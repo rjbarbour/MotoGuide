@@ -15,6 +15,8 @@
 		E13E87B82C3EE36400308669 /* MotoGuideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87B72C3EE36400308669 /* MotoGuideTests.swift */; };
 		E13E87C22C3EE36400308669 /* MotoGuideUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87C12C3EE36400308669 /* MotoGuideUITests.swift */; };
 		E13E87C42C3EE36400308669 /* MotoGuideUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87C32C3EE36400308669 /* MotoGuideUITestsLaunchTests.swift */; };
+		E13E87D12C3EEF7100308669 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87D02C3EEF7100308669 /* LocationManager.swift */; };
+		E13E87D32C3F167800308669 /* LocationManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87D22C3F167800308669 /* LocationManagerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +50,8 @@
 		E13E87BD2C3EE36400308669 /* MotoGuideUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MotoGuideUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E13E87C12C3EE36400308669 /* MotoGuideUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotoGuideUITests.swift; sourceTree = "<group>"; };
 		E13E87C32C3EE36400308669 /* MotoGuideUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotoGuideUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		E13E87D02C3EEF7100308669 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
+		E13E87D22C3F167800308669 /* LocationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManagerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,6 +109,7 @@
 				E13E87AD2C3EE36400308669 /* MotoGuide.entitlements */,
 				E13E87AE2C3EE36400308669 /* Info.plist */,
 				E13E87AA2C3EE36400308669 /* Preview Content */,
+				E13E87D02C3EEF7100308669 /* LocationManager.swift */,
 			);
 			path = MotoGuide;
 			sourceTree = "<group>";
@@ -121,6 +126,7 @@
 			isa = PBXGroup;
 			children = (
 				E13E87B72C3EE36400308669 /* MotoGuideTests.swift */,
+				E13E87D22C3F167800308669 /* LocationManagerTests.swift */,
 			);
 			path = MotoGuideTests;
 			sourceTree = "<group>";
@@ -264,6 +270,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E13E87D12C3EEF7100308669 /* LocationManager.swift in Sources */,
 				E13E87A52C3EE36100308669 /* ContentView.swift in Sources */,
 				E13E87A72C3EE36100308669 /* Item.swift in Sources */,
 				E13E87A32C3EE36100308669 /* MotoGuideApp.swift in Sources */,
@@ -274,6 +281,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E13E87D32C3F167800308669 /* LocationManagerTests.swift in Sources */,
 				E13E87B82C3EE36400308669 /* MotoGuideTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -427,13 +435,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = MotoGuide/MotoGuide.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"MotoGuide/Preview Content\"";
+				DEVELOPMENT_TEAM = 5XWF4T2ZCD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MotoGuide/Info.plist;
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "We need your location to provide better services even when the app is in the background.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to show your current position.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -457,13 +469,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = MotoGuide/MotoGuide.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"MotoGuide/Preview Content\"";
+				DEVELOPMENT_TEAM = 5XWF4T2ZCD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MotoGuide/Info.plist;
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "We need your location to provide better services even when the app is in the background.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to show your current position.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -489,6 +505,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5XWF4T2ZCD;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				MARKETING_VERSION = 1.0;
@@ -508,6 +525,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5XWF4T2ZCD;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				MARKETING_VERSION = 1.0;
