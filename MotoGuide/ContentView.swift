@@ -34,7 +34,7 @@ struct ContentView: View {
             Toggle("Repeat County", isOn: $locationManager.repeatCounty)
                 .padding()
 
-            Toggle("Repeat Country", isOn: $locationManager.repeatCountry)
+            Toggle("Repeat Country", isOn: $locationManager.repeatAdministrativeArea)
                 .padding()
 
             List(logs, id: \.timestamp) { log in
@@ -44,7 +44,7 @@ struct ContentView: View {
                     Text("Street: \(log.address.street)")
                     Text("Town: \(log.address.town)")
                     Text("County: \(log.address.county)")
-                    Text("Country: \(log.address.country)")
+                    Text("Country: \(log.address.administrativeArea)")
                 }
             }
 
@@ -86,10 +86,10 @@ struct ContentView: View {
             print("No available voices.")
             return
         }
-        let utterance = AVSpeechUtterance(string: address.toString(includeStreet: locationManager.repeatStreet, includeTown: locationManager.repeatTown, includeCounty: locationManager.repeatCounty, includeCountry: locationManager.repeatCountry))
+        let utterance = AVSpeechUtterance(string: address.toString(includeStreet: locationManager.repeatStreet, includeTown: locationManager.repeatTown, includeCounty: locationManager.repeatCounty, includeAdministrativeArea: locationManager.repeatAdministrativeArea))
         utterance.voice = AVSpeechSynthesisVoice(language: "en-GB")
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        print("Speaking address from button: \(address.toString(includeStreet: locationManager.repeatStreet, includeTown: locationManager.repeatTown, includeCounty: locationManager.repeatCounty, includeCountry: locationManager.repeatCountry))")
+        print("Speaking address from button: \(address.toString(includeStreet: locationManager.repeatStreet, includeTown: locationManager.repeatTown, includeCounty: locationManager.repeatCounty, includeAdministrativeArea: locationManager.repeatAdministrativeArea))")
         speechSynthesizer.speak(utterance)
         print("Utterance spoken from button: \(utterance.speechString)")
     }
@@ -109,3 +109,4 @@ struct ContentView_Previews: PreviewProvider {
         ContentView()
     }
 }
+

@@ -6,17 +6,17 @@ struct Address: Equatable {
     let street: String
     let town: String
     let county: String
-    let country: String
+    let administrativeArea: String
     
     func toJSON() -> String? {
-        let dict = ["street": street, "town": town, "county": county, "country": country]
+        let dict = ["street": street, "town": town, "county": county, "administrativeArea": administrativeArea]
         if let jsonData = try? JSONSerialization.data(withJSONObject: dict, options: .prettyPrinted) {
             return String(data: jsonData, encoding: .utf8)
         }
         return nil
     }
     
-    func toString(includeStreet: Bool = true, includeTown: Bool = true, includeCounty: Bool = true, includeCountry: Bool = true) -> String {
+    func toString(includeStreet: Bool = true, includeTown: Bool = true, includeCounty: Bool = true, includeAdministrativeArea: Bool = true) -> String {
         var addressComponents = [String]()
         if includeStreet {
             addressComponents.append(street)
@@ -27,8 +27,8 @@ struct Address: Equatable {
         if includeCounty {
             addressComponents.append(county)
         }
-        if includeCountry {
-            addressComponents.append(country)
+        if includeAdministrativeArea {
+            addressComponents.append(administrativeArea)
         }
         return addressComponents.joined(separator: ", ")
     }
@@ -63,7 +63,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var repeatStreet: Bool = true // Toggle for repeating the street
     @Published var repeatTown: Bool = true // Toggle for repeating the town
     @Published var repeatCounty: Bool = true // Toggle for repeating the county
-    @Published var repeatCountry: Bool = true // Toggle for repeating the country
+    @Published var repeatAdministrativeArea: Bool = true // Toggle for repeating the administrative area (country)
     @Published var testMode: Bool = false // Toggle for test mode
     
     var onAddressChange: ((Address) -> Void)?
@@ -101,7 +101,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         var includeStreet = repeatStreet
         var includeTown = repeatTown
         var includeCounty = repeatCounty
-        var includeCountry = repeatCountry
+        var includeAdministrativeArea = repeatAdministrativeArea
         
         if let previousAddress = previousAddress {
             if !repeatStreet && previousAddress.street != currentAddress.street {
@@ -113,18 +113,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             if !repeatCounty && previousAddress.county != currentAddress.county {
                 includeCounty = true
             }
-            if !repeatCountry && previousAddress.country != currentAddress.country {
-                includeCountry = true
+            if !repeatAdministrativeArea && previousAddress.administrativeArea != currentAddress.administrativeArea {
+                includeAdministrativeArea = true
             }
         }
         
-        previousAddress = currentAddress
-        
-        let addressString = currentAddress.toString(includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeCountry: includeCountry)
-        
-        if !addressString.isEmpty {
+        if previousAddress != currentAddress {
+            previousAddress = currentAddress
+            let addressString = currentAddress.toString(includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeAdministrativeArea: includeAdministrativeArea)
             onAddressChange?(currentAddress)
-            speak(address: currentAddress, includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeCountry: includeCountry)
+            speak(address: currentAddress, includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeAdministrativeArea: includeAdministrativeArea)
         } else {
             print("Address has not changed.")
         }
@@ -151,7 +149,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         print("Failed to get user location: \(error.localizedDescription)")
     }
 
-    private func reverseGeocode(location: CLLocation) {
+    private func reverseGeocode(location: CLLocation, completion: (() -> Void)? = nil) {
         geocoder.reverseGeocodeLocation(location) { [weak self] (placemarks, error) in
             if let error = error {
                 print("Failed to reverse geocode location: \(error.localizedDescription)")
@@ -166,18 +164,20 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             let county = placemark.subAdministrativeArea ?? "N/A"
             let town = placemark.locality ?? "N/A"
             let street = placemark.thoroughfare ?? "N/A"
-            let country = placemark.administrativeArea ?? "N/A"
+            let administrativeArea = placemark.administrativeArea ?? "N/A"
             
-            let address = Address(street: street, town: town, county: county, country: country)
+            let address = Address(street: street, town: town, county: county, administrativeArea: administrativeArea)
             self?.lastKnownAddress = address
             if let addressJSON = self?.lastKnownAddress?.toJSON() {
                 print("Resolved Address JSON: \(addressJSON)")
             }
             
+            completion?()
+            
             if self?.speakAfterEveryGeocode == true {
-                self?.speak(address: address, includeStreet: self?.repeatStreet ?? true, includeTown: self?.repeatTown ?? true, includeCounty: self?.repeatCounty ?? true, includeCountry: self?.repeatCountry ?? true)
+                self?.speak(address: address, includeStreet: self?.repeatStreet ?? true, includeTown: self?.repeatTown ?? true, includeCounty: self?.repeatCounty ?? true, includeAdministrativeArea: self?.repeatAdministrativeArea ?? true)
             } else {
-                self?.checkForAddressChange()  // Ensure to check for address change here
+                self?.checkForAddressChange()
             }
         }
     }
@@ -214,21 +214,21 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             if options.contains(.shouldResume) {
                 print("Speech interruption ended, resuming.")
                 if let address = lastKnownAddress {
-                    speak(address: address, includeStreet: repeatStreet, includeTown: repeatTown, includeCounty: repeatCounty, includeCountry: repeatCountry)
+                    speak(address: address, includeStreet: repeatStreet, includeTown: repeatTown, includeCounty: repeatCounty, includeAdministrativeArea: repeatAdministrativeArea)
                 }
             }
         }
     }
 
-    private func speak(address: Address, includeStreet: Bool = true, includeTown: Bool = true, includeCounty: Bool = true, includeCountry: Bool = true) {
+    private func speak(address: Address, includeStreet: Bool = true, includeTown: Bool = true, includeCounty: Bool = true, includeAdministrativeArea: Bool = true) {
         guard AVSpeechSynthesisVoice.speechVoices().count > 0 else {
             print("No available voices.")
             return
         }
-        let utterance = AVSpeechUtterance(string: address.toString(includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeCountry: includeCountry))
+        let utterance = AVSpeechUtterance(string: address.toString(includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeAdministrativeArea: includeAdministrativeArea))
         utterance.voice = AVSpeechSynthesisVoice(language: "en-GB")
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        print("Speaking address: \(address.toString(includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeCountry: includeCountry))")
+        print("Speaking address: \(address.toString(includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeAdministrativeArea: includeAdministrativeArea))")
         speechSynthesizer.speak(utterance)
         print("Utterance spoken: \(utterance.speechString)")
     }
@@ -239,19 +239,11 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         lastKnownLocation = CLLocationCoordinate2D(latitude: testCoordinate.latitude, longitude: testCoordinate.longitude)
         print("Test location logged: \(testCoordinate.latitude), \(testCoordinate.longitude)")
-        reverseGeocode(location: CLLocation(latitude: testCoordinate.latitude, longitude: testCoordinate.longitude)) { [weak self] in
-            if self?.speakAfterEveryGeocode == true {
-                self?.speak(address: self?.lastKnownAddress ?? Address(street: "", town: "", county: "", country: ""))
-            } else {
-                self?.checkForAddressChangeInTestMode()
-            }
-        }
-    }
-    
-    private func reverseGeocode(location: CLLocation, completion: @escaping () -> Void) {
-        geocoder.reverseGeocodeLocation(location) { [weak self] (placemarks, error) in
+        
+        // Reverse geocode the test location without calling checkForAddressChange from reverseGeocode
+        geocoder.reverseGeocodeLocation(CLLocation(latitude: testCoordinate.latitude, longitude: testCoordinate.longitude)) { [weak self] (placemarks, error) in
             if let error = error {
-                print("Failed to reverse geocode location: \(error.localizedDescription)")
+                print("Failed to reverse geocode test location: \(error.localizedDescription)")
                 return
             }
             
@@ -263,50 +255,15 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             let county = placemark.subAdministrativeArea ?? "N/A"
             let town = placemark.locality ?? "N/A"
             let street = placemark.thoroughfare ?? "N/A"
-            let country = placemark.administrativeArea ?? "N/A"
+            let administrativeArea = placemark.administrativeArea ?? "N/A"
             
-            let address = Address(street: street, town: town, county: county, country: country)
+            let address = Address(street: street, town: town, county: county, administrativeArea: administrativeArea)
             self?.lastKnownAddress = address
             if let addressJSON = self?.lastKnownAddress?.toJSON() {
-                print("Resolved Address JSON: \(addressJSON)")
+                print("Resolved Test Address JSON: \(addressJSON)")
             }
             
-            completion()
-        }
-    }
-    
-    private func checkForAddressChangeInTestMode() {
-        guard let currentAddress = lastKnownAddress else { return }
-        
-        var includeStreet = repeatStreet
-        var includeTown = repeatTown
-        var includeCounty = repeatCounty
-        var includeCountry = repeatCountry
-        
-        if let previousAddress = previousAddress {
-            if !repeatStreet && previousAddress.street != currentAddress.street {
-                includeStreet = true
-            }
-            if !repeatTown && previousAddress.town != currentAddress.town {
-                includeTown = true
-            }
-            if !repeatCounty && previousAddress.county != currentAddress.county {
-                includeCounty = true
-            }
-            if !repeatCountry && previousAddress.country != currentAddress.country {
-                includeCountry = true
-            }
-        }
-        
-        previousAddress = currentAddress
-        
-        let addressString = currentAddress.toString(includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeCountry: includeCountry)
-        
-        if !addressString.isEmpty {
-            onAddressChange?(currentAddress)
-            speak(address: currentAddress, includeStreet: includeStreet, includeTown: includeTown, includeCounty: includeCounty, includeCountry: includeCountry)
-        } else {
-            print("Address has not changed.")
+            self?.checkForAddressChange()
         }
     }
 }
