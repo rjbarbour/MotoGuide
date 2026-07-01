@@ -24,7 +24,7 @@ struct CachedPlaceFactGenerator: PlaceFactGenerating {
 }
 
 enum PlaceFactFetcher {
-    static let fetchTimeoutSeconds: TimeInterval = 3
+    static let fetchTimeoutSeconds = FactProxyContract.iosTimeoutSeconds
 
     static func fact(
         for request: PlaceFactRequest,

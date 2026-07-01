@@ -112,6 +112,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
         MockURLProtocol.requestHandler = { urlRequest in
             XCTAssertEqual(urlRequest.url, endpoint)
             XCTAssertEqual(urlRequest.httpMethod, "POST")
+            XCTAssertEqual(urlRequest.timeoutInterval, FactProxyContract.iosTimeoutSeconds)
             XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "Authorization"), "Bearer proxy-token")
             XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "Content-Type"), "application/json")
 
@@ -137,6 +138,57 @@ final class ProxyFactGeneratorTests: XCTestCase {
         )
 
         let fact = try await generator.fact(for: request)
+
+        XCTAssertEqual(fact, "Known for its wool trade.")
+    }
+
+    func testDefaultEndpointUsesProductionFlyProxyFromContract() async throws {
+        let expectedEndpoint = URL(string: "https://motoguide-fact-proxy.fly.dev/v1/fact")!
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            XCTAssertEqual(urlRequest.url, expectedEndpoint)
+
+            let response = HTTPURLResponse(
+                url: expectedEndpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+        }
+
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession()
+        )
+
+        let fact = try await generator.fact(for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil))
+
+        XCTAssertEqual(fact, "Known for its wool trade.")
+    }
+
+    func testCanUseLocalDevelopmentBaseURLFromContract() async throws {
+        let expectedEndpoint = URL(string: "http://127.0.0.1:3000/v1/fact")!
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            XCTAssertEqual(urlRequest.url, expectedEndpoint)
+
+            let response = HTTPURLResponse(
+                url: expectedEndpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+        }
+
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            baseURL: FactProxyContract.localDevelopmentBaseURL
+        )
+
+        let fact = try await generator.fact(for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil))
 
         XCTAssertEqual(fact, "Known for its wool trade.")
     }
@@ -196,6 +248,64 @@ final class ProxyFactGeneratorTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
+    }
+
+    private func makeMockSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+}
+
+final class ProxyHealthCheckerTests: XCTestCase {
+    private let endpoint = URL(string: "https://proxy.test/health")!
+
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        super.tearDown()
+    }
+
+    func testHealthCheckUsesPublicHealthEndpointWithoutBearerToken() async {
+        let endpoint = self.endpoint
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            XCTAssertEqual(urlRequest.url, endpoint)
+            XCTAssertEqual(urlRequest.httpMethod, "GET")
+            XCTAssertEqual(urlRequest.timeoutInterval, FactProxyContract.iosTimeoutSeconds)
+            XCTAssertNil(urlRequest.value(forHTTPHeaderField: "Authorization"))
+
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "text/plain"]
+            )!
+            return (response, Data("ok\n".utf8))
+        }
+
+        let checker = ProxyHealthChecker(session: makeMockSession(), endpoint: endpoint)
+        let healthy = await checker.isHealthy()
+
+        XCTAssertTrue(healthy)
+    }
+
+    func testHealthCheckReturnsFalseForNonOkBody() async {
+        let endpoint = self.endpoint
+
+        MockURLProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "text/plain"]
+            )!
+            return (response, Data("starting".utf8))
+        }
+
+        let checker = ProxyHealthChecker(session: makeMockSession(), endpoint: endpoint)
+        let healthy = await checker.isHealthy()
+
+        XCTAssertFalse(healthy)
     }
 
     private func makeMockSession() -> URLSession {

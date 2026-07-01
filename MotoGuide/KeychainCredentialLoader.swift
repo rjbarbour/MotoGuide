@@ -4,7 +4,7 @@ import Security
 enum KeychainCredentialLoader {
     // Contract: the iOS app stores only the proxy token under this service.
     // See /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
-    static func loadMotoGuideProxyToken(service: String = "MotoGuideProxy") -> String? {
+    static func loadMotoGuideProxyToken(service: String = FactProxyContract.keychainService) -> String? {
         loadGenericPassword(service: service)
     }
 
