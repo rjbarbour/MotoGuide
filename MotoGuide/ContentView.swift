@@ -1,22 +1,20 @@
 import SwiftUI
 import CoreLocation
-import AVFoundation
 
 struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
     @State private var logs: [(timestamp: Date, location: CLLocationCoordinate2D, address: Address)] = []
-    private let speechSynthesizer = AVSpeechSynthesizer()
 
-    let intervals = [1, 2, 5, 10, 15, 30, 60, 120, 300] // Options for location check intervals
+    let intervals = [1, 2, 5, 10, 15, 30, 60, 120, 300]
 
     var body: some View {
         VStack {
             Toggle("Test Mode", isOn: $locationManager.testMode)
                 .padding()
-            
+
             Toggle("Speak After Every Geocode", isOn: $locationManager.speakAfterEveryGeocode)
                 .padding()
-            
+
             Picker("Location Check Interval (seconds)", selection: $locationManager.locationCheckInterval) {
                 ForEach(intervals, id: \.self) { interval in
                     Text("\(interval) seconds").tag(interval)
@@ -27,10 +25,10 @@ struct ContentView: View {
 
             Toggle("Repeat Street", isOn: $locationManager.repeatStreet)
                 .padding()
-            
+
             Toggle("Repeat Town", isOn: $locationManager.repeatTown)
                 .padding()
-            
+
             Toggle("Repeat County", isOn: $locationManager.repeatCounty)
                 .padding()
 
@@ -54,7 +52,7 @@ struct ContentView: View {
                 } else {
                     locationManager.requestLocation()
                 }
-                
+
                 if let location = locationManager.lastKnownLocation, let address = locationManager.lastKnownAddress {
                     logs.append((timestamp: Date(), location: location, address: address))
                     print("Log added: \(Date()) - \(location.latitude), \(location.longitude) - \(address.toJSON() ?? "N/A")")
@@ -80,22 +78,8 @@ struct ContentView: View {
             }
         }
     }
-    
-    private func speak(address: Address) {
-        guard AVSpeechSynthesisVoice.speechVoices().count > 0 else {
-            print("No available voices.")
-            return
-        }
-        let utterance = AVSpeechUtterance(string: address.toString(includeStreet: locationManager.repeatStreet, includeTown: locationManager.repeatTown, includeCounty: locationManager.repeatCounty, includeAdministrativeArea: locationManager.repeatAdministrativeArea))
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-GB")
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        print("Speaking address from button: \(address.toString(includeStreet: locationManager.repeatStreet, includeTown: locationManager.repeatTown, includeCounty: locationManager.repeatCounty, includeAdministrativeArea: locationManager.repeatAdministrativeArea))")
-        speechSynthesizer.speak(utterance)
-        print("Utterance spoken from button: \(utterance.speechString)")
-    }
 }
 
-// Date formatter for displaying the timestamp
 private let dateFormatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.dateStyle = .short
@@ -103,10 +87,8 @@ private let dateFormatter: DateFormatter = {
     return formatter
 }()
 
-// Preview
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
     }
 }
-

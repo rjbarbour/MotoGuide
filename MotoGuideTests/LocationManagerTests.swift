@@ -2,30 +2,32 @@ import XCTest
 import CoreLocation
 @testable import MotoGuide
 
-class LocationManagerTests: XCTestCase {
-    var locationManager: LocationManager!
-    
-    override func setUp() {
-        super.setUp()
-        locationManager = LocationManager()
+final class LocationManagerTests: XCTestCase {
+    func testLocationUpdateIntervalThrottling() {
+        let locationManager = LocationManager()
+        locationManager.testMode = false
+        locationManager.locationCheckInterval = 60
+
+        let firstLocation = CLLocation(latitude: 51.6971, longitude: -2.5830)
+        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [firstLocation])
+
+        XCTAssertEqual(locationManager.lastKnownLocation?.latitude, firstLocation.coordinate.latitude)
+        XCTAssertEqual(locationManager.lastKnownLocation?.longitude, firstLocation.coordinate.longitude)
+
+        let secondLocation = CLLocation(latitude: 51.6751, longitude: -2.6210)
+        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [secondLocation])
+
+        XCTAssertEqual(locationManager.lastKnownLocation?.latitude, firstLocation.coordinate.latitude)
+        XCTAssertEqual(locationManager.lastKnownLocation?.longitude, firstLocation.coordinate.longitude)
     }
-    
-    override func tearDown() {
-        locationManager = nil
-        super.tearDown()
-    }
-    
-    func testLocationUpdates() {
-        // Simulate location updates
-        let initialLocation = CLLocation(latitude: 37.7749, longitude: -122.4194)
-        let newLocation = CLLocation(latitude: 37.8044, longitude: -122.2711)
-        
-        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [initialLocation])
-        XCTAssertEqual(locationManager.lastKnownLocation?.latitude, initialLocation.coordinate.latitude)
-        XCTAssertEqual(locationManager.lastKnownLocation?.longitude, initialLocation.coordinate.longitude)
-        
-//        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [newLocation])
-//        XCTAssertEqual(locationManager.lastKnownLocation?.latitude, newLocation.coordinate.latitude)
-//        XCTAssertEqual(locationManager.lastKnownLocation?.longitude, newLocation.coordinate.longitude)
+
+    func testTestModeIgnoresLiveLocationUpdates() {
+        let locationManager = LocationManager()
+        locationManager.testMode = true
+
+        let location = CLLocation(latitude: 37.7749, longitude: -122.4194)
+        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [location])
+
+        XCTAssertNil(locationManager.lastKnownLocation)
     }
 }

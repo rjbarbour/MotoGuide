@@ -17,6 +17,12 @@
 		E13E87C42C3EE36400308669 /* MotoGuideUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87C32C3EE36400308669 /* MotoGuideUITestsLaunchTests.swift */; };
 		E13E87D12C3EEF7100308669 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87D02C3EEF7100308669 /* LocationManager.swift */; };
 		E13E87D32C3F167800308669 /* LocationManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87D22C3F167800308669 /* LocationManagerTests.swift */; };
+		E13E87D42C3F200000308669 /* Address.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DA2C3F200000308669 /* Address.swift */; };
+		E13E87D52C3F200100308669 /* AnnouncementDecision.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DB2C3F200100308669 /* AnnouncementDecision.swift */; };
+		E13E87D62C3F200200308669 /* TestRouteFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DC2C3F200200308669 /* TestRouteFixture.swift */; };
+		E13E87D72C3F200300308669 /* AddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DD2C3F200300308669 /* AddressTests.swift */; };
+		E13E87D82C3F200400308669 /* AnnouncementDecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DE2C3F200400308669 /* AnnouncementDecisionTests.swift */; };
+		E13E87D92C3F200500308669 /* TestRouteFixtureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DF2C3F200500308669 /* TestRouteFixtureTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +58,12 @@
 		E13E87C32C3EE36400308669 /* MotoGuideUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotoGuideUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		E13E87D02C3EEF7100308669 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
 		E13E87D22C3F167800308669 /* LocationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManagerTests.swift; sourceTree = "<group>"; };
+		E13E87DA2C3F200000308669 /* Address.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Address.swift; sourceTree = "<group>"; };
+		E13E87DB2C3F200100308669 /* AnnouncementDecision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementDecision.swift; sourceTree = "<group>"; };
+		E13E87DC2C3F200200308669 /* TestRouteFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestRouteFixture.swift; sourceTree = "<group>"; };
+		E13E87DD2C3F200300308669 /* AddressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressTests.swift; sourceTree = "<group>"; };
+		E13E87DE2C3F200400308669 /* AnnouncementDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementDecisionTests.swift; sourceTree = "<group>"; };
+		E13E87DF2C3F200500308669 /* TestRouteFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestRouteFixtureTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,6 +122,9 @@
 				E13E87AE2C3EE36400308669 /* Info.plist */,
 				E13E87AA2C3EE36400308669 /* Preview Content */,
 				E13E87D02C3EEF7100308669 /* LocationManager.swift */,
+				E13E87DA2C3F200000308669 /* Address.swift */,
+				E13E87DB2C3F200100308669 /* AnnouncementDecision.swift */,
+				E13E87DC2C3F200200308669 /* TestRouteFixture.swift */,
 			);
 			path = MotoGuide;
 			sourceTree = "<group>";
@@ -127,6 +142,9 @@
 			children = (
 				E13E87B72C3EE36400308669 /* MotoGuideTests.swift */,
 				E13E87D22C3F167800308669 /* LocationManagerTests.swift */,
+				E13E87DD2C3F200300308669 /* AddressTests.swift */,
+				E13E87DE2C3F200400308669 /* AnnouncementDecisionTests.swift */,
+				E13E87DF2C3F200500308669 /* TestRouteFixtureTests.swift */,
 			);
 			path = MotoGuideTests;
 			sourceTree = "<group>";
@@ -271,6 +289,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				E13E87D12C3EEF7100308669 /* LocationManager.swift in Sources */,
+				E13E87D42C3F200000308669 /* Address.swift in Sources */,
+				E13E87D52C3F200100308669 /* AnnouncementDecision.swift in Sources */,
+				E13E87D62C3F200200308669 /* TestRouteFixture.swift in Sources */,
 				E13E87A52C3EE36100308669 /* ContentView.swift in Sources */,
 				E13E87A72C3EE36100308669 /* Item.swift in Sources */,
 				E13E87A32C3EE36100308669 /* MotoGuideApp.swift in Sources */,
@@ -282,6 +303,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				E13E87D32C3F167800308669 /* LocationManagerTests.swift in Sources */,
+				E13E87D72C3F200300308669 /* AddressTests.swift in Sources */,
+				E13E87D82C3F200400308669 /* AnnouncementDecisionTests.swift in Sources */,
+				E13E87D92C3F200500308669 /* TestRouteFixtureTests.swift in Sources */,
 				E13E87B82C3EE36400308669 /* MotoGuideTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
