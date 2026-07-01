@@ -12,7 +12,6 @@ private struct RideLogEntry: Identifiable {
 struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var firstRunState = FirstRunState()
-    @StateObject private var debugLog = DebugLogStore.shared
     @State private var logs: [RideLogEntry] = []
     @State private var showOnboarding = false
     @State private var showResetConfirmation = false
@@ -31,11 +30,6 @@ struct ContentView: View {
             LogHistoryView(locationManager: locationManager, logs: $logs)
                 .tabItem {
                     Label("Log", systemImage: "list.bullet")
-                }
-
-            DebugLogView(debugLog: debugLog)
-                .tabItem {
-                    Label("Debug", systemImage: "stethoscope")
                 }
         }
         .onAppear {
@@ -245,47 +239,6 @@ private struct LogHistoryView: View {
             print("Log added: \(Date()) - \(location.latitude), \(location.longitude) - \(address.toJSON() ?? "N/A")")
         } else {
             print("Location or address not available")
-        }
-    }
-}
-
-private struct DebugLogView: View {
-    @ObservedObject var debugLog: DebugLogStore
-
-    var body: some View {
-        NavigationStack {
-            List {
-                if debugLog.entries.isEmpty {
-                    Text("No debug events yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(debugLog.entries) { entry in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(entry.category)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(entry.timestamp, formatter: dateFormatter)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(entry.message)
-                                .font(.subheadline)
-                                .textSelection(.enabled)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .navigationTitle("Debug")
-            .toolbar {
-                Button("Clear") {
-                    debugLog.clear()
-                }
-                .disabled(debugLog.entries.isEmpty)
-            }
         }
     }
 }
