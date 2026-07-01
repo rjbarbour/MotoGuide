@@ -19,33 +19,30 @@ The existing GitHub prototype is an iOS SwiftUI app:
 - Repository: `https://github.com/rjbarbour/MotoGuide.git`
 - Local checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`
 - Main app: `/Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide/`
-- Core location and speech logic: `/Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide/LocationManager.swift`
-- Main SwiftUI screen: `/Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide/ContentView.swift`
-- Address model and formatter: `/Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide/Address.swift`
-- Announcement decision logic: `/Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide/AnnouncementDecision.swift`
-- Manual test route fixture: `/Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide/TestRouteFixture.swift`
+- Core modules: `LocationManager.swift`, `AnnouncementPolicy.swift`, `Address.swift`, `ProxyFactGenerator.swift`, `FirstRunState.swift`
+- UI: `ContentView.swift` (Settings and Log tabs), `OnboardingView.swift`
+- Test route: `TestRouteFixture.swift` (Gloucestershire waypoints)
 
 Current prototype capabilities:
 
-- Request iOS location updates.
-- Reverse-geocode coordinates into address components.
-- Format selected address components into spoken text.
-- Decide whether to speak based on address changes, repeat preferences, and speak-after-every-geocode mode.
-- Speak address changes using iOS text-to-speech.
-- Support background audio and location modes.
-- Provide a test mode with named Gloucestershire route coordinates.
-- Unit-test address formatting, announcement decisions, location interval throttling, test mode, and the route fixture.
+- Onboarding on first launch; developer reset under Settings → Advanced → Developer.
+- Location tracking starts after onboarding (not on raw app init).
+- Reverse-geocode coordinates into street, town, county, nation, and country.
+- Natural announcement phrasing, e.g. `Welcome to Wales. You are in Chepstow, Monmouthshire`.
+- Announcement modes: Natural, Names Only, Short Facts (proxy-backed LLM), Quiet.
+- Single-slot announcement queue with Bluetooth audio delay.
+- Boundary priority: country → nation → county → town → street.
+- Test mode with named Gloucestershire route coordinates.
+- Unit tests for address, announcements, facts (mocked), first-run state, and route fixture.
+- Short Facts OpenAPI contract: `FACT_PROXY_OPENAPI.yaml`.
 
-Current interface controls:
+Current interface (Settings tab):
 
-- `Test Mode`
-- `Speak After Every Geocode`
-- `Location Check Interval (seconds)`: `1`, `2`, `5`, `10`, `15`, `30`, `60`, `120`, `300`
-- `Repeat Street`
-- `Repeat Town`
-- `Repeat County`
-- `Repeat Country`
-- Manual `Log`
+- `Test Mode`, announcement style, Bluetooth delay, check interval
+- Announce toggles for street, town, county, nation, country
+- Advanced → Developer → Reset First-Time Experience
+
+Log tab: scrollable history and manual Log button.
 
 ## Product Definition
 
@@ -130,9 +127,85 @@ ICB catalogue context:
 - Prefer deterministic location logic before AI-generated content.
 - Keep routing separate from place awareness.
 - Add tests around location-change detection, announcement throttling, and speech text generation.
-- Use simulator tests for logic, but validate Bluetooth/audio/background behavior on a real iPhone before calling it done.
+- Validate Bluetooth/audio/background behavior on the physical iPhone before calling ride-facing work done.
 - The primary physical test device is an iPhone 17 Pro Max running iOS 26.5.1.
 - Do not commit secrets, Trello exports, personal ride logs, location history, or private notes.
+
+## Development Workflow
+
+All agents work in one checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`. There are no separate worktrees unless explicitly created.
+
+- Work on one coherent batch of changes at a time. Do not run parallel agents that edit the same repo.
+- Do not run multiple `xcodebuild` jobs in parallel against the same `DerivedData` path.
+- Prefer writing and compiling over repeated full test/deploy cycles.
+
+### Default loop
+
+Batch changes, then validate once:
+
+1. Implement a coherent chunk of work (feature slice, bugfix, or polish group).
+2. Run a compile check (`xcodebuild build` for the physical device destination).
+3. Deploy to the iPhone if connected (see Device Deploy).
+4. Run the simulator unit test suite only at meaningful checkpoints — not after every small edit.
+
+### When to run simulator tests
+
+Run `xcodebuild test` when:
+
+- Announcement, location, or speech logic changed and tests were added or updated.
+- A milestone slice is complete.
+- The user asks for tests, or before a commit the user requested.
+
+Skip simulator tests when:
+
+- Only docs, copy, or comments changed.
+- Small UI tweaks with no logic change.
+- Mid-batch work that will be validated at the end of the batch.
+
+iOS unit tests require a simulator or device test host. There is no separate fast non-simulator XCTest path for this app today.
+
+### Phone vs simulator
+
+| Step | Prefer |
+|------|--------|
+| Manual check (speech, Bluetooth, UI) | Physical iPhone |
+| Install after build | Physical iPhone |
+| Automated unit tests | Simulator at checkpoints |
+| Ride validation | Physical iPhone with helmet |
+
+The simulator is slow to boot and run. The phone is faster for day-to-day “does it work” checks.
+
+## Device Deploy
+
+After a **coherent batch** of app code changes, build and install on the physical iPhone if it is connected. Do not wait for the user to ask. Do not deploy after every tiny edit within the same batch.
+
+One build and one install per batch is enough.
+
+Primary device:
+
+```text
+Robert's iPhone — id 00008150-000C70883E87401C
+```
+
+Check the device is available:
+
+```bash
+xcodebuild -showdestinations -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide 2>&1 | rg "Robert's iPhone"
+```
+
+Build, install, and launch:
+
+```bash
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
+
+xcrun devicectl device install app --device 00008150-000C70883E87401C /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData/Build/Products/Debug-iphoneos/MotoGuide.app
+
+xcrun devicectl device process launch --device 00008150-000C70883E87401C ai.dml.MotoGuide
+```
+
+Expected result: the latest build is on the phone and the app opens.
+
+If the phone is not connected, say so briefly and continue. Do not block the task on device deploy failure.
 
 ## Commands
 
@@ -152,13 +225,13 @@ open /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj
 
 Expected result: Xcode opens the MotoGuide project.
 
-Run tests from the command line after the project is cloned:
+Run unit tests on the simulator at a milestone or pre-commit checkpoint (not after every small change):
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS Simulator,name=iPhone 15'
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -only-testing:MotoGuideTests
 ```
 
-Expected result: the MotoGuide unit and UI test targets build and run in the iOS Simulator.
+Expected result: the MotoGuide unit test target builds and runs in the iOS Simulator.
 
 Inspect the MotoGuide ICB:
 

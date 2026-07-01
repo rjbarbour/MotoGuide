@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		E13E87A32C3EE36100308669 /* MotoGuideApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87A22C3EE36100308669 /* MotoGuideApp.swift */; };
 		E13E87A52C3EE36100308669 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87A42C3EE36100308669 /* ContentView.swift */; };
-		E13E87A72C3EE36100308669 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87A62C3EE36100308669 /* Item.swift */; };
 		E13E87A92C3EE36400308669 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E13E87A82C3EE36400308669 /* Assets.xcassets */; };
 		E13E87AC2C3EE36400308669 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E13E87AB2C3EE36400308669 /* Preview Assets.xcassets */; };
 		E13E87B82C3EE36400308669 /* MotoGuideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87B72C3EE36400308669 /* MotoGuideTests.swift */; };
@@ -23,6 +22,19 @@
 		E13E87D72C3F200300308669 /* AddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DD2C3F200300308669 /* AddressTests.swift */; };
 		E13E87D82C3F200400308669 /* AnnouncementDecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DE2C3F200400308669 /* AnnouncementDecisionTests.swift */; };
 		E13E87D92C3F200500308669 /* TestRouteFixtureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87DF2C3F200500308669 /* TestRouteFixtureTests.swift */; };
+		E13E87E02C3F300000308669 /* BoundaryType.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87E12C3F300000308669 /* BoundaryType.swift */; };
+		E13E87E22C3F300100308669 /* AnnouncementPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87E32C3F300100308669 /* AnnouncementPolicy.swift */; };
+		E13E87E42C3F300200308669 /* AnnouncementPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87E52C3F300200308669 /* AnnouncementPolicyTests.swift */; };
+		E13E87E62C3F400000308669 /* PlaceFactRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87F02C3F400000308669 /* PlaceFactRequest.swift */; };
+		E13E87E72C3F400100308669 /* PlaceFactCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87F12C3F400100308669 /* PlaceFactCache.swift */; };
+		E13E87E82C3F400200308669 /* KeychainCredentialLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87F22C3F400200308669 /* KeychainCredentialLoader.swift */; };
+		E13E87E92C3F400300308669 /* FactPhraseBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87F32C3F400300308669 /* FactPhraseBuilder.swift */; };
+		E13E87EA2C3F400400308669 /* ProxyFactGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87F42C3F400400308669 /* ProxyFactGenerator.swift */; };
+		E13E87EB2C3F400500308669 /* CachedPlaceFactGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87F52C3F400500308669 /* CachedPlaceFactGenerator.swift */; };
+		E13E87EC2C3F400600308669 /* PlaceFactTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87F62C3F400600308669 /* PlaceFactTests.swift */; };
+		E13E88032C3F500000308669 /* FirstRunState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E88002C3F500000308669 /* FirstRunState.swift */; };
+		E13E88042C3F500100308669 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E88012C3F500100308669 /* OnboardingView.swift */; };
+		E13E88052C3F500200308669 /* FirstRunStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E88022C3F500200308669 /* FirstRunStateTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,7 +58,6 @@
 		E13E879F2C3EE36100308669 /* MotoGuide.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MotoGuide.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E13E87A22C3EE36100308669 /* MotoGuideApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotoGuideApp.swift; sourceTree = "<group>"; };
 		E13E87A42C3EE36100308669 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		E13E87A62C3EE36100308669 /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
 		E13E87A82C3EE36400308669 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E13E87AB2C3EE36400308669 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		E13E87AD2C3EE36400308669 /* MotoGuide.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MotoGuide.entitlements; sourceTree = "<group>"; };
@@ -64,6 +75,19 @@
 		E13E87DD2C3F200300308669 /* AddressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressTests.swift; sourceTree = "<group>"; };
 		E13E87DE2C3F200400308669 /* AnnouncementDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementDecisionTests.swift; sourceTree = "<group>"; };
 		E13E87DF2C3F200500308669 /* TestRouteFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestRouteFixtureTests.swift; sourceTree = "<group>"; };
+		E13E87E12C3F300000308669 /* BoundaryType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundaryType.swift; sourceTree = "<group>"; };
+		E13E87E32C3F300100308669 /* AnnouncementPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementPolicy.swift; sourceTree = "<group>"; };
+		E13E87E52C3F300200308669 /* AnnouncementPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementPolicyTests.swift; sourceTree = "<group>"; };
+		E13E87F02C3F400000308669 /* PlaceFactRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceFactRequest.swift; sourceTree = "<group>"; };
+		E13E87F12C3F400100308669 /* PlaceFactCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceFactCache.swift; sourceTree = "<group>"; };
+		E13E87F22C3F400200308669 /* KeychainCredentialLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainCredentialLoader.swift; sourceTree = "<group>"; };
+		E13E87F32C3F400300308669 /* FactPhraseBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FactPhraseBuilder.swift; sourceTree = "<group>"; };
+		E13E87F42C3F400400308669 /* ProxyFactGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyFactGenerator.swift; sourceTree = "<group>"; };
+		E13E87F52C3F400500308669 /* CachedPlaceFactGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedPlaceFactGenerator.swift; sourceTree = "<group>"; };
+		E13E87F62C3F400600308669 /* PlaceFactTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceFactTests.swift; sourceTree = "<group>"; };
+		E13E88002C3F500000308669 /* FirstRunState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunState.swift; sourceTree = "<group>"; };
+		E13E88012C3F500100308669 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		E13E88022C3F500200308669 /* FirstRunStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunStateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,7 +140,6 @@
 			children = (
 				E13E87A22C3EE36100308669 /* MotoGuideApp.swift */,
 				E13E87A42C3EE36100308669 /* ContentView.swift */,
-				E13E87A62C3EE36100308669 /* Item.swift */,
 				E13E87A82C3EE36400308669 /* Assets.xcassets */,
 				E13E87AD2C3EE36400308669 /* MotoGuide.entitlements */,
 				E13E87AE2C3EE36400308669 /* Info.plist */,
@@ -125,6 +148,16 @@
 				E13E87DA2C3F200000308669 /* Address.swift */,
 				E13E87DB2C3F200100308669 /* AnnouncementDecision.swift */,
 				E13E87DC2C3F200200308669 /* TestRouteFixture.swift */,
+				E13E87E12C3F300000308669 /* BoundaryType.swift */,
+				E13E87E32C3F300100308669 /* AnnouncementPolicy.swift */,
+				E13E87F02C3F400000308669 /* PlaceFactRequest.swift */,
+				E13E87F12C3F400100308669 /* PlaceFactCache.swift */,
+				E13E87F22C3F400200308669 /* KeychainCredentialLoader.swift */,
+				E13E87F32C3F400300308669 /* FactPhraseBuilder.swift */,
+				E13E87F42C3F400400308669 /* ProxyFactGenerator.swift */,
+				E13E87F52C3F400500308669 /* CachedPlaceFactGenerator.swift */,
+				E13E88002C3F500000308669 /* FirstRunState.swift */,
+				E13E88012C3F500100308669 /* OnboardingView.swift */,
 			);
 			path = MotoGuide;
 			sourceTree = "<group>";
@@ -145,6 +178,9 @@
 				E13E87DD2C3F200300308669 /* AddressTests.swift */,
 				E13E87DE2C3F200400308669 /* AnnouncementDecisionTests.swift */,
 				E13E87DF2C3F200500308669 /* TestRouteFixtureTests.swift */,
+				E13E87E52C3F300200308669 /* AnnouncementPolicyTests.swift */,
+				E13E87F62C3F400600308669 /* PlaceFactTests.swift */,
+				E13E88022C3F500200308669 /* FirstRunStateTests.swift */,
 			);
 			path = MotoGuideTests;
 			sourceTree = "<group>";
@@ -292,8 +328,17 @@
 				E13E87D42C3F200000308669 /* Address.swift in Sources */,
 				E13E87D52C3F200100308669 /* AnnouncementDecision.swift in Sources */,
 				E13E87D62C3F200200308669 /* TestRouteFixture.swift in Sources */,
+				E13E87E02C3F300000308669 /* BoundaryType.swift in Sources */,
+				E13E87E22C3F300100308669 /* AnnouncementPolicy.swift in Sources */,
+				E13E87E62C3F400000308669 /* PlaceFactRequest.swift in Sources */,
+				E13E87E72C3F400100308669 /* PlaceFactCache.swift in Sources */,
+				E13E87E82C3F400200308669 /* KeychainCredentialLoader.swift in Sources */,
+				E13E87E92C3F400300308669 /* FactPhraseBuilder.swift in Sources */,
+				E13E87EA2C3F400400308669 /* ProxyFactGenerator.swift in Sources */,
+				E13E87EB2C3F400500308669 /* CachedPlaceFactGenerator.swift in Sources */,
+				E13E88032C3F500000308669 /* FirstRunState.swift in Sources */,
+				E13E88042C3F500100308669 /* OnboardingView.swift in Sources */,
 				E13E87A52C3EE36100308669 /* ContentView.swift in Sources */,
-				E13E87A72C3EE36100308669 /* Item.swift in Sources */,
 				E13E87A32C3EE36100308669 /* MotoGuideApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -306,6 +351,9 @@
 				E13E87D72C3F200300308669 /* AddressTests.swift in Sources */,
 				E13E87D82C3F200400308669 /* AnnouncementDecisionTests.swift in Sources */,
 				E13E87D92C3F200500308669 /* TestRouteFixtureTests.swift in Sources */,
+				E13E87E42C3F300200308669 /* AnnouncementPolicyTests.swift in Sources */,
+				E13E87EC2C3F400600308669 /* PlaceFactTests.swift in Sources */,
+				E13E88052C3F500200308669 /* FirstRunStateTests.swift in Sources */,
 				E13E87B82C3EE36400308669 /* MotoGuideTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

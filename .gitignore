@@ -1,0 +1,5 @@
+DerivedData/
+DerivedData-test/
+*.xcuserstate
+xcuserdata/
+.DS_Store

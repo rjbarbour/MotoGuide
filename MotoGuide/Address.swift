@@ -6,17 +6,20 @@ struct Address: Equatable {
     let town: String
     let county: String
     let administrativeArea: String
+    let country: String
 
     init(
         street: String,
         town: String,
         county: String,
-        administrativeArea: String
+        administrativeArea: String,
+        country: String = "N/A"
     ) {
         self.street = street
         self.town = town
         self.county = county
         self.administrativeArea = administrativeArea
+        self.country = country
     }
 
     init(placemark: CLPlacemark) {
@@ -24,8 +27,13 @@ struct Address: Equatable {
             street: placemark.thoroughfare ?? "N/A",
             town: placemark.locality ?? "N/A",
             county: placemark.subAdministrativeArea ?? "N/A",
-            administrativeArea: placemark.administrativeArea ?? "N/A"
+            administrativeArea: placemark.administrativeArea ?? "N/A",
+            country: placemark.country ?? "N/A"
         )
+    }
+
+    static func isValidPlaceName(_ value: String) -> Bool {
+        !value.isEmpty && value != "N/A"
     }
 
     func toJSON() -> String? {
@@ -33,7 +41,8 @@ struct Address: Equatable {
             "street": street,
             "town": town,
             "county": county,
-            "administrativeArea": administrativeArea
+            "administrativeArea": administrativeArea,
+            "country": country
         ]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: dict, options: .prettyPrinted) else {
             return nil

@@ -1,0 +1,142 @@
+openapi: 3.0.3
+info:
+  title: MotoGuide Fact Proxy API
+  version: 0.1.0
+  description: |
+    MVP contract for the MotoGuide iOS app to request one short place fact
+    without storing or sending an OpenAI API key from the device.
+servers:
+  - url: https://motoguide-fact-proxy.fly.dev
+    description: Production Fly.io proxy
+  - url: http://127.0.0.1:3000
+    description: Local development proxy
+tags:
+  - name: Health
+    description: Proxy health checks.
+  - name: Facts
+    description: Short ride-safe place facts.
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Check proxy health
+      description: Public health check. Does not require bearer authentication.
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Proxy is running.
+          content:
+            text/plain:
+              schema:
+                type: string
+                enum:
+                  - ok
+  /v1/fact:
+    post:
+      tags:
+        - Facts
+      summary: Generate one short place fact
+      description: |
+        Validates a place request, calls the server-side LLM provider, sanitizes
+        the generated sentence, and returns one short fact. The iOS app must
+        fall back to the base place announcement for any non-200 response,
+        invalid response body, rejected fact, missing token, or request timeout.
+      operationId: createPlaceFact
+      security:
+        - MotoGuideProxyToken: []
+      x-ios-keychain-service: MotoGuideProxy
+      x-ios-timeout-seconds: 3
+      x-ios-fallback: Speak the base place announcement without a fact.
+      x-openai-api-key-location: Server-side only. Never store the OpenAI API key in the iOS app or repository.
+      x-speech-safety-rules:
+        - One sentence.
+        - Factual and neutral.
+        - Useful as ambient place context.
+        - Short enough to keep the total spoken announcement ride-safe.
+        - No questions.
+        - No invitations, route advice, speed advice, or riding instructions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FactRequest"
+            examples:
+              town:
+                summary: UK town request
+                value:
+                  boundary: town
+                  placeName: Stroud
+                  countryContext: United Kingdom
+      responses:
+        "200":
+          description: One sanitized short fact.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FactResponse"
+              examples:
+                fact:
+                  value:
+                    fact: Known for its wool trade.
+        "400":
+          description: Invalid JSON, missing boundary, invalid boundary, or missing placeName.
+        "401":
+          description: Missing or wrong proxy bearer token.
+        "500":
+          description: Proxy is misconfigured, including missing server-side proxy token.
+        "502":
+          description: OpenAI returned an error or unusable response.
+components:
+  securitySchemes:
+    MotoGuideProxyToken:
+      type: http
+      scheme: bearer
+      bearerFormat: MOTOGUIDE_PROXY_TOKEN
+      description: |
+        Shared proxy token. The iOS app reads this from the Keychain generic-password
+        item with service `MotoGuideProxy`.
+  schemas:
+    Boundary:
+      type: string
+      description: Boundary type that triggered the announcement.
+      enum:
+        - country
+        - nation
+        - county
+        - town
+        - street
+    FactRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - boundary
+        - placeName
+      properties:
+        boundary:
+          $ref: "#/components/schemas/Boundary"
+        placeName:
+          type: string
+          minLength: 1
+          description: Place to generate a fact about.
+          example: Stroud
+        countryContext:
+          type: string
+          nullable: true
+          minLength: 1
+          description: Optional country name used to disambiguate reused place names.
+          example: United Kingdom
+    FactResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - fact
+      properties:
+        fact:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: One short, factual, ride-safe sentence.
+          example: Known for its wool trade.

@@ -196,11 +196,14 @@ Existing baseline:
 
 - The app can already speak selected place/address components.
 - The proposed first-region route is known.
+- Short Facts currently use the OpenAI-backed MotoGuide fact proxy as the primary implementation path.
+- The proxy API contract is documented in `FACT_PROXY_OPENAPI.yaml`, with `FACT_PROXY_CONTRACT.md` as the human-readable companion.
 
 Enhancement work:
 
 - Define a short fact format.
-- Add a tiny curated fact set for the first region.
+- Use the OpenAI-backed fact proxy first. Keep the iOS client and proxy server aligned with `FACT_PROXY_OPENAPI.yaml`.
+- Keep `LOCAL_LLM_FACTS_FALLBACK_PLAN.md` as an alternative if OpenAI cost, latency, connectivity, privacy, or quality becomes a blocker.
 - Add a content-depth parameter, starting with names only and one sentence.
 - Add rules for when facts are spoken.
 - Keep fact announcements shorter than navigation instructions.
@@ -214,7 +217,40 @@ Done when:
 - Quiet mode remains silent.
 - The fact instruction is constrained enough that announcements remain short.
 
-## Milestone 6: Custom Announcement Instructions
+## Milestone 6: Situational Awareness Map
+
+Target outcome: riders can glance at a Map tab and understand where they are in the geographic hierarchy and relative to nearby towns, without turn-by-turn navigation.
+
+Design reference: `MAP_SITUATIONAL_AWARENESS.md`
+
+Existing baseline:
+
+- `LocationManager` provides throttled coordinates and reverse-geocoded `Address`.
+- `BoundaryType` and `AnnouncementPolicy` define the street → town → county → nation → country hierarchy.
+- `ContentView` has Settings and Log tabs only; no MapKit usage yet.
+
+Enhancement work:
+
+- Add a **Map** tab (proposed default) with a single MapKit map and a context stack above it.
+- Show summary line, hierarchy panel, previous street (when changed), and nearest towns with distances.
+- Auto-follow user location with context-aware default zoom; speed-gated zoom presets when stopped.
+- Reuse shared `LocationManager` state; support test mode on the Gloucestershire fixture.
+- Do **not** add administrative boundary polygons in M6 — defer to Milestone 3.
+- Use `MKLocalSearch` (or equivalent) for nearest-town context; geocoder for hierarchy text.
+- Extract testable pure functions for summary, hierarchy rows, and distance/bearing formatting.
+- Show Quiet mode indicator on Map when announcements are muted.
+- Disable map pan/zoom interaction while moving.
+
+Done when:
+
+- Map tab displays current hierarchy from live or test-mode location.
+- Nearby towns list updates sensibly without excessive network calls.
+- Map interaction is limited while moving; zoom presets work when stopped.
+- Unit tests cover hierarchy presentation and nearby-town formatting logic.
+- A rider can orient themselves at a brief stop without using a navigation app.
+- Design doc open questions are resolved or logged as follow-ups.
+
+## Milestone 7: Custom Announcement Instructions
 
 Target outcome: MotoGuide can adapt announcement style without making the ride experience unsafe or noisy.
 
@@ -231,7 +267,7 @@ Done when:
 - The app still limits output to the selected content depth.
 - Boundary-specific preferences do not bypass safety limits.
 
-## Milestone 7: MVP1 Field Trial
+## Milestone 8: MVP1 Field Trial
 
 Target outcome: decide whether the separate audio companion is useful enough to continue.
 
@@ -249,7 +285,7 @@ Done when:
 - MVP1 defaults have been adjusted from real use.
 - The next build direction is explicit.
 
-## Milestone 8: MVP2 Listening And POI Handoff
+## Milestone 9: MVP2 Listening And POI Handoff
 
 Target outcome: MotoGuide can listen for simple rider replies and hand off a selected point of interest to navigation.
 
@@ -267,7 +303,7 @@ Done when:
 - The app can pass the selected POI to the chosen navigation flow.
 - Listening does not interfere with core boundary announcements.
 
-## Milestone 9: Rider Questions
+## Milestone 10: Rider Questions
 
 Target outcome: MotoGuide can answer simple place questions during a ride.
 
@@ -284,7 +320,7 @@ Done when:
 - Answers stay within ride-safe length limits.
 - The feature can be disabled completely.
 
-## Milestone 10: Post-MVP Direction
+## Milestone 11: Post-MVP Direction
 
 Target outcome: choose the next product shape after validation.
 
