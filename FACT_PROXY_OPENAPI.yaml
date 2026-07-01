@@ -15,6 +15,85 @@ tags:
     description: Proxy health checks.
   - name: Facts
     description: Short ride-safe place facts.
+  - name: Admin
+    description: Operational controls. Not used by the iOS app.
+x-deployment:
+  provider: Fly.io
+  app: motoguide-fact-proxy
+  organization: dml
+  primaryRegion: lhr
+  image: motoguide-fact-proxy:deployment-01KWFY4N628G4137Y7BMQPN6P9
+  machines:
+    - id: 080d306c727d98
+      process: app
+      region: lhr
+      state: started
+      version: 6
+    - id: 8ee01dc77de778
+      process: app
+      region: lhr
+      state: started
+      version: 6
+  publicIngress:
+    sharedIpv4: 66.241.125.198
+    dedicatedIpv6: "2a09:8280:1::13b:6469:0"
+  deployedSecrets:
+    - OPENAI_API_KEY
+    - MOTOGUIDE_PROXY_TOKEN
+  optionalSecrets:
+    - MOTOGUIDE_ADMIN_TOKEN
+  runtimeConfiguration:
+    MOTOGUIDE_DIAGNOSTICS_ENABLED:
+      default: false
+      description: Enables verbose proxy diagnostics at startup.
+    OPENAI_MODEL:
+      default: gpt-4o-mini
+      description: OpenAI model selected by the Fly runtime environment.
+    RATE_LIMIT_PER_MINUTE:
+      default: 30
+      description: Per-IP request limit for authenticated proxy calls.
+x-current-security-model:
+  transport: HTTPS through Fly.io public ingress.
+  appAuthentication: Shared bearer token in the Authorization header.
+  deviceSecretStorage: iOS Keychain generic-password service MotoGuideProxy.
+  serverSecretStorage: Fly.io secrets.
+  openAiKeyExposure: Server-side only. Never store the OpenAI API key in the iOS app or repository.
+  currentLimitations:
+    - A leaked MOTOGUIDE_PROXY_TOKEN can call the proxy until rotated or rate-limited.
+    - The MVP proxy does not yet bind requests to a specific app install, Apple App Attest key, user, or approved device.
+  plannedHardening:
+    - Per-device registration.
+    - Apple App Attest assertion verification.
+    - Server-side device approval, revocation, and quota state.
+    - Per-user auth before wider non-TestFlight distribution.
+x-observability:
+  responseHeaders:
+    X-Request-Id: Correlates app requests with Fly proxy logs.
+  logPrivacy:
+    logsTokens: false
+    logsOpenAiKey: false
+    logsExactPlaceName: false
+    logsRiderCoordinates: false
+  events:
+    - fact_proxy_request
+    - fact_request_valid
+    - fact_request_success
+    - fact_request_rejected
+    - proxy_auth_failed
+    - proxy_auth_misconfigured
+    - rate_limit_exceeded
+    - openai_response
+    - openai_upstream_error
+    - openai_request_failed
+    - diagnostics_updated
+  diagnostics:
+    baselineRequestLogsAlwaysEnabled: true
+    verboseDiagnosticsDefault: false
+    startupEnvironmentVariable: MOTOGUIDE_DIAGNOSTICS_ENABLED
+    adminEndpoint: /admin/diagnostics
+    adminEndpointRequiresSecret: MOTOGUIDE_ADMIN_TOKEN
+    adminEndpointHiddenWhenSecretUnset: true
+    runtimeChangesAreProcessLocal: true
 paths:
   /health:
     get:
@@ -89,6 +168,57 @@ paths:
           description: Proxy is misconfigured, including missing server-side proxy token.
         "502":
           description: OpenAI returned an error or unusable response.
+  /admin/diagnostics:
+    get:
+      tags:
+        - Admin
+      summary: Read verbose diagnostics state
+      description: |
+        Operational endpoint. Not used by the iOS app. Requires
+        `MOTOGUIDE_ADMIN_TOKEN`. If that token is not configured, this endpoint
+        returns 404.
+      operationId: getDiagnostics
+      security:
+        - MotoGuideAdminToken: []
+      responses:
+        "200":
+          description: Current diagnostics state for this proxy process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticsResponse"
+        "401":
+          description: Missing or wrong admin bearer token.
+        "404":
+          description: Admin diagnostics endpoint is disabled because MOTOGUIDE_ADMIN_TOKEN is not configured.
+    put:
+      tags:
+        - Admin
+      summary: Update verbose diagnostics state
+      description: |
+        Operational endpoint. Not used by the iOS app. Runtime changes are
+        process-local; on multi-machine deployments, prefer
+        `MOTOGUIDE_DIAGNOSTICS_ENABLED` for a consistent fleet-wide setting.
+      operationId: updateDiagnostics
+      security:
+        - MotoGuideAdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiagnosticsRequest"
+      responses:
+        "200":
+          description: Updated diagnostics state for this proxy process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticsResponse"
+        "401":
+          description: Missing or wrong admin bearer token.
+        "404":
+          description: Admin diagnostics endpoint is disabled because MOTOGUIDE_ADMIN_TOKEN is not configured.
 components:
   securitySchemes:
     MotoGuideProxyToken:
@@ -98,6 +228,13 @@ components:
       description: |
         Shared proxy token. The iOS app reads this from the Keychain generic-password
         item with service `MotoGuideProxy`.
+    MotoGuideAdminToken:
+      type: http
+      scheme: bearer
+      bearerFormat: MOTOGUIDE_ADMIN_TOKEN
+      description: |
+        Separate operational token for `/admin/diagnostics`. This token must not
+        be shipped in the iOS app.
   schemas:
     Boundary:
       type: string
@@ -120,12 +257,16 @@ components:
         placeName:
           type: string
           minLength: 1
+          maxLength: 96
+          pattern: "^[A-Za-z0-9 .,'’&()\\-]+$"
           description: Place to generate a fact about.
           example: Stroud
         countryContext:
           type: string
           nullable: true
           minLength: 1
+          maxLength: 64
+          pattern: "^[A-Za-z .,'’()\\-]+$"
           description: Optional country name used to disambiguate reused place names.
           example: United Kingdom
     FactResponse:
@@ -140,3 +281,21 @@ components:
           maxLength: 120
           description: One short, factual, ride-safe sentence.
           example: Known for its wool trade.
+    DiagnosticsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Whether verbose diagnostics should be enabled for this proxy process.
+    DiagnosticsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Whether verbose diagnostics are enabled for this proxy process.

@@ -1,0 +1,17 @@
+server:
+  port: ${PORT:3000}
+
+motoguide:
+  proxy-token: ${MOTOGUIDE_PROXY_TOKEN:}
+  admin-token: ${MOTOGUIDE_ADMIN_TOKEN:}
+  rate-limit-per-minute: ${RATE_LIMIT_PER_MINUTE:30}
+  diagnostics-enabled: ${MOTOGUIDE_DIAGNOSTICS_ENABLED:false}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: ${OPENAI_MODEL:gpt-4o-mini}
+  endpoint: https://api.openai.com/v1/chat/completions
+
+spring:
+  application:
+    name: motoguide-fact-proxy

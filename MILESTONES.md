@@ -277,6 +277,7 @@ Work:
 - Compare against normal navigation alone.
 - Capture rider notes immediately after each ride.
 - Evaluate distraction, timing, usefulness, novelty, and headset reliability.
+- Move the fact proxy from the default `motoguide-fact-proxy.fly.dev` hostname to an owned MotoGuide/DML domain name before inviting broader external testers.
 - Decide whether to continue, pivot, or stop.
 
 Done when:

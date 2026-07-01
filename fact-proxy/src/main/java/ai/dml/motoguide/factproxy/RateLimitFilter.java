@@ -1,0 +1,68 @@
+package ai.dml.motoguide.factproxy;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Component
+public class RateLimitFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
+
+    private final MotoGuideProperties properties;
+    private final Map<String, Deque<Instant>> requestsByIp = new ConcurrentHashMap<>();
+
+    public RateLimitFilter(MotoGuideProperties properties) {
+        this.properties = properties;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "/health".equals(request.getRequestURI());
+    }
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
+        String clientIp = clientIp(request);
+        int limit = Math.max(properties.rateLimitPerMinute(), 1);
+        Instant cutoff = Instant.now().minusSeconds(60);
+
+        Deque<Instant> timestamps = requestsByIp.computeIfAbsent(clientIp, ignored -> new ArrayDeque<>());
+        synchronized (timestamps) {
+            while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(cutoff)) {
+                timestamps.removeFirst();
+            }
+            if (timestamps.size() >= limit) {
+                log.warn("event=rate_limit_exceeded status=429 limitPerMinute={}", limit);
+                response.sendError(429, "Rate limit exceeded");
+                return;
+            }
+            timestamps.addLast(Instant.now());
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("Fly-Client-IP");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.trim();
+        }
+        return request.getRemoteAddr();
+    }
+}

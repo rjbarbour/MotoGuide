@@ -3,3 +3,6 @@ DerivedData-test/
 *.xcuserstate
 xcuserdata/
 .DS_Store
+fact-proxy/build/
+fact-proxy/.gradle/
+fact-proxy/.gradle-user/

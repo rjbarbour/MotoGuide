@@ -1,0 +1,10 @@
+.gradle/
+.gradle-user/
+.tools/
+build/
+out/
+.idea/
+*.iml
+.env
+.DS_Store
+fly.toml.bak

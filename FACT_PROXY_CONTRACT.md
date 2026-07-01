@@ -19,10 +19,10 @@ The iOS app sends a place request to the MotoGuide fact proxy. The proxy validat
 - iOS client: `MotoGuide/ProxyFactGenerator.swift`
 - iOS token loader: `MotoGuide/KeychainCredentialLoader.swift`
 - iOS tests: `MotoGuideTests/PlaceFactTests.swift`, `ProxyFactGeneratorTests`
-- Proxy endpoint: `/Users/rob_dev/DocsLocal/motoguide/fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactController.java`
-- Proxy request model: `/Users/rob_dev/DocsLocal/motoguide/fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactRequest.java`
-- Proxy response model: `/Users/rob_dev/DocsLocal/motoguide/fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactResponse.java`
-- Proxy docs: `/Users/rob_dev/DocsLocal/motoguide/fact-proxy/README.md`
+- Proxy endpoint: `fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactController.java`
+- Proxy request model: `fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactRequest.java`
+- Proxy response model: `fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactResponse.java`
+- Proxy docs: `fact-proxy/README.md`
 - OpenAPI spec: `FACT_PROXY_OPENAPI.yaml`
 
 ## Validate The OpenAPI Spec
@@ -53,6 +53,67 @@ Local endpoint:
 http://127.0.0.1:3000/v1/fact
 ```
 
+## Current Fly Deployment
+
+Date verified: 2026-07-01.
+
+| Field | Value |
+|-------|-------|
+| Fly app | `motoguide-fact-proxy` |
+| Fly org | `dml` |
+| Hostname | `motoguide-fact-proxy.fly.dev` |
+| Primary region | `lhr` |
+| Image | `motoguide-fact-proxy:deployment-01KWFY4N628G4137Y7BMQPN6P9` |
+| Shared IPv4 | `66.241.125.198` |
+| Dedicated IPv6 | `2a09:8280:1::13b:6469:0` |
+
+Current machines:
+
+| Machine ID | Process | Region | Version | State |
+|------------|---------|--------|---------|-------|
+| `080d306c727d98` | `app` | `lhr` | `6` | `started` |
+| `8ee01dc77de778` | `app` | `lhr` | `6` | `started` |
+
+Required Fly secrets:
+
+| Secret | Status |
+|--------|--------|
+| `OPENAI_API_KEY` | Deployed |
+| `MOTOGUIDE_PROXY_TOKEN` | Deployed |
+| `MOTOGUIDE_ADMIN_TOKEN` | Optional; enables admin diagnostics endpoint when deployed |
+
+Runtime configuration:
+
+| Environment variable | Default | Meaning |
+|----------------------|---------|---------|
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model selected by the Fly runtime environment. |
+| `MOTOGUIDE_DIAGNOSTICS_ENABLED` | `false` | Enables verbose proxy diagnostics at startup. |
+| `RATE_LIMIT_PER_MINUTE` | `30` | Per-IP request limit for authenticated proxy calls. |
+
+Health check:
+
+```bash
+curl -fsS https://motoguide-fact-proxy.fly.dev/health
+```
+
+Expected result:
+
+```text
+ok
+```
+
+If local DNS is still propagating, this equivalent command verifies the Fly public route through the assigned shared IPv4:
+
+```bash
+curl -fsS --resolve motoguide-fact-proxy.fly.dev:443:66.241.125.198 https://motoguide-fact-proxy.fly.dev/health
+```
+
+Expected result:
+
+```text
+ok
+```
+
 ## Authentication
 
 Every `POST /v1/fact` request must include:
@@ -69,6 +130,70 @@ MotoGuideProxy
 ```
 
 The OpenAI API key must stay server-side. It must be configured only on the proxy host, for example as the Fly.io secret `OPENAI_API_KEY`.
+
+Current MVP security model:
+
+- Transport is HTTPS through Fly.io public ingress.
+- App authentication is a shared bearer token: `MOTOGUIDE_PROXY_TOKEN`.
+- The app stores only the proxy token, not the OpenAI key.
+- The OpenAI key is stored only as the Fly secret `OPENAI_API_KEY`.
+- The proxy only exposes a narrow place-fact endpoint; clients cannot send arbitrary OpenAI prompts, model names, endpoints, or message arrays.
+- The proxy validates `boundary` and `placeName`.
+- The proxy rate-limits by client IP.
+
+Current limitation:
+
+- If `MOTOGUIDE_PROXY_TOKEN` is extracted from the app or device, the holder can call `/v1/fact` until the token is rotated, rate limits apply, or server-side controls block it.
+
+Planned hardening:
+
+- Per-device registration.
+- Apple App Attest assertion verification.
+- Server-side approved-device state with revoke/block support.
+- Per-device and per-user quotas.
+- Per-user authentication before wider non-TestFlight distribution.
+
+## Observability
+
+The proxy returns an `X-Request-Id` header on `/v1/fact` responses.
+
+The app may send its own safe `X-Request-Id` header using only letters, digits, `.`, `_`, `:`, or `-`, between 8 and 80 characters. If it does not, the proxy generates a UUID.
+
+Proxy logs include these event names:
+
+| Event | Meaning | Sensitive fields logged |
+|-------|---------|-------------------------|
+| `fact_proxy_request` | Final request status and duration for `/v1/fact`. | No token, no place name, no IP. |
+| `fact_request_valid` | Request passed deterministic validation. Emitted only when diagnostics are enabled. | Boundary, place-name length, country-context presence. |
+| `fact_request_success` | Fact generated and returned. Emitted only when diagnostics are enabled. | Boundary, fact length. |
+| `fact_request_rejected` | Request failed validation with `400`. | Rejection reason only. |
+| `proxy_auth_failed` | Missing or wrong bearer token with `401`. | Failure category only. |
+| `proxy_auth_misconfigured` | Missing server-side proxy token with `500`. | No secret value. |
+| `rate_limit_exceeded` | Client exceeded per-IP limit with `429`. | Limit value only. |
+| `openai_response` | OpenAI returned an HTTP response. Emitted only when diagnostics are enabled. | Status, duration, boundary. |
+| `openai_upstream_error` | OpenAI returned an unusable response. | Boundary and bounded reason. |
+| `openai_request_failed` | OpenAI request failed before usable response. | Boundary and exception class. |
+| `diagnostics_updated` | Admin diagnostics setting changed for the current proxy process. | Enabled flag only. |
+
+Diagnostics control:
+
+- Baseline request logs remain on so app-reported `X-Request-Id` values can be matched to Fly logs.
+- Verbose diagnostics are off by default.
+- Set `MOTOGUIDE_DIAGNOSTICS_ENABLED=true` to enable verbose diagnostics at process startup.
+- `GET /admin/diagnostics` returns the current setting when `MOTOGUIDE_ADMIN_TOKEN` is configured.
+- `PUT /admin/diagnostics` with `{"enabled": true}` or `{"enabled": false}` changes the setting for the current running proxy process.
+- The admin endpoint requires `Authorization: Bearer <MOTOGUIDE_ADMIN_TOKEN>`.
+- If `MOTOGUIDE_ADMIN_TOKEN` is not configured, `/admin/diagnostics` returns `404`.
+- Runtime changes are process-local. On a multi-machine Fly deployment, prefer the environment variable for a consistent fleet-wide setting.
+
+Live debugging command:
+
+```bash
+cd /Users/rob_dev/DocsLocal/motoguide/repo/fact-proxy
+fly logs
+```
+
+Expected result: live Fly logs showing the event names above. No bearer tokens, OpenAI keys, exact place names, or rider coordinates should appear in logs.
 
 ## Request
 
@@ -97,6 +222,19 @@ Fields:
 | `countryContext` | No | String or `null` | Non-empty country name when known | Disambiguates places with reused names. |
 
 The iOS app must map `BoundaryType.factLabel` directly to `boundary`.
+
+Input hardening:
+
+- `placeName` is trimmed and whitespace-normalized before prompting.
+- `placeName` maximum length is 96 characters.
+- `countryContext` maximum length is 64 characters.
+- Inputs must contain at least one Latin letter.
+- Inputs must use only Latin letters, digits where useful, spaces, and common UK place-name punctuation: `.`, `,`, `'`, `’`, `&`, `(`, `)`, `-`.
+- `countryContext` is stricter and does not allow digits or `&`.
+- Inputs with more than 10 whitespace-separated words are rejected.
+- Inputs with repeated suspicious punctuation are rejected.
+- Obvious prompt-injection terms such as `ignore`, `system`, `developer`, `prompt`, `instruction`, `json`, `return`, `output`, `script`, and `tool` are rejected.
+- Rejected inputs return `400` and must not call OpenAI.
 
 ## Response
 
