@@ -9,6 +9,12 @@ import SwiftUI
 
 @main
 struct MotoGuideApp: App {
+    init() {
+        #if DEBUG
+        DebugProxyTokenImporter.importFromEnvironment()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

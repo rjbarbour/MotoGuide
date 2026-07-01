@@ -8,6 +8,10 @@ enum KeychainCredentialLoader {
         loadGenericPassword(service: service)
     }
 
+    static func storeMotoGuideProxyToken(_ token: String, service: String = FactProxyContract.keychainService) -> Bool {
+        storeGenericPassword(token, service: service)
+    }
+
     static func loadGenericPassword(service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -27,4 +31,47 @@ enum KeychainCredentialLoader {
         }
         return password
     }
+
+    static func storeGenericPassword(_ password: String, service: String) -> Bool {
+        guard let data = password
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .data(using: .utf8),
+              !data.isEmpty else {
+            return false
+        }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service
+        ]
+        let attributes: [String: Any] = [
+            kSecValueData as String: data
+        ]
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return true
+        }
+        guard updateStatus == errSecItemNotFound else {
+            return false
+        }
+
+        var addQuery = query
+        addQuery[kSecValueData as String] = data
+        return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
+    }
 }
+
+#if DEBUG
+enum DebugProxyTokenImporter {
+    private static let environmentKey = "MOTOGUIDE_PROXY_TOKEN"
+
+    static func importFromEnvironment() {
+        guard let token = ProcessInfo.processInfo.environment[environmentKey],
+              KeychainCredentialLoader.storeMotoGuideProxyToken(token) else {
+            return
+        }
+        print("Stored MotoGuide proxy token in iOS Keychain service \(FactProxyContract.keychainService).")
+    }
+}
+#endif
