@@ -6,7 +6,11 @@ struct PlaceFactRequest: Equatable {
     let countryContext: String?
 
     var cacheKey: String {
-        "\(boundary.rawValue):\(PlaceNameNormalizer.normalize(placeName))"
+        [
+            String(boundary.rawValue),
+            PlaceNameNormalizer.normalize(placeName),
+            PlaceNameNormalizer.normalize(countryContext ?? "")
+        ].joined(separator: ":")
     }
 }
 

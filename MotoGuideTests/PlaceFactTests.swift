@@ -66,12 +66,19 @@ final class PlaceFactCacheTests: XCTestCase {
         let second = PlaceFactRequest(boundary: .county, placeName: " gloucestershire ", countryContext: nil)
         XCTAssertEqual(first.cacheKey, second.cacheKey)
     }
+
+    func testCacheKeyIncludesCountryContext() {
+        let uk = PlaceFactRequest(boundary: .town, placeName: "Newport", countryContext: "United Kingdom")
+        let us = PlaceFactRequest(boundary: .town, placeName: "Newport", countryContext: "United States")
+
+        XCTAssertNotEqual(uk.cacheKey, us.cacheKey)
+    }
 }
 
 final class CachedPlaceFactGeneratorTests: XCTestCase {
     func testUsesCacheOnSecondLookup() async throws {
         let mock = MockPlaceFactGenerator()
-        mock.factsByCacheKey["3:stroud"] = "A steep Cotswold town."
+        mock.factsByCacheKey["3:stroud:united kingdom"] = "A steep Cotswold town."
         let cache = PlaceFactCache(loadPersisted: false)
         let generator = CachedPlaceFactGenerator(generator: mock, cache: cache)
         let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: "United Kingdom")

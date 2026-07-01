@@ -230,6 +230,10 @@ struct AnnouncementQueue {
         }
     }
 
+    mutating func clearPending() {
+        pending = nil
+    }
+
     static func shouldDropWhileSpeaking(
         newBoundary: BoundaryType,
         currentlySpeaking: BoundaryType?

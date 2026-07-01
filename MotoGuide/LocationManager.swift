@@ -2,10 +2,12 @@ import Foundation
 import CoreLocation
 import AVFoundation
 
-class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVSpeechSynthesizerDelegate {
+@MainActor
+class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
     private let speechSynthesizer = AVSpeechSynthesizer()
+    private let speechDelegate = SpeechSynthesizerDelegateBridge()
     private var previousAddress: Address?
     private var lastUpdateTime: Date?
     private var testIndex = 0
@@ -15,6 +17,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
     private let factGenerator: PlaceFactGenerating
     private var inFlightFactTask: Task<Void, Never>?
     private var activeAnnouncementToken = UUID()
+    private var wantsRideTracking = false
 
     @Published var lastKnownLocation: CLLocationCoordinate2D?
     @Published var lastKnownAddress: Address?
@@ -36,7 +39,17 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
     init(factGenerator: PlaceFactGenerating? = nil) {
         self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
         super.init()
-        speechSynthesizer.delegate = self
+        speechDelegate.onFinish = { [weak self] in
+            Task { @MainActor in
+                self?.currentlySpeakingBoundary = nil
+            }
+        }
+        speechDelegate.onCancel = { [weak self] in
+            Task { @MainActor in
+                self?.currentlySpeakingBoundary = nil
+            }
+        }
+        speechSynthesizer.delegate = speechDelegate
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.pausesLocationUpdatesAutomatically = false
@@ -61,17 +74,39 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
 
     /// Requests location permission and starts ride tracking. Call after onboarding completes.
     func beginRideTracking() {
-        guard !isTracking else { return }
-        locationManager.requestAlwaysAuthorization()
-        locationManager.allowsBackgroundLocationUpdates = true
-        locationManager.startUpdatingLocation()
-        isTracking = true
+        wantsRideTracking = true
+        startRideTrackingIfAuthorized()
     }
 
     func pauseRideTracking() {
-        guard isTracking else { return }
+        wantsRideTracking = false
         locationManager.stopUpdatingLocation()
         isTracking = false
+    }
+
+    private func startRideTrackingIfAuthorized() {
+        guard wantsRideTracking else { return }
+
+        switch locationManager.authorizationStatus {
+        case .notDetermined:
+            locationManager.requestAlwaysAuthorization()
+            isTracking = false
+        case .authorizedAlways:
+            locationManager.allowsBackgroundLocationUpdates = true
+            locationManager.startUpdatingLocation()
+            isTracking = true
+        case .authorizedWhenInUse:
+            locationManager.requestAlwaysAuthorization()
+            locationManager.allowsBackgroundLocationUpdates = false
+            locationManager.startUpdatingLocation()
+            isTracking = true
+        case .denied, .restricted:
+            locationManager.stopUpdatingLocation()
+            isTracking = false
+        @unknown default:
+            locationManager.stopUpdatingLocation()
+            isTracking = false
+        }
     }
 
     private var boundarySettings: BoundaryAnnouncementSettings {
@@ -145,6 +180,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
         let token = UUID()
         activeAnnouncementToken = token
         inFlightFactTask?.cancel()
+        cancelPendingAnnouncement()
 
         let request = AnnouncementPolicy.factRequest(for: plan, address: address)
         let generator = factGenerator
@@ -209,6 +245,12 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
         print("Queued announcement after \(bluetoothDelaySeconds)s: \(plan.text)")
     }
 
+    private func cancelPendingAnnouncement() {
+        delayWorkItem?.cancel()
+        delayWorkItem = nil
+        announcementQueue.clearPending()
+    }
+
     private func deliverAnnouncement(id: UUID) {
         guard let pending = announcementQueue.pending, pending.id == id else {
             print("Skipped stale announcement.")
@@ -258,7 +300,11 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
         print("Failed to get user location: \(error.localizedDescription)")
     }
 
-    private func reverseGeocode(location: CLLocation, completion: (() -> Void)? = nil) {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        startRideTrackingIfAuthorized()
+    }
+
+    private func reverseGeocode(location: CLLocation, completion: (@MainActor () -> Void)? = nil) {
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             if let error = error {
                 print("Failed to reverse geocode location: \(error.localizedDescription)")
@@ -271,13 +317,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
             }
 
             let address = Address(placemark: placemark)
-            self?.lastKnownAddress = address
-            if let addressJSON = address.toJSON() {
-                print("Resolved Address JSON: \(addressJSON)")
-            }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.lastKnownAddress = address
+                if let addressJSON = address.toJSON() {
+                    print("Resolved Address JSON: \(addressJSON)")
+                }
 
-            completion?()
-            self?.processResolvedAddress(address)
+                completion?()
+                self.processResolvedAddress(address)
+            }
         }
     }
 
@@ -333,14 +382,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
         speechSynthesizer.speak(utterance)
     }
 
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        currentlySpeakingBoundary = nil
-    }
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        currentlySpeakingBoundary = nil
-    }
-
     func logTestLocation() {
         let waypoint = TestRouteFixture.waypoint(at: testIndex)
         testIndex = (testIndex + 1) % TestRouteFixture.waypoints.count
@@ -360,12 +401,28 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate, AV
             }
 
             let address = Address(placemark: placemark)
-            self?.lastKnownAddress = address
-            if let addressJSON = address.toJSON() {
-                print("Resolved Test Address JSON: \(addressJSON)")
-            }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.lastKnownAddress = address
+                if let addressJSON = address.toJSON() {
+                    print("Resolved Test Address JSON: \(addressJSON)")
+                }
 
-            self?.processResolvedAddress(address)
+                self.processResolvedAddress(address)
+            }
         }
+    }
+}
+
+private final class SpeechSynthesizerDelegateBridge: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
+    var onFinish: (@Sendable () -> Void)?
+    var onCancel: (@Sendable () -> Void)?
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        onFinish?()
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        onCancel?()
     }
 }

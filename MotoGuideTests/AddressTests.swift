@@ -60,6 +60,20 @@ final class AddressTests: XCTestCase {
         )
     }
 
+    func testSpokenTextSkipsPlaceholderComponents() {
+        let address = Address(
+            street: "N/A",
+            town: "Stroud",
+            county: "",
+            administrativeArea: "England"
+        )
+
+        XCTAssertEqual(
+            AddressFormatter.spokenText(for: address, inclusion: .all),
+            "Stroud, England"
+        )
+    }
+
     func testToJSONContainsAddressFields() {
         let address = Address(
             street: "High Street",

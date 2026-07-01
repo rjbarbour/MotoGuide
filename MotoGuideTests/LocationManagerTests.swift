@@ -3,6 +3,7 @@ import CoreLocation
 @testable import MotoGuide
 
 final class LocationManagerTests: XCTestCase {
+    @MainActor
     func testLocationUpdateIntervalThrottling() {
         let locationManager = LocationManager()
         locationManager.testMode = false
@@ -21,6 +22,7 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(locationManager.lastKnownLocation?.longitude, firstLocation.coordinate.longitude)
     }
 
+    @MainActor
     func testTestModeIgnoresLiveLocationUpdates() {
         let locationManager = LocationManager()
         locationManager.testMode = true

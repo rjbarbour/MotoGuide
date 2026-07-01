@@ -68,16 +68,16 @@ struct AddressFormatter {
 
     static func spokenText(for address: Address, inclusion: Inclusion) -> String {
         var components = [String]()
-        if inclusion.includeStreet {
+        if inclusion.includeStreet, Address.isValidPlaceName(address.street) {
             components.append(address.street)
         }
-        if inclusion.includeTown {
+        if inclusion.includeTown, Address.isValidPlaceName(address.town) {
             components.append(address.town)
         }
-        if inclusion.includeCounty {
+        if inclusion.includeCounty, Address.isValidPlaceName(address.county) {
             components.append(address.county)
         }
-        if inclusion.includeAdministrativeArea {
+        if inclusion.includeAdministrativeArea, Address.isValidPlaceName(address.administrativeArea) {
             components.append(address.administrativeArea)
         }
         return components.joined(separator: ", ")

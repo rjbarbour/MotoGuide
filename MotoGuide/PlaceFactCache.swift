@@ -22,7 +22,8 @@ final class PlaceFactCache {
     func store(_ fact: String, forKey key: String) {
         lock.lock()
         memory[key] = fact
+        let snapshot = memory
         lock.unlock()
-        UserDefaults.standard.set(memory, forKey: defaultsKey)
+        UserDefaults.standard.set(snapshot, forKey: defaultsKey)
     }
 }
