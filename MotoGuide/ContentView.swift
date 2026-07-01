@@ -12,6 +12,10 @@ private struct RideLogEntry: Identifiable {
 struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var firstRunState = FirstRunState()
+#if DEBUG
+    @StateObject private var debugLog = DebugLogStore.shared
+    @AppStorage(ProxyDiagnostics.enabledKey) private var proxyDiagnosticsEnabled = false
+#endif
     @State private var logs: [RideLogEntry] = []
     @State private var showOnboarding = false
     @State private var showResetConfirmation = false
@@ -31,6 +35,15 @@ struct ContentView: View {
                 .tabItem {
                     Label("Log", systemImage: "list.bullet")
                 }
+
+#if DEBUG
+            if proxyDiagnosticsEnabled {
+                DebugLogView(debugLog: debugLog)
+                    .tabItem {
+                        Label("Debug", systemImage: "stethoscope")
+                    }
+            }
+#endif
         }
         .onAppear {
             showOnboarding = firstRunState.needsOnboarding
@@ -99,6 +112,9 @@ struct ContentView: View {
 private struct SettingsView: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var showResetConfirmation: Bool
+#if DEBUG
+    @AppStorage(ProxyDiagnostics.enabledKey) private var proxyDiagnosticsEnabled = false
+#endif
 
     let intervals = [1, 2, 5, 10, 15, 30, 60, 120, 300]
 
@@ -148,6 +164,15 @@ private struct SettingsView: View {
                             Text("Testing tools only. Not for normal rides.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
+
+#if DEBUG
+                            Toggle("Proxy Diagnostics", isOn: $proxyDiagnosticsEnabled)
+                                .onChange(of: proxyDiagnosticsEnabled) { _, isEnabled in
+                                    if !isEnabled {
+                                        DebugLogStore.shared.clear()
+                                    }
+                                }
+#endif
 
                             Button("Reset First-Time Experience", role: .destructive) {
                                 showResetConfirmation = true
@@ -242,6 +267,49 @@ private struct LogHistoryView: View {
         }
     }
 }
+
+#if DEBUG
+private struct DebugLogView: View {
+    @ObservedObject var debugLog: DebugLogStore
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if debugLog.entries.isEmpty {
+                    Text("No debug events yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(debugLog.entries) { entry in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(entry.category)
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(entry.timestamp, formatter: dateFormatter)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(entry.message)
+                                .font(.subheadline)
+                                .textSelection(.enabled)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle("Debug")
+            .toolbar {
+                Button("Clear") {
+                    debugLog.clear()
+                }
+                .disabled(debugLog.entries.isEmpty)
+            }
+        }
+    }
+}
+#endif
 
 private let dateFormatter: DateFormatter = {
     let formatter = DateFormatter()

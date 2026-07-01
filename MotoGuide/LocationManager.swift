@@ -189,6 +189,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             let fact = await PlaceFactFetcher.fact(for: request, using: generator)
             await MainActor.run {
                 guard let self, !Task.isCancelled, self.activeAnnouncementToken == token else { return }
+                if fact == nil {
+                    ProxyDiagnostics.log("Facts", "No proxy fact available. Speaking base phrase for \(request.cacheKey).")
+                }
                 let text = FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact)
                 self.enqueueAnnouncement(AnnouncementPlan(text: text, boundary: plan.boundary))
             }
