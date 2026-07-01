@@ -4,6 +4,14 @@ import CoreLocation
 
 final class LocationManagerTests: XCTestCase {
     @MainActor
+    func testDebugProxyDefaultsUseTestModeAndShortFacts() {
+        let locationManager = LocationManager()
+
+        XCTAssertTrue(locationManager.testMode)
+        XCTAssertEqual(locationManager.contentMode, .shortFacts)
+    }
+
+    @MainActor
     func testLocationUpdateIntervalThrottling() {
         let locationManager = LocationManager()
         locationManager.testMode = false

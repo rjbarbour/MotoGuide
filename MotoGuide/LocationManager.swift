@@ -28,9 +28,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var announceCounty: Bool = true
     @Published var announceNation: Bool = true
     @Published var announceCountry: Bool = true
-    @Published var contentMode: ContentMode = .natural
+    @Published var contentMode: ContentMode = .shortFacts
     @Published var bluetoothDelaySeconds: Double = 0.5
-    @Published var testMode: Bool = false
+    @Published var testMode: Bool = true
     @Published private(set) var isTracking = false
 
     var onAddressChange: ((Address) -> Void)?
@@ -189,6 +189,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             let fact = await PlaceFactFetcher.fact(for: request, using: generator)
             await MainActor.run {
                 guard let self, !Task.isCancelled, self.activeAnnouncementToken == token else { return }
+                if fact == nil {
+                    DebugLogStore.log("Facts", "No proxy fact available. Speaking base phrase for \(request.cacheKey).")
+                }
                 let text = FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact)
                 self.enqueueAnnouncement(AnnouncementPlan(text: text, boundary: plan.boundary))
             }

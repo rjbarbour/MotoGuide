@@ -11,14 +11,18 @@ struct CachedPlaceFactGenerator: PlaceFactGenerating {
 
     func fact(for request: PlaceFactRequest) async throws -> String {
         if let cached = cache.fact(forKey: request.cacheKey) {
+            DebugLogStore.log("Facts", "Cache hit for \(request.cacheKey)")
             return cached
         }
 
+        DebugLogStore.log("Facts", "Cache miss for \(request.cacheKey)")
         let fact = try await generator.fact(for: request)
         if let sanitized = FactPhraseBuilder.sanitize(fact) {
             cache.store(sanitized, forKey: request.cacheKey)
+            DebugLogStore.log("Facts", "Stored fact in cache for \(request.cacheKey)")
             return sanitized
         }
+        DebugLogStore.log("Facts", "Generated fact failed local sanitization for \(request.cacheKey)")
         throw PlaceFactError.invalidResponse
     }
 }
@@ -36,11 +40,13 @@ enum PlaceFactFetcher {
                 do {
                     return try await generator.fact(for: request)
                 } catch {
+                    DebugLogStore.log("Facts", "Fact fetch failed for \(request.cacheKey): \(error.localizedDescription)")
                     return nil
                 }
             }
             group.addTask {
                 try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                DebugLogStore.log("Facts", "Fact fetch timed out after \(timeout)s for \(request.cacheKey)")
                 return nil
             }
 
