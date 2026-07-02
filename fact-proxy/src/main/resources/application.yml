@@ -6,6 +6,8 @@ motoguide:
   admin-token: ${MOTOGUIDE_ADMIN_TOKEN:}
   rate-limit-per-minute: ${RATE_LIMIT_PER_MINUTE:30}
   diagnostics-enabled: ${MOTOGUIDE_DIAGNOSTICS_ENABLED:false}
+  short-fact-prompt: ${MOTOGUIDE_SHORT_FACT_PROMPT:}
+  long-fact-prompt: ${MOTOGUIDE_LONG_FACT_PROMPT:}
 
 openai:
   api-key: ${OPENAI_API_KEY:}

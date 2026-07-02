@@ -188,62 +188,63 @@ Done when:
 - Known failures are logged as issues or notes.
 - The app can complete a short route without manual intervention.
 
-## Milestone 5: Short Facts MVP
+## Milestone 5: Facts MVP
 
-Target outcome: MotoGuide can add lightweight local context beyond names while keeping speech short.
+Target outcome: MotoGuide can add lightweight local context beyond names while keeping speech bounded and ride-safe.
 
 Existing baseline:
 
 - The app can already speak selected place/address components.
 - The proposed first-region route is known.
-- Short Facts currently use the OpenAI-backed MotoGuide fact proxy as the primary implementation path.
+- Short Facts and Long Facts use the OpenAI-backed MotoGuide fact proxy as the primary implementation path.
 - The proxy API contract is documented in `FACT_PROXY_OPENAPI.yaml`, with `FACT_PROXY_CONTRACT.md` as the human-readable companion.
 
 Enhancement work:
 
-- Define a short fact format.
+- Define short and long fact formats.
 - Use the OpenAI-backed fact proxy first. Keep the iOS client and proxy server aligned with `FACT_PROXY_OPENAPI.yaml`.
 - Keep `LOCAL_LLM_FACTS_FALLBACK_PLAN.md` as an alternative if OpenAI cost, latency, connectivity, privacy, or quality becomes a blocker.
-- Add a content-depth parameter, starting with names only and one sentence.
+- Add a content-depth parameter, including names only, Short Facts, and Long Facts.
 - Add rules for when facts are spoken.
 - Keep fact announcements shorter than navigation instructions.
-- Add an internal prompt or instruction field for generating or selecting local facts.
+- Keep prompt selection server-side; iOS sends only the requested fact mode and place hierarchy.
 - Add tests for selecting and suppressing facts.
 
 Done when:
 
-- One-sentence mode speaks a place name plus one concise fact when appropriate.
+- Short Facts speaks a place name plus one concise fact when appropriate.
+- Long Facts speaks a longer but bounded place blurb when selected.
 - Names-only mode never speaks facts.
 - Quiet mode remains silent.
-- The fact instruction is constrained enough that announcements remain short.
+- The fact instruction is constrained enough that announcements remain ride-safe.
 
 ## Milestone 6: Situational Awareness Map
 
-Target outcome: riders can glance at a Map tab and understand where they are in the geographic hierarchy and relative to nearby towns, without turn-by-turn navigation.
+Target outcome: riders can glance at the Location screen and understand where they are in the geographic hierarchy and relative to nearby towns, without turn-by-turn navigation.
 
 Design reference: `MAP_SITUATIONAL_AWARENESS.md`
 
 Existing baseline:
 
 - `LocationManager` provides throttled coordinates and reverse-geocoded `Address`.
-- `BoundaryType` and `AnnouncementPolicy` define the street → town → county → nation → country hierarchy.
-- `ContentView` has Settings and Log tabs only; no MapKit usage yet.
+- `BoundaryType` and `AnnouncementPolicy` define the street → town → county → region → country hierarchy.
+- `ContentView` has a primary Location screen with toolbar Settings and Log.
 
 Enhancement work:
 
-- Add a **Map** tab (proposed default) with a single MapKit map and a context stack above it.
+- Add a **Location** screen with a single MapKit map and a context stack above it.
 - Show summary line, hierarchy panel, previous street (when changed), and nearest towns with distances.
 - Auto-follow user location with context-aware default zoom; speed-gated zoom presets when stopped.
 - Reuse shared `LocationManager` state; support test mode on the Gloucestershire fixture.
 - Do **not** add administrative boundary polygons in M6 — defer to Milestone 3.
 - Use `MKLocalSearch` (or equivalent) for nearest-town context; geocoder for hierarchy text.
 - Extract testable pure functions for summary, hierarchy rows, and distance/bearing formatting.
-- Show Quiet mode indicator on Map when announcements are muted.
+- Show Quiet mode indicator on Location when announcements are muted.
 - Disable map pan/zoom interaction while moving.
 
 Done when:
 
-- Map tab displays current hierarchy from live or test-mode location.
+- Location screen displays current hierarchy from live or test-mode location.
 - Nearby towns list updates sensibly without excessive network calls.
 - Map interaction is limited while moving; zoom presets work when stopped.
 - Unit tests cover hierarchy presentation and nearby-town formatting logic.

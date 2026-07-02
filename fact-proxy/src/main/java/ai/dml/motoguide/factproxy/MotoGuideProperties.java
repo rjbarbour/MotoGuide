@@ -7,6 +7,8 @@ public record MotoGuideProperties(
         String proxyToken,
         String adminToken,
         int rateLimitPerMinute,
-        boolean diagnosticsEnabled
+        boolean diagnosticsEnabled,
+        String shortFactPrompt,
+        String longFactPrompt
 ) {
 }

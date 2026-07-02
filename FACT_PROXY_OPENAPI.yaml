@@ -3,8 +3,9 @@ info:
   title: MotoGuide Fact Proxy API
   version: 0.1.0
   description: |
-    MVP contract for the MotoGuide iOS app to request one short place fact
-    without storing or sending an OpenAI API key from the device.
+    MVP contract for the MotoGuide iOS app to request a short or long
+    ride-safe place fact without storing or sending an OpenAI API key from
+    the device.
 servers:
   - url: https://motoguide-fact-proxy.fly.dev
     description: Production Fly.io proxy
@@ -14,7 +15,7 @@ tags:
   - name: Health
     description: Proxy health checks.
   - name: Facts
-    description: Short ride-safe place facts.
+    description: Ride-safe place facts.
   - name: Admin
     description: Operational controls. Not used by the iOS app.
 x-deployment:
@@ -46,6 +47,12 @@ x-deployment:
     MOTOGUIDE_DIAGNOSTICS_ENABLED:
       default: false
       description: Enables verbose proxy diagnostics at startup.
+    MOTOGUIDE_SHORT_FACT_PROMPT:
+      default: built-in short fact prompt
+      description: Optional server-side prompt override for shortFacts requests. Never sent by iOS.
+    MOTOGUIDE_LONG_FACT_PROMPT:
+      default: built-in long fact prompt
+      description: Optional server-side prompt override for longFacts requests. Never sent by iOS.
     OPENAI_MODEL:
       default: gpt-4o-mini
       description: OpenAI model selected by the Fly runtime environment.
@@ -116,12 +123,16 @@ paths:
     post:
       tags:
         - Facts
-      summary: Generate one short place fact
+      summary: Generate one ride-safe place fact
       description: |
         Validates a place request, calls the server-side LLM provider, sanitizes
-        the generated sentence, and returns one short fact. The iOS app must
-        fall back to the base place announcement for any non-200 response,
-        invalid response body, rejected fact, missing token, or request timeout.
+        the generated text, and returns one bounded fact. The iOS app sends
+        only `factMode`, boundary/place fields, and place hierarchy. It never
+        sends prompt text, arbitrary model messages, OpenAI configuration, or
+        coordinates. The proxy owns prompt selection for `shortFacts` and
+        `longFacts`. The iOS app must fall back to the base place announcement
+        for any non-200 response, invalid response body, rejected fact, missing
+        token, or request timeout.
       operationId: createPlaceFact
       security:
         - MotoGuideProxyToken: []
@@ -131,6 +142,7 @@ paths:
       x-openai-api-key-location: Server-side only. Never store the OpenAI API key in the iOS app or repository.
       x-speech-safety-rules:
         - One sentence.
+        - Long Facts may use up to two short sentences.
         - Factual and neutral.
         - Useful as ambient place context.
         - Short enough to keep the total spoken announcement ride-safe.
@@ -148,10 +160,17 @@ paths:
                 value:
                   boundary: town
                   placeName: Stroud
+                  factMode: shortFacts
                   countryContext: United Kingdom
+                  placeHierarchy:
+                    street: null
+                    town: Stroud
+                    county: Gloucestershire
+                    region: England
+                    country: United Kingdom
       responses:
         "200":
-          description: One sanitized short fact.
+          description: One sanitized bounded fact.
           content:
             application/json:
               schema:
@@ -161,7 +180,7 @@ paths:
                   value:
                     fact: Known for its wool trade.
         "400":
-          description: Invalid JSON, missing boundary, invalid boundary, or missing placeName.
+          description: Invalid JSON, missing required field, invalid boundary, invalid factMode, invalid placeName, or invalid placeHierarchy.
         "401":
           description: Missing or wrong proxy bearer token.
         "500":
@@ -251,6 +270,8 @@ components:
       required:
         - boundary
         - placeName
+        - factMode
+        - placeHierarchy
       properties:
         boundary:
           $ref: "#/components/schemas/Boundary"
@@ -261,6 +282,15 @@ components:
           pattern: "^[A-Za-z0-9 .,'’&()\\-]+$"
           description: Place to generate a fact about.
           example: Stroud
+        factMode:
+          type: string
+          description: |
+            Requested fact depth. The proxy validates this field and selects
+            the server-side prompt. Unknown values return 400.
+          enum:
+            - shortFacts
+            - longFacts
+          example: shortFacts
         countryContext:
           type: string
           nullable: true
@@ -269,6 +299,41 @@ components:
           pattern: "^[A-Za-z .,'’()\\-]+$"
           description: Optional country name used to disambiguate reused place names.
           example: United Kingdom
+        placeHierarchy:
+          $ref: "#/components/schemas/PlaceHierarchy"
+    PlaceHierarchy:
+      type: object
+      additionalProperties: false
+      description: |
+        Current place hierarchy from iOS reverse geocoding. Values may be null
+        when unavailable or invalid. Coordinates are intentionally not part of
+        this contract.
+      properties:
+        street:
+          $ref: "#/components/schemas/OptionalPlaceName"
+        town:
+          $ref: "#/components/schemas/OptionalPlaceName"
+        county:
+          $ref: "#/components/schemas/OptionalPlaceName"
+        region:
+          $ref: "#/components/schemas/OptionalPlaceName"
+        country:
+          allOf:
+            - $ref: "#/components/schemas/OptionalCountryName"
+    OptionalPlaceName:
+      type: string
+      nullable: true
+      minLength: 1
+      maxLength: 96
+      pattern: "^[A-Za-z0-9 .,'’&()\\-]+$"
+      example: Nailsworth
+    OptionalCountryName:
+      type: string
+      nullable: true
+      minLength: 1
+      maxLength: 64
+      pattern: "^[A-Za-z .,'’()\\-]+$"
+      example: United Kingdom
     FactResponse:
       type: object
       additionalProperties: false
@@ -278,8 +343,10 @@ components:
         fact:
           type: string
           minLength: 1
-          maxLength: 120
-          description: One short, factual, ride-safe sentence.
+          maxLength: 280
+          description: |
+            Sanitized ride-safe fact. shortFacts responses are bounded to 120
+            characters; longFacts responses are bounded to 280 characters.
           example: Known for its wool trade.
     DiagnosticsRequest:
       type: object

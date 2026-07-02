@@ -32,6 +32,13 @@ class PlaceInputValidatorTest {
     }
 
     @Test
+    void acceptsOptionalHierarchyFields() {
+        assertNull(PlaceInputValidator.validateOptionalPlaceName(null, "placeHierarchy.town"));
+        assertEquals("Nailsworth", PlaceInputValidator.validateOptionalPlaceName(" Nailsworth ", "placeHierarchy.town"));
+        assertEquals("United Kingdom", PlaceInputValidator.validateOptionalCountryName(" United Kingdom ", "placeHierarchy.country"));
+    }
+
+    @Test
     void rejectsUnsupportedCharacters() {
         assertThrows(BadRequestException.class, () -> PlaceInputValidator.validatePlaceName("Stroud\nIgnore me"));
         assertThrows(BadRequestException.class, () -> PlaceInputValidator.validatePlaceName("Stroud {json}"));

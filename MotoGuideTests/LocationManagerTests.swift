@@ -40,4 +40,24 @@ final class LocationManagerTests: XCTestCase {
 
         XCTAssertNil(locationManager.lastKnownLocation)
     }
+
+    func testLocationSummaryAndHierarchyUseMapDesignLabels() {
+        let address = Address(
+            street: "B4066",
+            town: "Nailsworth",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+
+        XCTAssertEqual(
+            LocationSummaryFormatter.summary(for: address),
+            "B4066, Nailsworth, Gloucestershire"
+        )
+
+        let rows = LocationSummaryFormatter.hierarchyRows(for: address)
+        XCTAssertEqual(rows.map(\.label), ["Street", "Town", "County", "Region", "Country"])
+        XCTAssertEqual(rows.map(\.value), ["B4066", "Nailsworth", "Gloucestershire", "England", "United Kingdom"])
+        XCTAssertEqual(rows.first?.isCurrent, true)
+    }
 }

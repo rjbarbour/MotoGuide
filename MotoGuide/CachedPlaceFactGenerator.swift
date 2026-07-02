@@ -17,7 +17,7 @@ struct CachedPlaceFactGenerator: PlaceFactGenerating {
 
         ProxyDiagnostics.log("Facts", "Cache miss for \(request.cacheKey)")
         let fact = try await generator.fact(for: request)
-        if let sanitized = FactPhraseBuilder.sanitize(fact) {
+        if let sanitized = FactPhraseBuilder.sanitize(fact, mode: request.factMode) {
             cache.store(sanitized, forKey: request.cacheKey)
             ProxyDiagnostics.log("Facts", "Stored fact in cache for \(request.cacheKey)")
             return sanitized
@@ -45,7 +45,11 @@ enum PlaceFactFetcher {
                 }
             }
             group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                } catch {
+                    return nil
+                }
                 ProxyDiagnostics.log("Facts", "Fact fetch timed out after \(timeout)s for \(request.cacheKey)")
                 return nil
             }

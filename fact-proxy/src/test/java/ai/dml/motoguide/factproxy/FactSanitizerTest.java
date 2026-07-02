@@ -25,4 +25,10 @@ class FactSanitizerTest {
         String longFact = "a".repeat(150);
         assertEquals(120, FactSanitizer.sanitize(longFact).length());
     }
+
+    @Test
+    void sanitizeAllowsLongFactsWithinLongModeBound() {
+        String longFact = "a".repeat(300);
+        assertEquals(280, FactSanitizer.sanitize(longFact, FactMode.LONG_FACTS).length());
+    }
 }

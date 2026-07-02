@@ -20,29 +20,31 @@ The existing GitHub prototype is an iOS SwiftUI app:
 - Local checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`
 - Main app: `/Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide/`
 - Core modules: `LocationManager.swift`, `AnnouncementPolicy.swift`, `Address.swift`, `ProxyFactGenerator.swift`, `FirstRunState.swift`
-- UI: `ContentView.swift` (Settings and Log tabs), `OnboardingView.swift`
+- UI: `ContentView.swift` (primary Location screen with toolbar Settings and Log), `OnboardingView.swift`
 - Test route: `TestRouteFixture.swift` (Gloucestershire waypoints)
 
 Current prototype capabilities:
 
 - Onboarding on first launch; developer reset under Settings → Advanced → Developer.
 - Location tracking starts after onboarding (not on raw app init).
-- Reverse-geocode coordinates into street, town, county, nation, and country.
+- Reverse-geocode coordinates into street, town, county, region, and country.
 - Natural announcement phrasing, e.g. `Welcome to Wales. You are in Chepstow, Monmouthshire`.
-- Announcement modes: Natural, Names Only, Short Facts (proxy-backed LLM), Quiet.
+- Announcement modes: Natural, Names Only, Short Facts (proxy-backed LLM), Long Facts (proxy-backed LLM), Quiet.
 - Single-slot announcement queue with Bluetooth audio delay.
 - Boundary priority: country → nation → county → town → street.
 - Test mode with named Gloucestershire route coordinates.
 - Unit tests for address, announcements, facts (mocked), first-run state, and route fixture.
-- Short Facts OpenAPI contract: `FACT_PROXY_OPENAPI.yaml`.
+- Short/Long Facts OpenAPI contract: `FACT_PROXY_OPENAPI.yaml`.
 
-Current interface (Settings tab):
+Current interface:
 
-- `Test Mode`, announcement style, Bluetooth delay, check interval
-- Announce toggles for street, town, county, nation, country
-- Advanced → Developer → Reset First-Time Experience
+- Location is the primary screen.
+- Toolbar gear opens Settings.
+- Toolbar history/list button opens Log.
+- Settings top level: announcement style and what to announce.
+- Settings Advanced: location check frequency, Test Mode, Speak After Every Geocode, Bluetooth delay, proxy diagnostics, reset onboarding.
 
-Log tab: scrollable history and manual Log button.
+Log: scrollable history and manual test/current-location log button.
 
 ## Product Definition
 

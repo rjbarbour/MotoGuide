@@ -32,6 +32,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var bluetoothDelaySeconds: Double = 0.5
     @Published var testMode: Bool = false
     @Published private(set) var isTracking = false
+    @Published private(set) var lastSpokenPhrase: String?
+    @Published private(set) var lastSpokenAt: Date?
 
     var onAddressChange: ((Address) -> Void)?
     var onRideLog: ((CLLocationCoordinate2D, Address, String?) -> Void)?
@@ -160,8 +162,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             onAddressChange?(address)
         }
 
-        if contentMode == .shortFacts {
-            fetchFactAndEnqueue(plan: plan, address: address)
+        if let factMode = contentMode.factMode {
+            fetchFactAndEnqueue(plan: plan, address: address, mode: factMode)
         } else if contentMode != .quiet {
             enqueueAnnouncement(plan)
         } else if testMode {
@@ -176,13 +178,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         onRideLog?(location, address, utteredPhrase)
     }
 
-    private func fetchFactAndEnqueue(plan: AnnouncementPlan, address: Address) {
+    private func fetchFactAndEnqueue(plan: AnnouncementPlan, address: Address, mode: FactMode) {
         let token = UUID()
         activeAnnouncementToken = token
         inFlightFactTask?.cancel()
         cancelPendingAnnouncement()
 
-        let request = AnnouncementPolicy.factRequest(for: plan, address: address)
+        let request = AnnouncementPolicy.factRequest(for: plan, address: address, mode: mode)
         let generator = factGenerator
 
         inFlightFactTask = Task { [weak self] in
@@ -192,7 +194,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 if fact == nil {
                     ProxyDiagnostics.log("Facts", "No proxy fact available. Speaking base phrase for \(request.cacheKey).")
                 }
-                let text = FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact)
+                let text = FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact, mode: mode)
                 self.enqueueAnnouncement(AnnouncementPlan(text: text, boundary: plan.boundary))
             }
         }
@@ -282,6 +284,24 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         speak(text: pending.text, boundary: pending.boundary)
     }
 
+    func repeatCurrentAnnouncement() {
+        guard contentMode != .quiet else { return }
+        guard let text = lastSpokenPhrase ?? currentLocationPhrase() else { return }
+
+        delayWorkItem?.cancel()
+        announcementQueue.clearPending()
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        speak(text: text, boundary: currentlySpeakingBoundary, shouldRecordTestLog: false)
+    }
+
+    private func currentLocationPhrase() -> String? {
+        guard let address = lastKnownAddress else { return nil }
+        let speechMode = AnnouncementPhraseBuilder.baseSpeechMode(for: contentMode)
+        return AnnouncementPhraseBuilder.locationPhrase(in: address, mode: speechMode)
+    }
+
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         if testMode { return }
 
@@ -369,7 +389,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
     }
 
-    private func speak(text: String, boundary: BoundaryType? = nil) {
+    private func speak(text: String, boundary: BoundaryType? = nil, shouldRecordTestLog: Bool = true) {
         guard contentMode != .quiet else { return }
         guard AVSpeechSynthesisVoice.speechVoices().count > 0 else {
             print("No available voices.")
@@ -381,7 +401,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         utterance.voice = AVSpeechSynthesisVoice(language: "en-GB")
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         print("Speaking: \(text)")
-        recordTestLog(utteredPhrase: text)
+        lastSpokenPhrase = text
+        lastSpokenAt = Date()
+        if shouldRecordTestLog {
+            recordTestLog(utteredPhrase: text)
+        }
         speechSynthesizer.speak(utterance)
     }
 

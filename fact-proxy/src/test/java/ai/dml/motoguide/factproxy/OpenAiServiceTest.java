@@ -31,16 +31,67 @@ class OpenAiServiceTest {
                     HttpClient.newHttpClient(),
                     objectMapper,
                     new OpenAiProperties("test-key", "gpt-test-runtime", endpoint),
-                    new DiagnosticsSettings(new MotoGuideProperties("proxy-token", null, 30, false))
+                    new MotoGuideProperties("proxy-token", null, 30, false, null, null),
+                    new DiagnosticsSettings(new MotoGuideProperties("proxy-token", null, 30, false, null, null))
             );
 
-            String fact = service.generateFact(new FactRequest("town", "Stroud", "United Kingdom"));
+            String fact = service.generateFact(new FactRequest(
+                    "town",
+                    "Stroud",
+                    "shortFacts",
+                    "United Kingdom",
+                    new PlaceHierarchy(null, "Stroud", "Gloucestershire", "England", "United Kingdom")
+            ));
 
             JsonNode payload = objectMapper.readTree(requestBody.get());
             assertEquals("Known for its wool trade.", fact);
             assertEquals("gpt-test-runtime", payload.path("model").asText());
             assertEquals(60, payload.path("max_completion_tokens").asInt());
             assertEquals(true, payload.path("max_tokens").isMissingNode());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void longFactsUseLongModePromptAndTokenBudget() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> handleOpenAiRequest(exchange, requestBody));
+        server.start();
+
+        try {
+            String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/chat/completions";
+            MotoGuideProperties properties = new MotoGuideProperties(
+                    "proxy-token",
+                    null,
+                    30,
+                    false,
+                    "SHORT PROMPT",
+                    "LONG PROMPT"
+            );
+            OpenAiService service = new OpenAiService(
+                    HttpClient.newHttpClient(),
+                    objectMapper,
+                    new OpenAiProperties("test-key", "gpt-test-runtime", endpoint),
+                    properties,
+                    new DiagnosticsSettings(properties)
+            );
+
+            service.generateFact(new FactRequest(
+                    "county",
+                    "Gloucestershire",
+                    "longFacts",
+                    "United Kingdom",
+                    new PlaceHierarchy("B4066", "Nailsworth", "Gloucestershire", "England", "United Kingdom")
+            ));
+
+            JsonNode payload = objectMapper.readTree(requestBody.get());
+            assertEquals(140, payload.path("max_completion_tokens").asInt());
+            assertEquals("LONG PROMPT", payload.path("messages").path(0).path("content").asText());
+            assertEquals(true, payload.path("messages").path(1).path("content").asText().contains("Fact mode: longFacts"));
+            assertEquals(true, payload.path("messages").path(1).path("content").asText().contains("Region: England"));
         } finally {
             server.stop(0);
         }

@@ -160,7 +160,7 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         urlRequest.httpBody = try JSONEncoder().encode(FactProxyRequest(from: request))
         ProxyDiagnostics.log(
             "Proxy",
-            "Request body boundary=\(request.boundary.factLabel), placeName=\(request.placeName), countryContext=\(request.countryContext ?? "nil")"
+            "Request body boundary=\(request.boundary.factLabel), factMode=\(request.factMode.rawValue), placeName=\(request.placeName), countryContext=\(request.countryContext ?? "nil")"
         )
 
         let data: Data
@@ -190,7 +190,7 @@ struct ProxyFactGenerator: PlaceFactGenerating {
             throw error
         }
 
-        guard let sanitized = FactPhraseBuilder.sanitize(decoded.fact) else {
+        guard let sanitized = FactPhraseBuilder.sanitize(decoded.fact, mode: request.factMode) else {
             ProxyDiagnostics.log("Proxy", "Proxy fact failed local sanitization.")
             throw PlaceFactError.invalidResponse
         }
@@ -241,12 +241,16 @@ struct ProxyHealthChecker {
 private struct FactProxyRequest: Encodable {
     let boundary: String
     let placeName: String
+    let factMode: String
     let countryContext: String?
+    let placeHierarchy: PlaceHierarchy
 
     init(from request: PlaceFactRequest) {
         self.boundary = request.boundary.factLabel
         self.placeName = request.placeName
+        self.factMode = request.factMode.rawValue
         self.countryContext = request.countryContext
+        self.placeHierarchy = request.placeHierarchy
     }
 }
 

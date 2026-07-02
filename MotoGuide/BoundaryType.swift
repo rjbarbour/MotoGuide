@@ -16,6 +16,7 @@ enum ContentMode: String, CaseIterable, Identifiable {
     case natural
     case namesOnly
     case shortFacts
+    case longFacts
     case quiet
 
     var id: String { rawValue }
@@ -25,7 +26,19 @@ enum ContentMode: String, CaseIterable, Identifiable {
         case .natural: return "Natural"
         case .namesOnly: return "Names Only"
         case .shortFacts: return "Short Facts"
+        case .longFacts: return "Long Facts"
         case .quiet: return "Quiet"
+        }
+    }
+
+    var factMode: FactMode? {
+        switch self {
+        case .shortFacts:
+            return .shortFacts
+        case .longFacts:
+            return .longFacts
+        case .natural, .namesOnly, .quiet:
+            return nil
         }
     }
 }

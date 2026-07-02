@@ -45,6 +45,20 @@ public final class PlaceInputValidator {
         return validate(value, "countryContext", MAX_COUNTRY_CONTEXT_LENGTH, COUNTRY_CHARACTERS);
     }
 
+    public static String validateOptionalPlaceName(String value, String field) {
+        if (value == null || value.isBlank() || "N/A".equalsIgnoreCase(value.trim())) {
+            return null;
+        }
+        return validate(value, field, MAX_PLACE_NAME_LENGTH, PLACE_CHARACTERS);
+    }
+
+    public static String validateOptionalCountryName(String value, String field) {
+        if (value == null || value.isBlank() || "N/A".equalsIgnoreCase(value.trim())) {
+            return null;
+        }
+        return validate(value, field, MAX_COUNTRY_CONTEXT_LENGTH, COUNTRY_CHARACTERS);
+    }
+
     private static String validate(String value, String field, int maxLength, Pattern allowedCharacters) {
         if (value == null || value.isBlank()) {
             throw new BadRequestException(field + " is required");

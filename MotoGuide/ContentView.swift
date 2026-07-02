@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import MapKit
 
 private struct RideLogEntry: Identifiable {
     let id = UUID()
@@ -9,47 +10,109 @@ private struct RideLogEntry: Identifiable {
     let utteredPhrase: String?
 }
 
+struct LocationHierarchyRow: Equatable, Identifiable {
+    let id: String
+    let label: String
+    let value: String
+    let isCurrent: Bool
+    let isAvailable: Bool
+}
+
+enum LocationSummaryFormatter {
+    static func summary(for address: Address?) -> String {
+        guard let address else { return "Waiting for location" }
+        let parts = [
+            valid(address.street),
+            valid(address.town),
+            valid(address.county)
+        ].compactMap { $0 }
+
+        return parts.isEmpty ? "Updating place..." : parts.joined(separator: ", ")
+    }
+
+    static func hierarchyRows(for address: Address?) -> [LocationHierarchyRow] {
+        let values: [(id: String, label: String, value: String?)] = [
+            ("street", "Street", address.flatMap { valid($0.street) }),
+            ("town", "Town", address.flatMap { valid($0.town) }),
+            ("county", "County", address.flatMap { valid($0.county) }),
+            ("region", "Region", address.flatMap { valid($0.administrativeArea) }),
+            ("country", "Country", address.flatMap { valid($0.country) })
+        ]
+        let currentID = values.first { $0.value != nil }?.id
+
+        return values.map { item in
+            LocationHierarchyRow(
+                id: item.id,
+                label: item.label,
+                value: item.value ?? "Unavailable",
+                isCurrent: item.id == currentID,
+                isAvailable: item.value != nil
+            )
+        }
+    }
+
+    private static func valid(_ value: String) -> String? {
+        Address.isValidPlaceName(value) ? value : nil
+    }
+}
+
 struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var firstRunState = FirstRunState()
 #if DEBUG
     @StateObject private var debugLog = DebugLogStore.shared
-    @AppStorage(ProxyDiagnostics.enabledKey) private var proxyDiagnosticsEnabled = false
 #endif
     @State private var logs: [RideLogEntry] = []
     @State private var showOnboarding = false
     @State private var showResetConfirmation = false
     @State private var showResetCompleteMessage = false
+    @State private var showSettings = false
+    @State private var showLog = false
 
     var body: some View {
-        TabView {
-            SettingsView(
-                locationManager: locationManager,
-                showResetConfirmation: $showResetConfirmation
-            )
-            .tabItem {
-                Label("Settings", systemImage: "gearshape")
+        NavigationStack {
+            LocationScreenView(locationManager: locationManager) {
+                locationManager.repeatCurrentAnnouncement()
             }
-
-            LogHistoryView(locationManager: locationManager, logs: $logs)
-                .tabItem {
-                    Label("Log", systemImage: "list.bullet")
-                }
-
-#if DEBUG
-            if proxyDiagnosticsEnabled {
-                DebugLogView(debugLog: debugLog)
-                    .tabItem {
-                        Label("Debug", systemImage: "stethoscope")
+            .navigationTitle("Location")
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        showLog = true
+                    } label: {
+                        Label("Log", systemImage: "clock.arrow.circlepath")
                     }
+
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                }
             }
-#endif
         }
         .onAppear {
             showOnboarding = firstRunState.needsOnboarding
             if !firstRunState.needsOnboarding {
                 startRideIfNeeded()
             }
+        }
+        .sheet(isPresented: $showSettings) {
+#if DEBUG
+            SettingsView(
+                locationManager: locationManager,
+                showResetConfirmation: $showResetConfirmation,
+                debugLog: debugLog
+            )
+#else
+            SettingsView(
+                locationManager: locationManager,
+                showResetConfirmation: $showResetConfirmation
+            )
+#endif
+        }
+        .sheet(isPresented: $showLog) {
+            LogHistoryView(locationManager: locationManager, logs: $logs)
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView(firstRunState: firstRunState) {
@@ -109,10 +172,183 @@ struct ContentView: View {
     }
 }
 
+private struct LocationScreenView: View {
+    @ObservedObject var locationManager: LocationManager
+    let onRepeat: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                currentInformationPanel
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onRepeat)
+
+                LocationMapView(coordinate: locationManager.lastKnownLocation)
+                    .frame(height: 260)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                statusPanel
+            }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private var currentInformationPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Where you are")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(LocationSummaryFormatter.summary(for: locationManager.lastKnownAddress))
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let coordinate = locationManager.lastKnownLocation {
+                    Text("\(coordinate.latitude, specifier: "%.5f"), \(coordinate.longitude, specifier: "%.5f")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Hierarchy")
+                    .font(.headline)
+                ForEach(LocationSummaryFormatter.hierarchyRows(for: locationManager.lastKnownAddress)) { row in
+                    HStack(spacing: 10) {
+                        Image(systemName: row.isCurrent ? "location.fill" : "circle")
+                            .font(.caption)
+                            .foregroundStyle(row.isCurrent ? .blue : .secondary)
+                            .frame(width: 18)
+                        Text(row.label)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 72, alignment: .leading)
+                        Text(row.value)
+                            .fontWeight(row.isCurrent ? .semibold : .regular)
+                            .foregroundStyle(row.isAvailable ? .primary : .secondary)
+                        Spacer()
+                    }
+                }
+            }
+
+            if let phrase = locationManager.lastSpokenPhrase {
+                Divider()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Last spoken")
+                        .font(.headline)
+                    Text(phrase)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let timestamp = locationManager.lastSpokenAt {
+                        Text(isoDateFormatter.string(from: timestamp))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityHint("Tap to repeat the current location announcement.")
+    }
+
+    private var statusPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if locationManager.contentMode == .quiet {
+                Label("Quiet mode is on", systemImage: "speaker.slash.fill")
+                    .foregroundStyle(.secondary)
+            } else {
+                Label("Always running", systemImage: "location.fill")
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Announcement style: \(locationManager.contentMode.label)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            if locationManager.testMode {
+                Button {
+                    locationManager.logTestLocation()
+                } label: {
+                    Label("Next test location", systemImage: "arrow.forward.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct LocationMapView: View {
+    let coordinate: CLLocationCoordinate2D?
+    @State private var cameraPosition: MapCameraPosition = .automatic
+
+    private var snapshot: CoordinateSnapshot? {
+        coordinate.map(CoordinateSnapshot.init)
+    }
+
+    var body: some View {
+        Group {
+            if let snapshot {
+                Map(position: $cameraPosition) {
+                    Marker("Current Location", coordinate: snapshot.coordinate)
+                }
+                .onAppear {
+                    updateCamera(snapshot)
+                }
+                .onChange(of: snapshot) { _, newValue in
+                    updateCamera(newValue)
+                }
+            } else {
+                ContentUnavailableView(
+                    "Waiting for GPS",
+                    systemImage: "location",
+                    description: Text("Location appears here once permission and GPS are available.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.secondarySystemGroupedBackground))
+            }
+        }
+    }
+
+    private func updateCamera(_ snapshot: CoordinateSnapshot) {
+        cameraPosition = .region(
+            MKCoordinateRegion(
+                center: snapshot.coordinate,
+                latitudinalMeters: 5_000,
+                longitudinalMeters: 5_000
+            )
+        )
+    }
+}
+
+private struct CoordinateSnapshot: Equatable {
+    let latitude: CLLocationDegrees
+    let longitude: CLLocationDegrees
+
+    init(_ coordinate: CLLocationCoordinate2D) {
+        self.latitude = coordinate.latitude
+        self.longitude = coordinate.longitude
+    }
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
 private struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var locationManager: LocationManager
     @Binding var showResetConfirmation: Bool
 #if DEBUG
+    @ObservedObject var debugLog: DebugLogStore
     @AppStorage(ProxyDiagnostics.enabledKey) private var proxyDiagnosticsEnabled = false
 #endif
 
@@ -121,14 +357,25 @@ private struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Ride") {
-                    Toggle("Test Mode", isOn: $locationManager.testMode)
-
+                Section("Announcements") {
                     Picker("Announcement Style", selection: $locationManager.contentMode) {
                         ForEach(ContentMode.allCases) { mode in
                             Text(mode.label).tag(mode)
                         }
                     }
+
+                    SectionToggleRows(locationManager: locationManager)
+                }
+
+                Section("Advanced") {
+                    Picker("Location check frequency", selection: $locationManager.locationCheckInterval) {
+                        ForEach(intervals, id: \.self) { interval in
+                            Text("\(interval) seconds").tag(interval)
+                        }
+                    }
+
+                    Toggle("Test Mode", isOn: $locationManager.testMode)
+                    Toggle("Speak After Every Geocode", isOn: $locationManager.speakAfterEveryGeocode)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Bluetooth Audio Delay: \(locationManager.bluetoothDelaySeconds, specifier: "%.1f")s")
@@ -138,107 +385,89 @@ private struct SettingsView: View {
                             step: 0.1
                         )
                     }
-                }
-
-                Section("Location") {
-                    Toggle("Speak After Every Geocode (Debug)", isOn: $locationManager.speakAfterEveryGeocode)
-
-                    Picker("Check Interval", selection: $locationManager.locationCheckInterval) {
-                        ForEach(intervals, id: \.self) { interval in
-                            Text("\(interval) seconds").tag(interval)
-                        }
-                    }
-                }
-
-                Section("Announce") {
-                    Toggle("Street", isOn: $locationManager.announceStreet)
-                    Toggle("Town", isOn: $locationManager.announceTown)
-                    Toggle("County", isOn: $locationManager.announceCounty)
-                    Toggle("Nation", isOn: $locationManager.announceNation)
-                    Toggle("Country", isOn: $locationManager.announceCountry)
-                }
-
-                Section {
-                    DisclosureGroup("Advanced") {
-                        DisclosureGroup("Developer") {
-                            Text("Testing tools only. Not for normal rides.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
 
 #if DEBUG
-                            Toggle("Proxy Diagnostics", isOn: $proxyDiagnosticsEnabled)
-                                .onChange(of: proxyDiagnosticsEnabled) { _, isEnabled in
-                                    if !isEnabled {
-                                        DebugLogStore.shared.clear()
-                                    }
+                    DisclosureGroup("Proxy Diagnostics") {
+                        Toggle("Enabled", isOn: $proxyDiagnosticsEnabled)
+                            .onChange(of: proxyDiagnosticsEnabled) { _, isEnabled in
+                                if !isEnabled {
+                                    debugLog.clear()
                                 }
+                            }
+
+                        if proxyDiagnosticsEnabled {
+                            DebugLogInlineView(debugLog: debugLog)
+                        }
+                    }
 #endif
 
-                            Button("Reset First-Time Experience", role: .destructive) {
-                                showResetConfirmation = true
-                            }
-                        }
+                    Button("Reset First-Time Experience", role: .destructive) {
+                        showResetConfirmation = true
                     }
                 }
             }
             .navigationTitle("Settings")
+            .toolbar {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+private struct SectionToggleRows: View {
+    @ObservedObject var locationManager: LocationManager
+
+    var body: some View {
+        DisclosureGroup("What to announce") {
+            Toggle("Street", isOn: $locationManager.announceStreet)
+            Toggle("Town", isOn: $locationManager.announceTown)
+            Toggle("County", isOn: $locationManager.announceCounty)
+            Toggle("Region", isOn: $locationManager.announceNation)
+            Toggle("Country", isOn: $locationManager.announceCountry)
         }
     }
 }
 
 private struct LogHistoryView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var locationManager: LocationManager
     @Binding var logs: [RideLogEntry]
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Text("Ride history appears here as boundaries change. Turn on Test Mode in Settings, then use Log to step through the Gloucestershire test route without riding.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    .padding(.top, 12)
-                    .padding(.bottom, 4)
-
-                List(logs) { log in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(log.timestamp, formatter: dateFormatter)
-                            .font(.headline)
-                        Text("\(log.location.latitude, specifier: "%.5f"), \(log.location.longitude, specifier: "%.5f")")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        if Address.isValidPlaceName(log.address.street) {
-                            Text(log.address.street)
-                        }
-
-                        Text("\(log.address.town), \(log.address.county)")
-
-                        Text("\(log.address.administrativeArea), \(log.address.country)")
-                            .foregroundStyle(.secondary)
-
-                        if locationManager.testMode, let phrase = log.utteredPhrase {
-                            Text("Spoke: \"\(phrase)\"")
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                                .padding(.top, 2)
+                List {
+                    if logs.isEmpty {
+                        ContentUnavailableView(
+                            "No log entries yet",
+                            systemImage: "list.bullet",
+                            description: Text("Place changes and manual test steps appear here.")
+                        )
+                    } else {
+                        ForEach(logs) { log in
+                            LogRow(log: log, showSpokenPhrase: locationManager.testMode)
                         }
                     }
-                    .padding(.vertical, 4)
                 }
 
                 Button(action: logCurrentLocation) {
-                    Text("Log")
+                    Label(locationManager.testMode ? "Next test location" : "Log current location", systemImage: "plus.circle")
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.blue)
                         .foregroundColor(.white)
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .padding()
             }
             .navigationTitle("Log")
+            .toolbar {
+                Button("Done") {
+                    dismiss()
+                }
+            }
         }
     }
 
@@ -268,58 +497,82 @@ private struct LogHistoryView: View {
     }
 }
 
+private struct LogRow: View {
+    let log: RideLogEntry
+    let showSpokenPhrase: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(LocationSummaryFormatter.summary(for: log.address))
+                .font(.headline)
+
+            if showSpokenPhrase, let phrase = log.utteredPhrase {
+                Text("Spoke: \(phrase)")
+                    .font(.subheadline)
+            }
+
+            Text("\(log.address.administrativeArea), \(log.address.country)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Text(isoDateFormatter.string(from: log.timestamp))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("\(log.location.latitude, specifier: "%.5f"), \(log.location.longitude, specifier: "%.5f")")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 #if DEBUG
-private struct DebugLogView: View {
+private struct DebugLogInlineView: View {
     @ObservedObject var debugLog: DebugLogStore
 
     var body: some View {
-        NavigationStack {
-            List {
-                if debugLog.entries.isEmpty {
-                    Text("No debug events yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(debugLog.entries) { entry in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(entry.category)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(entry.timestamp, formatter: dateFormatter)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(entry.message)
-                                .font(.subheadline)
-                                .textSelection(.enabled)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .navigationTitle("Debug")
-            .toolbar {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("\(debugLog.entries.count) events")
+                    .foregroundStyle(.secondary)
+                Spacer()
                 Button("Clear") {
                     debugLog.clear()
                 }
                 .disabled(debugLog.entries.isEmpty)
+            }
+
+            if debugLog.entries.isEmpty {
+                Text("No debug events yet.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(debugLog.entries.prefix(30)) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(entry.category)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(isoDateFormatter.string(from: entry.timestamp))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(entry.message)
+                            .font(.caption)
+                            .textSelection(.enabled)
+                    }
+                    .padding(.vertical, 4)
+                }
             }
         }
     }
 }
 #endif
 
-private let dateFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
+private let isoDateFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
     return formatter
 }()
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-    }
-}

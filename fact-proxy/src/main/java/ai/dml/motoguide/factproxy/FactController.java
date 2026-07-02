@@ -31,10 +31,12 @@ public class FactController {
         request.validate();
         String placeName = request.validatedPlaceName();
         String countryContext = request.validatedCountryContext();
+        FactMode factMode = request.validatedFactMode();
         if (diagnosticsSettings.enabled()) {
             log.info(
-                    "event=fact_request_valid boundary={} placeNameLength={} hasCountryContext={}",
+                    "event=fact_request_valid boundary={} factMode={} placeNameLength={} hasCountryContext={}",
                     request.boundary(),
+                    factMode.wireValue(),
                     placeName.length(),
                     countryContext != null
             );
@@ -42,7 +44,12 @@ public class FactController {
 
         String fact = openAiService.generateFact(request);
         if (diagnosticsSettings.enabled()) {
-            log.info("event=fact_request_success boundary={} factLength={}", request.boundary(), fact.length());
+            log.info(
+                    "event=fact_request_success boundary={} factMode={} factLength={}",
+                    request.boundary(),
+                    factMode.wireValue(),
+                    fact.length()
+            );
         }
         return new FactResponse(fact);
     }

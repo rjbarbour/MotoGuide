@@ -1,6 +1,6 @@
 # MotoGuide fact proxy
 
-Java 25 / Spring Boot thin HTTP proxy: MotoGuide iPhone → this service → OpenAI. The OpenAI API key lives only on Fly.io, not on the device.
+Java 25 / Spring Boot thin HTTP proxy: MotoGuide iPhone → this service → OpenAI. The OpenAI API key and prompt text live only on the server, not on the device.
 
 OpenAPI contract source: `/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml`.
 
@@ -85,17 +85,26 @@ Returns `200` with body `ok`.
 {
   "boundary": "town",
   "placeName": "Stroud",
-  "countryContext": "United Kingdom"
+  "factMode": "shortFacts",
+  "countryContext": "United Kingdom",
+  "placeHierarchy": {
+    "town": "Stroud",
+    "county": "Gloucestershire",
+    "region": "England",
+    "country": "United Kingdom"
+  }
 }
 ```
 
 `boundary` is one of: `country`, `nation`, `county`, `town`, `street`.
+`factMode` is one of: `shortFacts`, `longFacts`. Unknown modes return `400` before any OpenAI call.
+The iOS app sends place hierarchy only. It does not send prompt text, model messages, OpenAI configuration, or coordinates.
 
 **Response `200`**
 
 ```json
 {
-  "fact": "One short factual sentence."
+  "fact": "One bounded factual sentence."
 }
 ```
 
@@ -113,7 +122,7 @@ curl -sS http://127.0.0.1:3000/health
 curl -sS -X POST http://127.0.0.1:3000/v1/fact \
   -H "Authorization: Bearer dev-token" \
   -H "Content-Type: application/json" \
-  -d '{"boundary":"town","placeName":"Stroud","countryContext":"United Kingdom"}'
+  -d '{"boundary":"town","placeName":"Stroud","factMode":"shortFacts","countryContext":"United Kingdom","placeHierarchy":{"town":"Stroud","county":"Gloucestershire","region":"England","country":"United Kingdom"}}'
 ```
 
 ## Fly.io deploy
@@ -148,6 +157,8 @@ Store `MOTOGUIDE_PROXY_TOKEN` in the iOS app Keychain (service `MotoGuideProxy`)
 | `OPENAI_API_KEY` | Yes | OpenAI key (Fly secret only) |
 | `MOTOGUIDE_PROXY_TOKEN` | Yes | Shared secret the app sends as Bearer token |
 | `OPENAI_MODEL` | No | Fly runtime variable. Default `gpt-4o-mini` in `fly.toml` |
+| `MOTOGUIDE_SHORT_FACT_PROMPT` | No | Optional server-side prompt override for `shortFacts` |
+| `MOTOGUIDE_LONG_FACT_PROMPT` | No | Optional server-side prompt override for `longFacts` |
 | `PORT` | No | Default `3000` |
 | `RATE_LIMIT_PER_MINUTE` | No | Default `30` per client IP |
 

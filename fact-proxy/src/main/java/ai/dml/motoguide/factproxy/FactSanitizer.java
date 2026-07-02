@@ -1,12 +1,17 @@
 package ai.dml.motoguide.factproxy;
 
 public final class FactSanitizer {
-    public static final int MAX_FACT_LENGTH = 120;
+    public static final int MAX_SHORT_FACT_LENGTH = FactMode.SHORT_FACTS.maxFactLength();
+    public static final int MAX_LONG_FACT_LENGTH = FactMode.LONG_FACTS.maxFactLength();
 
     private FactSanitizer() {
     }
 
     public static String sanitize(String fact) {
+        return sanitize(fact, FactMode.SHORT_FACTS);
+    }
+
+    public static String sanitize(String fact, FactMode mode) {
         if (fact == null) {
             return null;
         }
@@ -27,8 +32,9 @@ public final class FactSanitizer {
             return null;
         }
 
-        if (text.length() > MAX_FACT_LENGTH) {
-            text = text.substring(0, MAX_FACT_LENGTH).trim();
+        int maxFactLength = mode.maxFactLength();
+        if (text.length() > maxFactLength) {
+            text = text.substring(0, maxFactLength).trim();
         }
 
         return text.isEmpty() ? null : text;

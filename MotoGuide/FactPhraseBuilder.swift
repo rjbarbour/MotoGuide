@@ -1,16 +1,17 @@
 import Foundation
 
 enum FactPhraseBuilder {
-    static let maxFactLength = 120
+    static let defaultFactMode: FactMode = .shortFacts
+    static let maxFactLength = FactMode.shortFacts.maxFactLength
 
-    static func utterance(basePhrase: String, fact: String?) -> String {
-        guard let sanitized = sanitize(fact) else {
+    static func utterance(basePhrase: String, fact: String?, mode: FactMode = defaultFactMode) -> String {
+        guard let sanitized = sanitize(fact, mode: mode) else {
             return basePhrase
         }
         return "\(basePhrase). \(sanitized)"
     }
 
-    static func sanitize(_ fact: String?) -> String? {
+    static func sanitize(_ fact: String?, mode: FactMode = defaultFactMode) -> String? {
         guard var text = fact?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
             return nil
         }
@@ -25,8 +26,8 @@ enum FactPhraseBuilder {
             return nil
         }
 
-        if text.count > maxFactLength {
-            text = String(text.prefix(maxFactLength)).trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.count > mode.maxFactLength {
+            text = String(text.prefix(mode.maxFactLength)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         return text.isEmpty ? nil : text

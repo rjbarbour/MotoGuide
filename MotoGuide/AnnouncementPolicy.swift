@@ -46,7 +46,7 @@ enum BoundaryChangeDetector {
 enum AnnouncementPhraseBuilder {
     static func baseSpeechMode(for mode: ContentMode) -> ContentMode {
         switch mode {
-        case .shortFacts:
+        case .shortFacts, .longFacts:
             return .natural
         case .natural, .namesOnly, .quiet:
             return mode
@@ -90,7 +90,7 @@ enum AnnouncementPhraseBuilder {
             return nil
         case .namesOnly:
             return namesOnlyPhrase(welcomeName: welcomeName, location: location)
-        case .natural, .shortFacts:
+        case .natural, .shortFacts, .longFacts:
             return naturalPhrase(welcomeName: welcomeName, location: location)
         }
     }
@@ -126,7 +126,7 @@ enum AnnouncementPhraseBuilder {
         return nil
     }
 
-    private static func locationPhrase(in address: Address, mode: ContentMode) -> String? {
+    static func locationPhrase(in address: Address, mode: ContentMode) -> String? {
         let town = Address.isValidPlaceName(address.town) ? address.town : nil
         let county = Address.isValidPlaceName(address.county) ? address.county : nil
 
@@ -138,7 +138,7 @@ enum AnnouncementPhraseBuilder {
             if let town { return town }
             if let county { return county }
             return nil
-        case .natural, .shortFacts:
+        case .natural, .shortFacts, .longFacts:
             if let town, let county { return "You are in \(town), \(county)" }
             if let town { return "You are in \(town)" }
             if let county { return "You are in \(county)" }
@@ -200,11 +200,17 @@ enum AnnouncementPolicy {
         return AnnouncementPlan(text: result.text, boundary: result.boundary)
     }
 
-    static func factRequest(for plan: AnnouncementPlan, address: Address) -> PlaceFactRequest {
+    static func factRequest(
+        for plan: AnnouncementPlan,
+        address: Address,
+        mode: FactMode = .shortFacts
+    ) -> PlaceFactRequest {
         PlaceFactRequest(
             boundary: plan.boundary,
             placeName: AnnouncementPhraseBuilder.placeName(for: plan.boundary, in: address),
-            countryContext: Address.isValidPlaceName(address.country) ? address.country : nil
+            factMode: mode,
+            countryContext: Address.isValidPlaceName(address.country) ? address.country : nil,
+            placeHierarchy: PlaceHierarchy(address: address)
         )
     }
 }

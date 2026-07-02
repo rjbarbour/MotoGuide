@@ -10,9 +10,11 @@ Keep the iOS app, fact proxy server, tests, and markdown in sync with the OpenAP
 
 ## Purpose
 
-The fact proxy contract lets MotoGuide ask for one short place fact without storing or sending an OpenAI API key from the iOS app.
+The fact proxy contract lets MotoGuide ask for one bounded place fact without storing or sending an OpenAI API key from the iOS app.
 
-The iOS app sends a place request to the MotoGuide fact proxy. The proxy validates the request, calls OpenAI server-side, sanitizes the model output, and returns one short sentence.
+The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the MotoGuide fact proxy. The proxy validates the request, chooses the server-side prompt for `shortFacts` or `longFacts`, calls OpenAI server-side, sanitizes the model output, and returns a bounded fact.
+
+The iOS app must not send prompt text, arbitrary model messages, OpenAI configuration, raw coordinates, or an OpenAI API key.
 
 ## Implementations
 
@@ -88,6 +90,8 @@ Runtime configuration:
 |----------------------|---------|---------|
 | `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model selected by the Fly runtime environment. |
 | `MOTOGUIDE_DIAGNOSTICS_ENABLED` | `false` | Enables verbose proxy diagnostics at startup. |
+| `MOTOGUIDE_SHORT_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `shortFacts`. Never sent by iOS. |
+| `MOTOGUIDE_LONG_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `longFacts`. Never sent by iOS. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Per-IP request limit for authenticated proxy calls. |
 
 Health check:
@@ -138,7 +142,7 @@ Current MVP security model:
 - The app stores only the proxy token, not the OpenAI key.
 - The OpenAI key is stored only as the Fly secret `OPENAI_API_KEY`.
 - The proxy only exposes a narrow place-fact endpoint; clients cannot send arbitrary OpenAI prompts, model names, endpoints, or message arrays.
-- The proxy validates `boundary` and `placeName`.
+- The proxy validates `boundary`, `factMode`, `placeName`, `countryContext`, and `placeHierarchy`.
 - The proxy rate-limits by client IP.
 
 Current limitation:
@@ -164,8 +168,8 @@ Proxy logs include these event names:
 | Event | Meaning | Sensitive fields logged |
 |-------|---------|-------------------------|
 | `fact_proxy_request` | Final request status and duration for `/v1/fact`. | No token, no place name, no IP. |
-| `fact_request_valid` | Request passed deterministic validation. Emitted only when diagnostics are enabled. | Boundary, place-name length, country-context presence. |
-| `fact_request_success` | Fact generated and returned. Emitted only when diagnostics are enabled. | Boundary, fact length. |
+| `fact_request_valid` | Request passed deterministic validation. Emitted only when diagnostics are enabled. | Boundary, fact mode, place-name length, country-context presence. |
+| `fact_request_success` | Fact generated and returned. Emitted only when diagnostics are enabled. | Boundary, fact mode, fact length. |
 | `fact_request_rejected` | Request failed validation with `400`. | Rejection reason only. |
 | `proxy_auth_failed` | Missing or wrong bearer token with `401`. | Failure category only. |
 | `proxy_auth_misconfigured` | Missing server-side proxy token with `500`. | No secret value. |
@@ -209,7 +213,14 @@ JSON body:
 {
   "boundary": "town",
   "placeName": "Stroud",
-  "countryContext": "United Kingdom"
+  "factMode": "shortFacts",
+  "countryContext": "United Kingdom",
+  "placeHierarchy": {
+    "town": "Stroud",
+    "county": "Gloucestershire",
+    "region": "England",
+    "country": "United Kingdom"
+  }
 }
 ```
 
@@ -219,15 +230,28 @@ Fields:
 |-------|----------|------|----------------|---------|
 | `boundary` | Yes | String | `country`, `nation`, `county`, `town`, `street` | The boundary type that triggered the announcement. |
 | `placeName` | Yes | String | Non-empty place name | The place to generate a fact about. |
+| `factMode` | Yes | String | `shortFacts`, `longFacts` | Requested fact depth. The proxy owns prompt selection and rejects unknown values with `400`. |
 | `countryContext` | No | String or `null` | Non-empty country name when known | Disambiguates places with reused names. |
+| `placeHierarchy` | Yes | Object | `street`, `town`, `county`, `region`, `country` string values or omitted/null | Current reverse-geocoded hierarchy. Coordinates are not sent. |
 
 The iOS app must map `BoundaryType.factLabel` directly to `boundary`.
+
+The iOS app maps content modes to fact modes as follows:
+
+| iOS content mode | Proxy call |
+|------------------|------------|
+| `Short Facts` | `factMode: "shortFacts"` |
+| `Long Facts` | `factMode: "longFacts"` |
+| `Natural` | No proxy call |
+| `Names Only` | No proxy call |
+| `Quiet` | No proxy call |
 
 Input hardening:
 
 - `placeName` is trimmed and whitespace-normalized before prompting.
 - `placeName` maximum length is 96 characters.
 - `countryContext` maximum length is 64 characters.
+- `placeHierarchy` values use the same bounded validation as `placeName` and `countryContext`.
 - Inputs must contain at least one Latin letter.
 - Inputs must use only Latin letters, digits where useful, spaces, and common UK place-name punctuation: `.`, `,`, `'`, `’`, `&`, `(`, `)`, `-`.
 - `countryContext` is stricter and does not allow digits or `&`.
@@ -257,13 +281,13 @@ Fields:
 
 | Field | Required | Type | Meaning |
 |-------|----------|------|---------|
-| `fact` | Yes | String | One short, factual, ride-safe sentence. |
+| `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 120 characters. `longFacts` is capped at 280 characters. |
 
 ## Error Responses
 
 | Status | Meaning | iOS behavior |
 |--------|---------|--------------|
-| `400` | Invalid JSON, missing `boundary`, invalid `boundary`, or missing `placeName`. | Fall back to the base place announcement. |
+| `400` | Invalid JSON, missing required field, invalid `boundary`, invalid `factMode`, invalid `placeName`, or invalid `placeHierarchy`. | Fall back to the base place announcement. |
 | `401` | Missing or wrong proxy token. | Fall back to the base place announcement. |
 | `500` | Proxy is misconfigured, including missing server-side proxy token. | Fall back to the base place announcement. |
 | `502` | OpenAI returned an error or unusable response. | Fall back to the base place announcement. |
@@ -274,14 +298,15 @@ The iOS app must not speak raw error text.
 
 The returned `fact` must be:
 
-- One sentence.
+- `shortFacts`: one sentence and no more than 120 characters.
+- `longFacts`: one or two short sentences and no more than 280 characters.
 - Factual and neutral.
 - Useful as ambient place context.
 - Short enough to keep the total spoken announcement ride-safe.
 - Free of questions.
 - Free of invitations, route advice, speed advice, or riding instructions.
 
-The current iOS sanitizer rejects empty facts, questions, and `you should` phrasing, and truncates facts to 120 characters.
+The current iOS sanitizer rejects empty facts, questions, and `you should` phrasing, and truncates facts using the selected fact mode.
 
 ## Timeout And Fallback
 
@@ -303,14 +328,14 @@ Exact command:
 curl -sS -X POST http://127.0.0.1:3000/v1/fact \
   -H "Authorization: Bearer dev-token" \
   -H "Content-Type: application/json" \
-  -d '{"boundary":"town","placeName":"Stroud","countryContext":"United Kingdom"}'
+  -d '{"boundary":"town","placeName":"Stroud","factMode":"shortFacts","countryContext":"United Kingdom","placeHierarchy":{"town":"Stroud","county":"Gloucestershire","region":"England","country":"United Kingdom"}}'
 ```
 
 Expected result:
 
 ```json
 {
-  "fact": "One short factual sentence."
+  "fact": "One bounded factual sentence."
 }
 ```
 

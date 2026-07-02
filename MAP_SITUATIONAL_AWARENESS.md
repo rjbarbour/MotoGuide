@@ -1,4 +1,4 @@
-# Situational Awareness Map — Design
+# Location Screen Situational Awareness — Design
 
 Date: 2026-07-01  
 Status: Planning (Milestone 6)
@@ -7,11 +7,11 @@ Status: Planning (Milestone 6)
 
 MotoGuide is an ambient place-awareness companion, not a navigation app. Navigation apps answer: *turn here, in 200 m, take the second exit*. MotoGuide answers: *where am I in the landscape, and what larger places am I near or inside?*
 
-The Map tab gives riders a **glanceable geographic context screen** they can open at a stoplight, fuel stop, or scenic pull-off. It complements helmet audio announcements and does not compete with turn-by-turn navigation for attention while moving.
+The Location screen gives riders a **glanceable geographic context screen** they can open at a stoplight, fuel stop, or scenic pull-off. It complements helmet audio announcements and does not compete with turn-by-turn navigation for attention while moving.
 
 ### vs navigation apps
 
-| Navigation apps | MotoGuide Map tab |
+| Navigation apps | MotoGuide Location screen |
 |-----------------|-------------------|
 | Route, ETA, next manoeuvre | Current place in hierarchy |
 | Street-level turn detail | County / region / country context |
@@ -19,7 +19,7 @@ The Map tab gives riders a **glanceable geographic context screen** they can ope
 | Corners and junctions | Nearby towns and distances |
 | Optimised for driving decisions | Optimised for orientation |
 
-MotoGuide should remain mountable beside a nav app: nav on one screen corner, MotoGuide Map available when the rider deliberately switches tab.
+MotoGuide should remain mountable beside a nav app: nav on one screen corner, MotoGuide Location available when the rider deliberately opens the app.
 
 ## Recommendation: single map + context stack (not dual map)
 
@@ -42,7 +42,7 @@ A compact **“wider context” row** below the hierarchy (nearest towns with di
 
 ## UI layout (SwiftUI + MapKit)
 
-Proposed tab order: **Map** (default) · **Settings** · **Log**
+Current app structure: **Location** is the primary screen. **Settings** opens from the toolbar gear. **Log** opens from the toolbar history/list button. There is no Start/Pause control.
 
 ```
 ┌─────────────────────────────────────┐
@@ -53,7 +53,7 @@ Proposed tab order: **Map** (default) · **Settings** · **Log**
 │  ● Street    B4066                  │  ← current level highlighted
 │    Town      Nailsworth             │
 │    County    Gloucestershire        │
-│    Nation    England                │
+│    Region    England                │
 │    Country   United Kingdom           │
 │  (previous street: Avening Road)    │  ← muted, only if known
 ├─────────────────────────────────────┤
@@ -117,7 +117,7 @@ Share the same throttled geocode path as announcements (`locationCheckInterval`)
 
 **In scope**
 
-- New **Map** tab as default landing tab.
+- New **Location** screen as the default app screen.
 - Context stack: summary, hierarchy, previous street, nearby towns.
 - Single MapKit map, user-following, context-aware default zoom.
 - Stopped-only zoom presets (or speed-gated).
@@ -132,25 +132,25 @@ Share the same throttled geocode path as announcements (`locationCheckInterval`)
 - Custom map styling, satellite imagery, 3D buildings.
 - Landmark layers, history pins, POI browsing.
 - Voice interaction on the map tab.
-- Log entry creation from the map (stays on Log tab).
-- Announcement settings duplication on map (read-only reflection of Settings).
+- Log entry creation from the Location screen, except explicit Test Mode stepping.
+- Announcement settings duplication on Location (read-only reflection of Settings).
 
 ## Later enhancements
 
 - **M3 integration:** county/town boundary overlays; offline hierarchy when geocoder is weak.
-- **M5 integration:** optional fact chip under summary (*“Wool capital of the Cotswolds”*) when Short Facts mode is on.
+- **M5 integration:** optional fact chip under summary (*“Wool capital of the Cotswolds”*) when Short Facts or Long Facts mode is on.
 - **Tap nearest town:** copy name or hand off to navigation app (MVP2 POI handoff pattern).
-- **Log correlation:** tap a log row to show that point on the map (Log tab enhancement).
+- **Log correlation:** tap a log row to show that point on the map (Log enhancement).
 - **Lock screen / widget:** minimal hierarchy line without opening the app (far future).
 - **CarPlay:** not planned for MVP1.
 
-## Interaction with Settings and Log tabs
+## Interaction with Settings and Log
 
-| Tab | Role relative to Map |
-|-----|----------------------|
-| **Settings** | Source of truth for announcement style, intervals, test mode, boundary toggles. Map **displays** current `Address` and does not change speech policy. Optional: small banner on Map when Quiet mode is on (*“Announcements muted”*). |
-| **Log** | Timestamped history of address changes. Map shows **now**; Log shows **then**. No merge in M6; future enhancement can jump from log row to map region. |
-| **Map** | Read-mostly. No new ride controls beyond zoom presets (stopped). Riders configure behaviour in Settings, review history in Log, orient themselves on Map. |
+| Surface | Role relative to Location |
+|---------|---------------------------|
+| **Settings** | Source of truth for announcement style, intervals, test mode, boundary toggles. Location **displays** current `Address` and does not change speech policy. Quiet mode is visible on Location. |
+| **Log** | Timestamped history of address changes. Location shows **now**; Log shows **then**. No merge in M6; future enhancement can jump from a log row to the map region. |
+| **Location** | Read-mostly. No ride controls beyond Test Mode stepping and later stopped-only zoom presets. Riders configure behaviour in Settings, review history in Log, orient themselves on Location. |
 
 Shared state: existing `LocationManager` (`@StateObject` in `ContentView`) — map view is another consumer of `lastKnownLocation`, `lastKnownAddress`, and test mode.
 
@@ -177,13 +177,13 @@ Physical validation: confirm a 2-second glance at a stop provides useful context
 
 ## Open questions
 
-1. **Default tab:** Should Map replace Settings as the launch tab, or stay second until field-tested?
+1. **Default screen:** Location replaces Settings as the launch screen.
 2. **Nearest town definition:** Minimum population threshold, or purely distance-based from search results?
-3. **Nation label:** UK riders expect “England” / “Scotland” — confirm `administrativeArea` from Apple geocoder is consistently correct on the test route.
+3. **Region label:** UK riders expect “England” / “Scotland” — confirm `administrativeArea` from Apple geocoder is consistently correct on the test route.
 4. **Zoom constants:** Are 2 km / 5 km / 25 km the right presets for UK touring, or should they scale with speed?
 5. **Heading arrow:** Show course on map when `CLLocation.course` is valid, or keep dot-only for simplicity?
 6. **Boundary highlight without polygons:** Is hierarchy-only enough for MVP, or should we draw a simple circle/hex “you are in this county” approximation until M3?
-7. **M5 facts on map:** Show short fact under summary in Short Facts mode, or keep map free of generated text until facts are curated?
+7. **M5 facts on Location:** Show short/long fact under summary, or keep the screen focused on the last spoken phrase?
 8. **Accessibility:** VoiceOver order — summary before map; verify hierarchy is navigable without seeing the map.
 
 ## References

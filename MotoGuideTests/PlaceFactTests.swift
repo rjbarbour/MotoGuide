@@ -50,6 +50,12 @@ final class FactPhraseBuilderTests: XCTestCase {
         let sanitized = FactPhraseBuilder.sanitize(long)
         XCTAssertEqual(sanitized?.count, 120)
     }
+
+    func testLongFactsUseLongerBoundedSanitizer() {
+        let long = String(repeating: "a", count: 300)
+        let sanitized = FactPhraseBuilder.sanitize(long, mode: .longFacts)
+        XCTAssertEqual(sanitized?.count, 280)
+    }
 }
 
 final class PlaceFactCacheTests: XCTestCase {
@@ -73,12 +79,19 @@ final class PlaceFactCacheTests: XCTestCase {
 
         XCTAssertNotEqual(uk.cacheKey, us.cacheKey)
     }
+
+    func testCacheKeyIncludesFactMode() {
+        let short = PlaceFactRequest(boundary: .town, placeName: "Stroud", factMode: .shortFacts, countryContext: "United Kingdom")
+        let long = PlaceFactRequest(boundary: .town, placeName: "Stroud", factMode: .longFacts, countryContext: "United Kingdom")
+
+        XCTAssertNotEqual(short.cacheKey, long.cacheKey)
+    }
 }
 
 final class CachedPlaceFactGeneratorTests: XCTestCase {
     func testUsesCacheOnSecondLookup() async throws {
         let mock = MockPlaceFactGenerator()
-        mock.factsByCacheKey["3:stroud:united kingdom"] = "A steep Cotswold town."
+        mock.factsByCacheKey["shortFacts:3:stroud:united kingdom"] = "A steep Cotswold town."
         let cache = PlaceFactCache(loadPersisted: false)
         let generator = CachedPlaceFactGenerator(generator: mock, cache: cache)
         let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: "United Kingdom")
@@ -120,7 +133,14 @@ final class ProxyFactGeneratorTests: XCTestCase {
             let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
             XCTAssertEqual(json?["boundary"] as? String, "town")
             XCTAssertEqual(json?["placeName"] as? String, "Stroud")
+            XCTAssertEqual(json?["factMode"] as? String, "shortFacts")
             XCTAssertEqual(json?["countryContext"] as? String, "United Kingdom")
+            let hierarchy = try XCTUnwrap(json?["placeHierarchy"] as? [String: Any])
+            XCTAssertNil(hierarchy["street"] as? String)
+            XCTAssertNil(hierarchy["town"] as? String)
+            XCTAssertNil(hierarchy["county"] as? String)
+            XCTAssertNil(hierarchy["region"] as? String)
+            XCTAssertNil(hierarchy["country"] as? String)
 
             let response = HTTPURLResponse(
                 url: endpoint,
@@ -140,6 +160,53 @@ final class ProxyFactGeneratorTests: XCTestCase {
         let fact = try await generator.fact(for: request)
 
         XCTAssertEqual(fact, "Known for its wool trade.")
+    }
+
+    func testPostsLongFactModeToProxy() async throws {
+        let endpoint = self.endpoint
+        let request = PlaceFactRequest(
+            boundary: .county,
+            placeName: "Gloucestershire",
+            factMode: .longFacts,
+            countryContext: "United Kingdom",
+            placeHierarchy: PlaceHierarchy(
+                street: "B4066",
+                town: "Nailsworth",
+                county: "Gloucestershire",
+                region: "England",
+                country: "United Kingdom"
+            )
+        )
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            let body = try XCTUnwrap(urlRequest.httpBody)
+            let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+            XCTAssertEqual(json?["factMode"] as? String, "longFacts")
+            let hierarchy = try XCTUnwrap(json?["placeHierarchy"] as? [String: Any])
+            XCTAssertEqual(hierarchy["street"] as? String, "B4066")
+            XCTAssertEqual(hierarchy["town"] as? String, "Nailsworth")
+            XCTAssertEqual(hierarchy["county"] as? String, "Gloucestershire")
+            XCTAssertEqual(hierarchy["region"] as? String, "England")
+            XCTAssertEqual(hierarchy["country"] as? String, "United Kingdom")
+
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data(#"{"fact":"A longer but still bounded place blurb."}"#.utf8))
+        }
+
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        let fact = try await generator.fact(for: request)
+
+        XCTAssertEqual(fact, "A longer but still bounded place blurb.")
     }
 
     func testDefaultEndpointUsesProductionFlyProxyFromContract() async throws {
@@ -349,7 +416,7 @@ final class PlaceFactFetcherTests: XCTestCase {
     func testTimeoutReturnsNilWhenGeneratorIsSlow() async {
         let mock = MockPlaceFactGenerator()
         mock.delayNanoseconds = 5_000_000_000
-        mock.factsByCacheKey["3:stroud"] = "Too late."
+        mock.factsByCacheKey["shortFacts:3:stroud"] = "Too late."
         let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
 
         let fact = await PlaceFactFetcher.fact(for: request, using: mock, timeout: 0.2)
@@ -359,7 +426,7 @@ final class PlaceFactFetcherTests: XCTestCase {
 
     func testReturnsFactWhenGeneratorIsFast() async {
         let mock = MockPlaceFactGenerator()
-        mock.factsByCacheKey["3:stroud"] = "A market town below the escarpment."
+        mock.factsByCacheKey["shortFacts:3:stroud"] = "A market town below the escarpment."
         let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
 
         let fact = await PlaceFactFetcher.fact(for: request, using: mock, timeout: 2)
@@ -412,10 +479,27 @@ final class ShortFactsAnnouncementTests: XCTestCase {
             settings: .ridingDefaults,
             mode: .shortFacts
         )
-        let request = AnnouncementPolicy.factRequest(for: plan!, address: walesTown)
+        let request = AnnouncementPolicy.factRequest(for: plan!, address: walesTown, mode: .shortFacts)
 
         XCTAssertEqual(plan?.text, "Welcome to Wales. You are in Chepstow, Monmouthshire")
         XCTAssertEqual(request.boundary, .nation)
+        XCTAssertEqual(request.placeName, "Wales")
+        XCTAssertEqual(request.factMode, .shortFacts)
+        XCTAssertEqual(request.placeHierarchy.region, "Wales")
+    }
+
+    func testLongFactsWelcomeUsesLongFactModeForFactRequest() {
+        let plan = AnnouncementPolicy.plan(
+            previous: gloucester,
+            current: walesTown,
+            settings: .ridingDefaults,
+            mode: .longFacts
+        )
+        let request = AnnouncementPolicy.factRequest(for: plan!, address: walesTown, mode: .longFacts)
+
+        XCTAssertEqual(plan?.text, "Welcome to Wales. You are in Chepstow, Monmouthshire")
+        XCTAssertEqual(request.boundary, .nation)
+        XCTAssertEqual(request.factMode, .longFacts)
         XCTAssertEqual(request.placeName, "Wales")
     }
 
