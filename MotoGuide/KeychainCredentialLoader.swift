@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 enum KeychainCredentialLoader {
-    // Contract: the iOS app stores only the proxy token under this service.
+    // Contract: the iOS app stores only proxy credentials under these services.
     // See /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
     static func loadMotoGuideProxyToken(service: String = FactProxyContract.keychainService) -> String? {
         loadGenericPassword(service: service)
@@ -10,6 +10,14 @@ enum KeychainCredentialLoader {
 
     static func storeMotoGuideProxyToken(_ token: String, service: String = FactProxyContract.keychainService) -> Bool {
         storeGenericPassword(token, service: service)
+    }
+
+    static func loadMotoGuideDeviceId(service: String = FactProxyContract.deviceIdKeychainService) -> String? {
+        loadGenericPassword(service: service)
+    }
+
+    static func storeMotoGuideDeviceId(_ deviceId: String, service: String = FactProxyContract.deviceIdKeychainService) -> Bool {
+        storeGenericPassword(deviceId, service: service)
     }
 
     static func loadGenericPassword(service: String) -> String? {

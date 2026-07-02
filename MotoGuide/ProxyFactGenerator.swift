@@ -110,6 +110,7 @@ enum FactProxyContract {
     static let productionBaseURL = URL(string: "https://motoguide-fact-proxy.fly.dev")!
     static let localDevelopmentBaseURL = URL(string: "http://127.0.0.1:3000")!
     static let keychainService = "MotoGuideProxy"
+    static let deviceIdKeychainService = "MotoGuideDeviceId"
     static let iosTimeoutSeconds: TimeInterval = 3
 
     static func factEndpoint(baseURL: URL = productionBaseURL) -> URL {
@@ -126,18 +127,22 @@ enum FactProxyContract {
 struct ProxyFactGenerator: PlaceFactGenerating {
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
     typealias ProxyTokenProvider = () -> String?
+    typealias DeviceIdProvider = () -> String?
 
     private let proxyTokenProvider: ProxyTokenProvider
+    private let deviceIdProvider: DeviceIdProvider
     private let session: URLSession
     private let endpoint: URL
 
     init(
         proxyTokenProvider: @escaping ProxyTokenProvider = { KeychainCredentialLoader.loadMotoGuideProxyToken() },
+        deviceIdProvider: @escaping DeviceIdProvider = { KeychainCredentialLoader.loadMotoGuideDeviceId() },
         session: URLSession = .shared,
         baseURL: URL = FactProxyContract.productionBaseURL,
         endpoint: URL? = nil
     ) {
         self.proxyTokenProvider = proxyTokenProvider
+        self.deviceIdProvider = deviceIdProvider
         self.session = session
         self.endpoint = endpoint ?? FactProxyContract.factEndpoint(baseURL: baseURL)
     }
@@ -157,6 +162,11 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         urlRequest.timeoutInterval = FactProxyContract.iosTimeoutSeconds
         urlRequest.setValue("Bearer \(proxyToken)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let deviceId = deviceIdProvider()?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !deviceId.isEmpty {
+            urlRequest.setValue(deviceId, forHTTPHeaderField: "X-MotoGuide-Device-Id")
+            ProxyDiagnostics.log("Proxy", "Device id present: yes, length \(deviceId.count)")
+        }
         urlRequest.httpBody = try JSONEncoder().encode(FactProxyRequest(from: request))
         ProxyDiagnostics.log(
             "Proxy",

@@ -175,6 +175,7 @@ paths:
             minLength: 4
             maxLength: 64
       x-ios-keychain-service: MotoGuideProxy
+      x-ios-device-id-keychain-service: MotoGuideDeviceId
       x-ios-timeout-seconds: 3
       x-ios-fallback: Speak the base place announcement without a fact.
       x-openai-api-key-location: Server-side only. Never store the OpenAI API key in the iOS app or repository.

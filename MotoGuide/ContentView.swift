@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreLocation
 import MapKit
+import UIKit
 
 private struct RideLogEntry: Identifiable {
     let id = UUID()
@@ -183,7 +184,11 @@ private struct LocationScreenView: View {
                     .contentShape(Rectangle())
                     .onTapGesture(perform: onRepeat)
 
-                LocationMapView(coordinate: locationManager.lastKnownLocation)
+                LocationMapView(
+                    coordinate: locationManager.lastKnownLocation,
+                    locationStatus: locationManager.locationStatus,
+                    allowsInteraction: locationManager.allowsMapInteraction
+                )
                     .frame(height: 260)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
@@ -231,6 +236,8 @@ private struct LocationScreenView: View {
                             .foregroundStyle(row.isAvailable ? .primary : .secondary)
                         Spacer()
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(row.label), \(row.value)")
                 }
             }
 
@@ -252,6 +259,7 @@ private struct LocationScreenView: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityAddTraits(.isButton)
         .accessibilityHint("Tap to repeat the current location announcement.")
     }
 
@@ -268,6 +276,16 @@ private struct LocationScreenView: View {
             Text("Announcement style: \(locationManager.contentMode.label)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+
+            Label(locationManager.locationStatus.riderMessage, systemImage: locationManager.locationStatus.needsSettingsAction ? "location.slash" : "location")
+                .font(.subheadline)
+                .foregroundStyle(locationManager.locationStatus.needsSettingsAction ? .orange : .secondary)
+
+            if !locationManager.allowsMapInteraction {
+                Label("Map locked while moving", systemImage: "lock.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
             if locationManager.testMode {
                 Button {
@@ -288,6 +306,9 @@ private struct LocationScreenView: View {
 
 private struct LocationMapView: View {
     let coordinate: CLLocationCoordinate2D?
+    let locationStatus: LocationServiceStatus
+    let allowsInteraction: Bool
+    @Environment(\.openURL) private var openURL
     @State private var cameraPosition: MapCameraPosition = .automatic
 
     private var snapshot: CoordinateSnapshot? {
@@ -297,7 +318,10 @@ private struct LocationMapView: View {
     var body: some View {
         Group {
             if let snapshot {
-                Map(position: $cameraPosition) {
+                Map(
+                    position: $cameraPosition,
+                    interactionModes: allowsInteraction ? .all : []
+                ) {
                     Marker("Current Location", coordinate: snapshot.coordinate)
                 }
                 .onAppear {
@@ -307,14 +331,53 @@ private struct LocationMapView: View {
                     updateCamera(newValue)
                 }
             } else {
-                ContentUnavailableView(
-                    "Waiting for GPS",
-                    systemImage: "location",
-                    description: Text("Location appears here once permission and GPS are available.")
-                )
+                unavailableLocationView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.secondarySystemGroupedBackground))
             }
+        }
+    }
+
+    private var unavailableLocationView: some View {
+        ContentUnavailableView {
+            Label(unavailableTitle, systemImage: locationStatus.needsSettingsAction ? "location.slash" : "location")
+        } description: {
+            Text(unavailableDescription)
+        } actions: {
+            if locationStatus.needsSettingsAction {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private var unavailableTitle: String {
+        switch locationStatus {
+        case .denied, .restricted:
+            return "Location Access Needed"
+        case .placeUnavailable:
+            return "Place Name Unavailable"
+        case .locationUnavailable:
+            return "Location Unavailable"
+        case .checking, .waitingForPermission, .active:
+            return "Waiting for GPS"
+        }
+    }
+
+    private var unavailableDescription: String {
+        switch locationStatus {
+        case .denied:
+            return "Enable location access in Settings so MotoGuide can show where you are."
+        case .restricted:
+            return "Location access is restricted on this device."
+        case .placeUnavailable, .locationUnavailable:
+            return locationStatus.riderMessage
+        case .checking, .waitingForPermission, .active:
+            return "Location appears here once permission and GPS are available."
         }
     }
 
@@ -358,6 +421,16 @@ private struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Announcements") {
+                    Toggle(
+                        "Quiet Mode",
+                        isOn: Binding(
+                            get: { locationManager.contentMode == .quiet },
+                            set: { isQuiet in
+                                locationManager.contentMode = isQuiet ? .quiet : .shortFacts
+                            }
+                        )
+                    )
+
                     Picker("Announcement Style", selection: $locationManager.contentMode) {
                         ForEach(ContentMode.allCases) { mode in
                             Text(mode.label).tag(mode)
@@ -374,9 +447,6 @@ private struct SettingsView: View {
                         }
                     }
 
-                    Toggle("Test Mode", isOn: $locationManager.testMode)
-                    Toggle("Speak After Every Geocode", isOn: $locationManager.speakAfterEveryGeocode)
-
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Bluetooth Audio Delay: \(locationManager.bluetoothDelaySeconds, specifier: "%.1f")s")
                         Slider(
@@ -386,23 +456,28 @@ private struct SettingsView: View {
                         )
                     }
 
-#if DEBUG
-                    DisclosureGroup("Proxy Diagnostics") {
-                        Toggle("Enabled", isOn: $proxyDiagnosticsEnabled)
-                            .onChange(of: proxyDiagnosticsEnabled) { _, isEnabled in
-                                if !isEnabled {
-                                    debugLog.clear()
-                                }
-                            }
+                    DisclosureGroup("Developer") {
+                        Toggle("Test Mode", isOn: $locationManager.testMode)
+                        Toggle("Speak After Every Geocode", isOn: $locationManager.speakAfterEveryGeocode)
 
-                        if proxyDiagnosticsEnabled {
-                            DebugLogInlineView(debugLog: debugLog)
+#if DEBUG
+                        DisclosureGroup("Proxy Diagnostics") {
+                            Toggle("Enabled", isOn: $proxyDiagnosticsEnabled)
+                                .onChange(of: proxyDiagnosticsEnabled) { _, isEnabled in
+                                    if !isEnabled {
+                                        debugLog.clear()
+                                    }
+                                }
+
+                            if proxyDiagnosticsEnabled {
+                                DebugLogInlineView(debugLog: debugLog)
+                            }
                         }
-                    }
 #endif
 
-                    Button("Reset First-Time Experience", role: .destructive) {
-                        showResetConfirmation = true
+                        Button("Reset First-Time Experience", role: .destructive) {
+                            showResetConfirmation = true
+                        }
                     }
                 }
             }

@@ -2,8 +2,46 @@ import Foundation
 import CoreLocation
 import AVFoundation
 
+enum LocationServiceStatus: Equatable {
+    case checking
+    case waitingForPermission
+    case denied
+    case restricted
+    case active
+    case locationUnavailable(String)
+    case placeUnavailable(String)
+
+    var riderMessage: String {
+        switch self {
+        case .checking:
+            return "Checking location..."
+        case .waitingForPermission:
+            return "Waiting for location permission."
+        case .denied:
+            return "Location access is off."
+        case .restricted:
+            return "Location access is restricted."
+        case .active:
+            return "Location is active."
+        case .locationUnavailable(let message), .placeUnavailable(let message):
+            return message
+        }
+    }
+
+    var needsSettingsAction: Bool {
+        switch self {
+        case .denied, .restricted:
+            return true
+        case .checking, .waitingForPermission, .active, .locationUnavailable, .placeUnavailable:
+            return false
+        }
+    }
+}
+
 @MainActor
 class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate {
+    static let movingMapInteractionThresholdMetersPerSecond = 8.0 / 3.6
+
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
     private let speechSynthesizer = AVSpeechSynthesizer()
@@ -34,6 +72,17 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published private(set) var isTracking = false
     @Published private(set) var lastSpokenPhrase: String?
     @Published private(set) var lastSpokenAt: Date?
+    @Published private(set) var locationStatus: LocationServiceStatus = .checking
+    @Published private(set) var currentSpeedMetersPerSecond: CLLocationSpeed?
+
+    var allowsMapInteraction: Bool {
+        guard !testMode,
+              let currentSpeedMetersPerSecond,
+              currentSpeedMetersPerSecond >= 0 else {
+            return true
+        }
+        return currentSpeedMetersPerSecond < Self.movingMapInteractionThresholdMetersPerSecond
+    }
 
     var onAddressChange: ((Address) -> Void)?
     var onRideLog: ((CLLocationCoordinate2D, Address, String?) -> Void)?
@@ -92,21 +141,26 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         switch locationManager.authorizationStatus {
         case .notDetermined:
             locationManager.requestAlwaysAuthorization()
+            locationStatus = .waitingForPermission
             isTracking = false
         case .authorizedAlways:
             locationManager.allowsBackgroundLocationUpdates = true
             locationManager.startUpdatingLocation()
+            locationStatus = .active
             isTracking = true
         case .authorizedWhenInUse:
             locationManager.requestAlwaysAuthorization()
             locationManager.allowsBackgroundLocationUpdates = false
             locationManager.startUpdatingLocation()
+            locationStatus = .active
             isTracking = true
         case .denied, .restricted:
             locationManager.stopUpdatingLocation()
+            locationStatus = locationManager.authorizationStatus == .denied ? .denied : .restricted
             isTracking = false
         @unknown default:
             locationManager.stopUpdatingLocation()
+            locationStatus = .locationUnavailable("Location is unavailable on this device.")
             isTracking = false
         }
     }
@@ -306,6 +360,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         if testMode { return }
 
         if let location = locations.last {
+            lastKnownLocation = location.coordinate
+            currentSpeedMetersPerSecond = location.speed
+            locationStatus = .active
+
             let currentTime = Date()
             if let lastTime = lastUpdateTime,
                currentTime.timeIntervalSince(lastTime) < TimeInterval(locationCheckInterval) {
@@ -313,13 +371,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             }
             lastUpdateTime = currentTime
 
-            lastKnownLocation = location.coordinate
             print("Location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
             reverseGeocode(location: location)
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        locationStatus = .locationUnavailable("Location update failed. MotoGuide will keep trying.")
         print("Failed to get user location: \(error.localizedDescription)")
     }
 
@@ -330,11 +388,17 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private func reverseGeocode(location: CLLocation, completion: (@MainActor () -> Void)? = nil) {
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             if let error = error {
+                Task { @MainActor [weak self] in
+                    self?.locationStatus = .placeUnavailable("Place lookup failed. GPS is still active.")
+                }
                 print("Failed to reverse geocode location: \(error.localizedDescription)")
                 return
             }
 
             guard let placemark = placemarks?.first else {
+                Task { @MainActor [weak self] in
+                    self?.locationStatus = .placeUnavailable("Place name is unavailable here.")
+                }
                 print("No placemarks found")
                 return
             }
@@ -414,15 +478,23 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         testIndex = (testIndex + 1) % TestRouteFixture.waypoints.count
 
         lastKnownLocation = waypoint.coordinate
+        currentSpeedMetersPerSecond = 0
+        locationStatus = .active
         print("Test location logged: \(waypoint.name) - \(waypoint.latitude), \(waypoint.longitude)")
 
         geocoder.reverseGeocodeLocation(CLLocation(latitude: waypoint.latitude, longitude: waypoint.longitude)) { [weak self] placemarks, error in
             if let error = error {
+                Task { @MainActor [weak self] in
+                    self?.locationStatus = .placeUnavailable("Test place lookup failed.")
+                }
                 print("Failed to reverse geocode test location: \(error.localizedDescription)")
                 return
             }
 
             guard let placemark = placemarks?.first else {
+                Task { @MainActor [weak self] in
+                    self?.locationStatus = .placeUnavailable("Test place name is unavailable.")
+                }
                 print("No placemarks found")
                 return
             }

@@ -160,6 +160,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
             XCTAssertEqual(urlRequest.timeoutInterval, FactProxyContract.iosTimeoutSeconds)
             XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "Authorization"), "Bearer proxy-token")
             XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertNil(urlRequest.value(forHTTPHeaderField: "X-MotoGuide-Device-Id"))
 
             let body = try self.requestBodyData(from: urlRequest)
             let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
@@ -185,6 +186,38 @@ final class ProxyFactGeneratorTests: XCTestCase {
 
         let generator = ProxyFactGenerator(
             proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        let fact = try await generator.fact(for: request)
+
+        XCTAssertEqual(fact, "Known for its wool trade.")
+    }
+
+    func testPostsDeviceIdHeaderWhenConfigured() async throws {
+        let endpoint = self.endpoint
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom"
+        )
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "X-MotoGuide-Device-Id"), "helmet-001")
+
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+        }
+
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            deviceIdProvider: { " helmet-001 " },
             session: makeMockSession(),
             endpoint: endpoint
         )

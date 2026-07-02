@@ -154,6 +154,14 @@ The iOS app reads this token from the iOS Keychain generic-password item with se
 MotoGuideProxy
 ```
 
+When device binding is enabled, the iOS app reads the optional approved-device identifier from a separate iOS Keychain generic-password item with service:
+
+```text
+MotoGuideDeviceId
+```
+
+If that item exists, iOS sends it as `X-MotoGuide-Device-Id`. If it is absent, iOS omits the header; keep `MOTOGUIDE_DEVICE_BINDING_REQUIRED=false` until approved device IDs have been provisioned on app installs.
+
 The OpenAI API key must stay server-side. It must be configured only on the proxy host, for example as the Fly.io secret `OPENAI_API_KEY`.
 
 Current MVP security model:
