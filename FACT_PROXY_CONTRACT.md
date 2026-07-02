@@ -348,7 +348,8 @@ Input hardening:
 - `countryContext` is stricter and does not allow digits or `&`.
 - `riderContext.customFactInstructions` is optional, capped at 240 characters, and treated as untrusted rider preference data rather than model/system prompt text.
 - `riderContext.factInterestCategories` is optional. Accepted values are:
-  - `safetyAdvice`
+  - `localRidingHints`
+  - `safetyAdvice` (legacy alias, still accepted for backwards compatibility)
   - `geographyBasics`
   - `locationFacts`
   - `pointsOfInterest`

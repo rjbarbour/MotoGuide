@@ -91,6 +91,7 @@ struct SpeechVoiceOption: Identifiable, Hashable {
 private enum LocationManagerDefaults {
     static let preferredVoiceIdentifierKey = "MotoGuidePreferredVoiceIdentifier"
     static let speechProviderKey = "MotoGuideSpeechProvider"
+    static let interruptsMusicKey = "MotoGuideInterruptsMusic"
     static let homeCountryKey = "MotoGuideHomeCountry"
     static let homeRegionKey = "MotoGuideHomeRegion"
     static let familiarRegionsKey = "MotoGuideFamiliarRegions"
@@ -150,6 +151,17 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var contentMode: ContentMode = .shortFacts
     @Published var bluetoothDelaySeconds: Double = 0.5
     @Published var testMode: Bool = false
+    @Published var interruptsMusic: Bool = {
+        guard UserDefaults.standard.object(forKey: LocationManagerDefaults.interruptsMusicKey) != nil else {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: LocationManagerDefaults.interruptsMusicKey)
+    }() {
+        didSet {
+            UserDefaults.standard.set(interruptsMusic, forKey: LocationManagerDefaults.interruptsMusicKey)
+            setupAudioSession()
+        }
+    }
     @Published var preferredVoiceIdentifier: String = UserDefaults.standard.string(
         forKey: LocationManagerDefaults.preferredVoiceIdentifierKey
     ) ?? "" {
@@ -391,9 +403,16 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         let stored = UserDefaults.standard.string(forKey: LocationManagerDefaults.factInterestCategoriesKey) ?? ""
         let values = stored
             .split(separator: ",")
-            .map { FactInterestCategory(rawValue: String($0)) }
-            .compactMap { $0 }
+            .compactMap { normalizeFactInterestCategory(String($0)) }
         return values.isEmpty ? FactInterestCategory.defaultSelections : values
+    }
+
+    private static func normalizeFactInterestCategory(_ value: String) -> FactInterestCategory? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized == "safetyAdvice" {
+            return .localRidingHints
+        }
+        return FactInterestCategory(rawValue: normalized)
     }
 
     private func parseFamiliarRegionsNormalized() -> [String] {
@@ -662,9 +681,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     private func setupAudioSession() {
         let audioSession = AVAudioSession.sharedInstance()
+        var options: AVAudioSession.CategoryOptions = [.mixWithOthers]
+        if interruptsMusic {
+            options.insert(.duckOthers)
+        }
 
         do {
-            try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try audioSession.setCategory(.playback, mode: .default, options: options)
             try audioSession.setActive(true)
             print("Audio session activated for background playback.")
         } catch {

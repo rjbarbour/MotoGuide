@@ -78,6 +78,14 @@ class PlaceInputValidatorTest {
     }
 
     @Test
+    void normalizesLegacySafetyAdviceToLocalRidingHints() {
+        var categories = PlaceInputValidator.validateFactInterestCategories(
+                java.util.List.of("safetyAdvice", "geographyBasics")
+        );
+        assertEquals(java.util.List.of("localRidingHints", "geographyBasics"), categories);
+    }
+
+    @Test
     void acceptsCustomFactInstructions() {
         assertEquals(
                 "engineering, old roads, local industry",

@@ -23,6 +23,7 @@ public final class PlaceInputValidator {
     private static final Pattern WORD_SPLIT = Pattern.compile("\\s+");
     private static final Pattern TOKEN_SPLIT = Pattern.compile("[^A-Za-z0-9]+");
     private static final Set<String> FACT_INTEREST_CATEGORIES = Set.of(
+            "localRidingHints",
             "safetyAdvice",
             "geographyBasics",
             "locationFacts",
@@ -139,6 +140,9 @@ public final class PlaceInputValidator {
                 continue;
             }
             String normalized = normalizeCommon(value);
+            if ("safetyAdvice".equals(normalized)) {
+                normalized = "localRidingHints";
+            }
             if (!FACT_INTEREST_CATEGORIES.contains(normalized)) {
                 throw new BadRequestException("riderContext.factInterestCategories contains unknown value");
             }

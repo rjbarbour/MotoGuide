@@ -628,6 +628,12 @@ private struct SettingsView: View {
                         )
                     )
 
+                    Toggle("Interrupt Music While Speaking", isOn: $locationManager.interruptsMusic)
+
+                    Text("Default uses bike-safe prioritization: music is ducked so announcements are easier to hear.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     Picker("Announcement Style", selection: $locationManager.contentMode) {
                         ForEach(ContentMode.allCases) { mode in
                             Text(mode.label).tag(mode)
@@ -669,21 +675,25 @@ private struct SettingsView: View {
 
                 Section("Rider Context") {
                     TextField(
-                        "Home country",
+                        "What country are you from?",
                         text: $locationManager.homeCountry,
-                        prompt: Text("Example: United Kingdom")
+                        prompt: Text("Optional")
                     )
                     TextField(
-                        "Home region",
+                        "What region feels familiar?",
                         text: $locationManager.homeRegion,
-                        prompt: Text("Example: West Midlands")
+                        prompt: Text("Optional")
                     )
                     TextField(
                         "Places you already know",
                         text: $locationManager.familiarRegions,
-                        prompt: Text("Example: England, Cotswolds")
+                        prompt: Text("Optional, comma-separated")
                     )
                         .textInputAutocapitalization(.words)
+
+                    Text("Answer these once so facts stay useful rather than repetitive.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     Text("What should the fact feed focus on?")
                         .font(.caption)

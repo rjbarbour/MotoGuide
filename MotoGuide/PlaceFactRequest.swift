@@ -13,7 +13,7 @@ enum FactMode: String, CaseIterable, Equatable {
 }
 
 enum FactInterestCategory: String, CaseIterable, Identifiable, Codable, Equatable {
-    case safetyAdvice
+    case localRidingHints
     case geographyBasics
     case locationFacts
     case pointsOfInterest
@@ -25,7 +25,7 @@ enum FactInterestCategory: String, CaseIterable, Identifiable, Codable, Equatabl
 
     var label: String {
         switch self {
-        case .safetyAdvice: return "Safety and cautions"
+        case .localRidingHints: return "Local Riding Hints"
         case .geographyBasics: return "Geography and place identity"
         case .locationFacts: return "Location facts and local identity"
         case .pointsOfInterest: return "Points of interest"
@@ -37,7 +37,7 @@ enum FactInterestCategory: String, CaseIterable, Identifiable, Codable, Equatabl
 
     var prompt: String {
         switch self {
-        case .safetyAdvice: return "Safety and cautions (brief, route-neutral)"
+        case .localRidingHints: return "Local riding hints (brief, route-neutral)"
         case .geographyBasics: return "Geography and local identity"
         case .locationFacts: return "Location facts and what makes this place useful while riding"
         case .pointsOfInterest: return "Points of interest and named places"
@@ -45,6 +45,38 @@ enum FactInterestCategory: String, CaseIterable, Identifiable, Codable, Equatabl
         case .culture: return "Culture and local character"
         case .landmarks: return "Landmarks and built environment"
         }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch value {
+        case "safetyAdvice", "localRidingHints":
+            self = .localRidingHints
+        case "geographyBasics":
+            self = .geographyBasics
+        case "locationFacts":
+            self = .locationFacts
+        case "pointsOfInterest":
+            self = .pointsOfInterest
+        case "history":
+            self = .history
+        case "culture":
+            self = .culture
+        case "landmarks":
+            self = .landmarks
+        default:
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unknown factInterestCategory value: \(value)"
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 
     static let defaultSelections: [FactInterestCategory] = [

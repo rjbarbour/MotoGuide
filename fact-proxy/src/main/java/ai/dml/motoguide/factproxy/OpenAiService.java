@@ -238,7 +238,7 @@ public class OpenAiService {
 
     private static String formatCategory(String category) {
         return switch (category) {
-            case "safetyAdvice" -> "Safety and cautions (if directly relevant and brief)";
+            case "localRidingHints", "safetyAdvice" -> "Local Riding Hints (if directly relevant and brief)";
             case "geographyBasics" -> "Geography basics and place identity";
             case "locationFacts" -> "Location facts and local identity details";
             case "pointsOfInterest" -> "Points of interest and named landmarks";
@@ -250,20 +250,21 @@ public class OpenAiService {
     }
 
     private static void appendInterestPriorityGuidance(StringBuilder builder, ValidatedRiderContext riderContext) {
-        boolean includesSafety = riderContext.factInterestCategories() != null
-                && riderContext.factInterestCategories().contains("safetyAdvice");
+        boolean includesLocalRidingHints = riderContext.factInterestCategories() != null
+                && (riderContext.factInterestCategories().contains("localRidingHints")
+                || riderContext.factInterestCategories().contains("safetyAdvice"));
         builder.append(
                 "\nUse this priority: "
                         + "geographic/cultural context first (roughly 70%), "
                         + "then local history, "
                         + "then points of interest, "
                         + "then practical notes and landmarks, "
-                        + "then safety only when explicitly selected."
+                        + "then local riding hints only when explicitly selected."
         );
-        if (!includesSafety) {
+        if (!includesLocalRidingHints) {
             builder.append(
-                    "\nDo not include safety-advice language unless this location has an obvious "
-                            + "safety-critical condition."
+                    "\nDo not include local riding hints unless this location has a clearly documented "
+                            + "local condition that materially changes rider context."
             );
         }
     }

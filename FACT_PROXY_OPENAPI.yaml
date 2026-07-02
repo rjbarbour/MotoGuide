@@ -473,6 +473,7 @@ components:
           items:
             type: string
             enum:
+              - localRidingHints
               - safetyAdvice
               - geographyBasics
               - locationFacts
