@@ -27,27 +27,29 @@ public class FactController {
 
     @PostMapping("/v1/fact")
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
-    public FactResponse fact(@RequestBody FactRequest request) {
-        request.validate();
-        String placeName = request.validatedPlaceName();
-        String countryContext = request.validatedCountryContext();
-        FactMode factMode = request.validatedFactMode();
+    public FactResponse fact(@RequestBody(required = false) FactRequest request) {
+        if (request == null) {
+            throw new BadRequestException("request body is required");
+        }
+
+        ValidatedFactRequest validatedRequest = request.validateAndNormalize();
+
         if (diagnosticsSettings.enabled()) {
             log.info(
                     "event=fact_request_valid boundary={} factMode={} placeNameLength={} hasCountryContext={}",
-                    request.boundary(),
-                    factMode.wireValue(),
-                    placeName.length(),
-                    countryContext != null
+                    validatedRequest.boundary(),
+                    validatedRequest.factMode().wireValue(),
+                    validatedRequest.placeName().length(),
+                    validatedRequest.countryContext() != null
             );
         }
 
-        String fact = openAiService.generateFact(request);
+        String fact = openAiService.generateFact(validatedRequest);
         if (diagnosticsSettings.enabled()) {
             log.info(
                     "event=fact_request_success boundary={} factMode={} factLength={}",
-                    request.boundary(),
-                    factMode.wireValue(),
+                    validatedRequest.boundary(),
+                    validatedRequest.factMode().wireValue(),
                     fact.length()
             );
         }

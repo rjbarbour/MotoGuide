@@ -17,3 +17,6 @@ openai:
 spring:
   application:
     name: motoguide-fact-proxy
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true

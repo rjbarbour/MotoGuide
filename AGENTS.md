@@ -99,9 +99,14 @@ Do not expand into general travel planning, route planning, social ride tracking
 - Expand from UK-only to UK and Europe.
 - Add car support after the motorbike use case is validated.
 
+Decisions:
+
+- Default real-ride interval is `10 s`.
+- Default real-ride content depth is Short Facts.
+- Default repeat settings keep street off and town, county, region, and country on.
+
 Open questions:
 
-- What are the default interval, repeat, and content-depth settings for a real ride?
 - How should custom instructions be constrained so rider-facing speech stays short and safe?
 - Which navigation apps should MVP2 target first for POI handoff?
 

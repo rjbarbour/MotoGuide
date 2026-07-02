@@ -1,9 +1,11 @@
 package ai.dml.motoguide.factproxy;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Set;
 
+@JsonIgnoreProperties(ignoreUnknown = false)
 public record FactRequest(
         String boundary,
         String placeName,
@@ -17,30 +19,57 @@ public record FactRequest(
     );
 
     public void validate() {
-        if (boundary == null || !ALLOWED_BOUNDARIES.contains(boundary)) {
+        validateAndNormalize();
+    }
+
+    public ValidatedFactRequest validateAndNormalize() {
+        String normalizedBoundary = boundary() == null ? null : boundary().trim();
+        if (normalizedBoundary == null || !ALLOWED_BOUNDARIES.contains(normalizedBoundary)) {
             throw new BadRequestException("boundary must be one of: country, nation, county, town, street");
         }
-        validatedFactMode();
-        PlaceInputValidator.validatePlaceName(placeName);
-        PlaceInputValidator.validateCountryContext(countryContext);
+
+        FactMode normalizedFactMode = parseFactMode();
+        String normalizedPlaceName = PlaceInputValidator.validatePlaceName(placeName);
+        String normalizedCountryContext = PlaceInputValidator.validateCountryContext(countryContext);
         if (placeHierarchy == null) {
             throw new BadRequestException("placeHierarchy is required");
         }
-        placeHierarchy.validate();
+        ValidatedPlaceHierarchy validatedPlaceHierarchy = placeHierarchy.validateAndNormalize();
+
+        return new ValidatedFactRequest(
+                normalizedBoundary,
+                normalizedPlaceName,
+                normalizedFactMode,
+                normalizedCountryContext,
+                validatedPlaceHierarchy
+        );
     }
 
     public String validatedPlaceName() {
-        return PlaceInputValidator.validatePlaceName(placeName);
+        return validateAndNormalize().placeName();
     }
 
     public String validatedCountryContext() {
-        return PlaceInputValidator.validateCountryContext(countryContext);
+        return validateAndNormalize().countryContext();
     }
 
     public FactMode validatedFactMode() {
+        return parseFactMode();
+    }
+
+    private FactMode parseFactMode() {
         if (factMode == null || factMode.isBlank()) {
             throw new BadRequestException("factMode must be one of: " + FactMode.allowedValues());
         }
         return FactMode.fromWireValue(factMode);
     }
+}
+
+record ValidatedFactRequest(
+        String boundary,
+        String placeName,
+        FactMode factMode,
+        String countryContext,
+        ValidatedPlaceHierarchy placeHierarchy
+) {
 }
