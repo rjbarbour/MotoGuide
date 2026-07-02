@@ -9,6 +9,10 @@ public record MotoGuideProperties(
         int rateLimitPerMinute,
         boolean diagnosticsEnabled,
         String shortFactPrompt,
-        String longFactPrompt
+        String longFactPrompt,
+        boolean promptOverridesEnabled,
+        String promptOverridesObjectUrl,
+        int promptOverridesRefreshSeconds,
+        String promptOverridesAuthToken
 ) {
 }

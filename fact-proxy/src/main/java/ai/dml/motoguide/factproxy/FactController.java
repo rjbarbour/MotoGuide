@@ -6,11 +6,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class FactController {
     private static final Logger log = LoggerFactory.getLogger(FactController.class);
+    private static final String USER_HEADER = "X-MotoGuide-User-Id";
+    private static final int USER_ID_MIN_LENGTH = 4;
+    private static final int USER_ID_MAX_LENGTH = 64;
 
     private final OpenAiService openAiService;
     private final DiagnosticsSettings diagnosticsSettings;
@@ -27,12 +31,15 @@ public class FactController {
 
     @PostMapping("/v1/fact")
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
-    public FactResponse fact(@RequestBody(required = false) FactRequest request) {
+    public FactResponse fact(
+            @RequestBody(required = false) FactRequest request,
+            @RequestHeader(name = USER_HEADER, required = false) String userId
+    ) {
         if (request == null) {
             throw new BadRequestException("request body is required");
         }
 
-        ValidatedFactRequest validatedRequest = request.validateAndNormalize();
+        ValidatedFactRequest validatedRequest = request.validateAndNormalize(normalizeUserId(userId));
 
         if (diagnosticsSettings.enabled()) {
             log.info(
@@ -54,5 +61,19 @@ public class FactController {
             );
         }
         return new FactResponse(fact);
+    }
+
+    private static String normalizeUserId(String userId) {
+        if (userId == null) {
+            return null;
+        }
+        String normalized = userId.trim().replaceAll("\\s+", " ");
+        if (normalized.length() < USER_ID_MIN_LENGTH || normalized.length() > USER_ID_MAX_LENGTH) {
+            return null;
+        }
+        if (normalized.contains("\"") || normalized.contains("\n") || normalized.contains("\r")) {
+            return null;
+        }
+        return normalized;
     }
 }

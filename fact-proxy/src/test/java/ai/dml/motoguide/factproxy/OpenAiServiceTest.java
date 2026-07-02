@@ -27,13 +27,7 @@ class OpenAiServiceTest {
 
         try {
             String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/chat/completions";
-            OpenAiService service = new OpenAiService(
-                    HttpClient.newHttpClient(),
-                    objectMapper,
-                    new OpenAiProperties("test-key", "gpt-test-runtime", endpoint),
-                    new MotoGuideProperties("proxy-token", null, 30, false, null, null),
-                    new DiagnosticsSettings(new MotoGuideProperties("proxy-token", null, 30, false, null, null))
-            );
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint, null);
 
             String fact = service.generateFact(new FactRequest(
                     "town",
@@ -69,15 +63,13 @@ class OpenAiServiceTest {
                     30,
                     false,
                     "SHORT PROMPT",
-                    "LONG PROMPT"
+                    "LONG PROMPT",
+                    false,
+                    null,
+                    60,
+                    null
             );
-            OpenAiService service = new OpenAiService(
-                    HttpClient.newHttpClient(),
-                    objectMapper,
-                    new OpenAiProperties("test-key", "gpt-test-runtime", endpoint),
-                    properties,
-                    new DiagnosticsSettings(properties)
-            );
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint, properties);
 
             service.generateFact(new FactRequest(
                     "county",
@@ -99,6 +91,112 @@ class OpenAiServiceTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    void userAndBoundaryPromptOverridesLoadFromObjectStorage() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> handleOpenAiRequest(exchange, requestBody));
+        server.createContext("/prompt-overrides.json", exchange -> {
+            String responseBody = """
+                    {
+                      "modePrompts": {"shortFacts": "GLOBAL SHORT", "longFacts": "GLOBAL LONG"},
+                      "users": {"rider-42": {"shortFacts": "USER SHORT"}},
+                      "boundaries": {"town": {"shortFacts": "BOUNDARY SHORT"}},
+                      "hierarchies": {"town:stourbridge": {"longFacts": "TOWN LONG"}}
+                    }
+                    """;
+            byte[] response = responseBody.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            try (OutputStream outputStream = exchange.getResponseBody()) {
+                outputStream.write(response);
+            }
+        });
+        server.start();
+
+        try {
+            String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/chat/completions";
+            String overrideUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/prompt-overrides.json";
+            MotoGuideProperties properties = new MotoGuideProperties(
+                    "proxy-token",
+                    null,
+                    30,
+                    false,
+                    null,
+                    null,
+                    true,
+                    overrideUrl,
+                    1,
+                    null
+            );
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint, properties);
+
+            service.generateFact(new FactRequest(
+                    "town",
+                    "Stroud",
+                    "shortFacts",
+                    "United Kingdom",
+                    new PlaceHierarchy("Hill Road", "Stroud", "Gloucestershire", "England", "United Kingdom")
+            ).validateAndNormalize("rider-42"));
+
+            JsonNode payload = objectMapper.readTree(requestBody.get());
+            String userPrompt = payload.path("messages").path(0).path("content").asText();
+            assertEquals(true, userPrompt.contains("Additional mode prompt: USER SHORT"));
+
+            service.generateFact(new FactRequest(
+                    "town",
+                    "Stourbridge",
+                    "longFacts",
+                    "United Kingdom",
+                    new PlaceHierarchy("Main Street", "Stourbridge", "West Midlands", "England", "United Kingdom")
+            ).validateAndNormalize("other-user"));
+
+            String hierarchyPrompt = objectMapper.readTree(requestBody.get()).path("messages").path(0).path("content").asText();
+            assertEquals(true, hierarchyPrompt.contains("Additional mode prompt: TOWN LONG"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static OpenAiService serviceWithDependencies(
+            ObjectMapper objectMapper,
+            String openAiEndpoint,
+            MotoGuideProperties properties
+    ) {
+        if (properties == null) {
+            properties = baseProperties();
+        }
+        PromptOverridesService promptOverridesService = new PromptOverridesService(
+                HttpClient.newHttpClient(),
+                objectMapper,
+                properties
+        );
+        return new OpenAiService(
+                HttpClient.newHttpClient(),
+                objectMapper,
+                new OpenAiProperties("test-key", "gpt-test-runtime", openAiEndpoint),
+                properties,
+                new DiagnosticsSettings(properties),
+                promptOverridesService
+        );
+    }
+
+    private static MotoGuideProperties baseProperties() {
+        return new MotoGuideProperties(
+                "proxy-token",
+                null,
+                30,
+                false,
+                null,
+                null,
+                false,
+                null,
+                60,
+                null
+        );
     }
 
     private static void handleOpenAiRequest(HttpExchange exchange, AtomicReference<String> requestBody) throws IOException {

@@ -92,6 +92,10 @@ Runtime configuration:
 | `MOTOGUIDE_DIAGNOSTICS_ENABLED` | `false` | Enables verbose proxy diagnostics at startup. |
 | `MOTOGUIDE_SHORT_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `shortFacts`. Never sent by iOS. |
 | `MOTOGUIDE_LONG_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `longFacts`. Never sent by iOS. |
+| `MOTOGUIDE_PROMPT_OVERRIDES_ENABLED` | `false` | When `true`, load prompt overrides from object storage. |
+| `MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL` | (not set) | Optional URL for prompt override JSON. |
+| `MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS` | `60` | Poll interval for override updates from object storage. |
+| `MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN` | (not set) | Optional bearer token for override object download. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Per-IP request limit for authenticated proxy calls. |
 
 Health check:
@@ -127,6 +131,12 @@ Authorization: Bearer <MOTOGUIDE_PROXY_TOKEN>
 Content-Type: application/json
 ```
 
+Optional request header for prompt overrides:
+
+```http
+X-MotoGuide-User-Id: rider-42
+```
+
 The iOS app reads this token from the iOS Keychain generic-password item with service:
 
 ```text
@@ -157,6 +167,43 @@ Planned hardening:
 - Per-device and per-user quotas.
 - Per-user authentication before wider non-TestFlight distribution.
 
+Prompt override configuration (server-side only):
+
+- If `MOTOGUIDE_PROMPT_OVERRIDES_ENABLED=true`, the proxy resolves prompt overrides in this order:
+  1. `users` (by `X-MotoGuide-User-Id` header)
+  2. `hierarchies` map keyed by `<boundary>:<normalized name>`
+  3. `boundaries` map by boundary (`town`, `county`, etc.)
+  4. `modePrompts`
+  5. environment variables `MOTOGUIDE_SHORT_FACT_PROMPT` and `MOTOGUIDE_LONG_FACT_PROMPT`
+
+Example object payload:
+
+```json
+{
+  "modePrompts": {
+    "shortFacts": "one factual sentence, max 120 characters",
+    "longFacts": "one or two short sentences, max 280 characters total"
+  },
+  "users": {
+    "rider-a": {
+      "shortFacts": "brief UK-focused historical context"
+    }
+  },
+  "boundaries": {
+    "town": {
+      "shortFacts": "focus on why the town is worth mentioning"
+    }
+  },
+  "hierarchies": {
+    "country:united kingdom": {
+      "shortFacts": "use UK-specific phrasing when possible"
+    }
+  }
+}
+```
+
+This requires no app contract changes.
+
 ## Observability
 
 The proxy returns an `X-Request-Id` header on `/v1/fact` responses.
@@ -178,6 +225,9 @@ Proxy logs include these event names:
 | `openai_upstream_error` | OpenAI returned an unusable response. | Boundary and bounded reason. |
 | `openai_request_failed` | OpenAI request failed before usable response. | Boundary and exception class. |
 | `diagnostics_updated` | Admin diagnostics setting changed for the current proxy process. | Enabled flag only. |
+| `prompt_overrides_loaded` | Prompt override configuration was loaded from object storage. | Source URL only. |
+| `prompt_overrides_load_failed` | Prompt override configuration failed to load; prior override state retained. | Failure reason only. |
+| `prompt_overrides_load_skipped` | Prompt override loading skipped because object URL is not set. | Reason only. |
 
 Diagnostics control:
 
@@ -205,6 +255,12 @@ Method:
 
 ```http
 POST /v1/fact
+```
+
+Optional header:
+
+```http
+X-MotoGuide-User-Id: <stable rider identifier>
 ```
 
 JSON body:

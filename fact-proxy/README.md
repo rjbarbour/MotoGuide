@@ -161,6 +161,10 @@ Store `MOTOGUIDE_PROXY_TOKEN` in the iOS app Keychain (service `MotoGuideProxy`)
 | `MOTOGUIDE_LONG_FACT_PROMPT` | No | Optional server-side prompt override for `longFacts` |
 | `PORT` | No | Default `3000` |
 | `RATE_LIMIT_PER_MINUTE` | No | Default `30` per client IP |
+| `MOTOGUIDE_PROMPT_OVERRIDES_ENABLED` | No | Default `false`; enables remote prompt override loading |
+| `MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL` | No | Object-store URL for JSON prompt overrides |
+| `MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS` | No | Cache refresh interval; default `60` |
+| `MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN` | No | Optional bearer token for object-store retrieval |
 
 ## iOS integration
 

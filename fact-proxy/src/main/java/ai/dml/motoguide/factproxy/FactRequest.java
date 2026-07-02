@@ -23,6 +23,10 @@ public record FactRequest(
     }
 
     public ValidatedFactRequest validateAndNormalize() {
+        return validateAndNormalize(null);
+    }
+
+    public ValidatedFactRequest validateAndNormalize(String userId) {
         String normalizedBoundary = boundary() == null ? null : boundary().trim();
         if (normalizedBoundary == null || !ALLOWED_BOUNDARIES.contains(normalizedBoundary)) {
             throw new BadRequestException("boundary must be one of: country, nation, county, town, street");
@@ -41,6 +45,7 @@ public record FactRequest(
                 normalizedPlaceName,
                 normalizedFactMode,
                 normalizedCountryContext,
+                userId,
                 validatedPlaceHierarchy
         );
     }
@@ -70,6 +75,7 @@ record ValidatedFactRequest(
         String placeName,
         FactMode factMode,
         String countryContext,
+        String userId,
         ValidatedPlaceHierarchy placeHierarchy
 ) {
 }

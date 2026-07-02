@@ -34,19 +34,22 @@ public class OpenAiService {
     private final OpenAiProperties openAiProperties;
     private final MotoGuideProperties motoGuideProperties;
     private final DiagnosticsSettings diagnosticsSettings;
+    private final PromptOverridesService promptOverridesService;
 
     public OpenAiService(
             HttpClient httpClient,
             ObjectMapper objectMapper,
             OpenAiProperties openAiProperties,
             MotoGuideProperties motoGuideProperties,
-            DiagnosticsSettings diagnosticsSettings
+            DiagnosticsSettings diagnosticsSettings,
+            PromptOverridesService promptOverridesService
     ) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.openAiProperties = openAiProperties;
         this.motoGuideProperties = motoGuideProperties;
         this.diagnosticsSettings = diagnosticsSettings;
+        this.promptOverridesService = promptOverridesService;
     }
 
     public String generateFact(ValidatedFactRequest request) {
@@ -102,7 +105,7 @@ public class OpenAiService {
         return Map.of(
                 "model", openAiProperties.model(),
                 "messages", List.of(
-                        Map.of("role", "system", "content", systemPrompt(factMode)),
+                        Map.of("role", "system", "content", systemPrompt(factMode, request)),
                         Map.of("role", "user", "content", userPrompt(request, factMode))
                 ),
                 "max_completion_tokens", factMode.maxCompletionTokens(),
@@ -110,11 +113,19 @@ public class OpenAiService {
         );
     }
 
-    private String systemPrompt(FactMode factMode) {
+    private String systemPrompt(FactMode factMode, ValidatedFactRequest request) {
         StringBuilder builder = new StringBuilder();
         builder.append(BASE_SYSTEM_PROMPT).append('\n');
         builder.append("For ").append(factMode.wireValue()).append(": ").append(factMode.defaultPrompt()).append('\n');
-        String overridePrompt = configuredModePrompt(factMode);
+        String overridePrompt = promptOverridesService.resolvePromptOverride(
+                factMode,
+                request.userId(),
+                request.boundary(),
+                request.placeHierarchy()
+        );
+        if (overridePrompt == null) {
+            overridePrompt = configuredModePrompt(factMode);
+        }
         if (overridePrompt != null && !overridePrompt.isBlank()) {
             builder.append(MODE_OVERRIDE_PREFIX).append(overridePrompt);
         }

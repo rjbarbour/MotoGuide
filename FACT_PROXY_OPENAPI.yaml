@@ -47,6 +47,14 @@ x-deployment:
     MOTOGUIDE_DIAGNOSTICS_ENABLED:
       default: false
       description: Enables verbose proxy diagnostics at startup.
+    MOTOGUIDE_PROMPT_OVERRIDES_ENABLED:
+      default: false
+      description: Load optional prompt overrides from Fly object storage URL.
+    MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL:
+      description: Object-store URL containing optional prompt override JSON.
+    MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS:
+      default: 60
+      description: How often proxy reloads prompt overrides from object storage.
     MOTOGUIDE_SHORT_FACT_PROMPT:
       default: built-in short fact prompt
       description: Optional server-side prompt override for shortFacts requests. Never sent by iOS.
@@ -93,6 +101,9 @@ x-observability:
     - openai_upstream_error
     - openai_request_failed
     - diagnostics_updated
+    - prompt_overrides_loaded
+    - prompt_overrides_load_failed
+    - prompt_overrides_load_skipped
   diagnostics:
     baselineRequestLogsAlwaysEnabled: true
     verboseDiagnosticsDefault: false
@@ -136,6 +147,15 @@ paths:
       operationId: createPlaceFact
       security:
         - MotoGuideProxyToken: []
+      parameters:
+        - in: header
+          name: X-MotoGuide-User-Id
+          description: Optional rider/user identifier for server-side prompt override lookup.
+          required: false
+          schema:
+            type: string
+            minLength: 4
+            maxLength: 64
       x-ios-keychain-service: MotoGuideProxy
       x-ios-timeout-seconds: 3
       x-ios-fallback: Speak the base place announcement without a fact.

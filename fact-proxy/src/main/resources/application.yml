@@ -6,6 +6,10 @@ motoguide:
   admin-token: ${MOTOGUIDE_ADMIN_TOKEN:}
   rate-limit-per-minute: ${RATE_LIMIT_PER_MINUTE:30}
   diagnostics-enabled: ${MOTOGUIDE_DIAGNOSTICS_ENABLED:false}
+  prompt-overrides-enabled: ${MOTOGUIDE_PROMPT_OVERRIDES_ENABLED:false}
+  prompt-overrides-object-url: ${MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL:}
+  prompt-overrides-refresh-seconds: ${MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS:60}
+  prompt-overrides-auth-token: ${MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN:}
   short-fact-prompt: ${MOTOGUIDE_SHORT_FACT_PROMPT:}
   long-fact-prompt: ${MOTOGUIDE_LONG_FACT_PROMPT:}
 
