@@ -203,6 +203,8 @@ paths:
           description: Invalid JSON, missing required field, invalid boundary, invalid factMode, invalid placeName, or invalid placeHierarchy.
         "401":
           description: Missing or wrong proxy bearer token.
+        "415":
+          description: Unsupported content type. Proxy only accepts application/json.
         "500":
           description: Proxy is misconfigured, including missing server-side proxy token.
         "502":

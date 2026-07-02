@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -24,6 +25,13 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, String>> handleInvalidRequest(HttpMessageNotReadableException ex) {
         log.warn("event=fact_request_rejected status=400 reason={}", ex.getMessage());
         return badRequest("request body is invalid");
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, String>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
+        log.warn("event=fact_request_rejected status=415 reason={}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(Map.of("error", "contentType must be application/json"));
     }
 
     @ExceptionHandler(UpstreamException.class)

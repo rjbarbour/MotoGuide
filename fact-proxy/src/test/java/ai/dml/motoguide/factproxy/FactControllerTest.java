@@ -56,7 +56,7 @@ class FactControllerTest {
                         .header("Authorization", "Bearer test-token")
                         .contentType(MediaType.TEXT_PLAIN)
                         .content(FactRequestFixture.shortFactRequestWithDefaults()))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.error").value("contentType must be application/json"));
     }
 
@@ -65,7 +65,7 @@ class FactControllerTest {
         mockMvc.perform(post("/v1/fact")
                         .header("Authorization", "Bearer test-token")
                         .content(FactRequestFixture.shortFactRequestWithDefaults()))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.error").value("contentType must be application/json"));
     }
 

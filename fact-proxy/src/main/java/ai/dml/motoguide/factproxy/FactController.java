@@ -2,15 +2,13 @@ package ai.dml.motoguide.factproxy;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Locale;
 
 @RestController
 public class FactController {
@@ -30,18 +28,14 @@ public class FactController {
         return ResponseEntity.ok("ok");
     }
 
-    @PostMapping("/v1/fact")
+    @PostMapping(path = "/v1/fact", consumes = MediaType.APPLICATION_JSON_VALUE)
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
     public FactResponse fact(
             @RequestBody(required = false) FactRequest request,
-            @RequestHeader(name = USER_HEADER, required = false) String userId,
-            @RequestHeader(name = HttpHeaders.CONTENT_TYPE, required = false) String contentType
+            @RequestHeader(name = USER_HEADER, required = false) String userId
     ) {
         if (request == null) {
             throw new BadRequestException("request body is required");
-        }
-        if (!isJsonContentType(contentType)) {
-            throw new BadRequestException("contentType must be application/json");
         }
 
         ValidatedFactRequest validatedRequest = request.validateAndNormalize(normalizeUserId(userId));
@@ -70,13 +64,5 @@ public class FactController {
 
     private static String normalizeUserId(String userId) {
         return UserIdSanitizer.normalizeAndValidate(userId);
-    }
-
-    private static boolean isJsonContentType(String contentType) {
-        if (contentType == null) {
-            return false;
-        }
-        String normalized = contentType.toLowerCase(Locale.ROOT).trim();
-        return normalized.equals("application/json") || normalized.startsWith("application/json;");
     }
 }
