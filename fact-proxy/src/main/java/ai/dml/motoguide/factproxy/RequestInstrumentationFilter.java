@@ -35,6 +35,7 @@ public class RequestInstrumentationFilter extends OncePerRequestFilter {
 
         MDC.put("requestId", requestId);
         response.setHeader(REQUEST_ID_HEADER, requestId);
+        addSecurityHeaders(response);
         try {
             filterChain.doFilter(request, response);
         } finally {
@@ -51,6 +52,17 @@ public class RequestInstrumentationFilter extends OncePerRequestFilter {
             }
             MDC.remove("requestId");
         }
+    }
+
+    private void addSecurityHeaders(HttpServletResponse response) {
+        response.setHeader("Referrer-Policy", "no-referrer");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("X-Frame-Options", "DENY");
+        response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+        response.setHeader("Permissions-Policy", "accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), display-capture=(), encrypted-media=(), gyroscope=(), geolocation=(), magnetometer=(), microphone=(), payment=(), usb=()");
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Expires", "0");
     }
 
     private String requestId(HttpServletRequest request) {

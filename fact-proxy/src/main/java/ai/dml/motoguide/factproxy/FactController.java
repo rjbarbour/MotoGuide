@@ -7,14 +7,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Locale;
 
 @RestController
 public class FactController {
     private static final Logger log = LoggerFactory.getLogger(FactController.class);
     private static final String USER_HEADER = "X-MotoGuide-User-Id";
-    private static final int USER_ID_MIN_LENGTH = 4;
-    private static final int USER_ID_MAX_LENGTH = 64;
 
     private final OpenAiService openAiService;
     private final DiagnosticsSettings diagnosticsSettings;
@@ -33,10 +34,14 @@ public class FactController {
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
     public FactResponse fact(
             @RequestBody(required = false) FactRequest request,
-            @RequestHeader(name = USER_HEADER, required = false) String userId
+            @RequestHeader(name = USER_HEADER, required = false) String userId,
+            @RequestHeader(name = HttpHeaders.CONTENT_TYPE, required = false) String contentType
     ) {
         if (request == null) {
             throw new BadRequestException("request body is required");
+        }
+        if (!isJsonContentType(contentType)) {
+            throw new BadRequestException("contentType must be application/json");
         }
 
         ValidatedFactRequest validatedRequest = request.validateAndNormalize(normalizeUserId(userId));
@@ -64,16 +69,14 @@ public class FactController {
     }
 
     private static String normalizeUserId(String userId) {
-        if (userId == null) {
-            return null;
+        return UserIdSanitizer.normalizeAndValidate(userId);
+    }
+
+    private static boolean isJsonContentType(String contentType) {
+        if (contentType == null) {
+            return false;
         }
-        String normalized = userId.trim().replaceAll("\\s+", " ");
-        if (normalized.length() < USER_ID_MIN_LENGTH || normalized.length() > USER_ID_MAX_LENGTH) {
-            return null;
-        }
-        if (normalized.contains("\"") || normalized.contains("\n") || normalized.contains("\r")) {
-            return null;
-        }
-        return normalized;
+        String normalized = contentType.toLowerCase(Locale.ROOT).trim();
+        return normalized.equals("application/json") || normalized.startsWith("application/json;");
     }
 }

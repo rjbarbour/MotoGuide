@@ -51,6 +51,25 @@ class FactControllerTest {
     }
 
     @Test
+    void factRequiresJsonContentType() throws Exception {
+        mockMvc.perform(post("/v1/fact")
+                        .header("Authorization", "Bearer test-token")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("contentType must be application/json"));
+    }
+
+    @Test
+    void factRejectsMissingContentType() throws Exception {
+        mockMvc.perform(post("/v1/fact")
+                        .header("Authorization", "Bearer test-token")
+                        .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("contentType must be application/json"));
+    }
+
+    @Test
     void factReturnsSanitizedSentence() throws Exception {
         // Contract coverage: POST /v1/fact requires Bearer auth and returns {"fact": "..."}.
         when(openAiService.generateFact(any())).thenReturn("Known for its wool trade.");

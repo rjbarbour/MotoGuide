@@ -15,10 +15,13 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
+    private static final String FLY_CLIENT_IP_HEADER = "Fly-Client-IP";
+    private static final Pattern CLIENT_IP_PATTERN = Pattern.compile("^[0-9a-fA-F:\\.:%]+$");
 
     private final MotoGuideProperties properties;
     private final Map<String, Deque<Instant>> requestsByIp = new ConcurrentHashMap<>();
@@ -50,6 +53,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             if (timestamps.size() >= limit) {
                 log.warn("event=rate_limit_exceeded status=429 limitPerMinute={}", limit);
                 response.sendError(429, "Rate limit exceeded");
+                if (timestamps.isEmpty()) {
+                    requestsByIp.remove(clientIp, timestamps);
+                }
                 return;
             }
             timestamps.addLast(Instant.now());
@@ -59,10 +65,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("Fly-Client-IP");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.trim();
+        String forwarded = request.getHeader(FLY_CLIENT_IP_HEADER);
+        if (forwarded == null || forwarded.isBlank()) {
+            return request.getRemoteAddr();
         }
-        return request.getRemoteAddr();
+
+        String normalized = forwarded.split(",", 2)[0].trim();
+        if (normalized.length() > 80 || !CLIENT_IP_PATTERN.matcher(normalized).matches()) {
+            return request.getRemoteAddr();
+        }
+        return normalized;
     }
 }

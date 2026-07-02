@@ -43,15 +43,14 @@ public class ProxyAuthFilter extends OncePerRequestFilter {
         }
 
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-        String prefix = "Bearer ";
-        if (authorization == null || !authorization.startsWith(prefix)) {
+        String token = AuthUtils.parseBearerToken(authorization);
+        if (token == null) {
             log.warn("event=proxy_auth_failed status=401 reason=missing_bearer");
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
 
-        String token = authorization.substring(prefix.length()).trim();
-        if (!expected.equals(token)) {
+        if (!AuthUtils.tokenEquals(expected, token)) {
             log.warn("event=proxy_auth_failed status=401 reason=wrong_token");
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
             return;

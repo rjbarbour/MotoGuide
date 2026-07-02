@@ -53,13 +53,12 @@ public class AdminDiagnosticsController {
         }
 
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-        String prefix = "Bearer ";
-        if (authorization == null || !authorization.startsWith(prefix)) {
+        String token = AuthUtils.parseBearerToken(authorization);
+        if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        String token = authorization.substring(prefix.length()).trim();
-        if (!expected.equals(token)) {
+        if (!AuthUtils.tokenEquals(expected, token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 

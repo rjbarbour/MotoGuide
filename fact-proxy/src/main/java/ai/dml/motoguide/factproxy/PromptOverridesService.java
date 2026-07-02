@@ -250,7 +250,7 @@ public class PromptOverridesService {
     }
 
     private String normalizeUserId(String userId) {
-        return normalizeLookupPart(userId);
+        return UserIdSanitizer.normalizeAndValidate(userId);
     }
 
     private static String normalizeLookupKey(String value) {
