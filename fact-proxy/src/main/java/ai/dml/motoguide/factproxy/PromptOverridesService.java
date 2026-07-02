@@ -163,8 +163,9 @@ public class PromptOverridesService {
     }
 
     private PromptOverrides fetchPromptOverrides(String objectUrl) throws IOException, InterruptedException {
+        URI promptOverridesUri = parsePromptOverridesUri(objectUrl);
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(objectUrl))
+                .uri(promptOverridesUri)
                 .timeout(REQUEST_TIMEOUT)
                 .GET();
 
@@ -183,6 +184,18 @@ public class PromptOverridesService {
         }
 
         return parsePromptOverrides(response.body());
+    }
+
+    private static URI parsePromptOverridesUri(String objectUrl) {
+        URI uri = URI.create(objectUrl);
+        String scheme = uri.getScheme();
+        if (scheme == null) {
+            throw new IllegalArgumentException("prompt override object url is missing a scheme");
+        }
+        if (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme)) {
+            throw new IllegalArgumentException("prompt override object url must use http or https");
+        }
+        return uri;
     }
 
     private PromptOverrides parsePromptOverrides(String body) throws IOException {

@@ -127,6 +127,17 @@ class PromptOverridesServiceTest {
         ));
     }
 
+    @Test
+    void ignoresUnsupportedPromptOverrideScheme() {
+        PromptOverridesService service = serviceWithOverridesEnabled("file:///tmp/prompt-overrides.json", true);
+        assertNull(service.resolvePromptOverride(
+                FactMode.SHORT_FACTS,
+                "rider-42",
+                "town",
+                new ValidatedPlaceHierarchy("Road", "Stroud", "Gloucestershire", "England", "United Kingdom")
+        ));
+    }
+
     private static PromptOverridesService serviceWithOverridesEnabled(String objectUrl, int refreshSeconds) {
         MotoGuideProperties properties = new MotoGuideProperties(
                 "proxy-token",
