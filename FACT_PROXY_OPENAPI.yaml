@@ -415,10 +415,10 @@ components:
         fact:
           type: string
           minLength: 1
-          maxLength: 900
+          maxLength: 1100
           description: |
-            Sanitized ride-safe fact. shortFacts responses are bounded to 700
-            characters; longFacts responses are bounded to 900 characters.
+            Sanitized ride-safe fact. shortFacts responses are bounded to 900
+            characters; longFacts responses are bounded to 1100 characters.
           example: Known for its wool trade.
     DiagnosticsRequest:
       type: object

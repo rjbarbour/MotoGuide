@@ -48,13 +48,13 @@ final class FactPhraseBuilderTests: XCTestCase {
     func testSanitizeTruncatesLongFacts() {
         let long = String(repeating: "a", count: 1_000)
         let sanitized = FactPhraseBuilder.sanitize(long)
-        XCTAssertEqual(sanitized?.count, 700)
+        XCTAssertEqual(sanitized?.count, 900)
     }
 
     func testLongFactsUseLongerBoundedSanitizer() {
-        let long = String(repeating: "a", count: 900)
+        let long = String(repeating: "a", count: 1_200)
         let sanitized = FactPhraseBuilder.sanitize(long, mode: .longFacts)
-        XCTAssertEqual(sanitized?.count, 900)
+        XCTAssertEqual(sanitized?.count, 1100)
     }
 }
 

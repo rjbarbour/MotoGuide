@@ -50,12 +50,20 @@ class FactSanitizerTest {
     @Test
     void sanitizeTruncatesLongFacts() {
         String longFact = "a".repeat(1000);
-        assertEquals(700, FactSanitizer.sanitize(longFact).length());
+        assertEquals(900, FactSanitizer.sanitize(longFact).length());
     }
 
     @Test
     void sanitizeAllowsLongFactsWithinLongModeBound() {
-        String longFact = "a".repeat(900);
-        assertEquals(900, FactSanitizer.sanitize(longFact, FactMode.LONG_FACTS).length());
+        String longFact = "a".repeat(1100);
+        assertEquals(1100, FactSanitizer.sanitize(longFact, FactMode.LONG_FACTS).length());
+    }
+
+    @Test
+    void sanitizeAllowsRiderContextTermsThatWereOverfiltered() {
+        assertEquals(
+                "Motorcycle routes followed the old rail corridor through the valley.",
+                FactSanitizer.sanitize("Motorcycle routes followed the old rail corridor through the valley.")
+        );
     }
 }

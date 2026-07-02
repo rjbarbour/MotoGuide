@@ -229,8 +229,8 @@ Enhancement work:
 - Keep `LOCAL_LLM_FACTS_FALLBACK_PLAN.md` as an alternative if OpenAI cost, latency, connectivity, privacy, or quality becomes a blocker.
 - Add a content-depth parameter, including names only, Short Facts, and Long Facts.
 - Revise fact length targets:
-  - Short Facts: up to 5 concise sentences, up to 700 characters.
-  - Long Facts: up to 7 concise sentences, up to 900 characters, still safe to hear while riding and interruptible.
+- Short Facts: up to 5 concise sentences, up to 900 characters.
+- Long Facts: up to 7 concise sentences, up to 1100 characters, still safe to hear while riding and interruptible.
 - Revise prompt style: avoid banal encyclopaedia facts, obvious administrative definitions, trivia without relevance, and patronising explanations. Prefer specific local history, landscape, road context, industry, architecture, border changes, notable people, or why the place matters.
 - Add optional rider familiarity context to the contract, such as `homeCountry`, `homeRegion`, or `familiarRegions`, without sending an exact home address. Use it only to tune what not to explain.
 - Add rules for when facts are spoken.

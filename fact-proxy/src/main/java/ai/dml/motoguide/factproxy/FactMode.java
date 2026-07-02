@@ -6,8 +6,8 @@ import java.util.stream.Collectors;
 public enum FactMode {
     SHORT_FACTS(
             "shortFacts",
-            700,
-            360,
+            900,
+            560,
             5,
             "Give up to five concise, practical facts focused on why this place is worth noticing while riding. "
                     + "Prioritise local history, distinctive geography, or practical observations. "
@@ -15,8 +15,8 @@ public enum FactMode {
     ),
     LONG_FACTS(
             "longFacts",
-            900,
-            560,
+            1100,
+            760,
             7,
             "Give up to seven concise local-context sentences with history, geography, or practical rider relevance. "
                     + "Prioritise what is distinctive about this place, especially facts that are useful to a rider passing through or near it."

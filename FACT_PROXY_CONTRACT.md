@@ -201,8 +201,8 @@ Example object payload:
 ```json
 {
   "modePrompts": {
-    "shortFacts": "up to five concise local-context facts, up to 700 characters",
-    "longFacts": "up to seven concise contextual facts, up to 900 characters total"
+    "shortFacts": "up to five concise local-context facts, up to 900 characters",
+    "longFacts": "up to seven concise contextual facts, up to 1100 characters total"
   },
   "users": {
     "rider-a": {
@@ -363,7 +363,7 @@ Fields:
 
 | Field | Required | Type | Meaning |
 |-------|----------|------|---------|
-| `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 700 characters. `longFacts` is capped at 900 characters. |
+| `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 900 characters. `longFacts` is capped at 1100 characters. |
 
 ## Error Responses
 
@@ -380,8 +380,8 @@ The iOS app must not speak raw error text.
 
 The returned `fact` must be:
 
-- `shortFacts`: up to 5 short sentences and no more than 700 characters.
-- `longFacts`: up to 7 short sentences and no more than 900 characters.
+- `shortFacts`: up to 5 short sentences and no more than 900 characters.
+- `longFacts`: up to 7 short sentences and no more than 1100 characters.
 - Factual and neutral.
 - Useful as ambient place context.
 - Short enough to keep the total spoken announcement ride-safe.

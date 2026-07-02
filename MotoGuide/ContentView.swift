@@ -191,7 +191,8 @@ private struct LocationScreenView: View {
             LocationMapView(
                 coordinate: locationManager.lastKnownLocation,
                 locationStatus: locationManager.locationStatus,
-                allowsInteraction: locationManager.allowsMapInteraction
+                allowsInteraction: locationManager.allowsMapInteraction,
+                currentSpeedMetersPerSecond: locationManager.currentSpeedMetersPerSecond
             )
             .ignoresSafeArea()
 
@@ -307,6 +308,7 @@ private struct LocationMapView: View {
     let coordinate: CLLocationCoordinate2D?
     let locationStatus: LocationServiceStatus
     let allowsInteraction: Bool
+    let currentSpeedMetersPerSecond: CLLocationSpeed?
     @Environment(\.openURL) private var openURL
     @State private var cameraPosition: MapCameraPosition = .automatic
 
@@ -382,11 +384,13 @@ private struct LocationMapView: View {
     }
 
     private func updateCamera(_ snapshot: CoordinateSnapshot) {
+        let shouldPreserveZoomForStillness = (currentSpeedMetersPerSecond ?? -1) <= 0
+        let regionMeters: CLLocationDistance = shouldPreserveZoomForStillness ? 56_569 : 45_000
         cameraPosition = .region(
             MKCoordinateRegion(
                 center: snapshot.coordinate,
-                latitudinalMeters: 40_000,
-                longitudinalMeters: 40_000
+                latitudinalMeters: regionMeters,
+                longitudinalMeters: regionMeters
             )
         )
     }
@@ -410,6 +414,8 @@ private struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var locationManager: LocationManager
     @Binding var showResetConfirmation: Bool
+    @State private var lastNonQuietMode: ContentMode = .shortFacts
+    private static let lastNonQuietModeKey = "MotoGuideLastNonQuietContentMode"
 #if DEBUG
     @ObservedObject var debugLog: DebugLogStore
     @AppStorage(ProxyDiagnostics.enabledKey) private var proxyDiagnosticsEnabled = false
@@ -426,7 +432,20 @@ private struct SettingsView: View {
                         isOn: Binding(
                             get: { locationManager.contentMode == .quiet },
                             set: { isQuiet in
-                                locationManager.contentMode = isQuiet ? .quiet : .shortFacts
+                                if isQuiet {
+                                    if locationManager.contentMode != .quiet {
+                                        lastNonQuietMode = locationManager.contentMode
+                                        UserDefaults.standard.set(
+                                            lastNonQuietMode.rawValue,
+                                            forKey: Self.lastNonQuietModeKey
+                                        )
+                                    }
+                                    locationManager.contentMode = .quiet
+                                } else {
+                                    let savedMode = UserDefaults.standard.string(forKey: Self.lastNonQuietModeKey)
+                                        .flatMap(ContentMode.init(rawValue:))
+                                    locationManager.contentMode = savedMode ?? lastNonQuietMode
+                                }
                             }
                         )
                     )
@@ -516,6 +535,21 @@ private struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .onAppear {
+                if let savedMode = UserDefaults.standard.string(forKey: Self.lastNonQuietModeKey),
+                   let savedContentMode = ContentMode(rawValue: savedMode) {
+                    lastNonQuietMode = savedContentMode
+                }
+
+                if locationManager.contentMode != .quiet {
+                    lastNonQuietMode = locationManager.contentMode
+                }
+            }
+            .onChange(of: locationManager.contentMode) { _, newMode in
+                guard newMode != .quiet else { return }
+                lastNonQuietMode = newMode
+                UserDefaults.standard.set(newMode.rawValue, forKey: Self.lastNonQuietModeKey)
+            }
             .toolbar {
                 Button("Done") {
                     dismiss()
@@ -556,7 +590,7 @@ private struct LogHistoryView: View {
                         )
                     } else {
                         ForEach(logs) { log in
-                            LogRow(log: log, showSpokenPhrase: locationManager.testMode)
+                            LogRow(log: log, showSpokenPhrase: true)
                         }
                     }
                 }

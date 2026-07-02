@@ -37,7 +37,7 @@ This plan defines polish appropriate for a **first-time user** preparing for fie
 | **Developer Log language** | Log still uses developer naming and exposes coordinates directly | Useful for field debugging, but not yet rider-friendly History |
 | **Internal language remains** | "Location check frequency", "Speak After Every Geocode", and "Natural" still need a rider-language pass | Jargon makes the app feel unfinished |
 | **Proxy/audio recovery incomplete** | Location and geocoder failures are visible, but proxy and audio failures mostly rely on diagnostics or console output | A rider needs visible fallback status if facts or speech fail |
-| **Fact quality too banal** | Short Facts are capped at 700 characters and Long Facts at 900, with concise and practical prompts | Adult touring riders need specific, locally meaningful context, not obvious encyclopaedia snippets |
+| **Fact quality too banal** | Short Facts are capped at 900 characters and Long Facts at 1100, with concise and practical prompts | Adult touring riders need specific, locally meaningful context, not obvious encyclopaedia snippets |
 | **TTS voice quality unknown** | App currently asks for default `en-GB` voice | Helmet speech should use the best installed enhanced/premium iOS voice and allow preview/selection |
 | **Location screen incomplete** | Summary, hierarchy, last spoken phrase, quiet status, basic map, speed-gated map interaction, and key empty states exist | Full-map layout, compact overlays, nearby towns, previous street, doubled default map area, stopped-only zoom presets, and presentation tests remain |
 | **Announcement style unclear** | "Natural" is still undefined in the UI | Rider may not understand the difference from Names Only / Short Facts |
@@ -205,8 +205,8 @@ Not App Store polish. Minimum:
 | Default screen | Location | **Location** | Keep Location as home |
 | Permission timing | on init | after onboarding | |
 | Voice | default `en-GB` | Best installed premium/enhanced `en-GB` | Add preview setting |
-| Short Facts length | 700 chars | About current Long Facts length | Implemented |
-| Long Facts length | 900 chars | Longer bounded blurb | Implemented |
+| Short Facts length | 900 chars | About current Long Facts length | Implemented |
+| Long Facts length | 1100 chars | Longer bounded blurb | Implemented |
 | Home context | none | Coarse home/familiar region only | No exact home address |
 
 `BoundaryAnnouncementSettings.ridingDefaults` in code already matches most ride defaults. Keep the `10 s` interval and Short Facts default; focus polish on permission timing and UI exposure, not these defaults.

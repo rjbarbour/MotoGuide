@@ -6,8 +6,8 @@ enum FactMode: String, CaseIterable, Equatable {
 
     var maxFactLength: Int {
         switch self {
-        case .shortFacts: return 700
-        case .longFacts: return 900
+        case .shortFacts: return 900
+        case .longFacts: return 1100
         }
     }
 }

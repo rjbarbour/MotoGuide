@@ -40,7 +40,7 @@ class OpenAiServiceTest {
             JsonNode payload = objectMapper.readTree(requestBody.get());
             assertEquals("Known for its wool trade.", fact);
             assertEquals("gpt-test-runtime", payload.path("model").asText());
-            assertEquals(360, payload.path("max_completion_tokens").asInt());
+            assertEquals(560, payload.path("max_completion_tokens").asInt());
             assertEquals(true, payload.path("max_tokens").isMissingNode());
         } finally {
             server.stop(0);
@@ -83,7 +83,7 @@ class OpenAiServiceTest {
             ).validateAndNormalize());
 
             JsonNode payload = objectMapper.readTree(requestBody.get());
-            assertEquals(560, payload.path("max_completion_tokens").asInt());
+            assertEquals(760, payload.path("max_completion_tokens").asInt());
             String systemPrompt = payload.path("messages").path(0).path("content").asText();
             assertEquals(true, systemPrompt.contains("LONG PROMPT"));
             assertEquals(true, systemPrompt.contains("For longFacts"));
