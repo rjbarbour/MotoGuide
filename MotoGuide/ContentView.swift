@@ -31,6 +31,25 @@ enum LocationSummaryFormatter {
         return parts.isEmpty ? "Updating place..." : parts.joined(separator: ", ")
     }
 
+    static func contextLine(for address: Address?) -> String? {
+        guard let address else { return nil }
+        let components = [
+            valid(address.town),
+            valid(address.county),
+            valid(address.administrativeArea),
+            valid(address.country)
+        ].compactMap { $0 }
+
+        let deduped = components.reduce(into: [String]()) { result, component in
+            let normalized = component.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            if !result.contains(where: { $0.lowercased() == normalized }) {
+                result.append(component)
+            }
+        }
+
+        return deduped.isEmpty ? nil : deduped.joined(separator: " · ")
+    }
+
     static func hierarchyRows(for address: Address?) -> [LocationHierarchyRow] {
         let values: [(id: String, label: String, value: String?)] = [
             ("street", "Street", address.flatMap { valid($0.street) }),
@@ -60,6 +79,7 @@ enum LocationSummaryFormatter {
 struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var firstRunState = FirstRunState()
+    @AppStorage("MotoGuideMapLabelScale") private var mapLabelScale = 1.0
 #if DEBUG
     @StateObject private var debugLog = DebugLogStore.shared
 #endif
@@ -72,11 +92,20 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            LocationScreenView(locationManager: locationManager) {
-                locationManager.repeatCurrentAnnouncement()
-            }
-            .navigationTitle("Location")
+            LocationScreenView(
+                locationManager: locationManager,
+                onRepeat: {
+                    locationManager.repeatCurrentAnnouncement()
+                },
+                mapLabelScale: mapLabelScale
+            )
+            .navigationTitle("Moto Guide")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text("Moto Guide")
+                        .font(.headline.weight(.semibold))
+                }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         showLog = true
@@ -176,14 +205,17 @@ struct ContentView: View {
 private struct LocationScreenView: View {
     @ObservedObject var locationManager: LocationManager
     let onRepeat: () -> Void
+    let mapLabelScale: Double
 
     private enum OverlayLayout {
         static let horizontalPad: CGFloat = 12
         static let verticalPad: CGFloat = 8
         static let cornerRadius: CGFloat = 12
         static let summaryLineLimit: Int = 2
-        static let hierarchyLineLimit: Int = 2
+        static let hierarchyLineLimit: Int = 1
         static let phraseLineLimit: Int = 3
+        static let panelBackgroundOpacity: Double = 0.82
+        static let panelTextColor: Color = .white
     }
 
     var body: some View {
@@ -192,7 +224,7 @@ private struct LocationScreenView: View {
                 coordinate: locationManager.lastKnownLocation,
                 locationStatus: locationManager.locationStatus,
                 allowsInteraction: locationManager.allowsMapInteraction,
-                currentSpeedMetersPerSecond: locationManager.currentSpeedMetersPerSecond
+                mapLabelScale: mapLabelScale
             )
             .ignoresSafeArea()
 
@@ -221,53 +253,52 @@ private struct LocationScreenView: View {
     private var currentInformationPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(LocationSummaryFormatter.summary(for: locationManager.lastKnownAddress))
-                .font(.headline)
+                .font(.system(size: scaledFont(24)))
                 .fontWeight(.semibold)
+                .foregroundStyle(OverlayLayout.panelTextColor)
                 .fixedSize(horizontal: false, vertical: true)
                 .lineLimit(OverlayLayout.summaryLineLimit)
 
-            let availableRows = LocationSummaryFormatter.hierarchyRows(for: locationManager.lastKnownAddress).filter(\.isAvailable)
-            Text(
-                availableRows
-                    .map(\.value)
-                    .joined(separator: " · ")
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(OverlayLayout.hierarchyLineLimit)
-            .fixedSize(horizontal: false, vertical: true)
+            if let contextLine = LocationSummaryFormatter.contextLine(for: locationManager.lastKnownAddress) {
+                Text(contextLine)
+                    .font(.system(size: scaledFont(18)))
+                    .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
+                    .lineLimit(OverlayLayout.hierarchyLineLimit)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Divider()
 
             VStack(alignment: .leading, spacing: 4) {
                 Label("Location status", systemImage: "location")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: scaledFont(11)))
+                    .foregroundStyle(Color.white.opacity(0.85))
                 Label(locationManager.locationStatus.riderMessage, systemImage: locationManager.locationStatus.needsSettingsAction ? "location.slash" : "location")
-                    .font(.caption)
-                    .foregroundStyle(locationManager.locationStatus.needsSettingsAction ? .orange : .secondary)
+                    .font(.system(size: scaledFont(13)))
+                    .foregroundStyle(locationManager.locationStatus.needsSettingsAction ? .orange : Color.white.opacity(0.9))
             }
 
             Divider()
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Last spoken phrase")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: scaledFont(12)))
+                    .foregroundStyle(Color.white.opacity(0.85))
                     .textCase(.uppercase)
                 Text(locationManager.lastSpokenPhrase ?? "No spoken phrase yet")
-                    .font(.subheadline)
+                    .font(.system(size: scaledFont(17)))
+                    .foregroundStyle(OverlayLayout.panelTextColor)
                     .fixedSize(horizontal: false, vertical: true)
                     .lineLimit(OverlayLayout.phraseLineLimit)
                 if let timestamp = locationManager.lastSpokenAt {
                     Text(isoDateFormatter.string(from: timestamp))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: scaledFont(11)))
+                        .foregroundStyle(Color.white.opacity(0.85))
                 }
             }
         }
         .padding()
-        .background(Color(.secondarySystemGroupedBackground).opacity(0.95))
+        .background(Color.black.opacity(OverlayLayout.panelBackgroundOpacity))
         .clipShape(RoundedRectangle(cornerRadius: OverlayLayout.cornerRadius))
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Tap to repeat the current location announcement.")
@@ -277,30 +308,35 @@ private struct LocationScreenView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(locationManager.contentMode.label)
-                    .font(.subheadline)
+                    .font(.system(size: scaledFont(16)))
                     .fontWeight(.semibold)
+                    .foregroundStyle(OverlayLayout.panelTextColor)
                 Spacer()
                 if locationManager.contentMode == .quiet {
                     Label("Quiet", systemImage: "speaker.slash.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: scaledFont(12)))
+                        .foregroundStyle(.orange)
                 } else {
                     Label("Always running", systemImage: "location.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: scaledFont(12)))
+                        .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
                 }
                 if !locationManager.allowsMapInteraction {
                     Label("Map locked", systemImage: "lock.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: scaledFont(12)))
+                        .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.8))
                 }
             }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground).opacity(0.95))
+        .background(Color.black.opacity(OverlayLayout.panelBackgroundOpacity))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func scaledFont(_ points: CGFloat) -> CGFloat {
+        max(11, points * CGFloat(mapLabelScale))
     }
 }
 
@@ -308,9 +344,21 @@ private struct LocationMapView: View {
     let coordinate: CLLocationCoordinate2D?
     let locationStatus: LocationServiceStatus
     let allowsInteraction: Bool
-    let currentSpeedMetersPerSecond: CLLocationSpeed?
+    let mapLabelScale: Double
     @Environment(\.openURL) private var openURL
+    @State private var hasInitializedCamera = false
+    @State private var followsLocation = false
+    @State private var isProgrammaticCameraUpdate = false
     @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var mapSpanMeters: CLLocationDistance = MapZoom.area
+
+    private enum MapZoom {
+        static let area: CLLocationDistance = 16_000
+        static let minimum: CLLocationDistance = 2_000
+        static let maximum: CLLocationDistance = 120_000
+    }
+
+    private let controlButtonSize: CGFloat = 52
 
     private var snapshot: CoordinateSnapshot? {
         coordinate.map(CoordinateSnapshot.init)
@@ -319,18 +367,71 @@ private struct LocationMapView: View {
     var body: some View {
         Group {
             if let snapshot {
-                Map(
-                    position: $cameraPosition,
-                    interactionModes: allowsInteraction ? .all : []
-                ) {
-                    Marker("Current Location", coordinate: snapshot.coordinate)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onAppear {
-                    updateCamera(snapshot)
-                }
-                .onChange(of: snapshot) { _, newValue in
-                    updateCamera(newValue)
+                ZStack(alignment: .topTrailing) {
+                    Map(
+                        position: $cameraPosition,
+                        interactionModes: allowsInteraction ? .all : []
+                    ) {
+                        Annotation("Current Location", coordinate: snapshot.coordinate) {
+                            VStack(spacing: 2) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(.system(size: scaledFont(28), weight: .semibold))
+                                    .foregroundStyle(.blue)
+                                    .shadow(radius: 2)
+                                Text("You")
+                                    .font(.system(size: scaledFont(16), weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.black.opacity(0.55))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .onAppear {
+                        centerOnCurrentLocationIfNeeded(snapshot)
+                    }
+                    .onChange(of: snapshot) { _, newValue in
+                        centerOnCurrentLocationIfNeeded(newValue)
+                    }
+                    .onChange(of: cameraPosition) {
+                        guard !isProgrammaticCameraUpdate else {
+                            isProgrammaticCameraUpdate = false
+                            return
+                        }
+                        followsLocation = false
+                    }
+
+                VStack(spacing: 10) {
+                        mapControlButton(systemName: "plus") {
+                            adjustMapZoom(by: 0.8)
+                        }
+
+                        mapControlButton(systemName: "minus") {
+                            adjustMapZoom(by: 1.25)
+                        }
+
+                        Button {
+                            resetMap(to: snapshot.coordinate)
+                        } label: {
+                            Label("Reset", systemImage: "location.magnifyingglass")
+                                .font(.system(size: scaledFont(15), weight: .semibold))
+                                .lineLimit(1)
+                                .frame(minWidth: controlButtonSize, minHeight: 24)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.35))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.9), lineWidth: 2)
+                        }
+                        .foregroundStyle(Color.white)
+                    }
+                    .padding(.top, 12)
+                    .padding(.trailing, 12)
                 }
             } else {
                 unavailableLocationView
@@ -383,16 +484,80 @@ private struct LocationMapView: View {
         }
     }
 
-    private func updateCamera(_ snapshot: CoordinateSnapshot) {
-        let shouldPreserveZoomForStillness = (currentSpeedMetersPerSecond ?? -1) <= 0
-        let regionMeters: CLLocationDistance = shouldPreserveZoomForStillness ? 56_569 : 45_000
-        cameraPosition = .region(
-            MKCoordinateRegion(
-                center: snapshot.coordinate,
-                latitudinalMeters: regionMeters,
-                longitudinalMeters: regionMeters
-            )
+    private var currentMapCenter: CLLocationCoordinate2D? {
+        if let region = cameraPosition.region {
+            return region.center
+        }
+
+        if let camera = cameraPosition.camera {
+            return camera.centerCoordinate
+        }
+
+        return nil
+    }
+
+    private func centerOnCurrentLocationIfNeeded(_ snapshot: CoordinateSnapshot) {
+        if !hasInitializedCamera {
+            hasInitializedCamera = true
+            moveCamera(to: snapshot.coordinate)
+            return
+        }
+
+        if followsLocation {
+            moveCamera(to: snapshot.coordinate)
+        }
+    }
+
+    private func resetMap(to center: CLLocationCoordinate2D) {
+        followsLocation = true
+        moveCamera(to: center)
+    }
+
+    private func adjustMapZoom(by factor: CLLocationDistance) {
+        guard let center = currentMapCenter ?? snapshot?.coordinate else { return }
+        mapSpanMeters = clampSpan(mapSpanMeters * factor)
+        setCamera(to: center, spanMeters: mapSpanMeters)
+    }
+
+    private func moveCamera(to coordinate: CLLocationCoordinate2D) {
+        setCamera(to: coordinate, spanMeters: mapSpanMeters)
+    }
+
+    private func setCamera(to coordinate: CLLocationCoordinate2D, spanMeters: CLLocationDistance) {
+        isProgrammaticCameraUpdate = true
+        mapSpanMeters = clampSpan(spanMeters)
+        let region = MKCoordinateRegion(
+            center: coordinate,
+            latitudinalMeters: mapSpanMeters,
+            longitudinalMeters: mapSpanMeters
         )
+        withAnimation(.easeInOut(duration: 0.2)) {
+            cameraPosition = .region(region)
+        }
+    }
+
+    private func mapControlButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: scaledFont(24), weight: .bold))
+                .frame(width: controlButtonSize, height: controlButtonSize)
+                .foregroundStyle(Color.white)
+                .background(Color.black.opacity(0.35))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.9), lineWidth: 2)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func clampSpan(_ meters: CLLocationDistance) -> CLLocationDistance {
+        max(MapZoom.minimum, min(MapZoom.maximum, meters))
+    }
+
+    private func scaledFont(_ points: CGFloat) -> CGFloat {
+        max(11, points * CGFloat(mapLabelScale))
     }
 }
 
@@ -416,6 +581,7 @@ private struct SettingsView: View {
     @Binding var showResetConfirmation: Bool
     @State private var lastNonQuietMode: ContentMode = .shortFacts
     private static let lastNonQuietModeKey = "MotoGuideLastNonQuietContentMode"
+    @AppStorage("MotoGuideMapLabelScale") private var mapLabelScale = 1.0
 #if DEBUG
     @ObservedObject var debugLog: DebugLogStore
     @AppStorage(ProxyDiagnostics.enabledKey) private var proxyDiagnosticsEnabled = false
@@ -498,6 +664,15 @@ private struct SettingsView: View {
                         ForEach(intervals, id: \.self) { interval in
                             Text("\(interval) seconds").tag(interval)
                         }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Map label scale: \(mapLabelScale, specifier: "%.1f")x")
+                            .font(.headline)
+                        Slider(value: $mapLabelScale, in: 0.8...1.8, step: 0.1)
+                        Text("Larger values make on-map labels and overlay text easier to read while riding.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
