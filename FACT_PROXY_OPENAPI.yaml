@@ -67,7 +67,7 @@ x-deployment:
     MOTOGUIDE_TRUSTED_DEVICE_IDS:
       description: Comma-separated list of allowed X-MotoGuide-Device-Id values when device binding is required.
     MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST:
-      description: Optional comma-separated host allowlist for prompt override JSON fetches.
+      description: Comma-separated host allowlist for prompt override JSON fetches. Required when MOTOGUIDE_PROMPT_OVERRIDES_ENABLED=true.
     OPENAI_MODEL:
       default: gpt-4o-mini
       description: OpenAI model selected by the Fly runtime environment.

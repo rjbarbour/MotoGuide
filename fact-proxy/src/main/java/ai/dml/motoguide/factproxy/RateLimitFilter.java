@@ -13,8 +13,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 @Component
@@ -23,10 +23,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final String FLY_CLIENT_IP_HEADER = "Fly-Client-IP";
     private static final String USER_ID_HEADER = "X-MotoGuide-User-Id";
     private static final String DEVICE_ID_HEADER = "X-MotoGuide-Device-Id";
+    private static final int MAX_TRACKED_CLIENT_IDENTITIES = 20_000;
     private static final Pattern CLIENT_IP_PATTERN = Pattern.compile("^[0-9a-fA-F:\\.:%]+$");
 
     private final MotoGuideProperties properties;
-    private final Map<String, Deque<Instant>> requestsByIp = new ConcurrentHashMap<>();
+    private final Map<String, Deque<Instant>> requestsByIdentity = new BoundedIdentityCache(MAX_TRACKED_CLIENT_IDENTITIES);
 
     public RateLimitFilter(MotoGuideProperties properties) {
         this.properties = properties;
@@ -46,10 +47,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String clientKey = requestIdentityKey(request);
         int limit = Math.max(properties.rateLimitPerMinute(), 1);
-        Instant cutoff = Instant.now().minusSeconds(60);
+        Instant now = Instant.now();
+        Instant cutoff = now.minusSeconds(60);
 
-        Deque<Instant> timestamps = requestsByIp.computeIfAbsent(clientKey, ignored -> new ArrayDeque<>());
-        synchronized (timestamps) {
+        synchronized (requestsByIdentity) {
+            Deque<Instant> timestamps = requestsByIdentity.computeIfAbsent(clientKey, ignored -> new ArrayDeque<>());
             while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(cutoff)) {
                 timestamps.removeFirst();
             }
@@ -57,11 +59,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 log.warn("event=rate_limit_exceeded status=429 limitPerMinute={}", limit);
                 response.sendError(429, "Rate limit exceeded");
                 if (timestamps.isEmpty()) {
-                    requestsByIp.remove(clientKey, timestamps);
+                    requestsByIdentity.remove(clientKey);
                 }
                 return;
             }
-            timestamps.addLast(Instant.now());
+            timestamps.addLast(now);
         }
 
         filterChain.doFilter(request, response);
@@ -90,5 +92,19 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return request.getRemoteAddr();
         }
         return normalized;
+    }
+
+    private static final class BoundedIdentityCache extends LinkedHashMap<String, Deque<Instant>> {
+        private final int maxSize;
+
+        BoundedIdentityCache(int maxSize) {
+            super(256, 0.75f, true);
+            this.maxSize = maxSize;
+        }
+
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Deque<Instant>> eldest) {
+            return size() > maxSize;
+        }
     }
 }

@@ -129,7 +129,11 @@ class PromptOverridesServiceTest {
 
     @Test
     void ignoresUnsupportedPromptOverrideScheme() {
-        PromptOverridesService service = serviceWithOverridesEnabled("file:///tmp/prompt-overrides.json", true);
+        PromptOverridesService service = serviceWithOverridesEnabled(
+                "file:///tmp/prompt-overrides.json",
+                true,
+                "localhost"
+        );
         assertNull(service.resolvePromptOverride(
                 FactMode.SHORT_FACTS,
                 "rider-42",
@@ -173,20 +177,15 @@ class PromptOverridesServiceTest {
     }
 
     private static PromptOverridesService serviceWithOverridesEnabled(String objectUrl, int refreshSeconds) {
-        MotoGuideProperties properties = new MotoGuideProperties(
-                "proxy-token",
-                null,
-                30,
-                false,
-                null,
-                null,
+        return serviceWithOverridesEnabled(objectUrl, true, refreshSeconds, "127.0.0.1");
+    }
+
+    private static PromptOverridesService serviceWithOverridesEnabled(String objectUrl, int refreshSeconds, String hostAllowlist) {
+        MotoGuideProperties properties = newProperties(
                 true,
                 objectUrl,
                 refreshSeconds,
-                null,
-                false,
-                null,
-                null
+                hostAllowlist
         );
         return new PromptOverridesService(
                 HttpClient.newHttpClient(),
@@ -196,23 +195,27 @@ class PromptOverridesServiceTest {
     }
 
     private static PromptOverridesService serviceWithOverridesEnabled(String objectUrl, boolean enabled) {
-        return serviceWithOverridesEnabled(objectUrl, enabled, null);
+        return serviceWithOverridesEnabled(objectUrl, enabled, "127.0.0.1");
     }
 
-    private static PromptOverridesService serviceWithOverridesEnabled(String objectUrl, boolean enabled, String hostAllowlist) {
-        MotoGuideProperties properties = new MotoGuideProperties(
-                "proxy-token",
-                null,
-                30,
-                false,
-                null,
-                null,
+    private static PromptOverridesService serviceWithOverridesEnabled(
+            String objectUrl,
+            boolean enabled,
+            String hostAllowlist
+    ) {
+        return serviceWithOverridesEnabled(objectUrl, enabled, 60, hostAllowlist);
+    }
+
+    private static PromptOverridesService serviceWithOverridesEnabled(
+            String objectUrl,
+            boolean enabled,
+            int refreshSeconds,
+            String hostAllowlist
+    ) {
+        MotoGuideProperties properties = newProperties(
                 enabled,
                 objectUrl,
-                60,
-                null,
-                false,
-                null,
+                refreshSeconds,
                 hostAllowlist
         );
         return new PromptOverridesService(
@@ -220,5 +223,72 @@ class PromptOverridesServiceTest {
                 OBJECT_MAPPER,
                 properties
         );
+    }
+
+    private static MotoGuideProperties newProperties(
+            boolean enabled,
+            String objectUrl,
+            int refreshSeconds,
+            String hostAllowlist
+    ) {
+        for (var constructor : MotoGuideProperties.class.getDeclaredConstructors()) {
+            if (constructor.getParameterCount() == 13) {
+                try {
+                    return (MotoGuideProperties) constructor.newInstance(
+                            "proxy-token",
+                            null,
+                            30,
+                            false,
+                            null,
+                            null,
+                            enabled,
+                            objectUrl,
+                            refreshSeconds,
+                            null,
+                            false,
+                            null,
+                            hostAllowlist
+                    );
+                } catch (ReflectiveOperationException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+            if (constructor.getParameterCount() == 12) {
+                try {
+                    return (MotoGuideProperties) constructor.newInstance(
+                            "proxy-token",
+                            null,
+                            30,
+                            false,
+                            null,
+                            null,
+                            enabled,
+                            objectUrl,
+                            refreshSeconds,
+                            null,
+                            false,
+                            null
+                    );
+                } catch (ReflectiveOperationException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        }
+        throw new IllegalStateException("Unexpected MotoGuideProperties constructor signature");
+    }
+
+    @Test
+    void failsToLoadOverridesWhenHostAllowlistIsMissing() {
+        PromptOverridesService service = serviceWithOverridesEnabled(
+                "https://object-store.example.com/prompt-overrides.json",
+                false,
+                null
+        );
+        assertNull(service.resolvePromptOverride(
+                FactMode.SHORT_FACTS,
+                null,
+                "town",
+                new ValidatedPlaceHierarchy("Road", "Stroud", "Gloucestershire", "England", "United Kingdom")
+        ));
     }
 }

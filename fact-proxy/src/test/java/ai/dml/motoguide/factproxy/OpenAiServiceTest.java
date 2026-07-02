@@ -57,7 +57,7 @@ class OpenAiServiceTest {
 
         try {
             String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/chat/completions";
-            MotoGuideProperties properties = new MotoGuideProperties(
+            MotoGuideProperties properties = properties(
                     "proxy-token",
                     null,
                     30,
@@ -123,7 +123,7 @@ class OpenAiServiceTest {
         try {
             String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/chat/completions";
             String overrideUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/prompt-overrides.json";
-            MotoGuideProperties properties = new MotoGuideProperties(
+            MotoGuideProperties properties = properties(
                     "proxy-token",
                     null,
                     30,
@@ -136,7 +136,7 @@ class OpenAiServiceTest {
                     null,
                     false,
                     null,
-                    null
+                    "127.0.0.1"
             );
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint, properties);
 
@@ -191,7 +191,7 @@ class OpenAiServiceTest {
     }
 
     private static MotoGuideProperties baseProperties() {
-        return new MotoGuideProperties(
+        return properties(
                 "proxy-token",
                 null,
                 30,
@@ -206,6 +206,69 @@ class OpenAiServiceTest {
                 null,
                 null
         );
+    }
+
+    private static MotoGuideProperties properties(
+            String proxyToken,
+            String adminToken,
+            int rateLimitPerMinute,
+            boolean diagnosticsEnabled,
+            String shortFactPrompt,
+            String longFactPrompt,
+            boolean promptOverridesEnabled,
+            String promptOverridesObjectUrl,
+            int promptOverridesRefreshSeconds,
+            String promptOverridesAuthToken,
+            boolean deviceBindingRequired,
+            String trustedDeviceIds,
+            String promptOverridesHostAllowlist
+    ) {
+        for (var constructor : MotoGuideProperties.class.getDeclaredConstructors()) {
+            if (constructor.getParameterCount() == 13) {
+                try {
+                    return (MotoGuideProperties) constructor.newInstance(
+                            proxyToken,
+                            adminToken,
+                            rateLimitPerMinute,
+                            diagnosticsEnabled,
+                            shortFactPrompt,
+                            longFactPrompt,
+                            promptOverridesEnabled,
+                            promptOverridesObjectUrl,
+                            promptOverridesRefreshSeconds,
+                            promptOverridesAuthToken,
+                            deviceBindingRequired,
+                            trustedDeviceIds,
+                            promptOverridesHostAllowlist
+                    );
+                } catch (ReflectiveOperationException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+
+            if (constructor.getParameterCount() == 12) {
+                try {
+                    return (MotoGuideProperties) constructor.newInstance(
+                            proxyToken,
+                            adminToken,
+                            rateLimitPerMinute,
+                            diagnosticsEnabled,
+                            shortFactPrompt,
+                            longFactPrompt,
+                            promptOverridesEnabled,
+                            promptOverridesObjectUrl,
+                            promptOverridesRefreshSeconds,
+                            promptOverridesAuthToken,
+                            deviceBindingRequired,
+                            trustedDeviceIds
+                    );
+                } catch (ReflectiveOperationException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        }
+
+        throw new IllegalStateException("Unexpected MotoGuideProperties constructor signature");
     }
 
     private static void handleOpenAiRequest(HttpExchange exchange, AtomicReference<String> requestBody) throws IOException {

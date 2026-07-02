@@ -98,7 +98,7 @@ Runtime configuration:
 | `MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN` | (not set) | Optional bearer token for override object download. |
 | `MOTOGUIDE_DEVICE_BINDING_REQUIRED` | `false` | Require approved devices via `X-MotoGuide-Device-Id` when true. |
 | `MOTOGUIDE_TRUSTED_DEVICE_IDS` | (not set) | Comma-separated allowed `X-MotoGuide-Device-Id` values when device binding is required. |
-| `MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST` | (not set) | Optional comma-separated host allowlist for prompt overrides fetches. |
+| `MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST` | (not set) | Comma-separated host allowlist. Required when `MOTOGUIDE_PROMPT_OVERRIDES_ENABLED=true`. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Per identity (trusted user/device if provided, else IP) request limit for authenticated proxy calls. |
 
 Health check:

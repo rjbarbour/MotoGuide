@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 public class PromptOverridesService {
     private static final Logger log = LoggerFactory.getLogger(PromptOverridesService.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(4);
+    private static final int MAX_PROMPT_OVERRIDE_LENGTH = 500;
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String AUTHORIZATION_PREFIX = "Bearer ";
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
@@ -152,8 +153,8 @@ public class PromptOverridesService {
                     Instant.now().plus(refreshInterval())
             );
         }
-
         try {
+            requirePromptOverridesHostAllowlistConfigured(objectUrl);
             PromptOverrides promptOverrides = fetchPromptOverrides(objectUrl);
             log.info("event=prompt_overrides_loaded url=prompt-overrides-json");
             return new PromptOverridesSnapshot(promptOverrides, Instant.now().plus(refreshInterval()));
@@ -272,7 +273,23 @@ public class PromptOverridesService {
             return "";
         }
         String normalized = WHITESPACE.matcher(value.strip()).replaceAll(" ");
+        if (normalized.length() > MAX_PROMPT_OVERRIDE_LENGTH) {
+            return "";
+        }
         return normalized;
+    }
+
+    private void requirePromptOverridesHostAllowlistConfigured(String objectUrl) {
+        Set<String> allowedHosts = properties.promptOverridesHostAllowlistSet();
+        if (allowedHosts.isEmpty()) {
+            throw new IllegalStateException(
+                    "prompt override host allowlist is required when MOTOGUIDE_PROMPT_OVERRIDES_ENABLED=true"
+            );
+        }
+        URI uri = parsePromptOverridesUri(objectUrl);
+        if (uri.getHost() == null || uri.getHost().isBlank()) {
+            throw new IllegalStateException("prompt override object URL must include a valid host");
+        }
     }
 
     private String normalizeUserId(String userId) {
