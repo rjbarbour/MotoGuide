@@ -8,3 +8,8 @@ out/
 .env
 .DS_Store
 fly.toml.bak
+terraform/.terraform
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfstate.*.backup
+terraform/ci.auto.tfvars

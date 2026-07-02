@@ -1,0 +1,94 @@
+name: Deploy MotoGuide fact proxy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "fact-proxy/**"
+
+env:
+  FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'motoguide-fact-proxy' }}
+  FLY_APP_ORG: ${{ vars.FLY_APP_ORG || 'personal' }}
+  OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-nano-2026-03-17' }}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Install flyctl
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          echo "$HOME/.fly/bin" >> "$GITHUB_PATH"
+
+      - name: Configure secret inputs
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MOTOGUIDE_PROXY_TOKEN: ${{ secrets.MOTOGUIDE_PROXY_TOKEN }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "${FLY_API_TOKEN:-}" ] || [ -z "${OPENAI_API_KEY:-}" ] || [ -z "${MOTOGUIDE_PROXY_TOKEN:-}" ]; then
+            echo "::error::Missing required repository secrets: FLY_API_TOKEN, OPENAI_API_KEY, and MOTOGUIDE_PROXY_TOKEN."
+            exit 1
+          fi
+
+      - name: Terraform plan/apply app definition
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          cd fact-proxy/terraform
+          terraform init -input=false
+          terraform validate
+          cat <<EOF > ci.auto.tfvars
+            fly_app_name = "${FLY_APP_NAME}"
+            fly_org = "${FLY_APP_ORG}"
+          EOF
+          terraform import fly_app.fact_proxy "${FLY_APP_NAME}" || true
+          terraform plan -out=fact-proxy.tfplan -input=false
+          terraform apply -input=false -auto-approve fact-proxy.tfplan
+
+      - name: Sync runtime secrets
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MOTOGUIDE_PROXY_TOKEN: ${{ secrets.MOTOGUIDE_PROXY_TOKEN }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-nano-2026-03-17' }}
+          MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN: ${{ secrets.MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN }}
+          MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST: ${{ vars.MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST }}
+        run: |
+          cd fact-proxy
+          secret_args=()
+          secret_args+=( "OPENAI_API_KEY=${OPENAI_API_KEY}" )
+          secret_args+=( "MOTOGUIDE_PROXY_TOKEN=${MOTOGUIDE_PROXY_TOKEN}" )
+          secret_args+=( "OPENAI_MODEL=${OPENAI_MODEL}" )
+
+          if [ -n "${MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN:-}" ]; then
+            secret_args+=( "MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN=${MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN}" )
+          fi
+
+          if [ -n "${MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST:-}" ]; then
+            secret_args+=( "MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST=${MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST}" )
+          fi
+
+          flyctl secrets set "${secret_args[@]}" -a "${FLY_APP_NAME}"
+
+      - name: Build and deploy service
+        run: |
+          cd fact-proxy
+          flyctl deploy --app "${FLY_APP_NAME}" --config fly.toml
+
+      - name: Smoke-check health endpoint
+        run: |
+          curl -fsS "https://${FLY_APP_NAME}.fly.dev/health"
