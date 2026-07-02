@@ -193,7 +193,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             UserDefaults.standard.set(customFactInstructions, forKey: LocationManagerDefaults.customFactInstructionsKey)
         }
     }
-    @Published var factInterestCategories: [FactInterestCategory] = Self.loadFactInterestCategories() {
+    @Published var factInterestCategories: [FactInterestCategory] = LocationManager.loadFactInterestCategories() {
         didSet {
             UserDefaults.standard.set(
                 factInterestCategories
@@ -582,6 +582,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     func repeatCurrentAnnouncement() {
         guard contentMode != .quiet else { return }
         guard let text = lastSpokenPhrase ?? currentLocationPhrase() else { return }
+        if isSpeechOutputActive {
+            stopSpeechOutput()
+            return
+        }
 
         delayWorkItem?.cancel()
         announcementQueue.clearPending()

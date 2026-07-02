@@ -272,7 +272,7 @@ private struct LocationScreenView: View {
             }
 
             if !repeatHintDismissed {
-                Label("Tap the place name to repeat it", systemImage: "speaker.wave.2")
+                Label("Tap here to repeat the phrase, or tap again to stop speech", systemImage: "speaker.wave.2")
                     .font(.system(size: scaledFont(14)))
                     .fontWeight(.medium)
                     .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.92))
@@ -313,7 +313,7 @@ private struct LocationScreenView: View {
         .background(Color.black.opacity(OverlayLayout.panelBackgroundOpacity))
         .clipShape(RoundedRectangle(cornerRadius: OverlayLayout.cornerRadius))
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Tap to repeat the current location announcement.")
+        .accessibilityHint("Tap to repeat when finished; tap while speaking to stop.")
     }
 
     private var statusPanel: some View {
