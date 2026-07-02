@@ -180,8 +180,8 @@ paths:
       x-ios-fallback: Speak the base place announcement without a fact.
       x-openai-api-key-location: Server-side only. Never store the OpenAI API key in the iOS app or repository.
       x-speech-safety-rules:
-        - One sentence.
-        - Long Facts may use up to two short sentences.
+        - Short Facts may use up to 5 concise sentences.
+        - Long Facts may use up to 7 concise sentences.
         - Factual and neutral.
         - Useful as ambient place context.
         - Short enough to keep the total spoken announcement ride-safe.
@@ -207,6 +207,12 @@ paths:
                     county: Gloucestershire
                     region: England
                     country: United Kingdom
+                  riderContext:
+                    homeCountry: United Kingdom
+                    homeRegion: West Midlands
+                    familiarRegions:
+                      - England
+                      - Cotswolds
       responses:
         "200":
           description: One sanitized bounded fact.
@@ -342,6 +348,8 @@ components:
           example: United Kingdom
         placeHierarchy:
           $ref: "#/components/schemas/PlaceHierarchy"
+        riderContext:
+          $ref: "#/components/schemas/RiderContext"
     PlaceHierarchy:
       type: object
       additionalProperties: false
@@ -375,6 +383,29 @@ components:
       maxLength: 64
       pattern: "^[A-Za-z .,'’()\\-]+$"
       example: United Kingdom
+    RiderContext:
+      type: object
+      additionalProperties: false
+      description: Optional rider-context hints sent to the server for fact generation.
+      properties:
+        homeCountry:
+          $ref: "#/components/schemas/OptionalCountryName"
+          description: Optional country of origin to avoid obvious admin-level context.
+        homeRegion:
+          $ref: "#/components/schemas/OptionalPlaceName"
+          description: Optional region known as familiar to the rider.
+        familiarRegions:
+          type: array
+          maxItems: 12
+          items:
+            $ref: "#/components/schemas/OptionalPlaceName"
+          description: Optional familiar regions to avoid repeating generic explanations.
+      example:
+        homeCountry: United Kingdom
+        homeRegion: West Midlands
+        familiarRegions:
+          - England
+          - Cotswolds
     FactResponse:
       type: object
       additionalProperties: false
@@ -384,10 +415,10 @@ components:
         fact:
           type: string
           minLength: 1
-          maxLength: 280
+          maxLength: 900
           description: |
-            Sanitized ride-safe fact. shortFacts responses are bounded to 120
-            characters; longFacts responses are bounded to 280 characters.
+            Sanitized ride-safe fact. shortFacts responses are bounded to 700
+            characters; longFacts responses are bounded to 900 characters.
           example: Known for its wool trade.
     DiagnosticsRequest:
       type: object

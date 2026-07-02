@@ -29,7 +29,9 @@ class FactSanitizerTest {
     @Test
     void sanitizeRejectsExcessSentencesInShortMode() {
         assertNull(FactSanitizer.sanitize(
-                "Stroud is in Gloucestershire. It is famous for wool. There is more history too.",
+                "Stroud is in Gloucestershire. It is famous for wool. There is more history too. " +
+                        "Another note for this place. Streets changed in recent years. It is still a market town. " +
+                        "Riders pass a lot of green lanes around it.",
                 FactMode.SHORT_FACTS
         ));
     }
@@ -37,20 +39,23 @@ class FactSanitizerTest {
     @Test
     void sanitizeRejectsExcessSentencesInLongMode() {
         assertNull(FactSanitizer.sanitize(
-                "Stroud is in Gloucestershire. It is famous for wool. It has deep history.",
+                "Stroud is in Gloucestershire. It is famous for wool. It has deep history. " +
+                        "That town shaped trade. It still hosts markets. Another local note remains. " +
+                        "The hills can influence local weather. Its rail links were important historically. " +
+                        "Riders can cross the bridge on the A419.",
                 FactMode.LONG_FACTS
         ));
     }
 
     @Test
     void sanitizeTruncatesLongFacts() {
-        String longFact = "a".repeat(150);
-        assertEquals(120, FactSanitizer.sanitize(longFact).length());
+        String longFact = "a".repeat(1000);
+        assertEquals(700, FactSanitizer.sanitize(longFact).length());
     }
 
     @Test
     void sanitizeAllowsLongFactsWithinLongModeBound() {
-        String longFact = "a".repeat(300);
-        assertEquals(280, FactSanitizer.sanitize(longFact, FactMode.LONG_FACTS).length());
+        String longFact = "a".repeat(900);
+        assertEquals(900, FactSanitizer.sanitize(longFact, FactMode.LONG_FACTS).length());
     }
 }

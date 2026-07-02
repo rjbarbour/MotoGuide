@@ -177,129 +177,128 @@ private struct LocationScreenView: View {
     @ObservedObject var locationManager: LocationManager
     let onRepeat: () -> Void
 
+    private enum OverlayLayout {
+        static let horizontalPad: CGFloat = 12
+        static let verticalPad: CGFloat = 8
+        static let cornerRadius: CGFloat = 12
+        static let summaryLineLimit: Int = 2
+        static let hierarchyLineLimit: Int = 2
+        static let phraseLineLimit: Int = 3
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+        ZStack(alignment: .bottom) {
+            LocationMapView(
+                coordinate: locationManager.lastKnownLocation,
+                locationStatus: locationManager.locationStatus,
+                allowsInteraction: locationManager.allowsMapInteraction
+            )
+            .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: OverlayLayout.verticalPad) {
                 currentInformationPanel
                     .contentShape(Rectangle())
                     .onTapGesture(perform: onRepeat)
-
-                LocationMapView(
-                    coordinate: locationManager.lastKnownLocation,
-                    locationStatus: locationManager.locationStatus,
-                    allowsInteraction: locationManager.allowsMapInteraction
-                )
-                    .frame(height: 260)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-
                 statusPanel
+                if locationManager.testMode {
+                    Button {
+                        locationManager.logTestLocation()
+                    } label: {
+                        Label("Next test location", systemImage: "arrow.forward.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
             }
-            .padding()
+            .padding(.horizontal, OverlayLayout.horizontalPad)
+            .padding(.bottom, OverlayLayout.horizontalPad)
         }
         .background(Color(.systemGroupedBackground))
     }
 
     private var currentInformationPanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Where you are")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(LocationSummaryFormatter.summary(for: locationManager.lastKnownAddress))
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(LocationSummaryFormatter.summary(for: locationManager.lastKnownAddress))
+                .font(.headline)
+                .fontWeight(.semibold)
+                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(OverlayLayout.summaryLineLimit)
 
-                if let coordinate = locationManager.lastKnownLocation {
-                    Text("\(coordinate.latitude, specifier: "%.5f"), \(coordinate.longitude, specifier: "%.5f")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            let availableRows = LocationSummaryFormatter.hierarchyRows(for: locationManager.lastKnownAddress).filter(\.isAvailable)
+            Text(
+                availableRows
+                    .map(\.value)
+                    .joined(separator: " · ")
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(OverlayLayout.hierarchyLineLimit)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Location status", systemImage: "location")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Label(locationManager.locationStatus.riderMessage, systemImage: locationManager.locationStatus.needsSettingsAction ? "location.slash" : "location")
+                    .font(.caption)
+                    .foregroundStyle(locationManager.locationStatus.needsSettingsAction ? .orange : .secondary)
             }
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Hierarchy")
-                    .font(.headline)
-                ForEach(LocationSummaryFormatter.hierarchyRows(for: locationManager.lastKnownAddress)) { row in
-                    HStack(spacing: 10) {
-                        Image(systemName: row.isCurrent ? "location.fill" : "circle")
-                            .font(.caption)
-                            .foregroundStyle(row.isCurrent ? .blue : .secondary)
-                            .frame(width: 18)
-                        Text(row.label)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 72, alignment: .leading)
-                        Text(row.value)
-                            .fontWeight(row.isCurrent ? .semibold : .regular)
-                            .foregroundStyle(row.isAvailable ? .primary : .secondary)
-                        Spacer()
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(row.label), \(row.value)")
-                }
-            }
-
-            if let phrase = locationManager.lastSpokenPhrase {
-                Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Last spoken")
-                        .font(.headline)
-                    Text(phrase)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let timestamp = locationManager.lastSpokenAt {
-                        Text(isoDateFormatter.string(from: timestamp))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Last spoken phrase")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Text(locationManager.lastSpokenPhrase ?? "No spoken phrase yet")
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(OverlayLayout.phraseLineLimit)
+                if let timestamp = locationManager.lastSpokenAt {
+                    Text(isoDateFormatter.string(from: timestamp))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(Color(.secondarySystemGroupedBackground).opacity(0.95))
+        .clipShape(RoundedRectangle(cornerRadius: OverlayLayout.cornerRadius))
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Tap to repeat the current location announcement.")
     }
 
     private var statusPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if locationManager.contentMode == .quiet {
-                Label("Quiet mode is on", systemImage: "speaker.slash.fill")
-                    .foregroundStyle(.secondary)
-            } else {
-                Label("Always running", systemImage: "location.fill")
-                    .foregroundStyle(.secondary)
-            }
-
-            Text("Announcement style: \(locationManager.contentMode.label)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Label(locationManager.locationStatus.riderMessage, systemImage: locationManager.locationStatus.needsSettingsAction ? "location.slash" : "location")
-                .font(.subheadline)
-                .foregroundStyle(locationManager.locationStatus.needsSettingsAction ? .orange : .secondary)
-
-            if !locationManager.allowsMapInteraction {
-                Label("Map locked while moving", systemImage: "lock.fill")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(locationManager.contentMode.label)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            if locationManager.testMode {
-                Button {
-                    locationManager.logTestLocation()
-                } label: {
-                    Label("Next test location", systemImage: "arrow.forward.circle")
-                        .frame(maxWidth: .infinity)
+                    .fontWeight(.semibold)
+                Spacer()
+                if locationManager.contentMode == .quiet {
+                    Label("Quiet", systemImage: "speaker.slash.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Label("Always running", systemImage: "location.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
+                if !locationManager.allowsMapInteraction {
+                    Label("Map locked", systemImage: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
-        .padding()
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(Color(.secondarySystemGroupedBackground).opacity(0.95))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
@@ -324,6 +323,7 @@ private struct LocationMapView: View {
                 ) {
                     Marker("Current Location", coordinate: snapshot.coordinate)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onAppear {
                     updateCamera(snapshot)
                 }
@@ -385,8 +385,8 @@ private struct LocationMapView: View {
         cameraPosition = .region(
             MKCoordinateRegion(
                 center: snapshot.coordinate,
-                latitudinalMeters: 5_000,
-                longitudinalMeters: 5_000
+                latitudinalMeters: 40_000,
+                longitudinalMeters: 40_000
             )
         )
     }
@@ -437,7 +437,41 @@ private struct SettingsView: View {
                         }
                     }
 
+                    Picker("Voice", selection: $locationManager.preferredVoiceIdentifier) {
+                        ForEach(locationManager.availableSpeechVoices()) { voice in
+                            Text(voice.pickerLabel).tag(voice.identifier)
+                        }
+                    }
+
+                    if let recommendation = locationManager.recommendedSpeechVoice() {
+                        Text("Recommended: \(recommendation.displayName) \(recommendation.localeIdentifier)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Preview voice") {
+                        locationManager.previewSelectedVoice()
+                    }
+                    .buttonStyle(.bordered)
+
+                    if let phrase = locationManager.lastSpokenPhrase {
+                        Text("Current voice phrase: \(phrase)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     SectionToggleRows(locationManager: locationManager)
+                }
+
+                Section("Rider Context") {
+                    TextField("Home country", text: $locationManager.homeCountry, prompt: Text("Optional"))
+                    TextField("Home region", text: $locationManager.homeRegion, prompt: Text("Optional"))
+                    TextField("Familiar regions", text: $locationManager.familiarRegions, prompt: Text("Optional, comma-separated"))
+                        .textInputAutocapitalization(.words)
+
+                    Text("Provide home context so facts can avoid obvious or repeated geography.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Advanced") {

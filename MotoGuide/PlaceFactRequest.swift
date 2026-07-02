@@ -6,8 +6,8 @@ enum FactMode: String, CaseIterable, Equatable {
 
     var maxFactLength: Int {
         switch self {
-        case .shortFacts: return 120
-        case .longFacts: return 280
+        case .shortFacts: return 700
+        case .longFacts: return 900
         }
     }
 }
@@ -57,12 +57,39 @@ struct PlaceHierarchy: Equatable, Codable {
     }
 }
 
+struct RiderContext: Equatable, Codable {
+    let homeCountry: String?
+    let homeRegion: String?
+    let familiarRegions: [String]
+
+    static let empty = RiderContext(homeCountry: nil, homeRegion: nil, familiarRegions: [])
+
+    init(
+        homeCountry: String?,
+        homeRegion: String?,
+        familiarRegions: [String] = []
+    ) {
+        self.homeCountry = PlaceNameNormalizer.normalizeOptional(homeCountry)
+        self.homeRegion = PlaceNameNormalizer.normalizeOptional(homeRegion)
+
+        var normalizedRegions: [String] = []
+        for region in familiarRegions {
+            if let normalized = PlaceNameNormalizer.normalizeOptional(region),
+               !normalizedRegions.contains(normalized) {
+                normalizedRegions.append(normalized)
+            }
+        }
+        self.familiarRegions = normalizedRegions
+    }
+}
+
 struct PlaceFactRequest: Equatable {
     let boundary: BoundaryType
     let placeName: String
     let factMode: FactMode
     let countryContext: String?
     let placeHierarchy: PlaceHierarchy
+    let riderContext: RiderContext
 
     var cacheKey: String {
         [
@@ -74,7 +101,10 @@ struct PlaceFactRequest: Equatable {
             PlaceNameNormalizer.normalize(placeHierarchy.town ?? ""),
             PlaceNameNormalizer.normalize(placeHierarchy.county ?? ""),
             PlaceNameNormalizer.normalize(placeHierarchy.region ?? ""),
-            PlaceNameNormalizer.normalize(placeHierarchy.country ?? "")
+            PlaceNameNormalizer.normalize(placeHierarchy.country ?? ""),
+            PlaceNameNormalizer.normalize(riderContext.homeCountry ?? ""),
+            PlaceNameNormalizer.normalize(riderContext.homeRegion ?? ""),
+            PlaceNameNormalizer.normalize(riderContext.familiarRegions.joined(separator: ","))
         ].joined(separator: ":")
     }
 
@@ -83,13 +113,15 @@ struct PlaceFactRequest: Equatable {
         placeName: String,
         factMode: FactMode = .shortFacts,
         countryContext: String?,
-        placeHierarchy: PlaceHierarchy = .empty
+        placeHierarchy: PlaceHierarchy = .empty,
+        riderContext: RiderContext = .empty
     ) {
         self.boundary = boundary
         self.placeName = placeName
         self.factMode = factMode
         self.countryContext = countryContext
         self.placeHierarchy = placeHierarchy
+        self.riderContext = riderContext
     }
 }
 
@@ -102,6 +134,12 @@ enum PlaceFactError: Error, Equatable {
 enum PlaceNameNormalizer {
     static func normalize(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    static func normalizeOptional(_ name: String?) -> String? {
+        guard let name, !name.isEmpty else { return nil }
+        let normalized = normalize(name)
+        return normalized.isEmpty ? nil : normalized
     }
 }
 

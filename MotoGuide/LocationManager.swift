@@ -38,6 +38,63 @@ enum LocationServiceStatus: Equatable {
     }
 }
 
+struct SpeechVoiceOption: Identifiable, Hashable {
+    let identifier: String
+    let displayName: String
+    let localeIdentifier: String
+    let quality: AVSpeechSynthesisVoiceQuality
+
+    var id: String { identifier }
+
+    var isRecommended: Bool {
+        localeIdentifier.hasPrefix("en-GB") && quality == .premium
+    }
+
+    var isSafeDefaultCandidate: Bool {
+        quality == .premium || quality == .enhanced
+    }
+
+    var qualityDescription: String {
+        switch quality {
+        case .premium:
+            return "Premium"
+        case .enhanced:
+            return "Enhanced"
+        case .default:
+            return "Default"
+        @unknown default:
+            return "Default"
+        }
+    }
+
+    var displayLabel: String {
+        "\(displayName) · \(localeIdentifier) · \(qualityDescription)"
+    }
+
+    var pickerLabel: String {
+        if isRecommended {
+            return "\(displayLabel) · Recommended"
+        }
+
+        if isSafeDefaultCandidate {
+            return "\(displayLabel) · Optional"
+        }
+
+        return displayLabel
+    }
+
+    var compactLabel: String {
+        displayLabel
+    }
+}
+
+private enum LocationManagerDefaults {
+    static let preferredVoiceIdentifierKey = "MotoGuidePreferredVoiceIdentifier"
+    static let homeCountryKey = "MotoGuideHomeCountry"
+    static let homeRegionKey = "MotoGuideHomeRegion"
+    static let familiarRegionsKey = "MotoGuideFamiliarRegions"
+}
+
 @MainActor
 class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate {
     static let movingMapInteractionThresholdMetersPerSecond = 8.0 / 3.6
@@ -69,6 +126,33 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var contentMode: ContentMode = .shortFacts
     @Published var bluetoothDelaySeconds: Double = 0.5
     @Published var testMode: Bool = false
+    @Published var preferredVoiceIdentifier: String = UserDefaults.standard.string(
+        forKey: LocationManagerDefaults.preferredVoiceIdentifierKey
+    ) ?? "" {
+        didSet {
+            UserDefaults.standard.set(preferredVoiceIdentifier, forKey: LocationManagerDefaults.preferredVoiceIdentifierKey)
+        }
+    }
+
+    @Published var homeCountry: String = UserDefaults.standard.string(forKey: LocationManagerDefaults.homeCountryKey) ?? "" {
+        didSet {
+            UserDefaults.standard.set(homeCountry, forKey: LocationManagerDefaults.homeCountryKey)
+        }
+    }
+
+    @Published var homeRegion: String = UserDefaults.standard.string(forKey: LocationManagerDefaults.homeRegionKey) ?? "" {
+        didSet {
+            UserDefaults.standard.set(homeRegion, forKey: LocationManagerDefaults.homeRegionKey)
+        }
+    }
+
+    @Published var familiarRegions: String = UserDefaults.standard.string(
+        forKey: LocationManagerDefaults.familiarRegionsKey
+    ) ?? "" {
+        didSet {
+            UserDefaults.standard.set(familiarRegions, forKey: LocationManagerDefaults.familiarRegionsKey)
+        }
+    }
     @Published private(set) var isTracking = false
     @Published private(set) var lastSpokenPhrase: String?
     @Published private(set) var lastSpokenAt: Date?
@@ -113,6 +197,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             name: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance()
         )
+
+        ensurePreferredVoiceSelection()
     }
 
     private static func makeDefaultFactGenerator() -> PlaceFactGenerating {
@@ -173,6 +259,81 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             announceTown: announceTown,
             announceStreet: announceStreet
         )
+    }
+
+    private var riderContext: RiderContext {
+        RiderContext(
+            homeCountry: normalizeContextValue(homeCountry),
+            homeRegion: normalizeContextValue(homeRegion),
+            familiarRegions: parseFamiliarRegionsNormalized()
+        )
+    }
+
+    func availableSpeechVoices() -> [SpeechVoiceOption] {
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+        return voices
+            .filter { !$0.language.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { voice in
+                SpeechVoiceOption(
+                    identifier: voice.identifier,
+                    displayName: voice.name,
+                    localeIdentifier: voice.language,
+                    quality: voice.quality
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.isRecommended != rhs.isRecommended {
+                    return lhs.isRecommended
+                }
+
+                let lhsIsGb = lhs.localeIdentifier.hasPrefix("en-GB")
+                let rhsIsGb = rhs.localeIdentifier.hasPrefix("en-GB")
+                if lhsIsGb != rhsIsGb {
+                    return lhsIsGb
+                }
+
+                if lhs.quality != rhs.quality {
+                    return Self.speechQualityRank(lhs.quality) > Self.speechQualityRank(rhs.quality)
+                }
+
+                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            }
+    }
+
+    func recommendedSpeechVoice() -> SpeechVoiceOption? {
+        availableSpeechVoices().first(where: { $0.isSafeDefaultCandidate })
+    }
+
+    func previewSelectedVoice() {
+        speechSynthesizer.stopSpeaking(at: .immediate)
+        announcementQueue.clearPending()
+        currentlySpeakingBoundary = nil
+        speak(
+            text: "MotoGuide can speak in this voice. Keep the road in front of you, rider.",
+            shouldRecordTestLog: false,
+            ignoreQuietMode: true
+        )
+    }
+
+    private func normalizeContextValue(_ value: String) -> String? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    private func parseFamiliarRegionsNormalized() -> [String] {
+        let rawRegions = familiarRegions
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        var values: [String] = []
+        for region in rawRegions {
+            let normalized = region.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !normalized.isEmpty, !values.contains(normalized) {
+                values.append(normalized)
+            }
+        }
+        return values
     }
 
     private var legacyRepeatPreferences: RepeatPreferences {
@@ -238,7 +399,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         inFlightFactTask?.cancel()
         cancelPendingAnnouncement()
 
-        let request = AnnouncementPolicy.factRequest(for: plan, address: address, mode: mode)
+        let request = AnnouncementPolicy.factRequest(
+            for: plan,
+            address: address,
+            mode: mode,
+            riderContext: riderContext
+        )
         let generator = factGenerator
 
         inFlightFactTask = Task { [weak self] in
@@ -453,16 +619,25 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
     }
 
-    private func speak(text: String, boundary: BoundaryType? = nil, shouldRecordTestLog: Bool = true) {
-        guard contentMode != .quiet else { return }
+    private func speak(
+        text: String,
+        boundary: BoundaryType? = nil,
+        shouldRecordTestLog: Bool = true,
+        ignoreQuietMode: Bool = false
+    ) {
+        guard ignoreQuietMode || contentMode != .quiet else { return }
         guard AVSpeechSynthesisVoice.speechVoices().count > 0 else {
             print("No available voices.")
+            return
+        }
+        guard let preferredVoice = resolveSpeechVoice() else {
+            print("No usable voices.")
             return
         }
 
         currentlySpeakingBoundary = boundary
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-GB")
+        utterance.voice = preferredVoice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         print("Speaking: \(text)")
         lastSpokenPhrase = text
@@ -471,6 +646,64 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             recordTestLog(utteredPhrase: text)
         }
         speechSynthesizer.speak(utterance)
+    }
+
+    private func resolveSpeechVoice() -> AVSpeechSynthesisVoice? {
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+        if let preferred = voices.first(where: { $0.identifier == preferredVoiceIdentifier }) {
+            return preferred
+        }
+
+        return bestVoice(from: voices)
+    }
+
+    private func ensurePreferredVoiceSelection() {
+        if let first = availableSpeechVoices().first, !first.identifier.isEmpty {
+            preferredVoiceIdentifier = availableSpeechVoices().first(where: { $0.identifier == preferredVoiceIdentifier })?.identifier
+                ?? first.identifier
+            return
+        }
+        preferredVoiceIdentifier = ""
+    }
+
+    private func bestVoice(from voices: [AVSpeechSynthesisVoice]) -> AVSpeechSynthesisVoice? {
+        guard !voices.isEmpty else {
+            return nil
+        }
+
+        if let preferredGb = voices
+            .filter({ $0.language == "en-GB" })
+            .max(by: compareVoiceQuality) {
+            return preferredGb
+        }
+
+        if let preferredEnglish = voices
+            .filter({ $0.language.hasPrefix("en") })
+            .max(by: compareVoiceQuality) {
+            return preferredEnglish
+        }
+
+        return voices.max(by: compareVoiceQuality)
+    }
+
+    private func compareVoiceQuality(lhs: AVSpeechSynthesisVoice, rhs: AVSpeechSynthesisVoice) -> Bool {
+        if Self.speechQualityRank(lhs.quality) != Self.speechQualityRank(rhs.quality) {
+            return Self.speechQualityRank(lhs.quality) > Self.speechQualityRank(rhs.quality)
+        }
+        return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+    }
+
+    private static func speechQualityRank(_ quality: AVSpeechSynthesisVoiceQuality) -> Int {
+        switch quality {
+        case .premium:
+            return 3
+        case .enhanced:
+            return 2
+        case .default:
+            return 1
+        @unknown default:
+            return 1
+        }
     }
 
     func logTestLocation() {

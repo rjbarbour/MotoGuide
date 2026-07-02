@@ -1,6 +1,8 @@
 package ai.dml.motoguide.factproxy;
 
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -57,6 +59,30 @@ public final class PlaceInputValidator {
             return null;
         }
         return validate(value, field, MAX_COUNTRY_CONTEXT_LENGTH, COUNTRY_CHARACTERS);
+    }
+
+    public static List<String> validateFamiliarRegions(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+
+        if (values.size() > 12) {
+            throw new BadRequestException("riderContext.familiarRegions has too many entries");
+        }
+
+        ArrayList<String> normalizedValues = new ArrayList<>();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+
+            String normalized = validate(value, "familiarRegions", MAX_PLACE_NAME_LENGTH, PLACE_CHARACTERS);
+            if (!normalizedValues.contains(normalized)) {
+                normalizedValues.add(normalized);
+            }
+        }
+
+        return normalizedValues;
     }
 
     private static String validate(String value, String field, int maxLength, Pattern allowedCharacters) {

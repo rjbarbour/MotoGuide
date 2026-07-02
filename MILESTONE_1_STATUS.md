@@ -1,6 +1,6 @@
 # Milestone 1 Status
 
-Date: 2026-07-01
+Date: 2026-07-02
 
 ## Result
 
@@ -68,4 +68,6 @@ xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcode
 
 ## Next Step
 
-Milestone 2: define ride-safe announcement rules (quiet mode, names-only mode, throttling, boundary-level repeat controls).
+Milestone 2 has since moved forward in code: quiet, names-only, Short Facts, Long Facts, boundary priority, and announcement queue behavior are implemented.
+
+Current next work is Milestone 6 Location screen completion and Milestone 6.5 first-time rider polish before the 2026-07-03 field trial.

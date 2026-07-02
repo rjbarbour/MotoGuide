@@ -516,8 +516,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MotoGuide/Info.plist;
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "We need your location to provide better services even when the app is in the background.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to show your current position.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "MotoGuide uses your location to announce towns, counties, regions, and countries while you ride, even when the screen is off or another app is open.";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "MotoGuide uses your location to announce towns, counties, regions, and countries while you ride, even when the screen is off or another app is open.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "MotoGuide uses your location to show your current place and speak short place updates during your ride.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -550,8 +551,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MotoGuide/Info.plist;
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "We need your location to provide better services even when the app is in the background.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to show your current position.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "MotoGuide uses your location to announce towns, counties, regions, and countries while you ride, even when the screen is off or another app is open.";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "MotoGuide uses your location to announce towns, counties, regions, and countries while you ride, even when the screen is off or another app is open.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "MotoGuide uses your location to show your current place and speak short place updates during your ride.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

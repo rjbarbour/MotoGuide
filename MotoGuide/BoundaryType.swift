@@ -23,7 +23,7 @@ enum ContentMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .natural: return "Natural"
+        case .natural: return "Places + greetings"
         case .namesOnly: return "Names Only"
         case .shortFacts: return "Short Facts"
         case .longFacts: return "Long Facts"

@@ -104,6 +104,8 @@ Decisions:
 - Default real-ride interval is `10 s`.
 - Default real-ride content depth is Short Facts.
 - Default repeat settings keep street off and town, county, region, and country on.
+- Deterministic UK place/boundary data is deferred until after MVP1 field trial.
+- MVP1 build scope stops at Location screen completion plus first-time rider polish before the 2026-07-03 field trial.
 
 Open questions:
 
@@ -126,6 +128,20 @@ ICB catalogue context:
 - Local repo: `/Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue`
 - GitHub repo: `https://github.com/rjbarbour/icb-catalogue-processing.git`
 - MotoGuide ICB: `/Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue/staged_icbs/6a1047a6a591ed37d9fd4e0e.md`
+
+Notion operating references read on 2026-07-02:
+
+- `MacBook Python (uv-managed, 3.13 standard)`: https://app.notion.com/p/33ea4c502b178138ab92fb8d4397662e
+  - Use `uv` for Python work. Prefer explicit project pins; use `uv run --python 3.13 ...` outside pinned projects.
+  - Avoid bare `python3` for project setup because this Mac also has Python 3.14 and Apple system Python.
+- `SOP: Secret Management in Agentic AI Development v3.0`: https://app.notion.com/p/320a4c502b1781d9ab34c4abf6d44152
+  - Never persist secrets to code, docs, logs, chat, Notion, or repo files.
+  - Retrieve secrets at runtime. Local development may use macOS Keychain; deployed services should use the platform secret store, with AWS Secrets Manager as the preferred canonical store for AWS-hosted work.
+  - Treat credential-like strings as sensitive and do not reproduce them.
+- `SOP: Diagnostic Script Standards for LLM-Assisted Debugging v1.0`: https://app.notion.com/p/324a4c502b1781298a2cc9cd702fb31b
+  - Diagnostic scripts must use dual output with `tee`, visible START/DONE markers, timestamped progress, and clean `tee` teardown.
+  - Default to `SANITIZE_FOR_LLM=true`; redact usernames, home paths, hostnames, IPs, emails, task content, and unrelated process arguments at collection time.
+  - Collect the minimum data needed and warn before slow operations.
 
 ## Working Rules
 

@@ -16,7 +16,7 @@ The current codebase is not a blank slate. It already contains:
 - `AnnouncementDecision`, which decides whether to speak, which address components to include, and how repeat preferences behave.
 - `TestRouteFixture`, a named Gloucestershire route with 11 fixed coordinates for manual and simulator testing.
 - Unit tests for address formatting, announcement decisions, location interval throttling, test mode, and the route fixture.
-- `Info.plist` background modes for audio, location, Bluetooth, fetch, processing, and external accessory support.
+- `Info.plist` background modes for audio and location.
 
 Treat this as the baseline. Do not re-plan work that is already implemented unless the milestone is about verification, hardening, or changing behaviour.
 
@@ -54,6 +54,10 @@ Date: 2026-07-02
 - Finish the Location screen before field trial. It should feel like the app's home, not a developer panel.
 - Add first-time rider polish and app-quality review readiness before field trial.
 - Stop the MVP1 build scope at Location screen completion plus first-time rider polish. The first field trial target is 2026-07-03.
+- Add a near-term audio-quality task: choose a better installed iOS TTS voice, prefer enhanced/premium `en-GB` voices when available, and expose a small previewable voice setting.
+- Improve fact quality before broader testing: Short Facts should be about as long as the current Long Facts, Long Facts should be longer, and both should assume an adult, middle-aged touring rider rather than explaining obvious schoolbook context.
+- Add optional coarse home/familiar-region context, for example home country/region only, so the proxy can avoid telling an English rider basic facts such as Wales being part of the UK.
+- Move the Location screen towards a map-first layout: full-height map with compact overlay information, roughly twice the current visible map area, and no navigation-style route UI.
 
 ## Milestone 0: Project Setup And Baseline Verification
 
@@ -64,13 +68,13 @@ Existing baseline:
 - The repository is cloned at `/Users/rob_dev/DocsLocal/motoguide/repo`.
 - `AGENTS.md`, `MILESTONES.md`, and `MILESTONE_0_STATUS.md` exist in the repository root.
 - Xcode sees the `MotoGuide` scheme.
-- Xcode sees `Robert's iPhone` as a physical iOS destination.
+- CoreDevice has seen `Robert's iPhone` over the OTA path as `Roberts-iPhone-17.coredevice.local`; `xcodebuild -showdestinations` may not always list it.
 - Xcode now has an iPhone 17 Pro Max simulator runtime available.
 
 Remaining work:
 
-- Trust the developer certificate on the iPhone.
-- Re-run on the physical phone after trust is granted.
+- Keep Robert's iPhone unlocked, trusted, and on the same Wi-Fi as the Mac for OTA deploys.
+- Re-run on the physical phone after CoreDevice visibility is confirmed.
 - Re-run simulator tests after any simulator launch issue is cleared.
 - Keep `MILESTONE_0_STATUS.md` updated with the latest pass/fail result.
 
@@ -224,18 +228,44 @@ Enhancement work:
 - Use the OpenAI-backed fact proxy first. Keep the iOS client and proxy server aligned with `FACT_PROXY_OPENAPI.yaml`.
 - Keep `LOCAL_LLM_FACTS_FALLBACK_PLAN.md` as an alternative if OpenAI cost, latency, connectivity, privacy, or quality becomes a blocker.
 - Add a content-depth parameter, including names only, Short Facts, and Long Facts.
+- Revise fact length targets:
+  - Short Facts: up to 5 concise sentences, up to 700 characters.
+  - Long Facts: up to 7 concise sentences, up to 900 characters, still safe to hear while riding and interruptible.
+- Revise prompt style: avoid banal encyclopaedia facts, obvious administrative definitions, trivia without relevance, and patronising explanations. Prefer specific local history, landscape, road context, industry, architecture, border changes, notable people, or why the place matters.
+- Add optional rider familiarity context to the contract, such as `homeCountry`, `homeRegion`, or `familiarRegions`, without sending an exact home address. Use it only to tune what not to explain.
 - Add rules for when facts are spoken.
 - Keep fact announcements shorter than navigation instructions.
 - Keep prompt selection server-side; iOS sends only the requested fact mode and place hierarchy.
 - Add tests for selecting and suppressing facts.
+- Add a fact-review fixture using real route places and expected quality checks: not banal, not obvious to a UK rider, no schoolbook definitions, no safety instruction, no raw coordinates, bounded length.
 
 Done when:
 
-- Short Facts speaks a place name plus one concise fact when appropriate.
-- Long Facts speaks a longer but bounded place blurb when selected.
+- Short Facts speaks a place name plus one useful adult-level fact or short blurb when appropriate.
+- Long Facts speaks a richer but bounded place blurb when selected.
 - Names-only mode never speaks facts.
 - Quiet mode remains silent.
 - The fact instruction is constrained enough that announcements remain ride-safe.
+- Facts use optional home/familiar-region context to avoid telling riders things they are likely to know already.
+
+## Milestone 5.5: Speech Voice And Audio Quality
+
+Target outcome: MotoGuide sounds less robotic and more suitable for helmet listening.
+
+Work:
+
+- Enumerate available `AVSpeechSynthesisVoice.speechVoices()` on the physical iPhone.
+- Prefer installed `en-GB` voices with `.premium` quality, then `.enhanced`, then default quality.
+- Add a small Settings control for voice choice with a short preview phrase.
+- Keep a sensible automatic default so a rider does not need to configure voice before first use.
+- Test speech through the Nex Xcom headset, not only the phone speaker.
+- Record preferred voice name, identifier, quality, rate, pitch, and volume in a status note.
+
+Done when:
+
+- MotoGuide uses the best available installed `en-GB` voice by default, or clearly falls back if it is unavailable.
+- The rider can preview and choose another installed voice.
+- The selected voice remains intelligible through the helmet at riding volume.
 
 ## Milestone 6: Location Screen Completion
 
@@ -253,8 +283,11 @@ Existing baseline:
 Enhancement work:
 
 - Complete the **Location** screen with a single MapKit map and context stack.
-- Show summary line, hierarchy panel, previous street when changed, and nearby towns with distances.
-- Auto-follow user location with context-aware default zoom; speed-gated zoom presets when stopped.
+- Move toward a map-first layout: a near full-screen MapKit map with compact translucent/bottom-sheet overlays for current place, hierarchy, last phrase, and mode.
+- Keep information compact: avoid a tall stacked dashboard above the map; use one-line current place, compressed hierarchy chips/rows, and collapsible detail.
+- Show summary line, hierarchy panel, previous street when changed, and nearby towns with distances in compact overlay form.
+- Auto-follow user location with context-aware default zoom; show roughly twice the current map area by default.
+- Keep speed-gated zoom presets when stopped.
 - Reuse shared `LocationManager` state; support test mode on the Gloucestershire fixture.
 - Do **not** add deterministic boundary data or administrative polygons in M6.
 - Use `MKLocalSearch` (or equivalent) for nearest-town context; geocoder for hierarchy text.

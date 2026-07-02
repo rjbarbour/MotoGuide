@@ -26,8 +26,18 @@ public class OpenAiService {
             Do not provide route guidance, speed advice, navigation directions, riding coaching, or invitations.
             Never ask questions or speculate.
             Output plain text only, in one short response.
+            The target audience is an adult motorcyclist; keep language concise, calm, and ride-safe.
+            Every sentence should be directly relevant to the current road context.
+            Prefer concrete, local detail over broad administrative definitions.
+            If rider context is provided, do not assume unfamiliarity with that context.
             """;
     private static final String MODE_OVERRIDE_PREFIX = "Additional mode prompt: ";
+    private static final String FALLBACK_SHORT_FACT_PROMPT =
+            "Give up to five concise, useful, factual points that matter to a rider now. "
+                    + "Prefer concrete, local detail and practical relevance; avoid basic administrative definitions.";
+    private static final String FALLBACK_LONG_FACT_PROMPT =
+            "Give up to seven concise, ride-safe facts about this place with local relevance for a rider. "
+                    + "Prioritise what is notable, practical, or historically meaningful over generic geography definitions.";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -109,7 +119,7 @@ public class OpenAiService {
                         Map.of("role", "user", "content", userPrompt(request, factMode))
                 ),
                 "max_completion_tokens", factMode.maxCompletionTokens(),
-                "temperature", 0.2
+                "temperature", 0.35
         );
     }
 
@@ -134,9 +144,21 @@ public class OpenAiService {
 
     private String configuredModePrompt(FactMode factMode) {
         return switch (factMode) {
-            case SHORT_FACTS -> motoGuideProperties.shortFactPrompt();
-            case LONG_FACTS -> motoGuideProperties.longFactPrompt();
+            case SHORT_FACTS -> defaultPrompt(
+                    motoGuideProperties.shortFactPrompt(),
+                    FALLBACK_SHORT_FACT_PROMPT
+            );
+            case LONG_FACTS -> defaultPrompt(
+                    motoGuideProperties.longFactPrompt(),
+                    FALLBACK_LONG_FACT_PROMPT
+            );
         };
+    }
+
+    private static String defaultPrompt(String configuredPrompt, String fallbackPrompt) {
+        return configuredPrompt == null || configuredPrompt.isBlank()
+                ? fallbackPrompt
+                : configuredPrompt;
     }
 
     private String userPrompt(ValidatedFactRequest request, FactMode factMode) {
@@ -149,8 +171,41 @@ public class OpenAiService {
         if (countryContext != null) {
             builder.append('\n').append("Country context: ").append(countryContext);
         }
+        appendRiderContext(builder, request.riderContext());
         appendHierarchy(builder, request.placeHierarchy());
         return builder.toString();
+    }
+
+    private static void appendRiderContext(StringBuilder builder, ValidatedRiderContext riderContext) {
+        if (riderContext == null) {
+            return;
+        }
+
+        if (riderContext.homeCountry() != null || riderContext.homeRegion() != null) {
+            builder.append('\n').append("Rider home context:");
+            if (riderContext.homeCountry() != null) {
+                builder.append('\n').append("- Home country: ").append(riderContext.homeCountry());
+            }
+            if (riderContext.homeRegion() != null) {
+                builder.append('\n').append("- Home region: ").append(riderContext.homeRegion());
+            }
+        }
+
+        if (riderContext.familiarRegions() != null && !riderContext.familiarRegions().isEmpty()) {
+            builder.append('\n').append("- Familiar regions: ")
+                    .append(String.join(", ", riderContext.familiarRegions()));
+        }
+
+        if (!builder.isEmpty()) {
+            builder.append("\nAvoid repeating generic facts that are obvious from the rider context above.");
+            builder.append("\nPrefer practical or local observations over definitions.");
+            if (riderContext.homeCountry() != null) {
+                builder.append("\nSkip generic facts about the stated home country unless they add immediate context.");
+            }
+            if (riderContext.homeRegion() != null) {
+                builder.append("\nSkip generic facts about the stated home region unless they add immediate context.");
+            }
+        }
     }
 
     private void appendHierarchy(StringBuilder builder, ValidatedPlaceHierarchy hierarchy) {

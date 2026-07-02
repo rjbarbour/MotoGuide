@@ -203,14 +203,16 @@ enum AnnouncementPolicy {
     static func factRequest(
         for plan: AnnouncementPlan,
         address: Address,
-        mode: FactMode = .shortFacts
+        mode: FactMode = .shortFacts,
+        riderContext: RiderContext = .empty
     ) -> PlaceFactRequest {
         PlaceFactRequest(
             boundary: plan.boundary,
             placeName: AnnouncementPhraseBuilder.placeName(for: plan.boundary, in: address),
             factMode: mode,
             countryContext: Address.isValidPlaceName(address.country) ? address.country : nil,
-            placeHierarchy: PlaceHierarchy(address: address)
+            placeHierarchy: PlaceHierarchy(address: address),
+            riderContext: riderContext
         )
     }
 }

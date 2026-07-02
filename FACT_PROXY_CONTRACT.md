@@ -1,6 +1,6 @@
 # MotoGuide Fact Proxy Contract
 
-Date: 2026-07-01
+Date: 2026-07-02
 
 Status: Human-readable companion to `FACT_PROXY_OPENAPI.yaml`.
 
@@ -12,7 +12,8 @@ Keep the iOS app, fact proxy server, tests, and markdown in sync with the OpenAP
 
 The fact proxy contract lets MotoGuide ask for one bounded place fact without storing or sending an OpenAI API key from the iOS app.
 
-The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the MotoGuide fact proxy. The proxy validates the request, chooses the server-side prompt for `shortFacts` or `longFacts`, calls OpenAI server-side, sanitizes the model output, and returns a bounded fact.
+The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the MotoGuide fact proxy. It also sends optional rider context (`homeCountry`, `homeRegion`, `familiarRegions`) so the proxy can avoid explaining obvious or redundant geography.
+The proxy validates the request, chooses the server-side prompt for `shortFacts` or `longFacts`, calls OpenAI server-side, sanitizes the model output, and returns a bounded fact.
 
 The iOS app must not send prompt text, arbitrary model messages, OpenAI configuration, raw coordinates, or an OpenAI API key.
 
@@ -171,7 +172,7 @@ Current MVP security model:
 - The app stores only the proxy token, not the OpenAI key.
 - The OpenAI key is stored only as the Fly secret `OPENAI_API_KEY`.
 - The proxy only exposes a narrow place-fact endpoint; clients cannot send arbitrary OpenAI prompts, model names, endpoints, or message arrays.
-- The proxy validates `boundary`, `factMode`, `placeName`, `countryContext`, and `placeHierarchy`.
+- The proxy validates `boundary`, `factMode`, `placeName`, `countryContext`, `placeHierarchy`, and optional `riderContext`.
 - The proxy rate-limits by user ID or device ID if provided, with IP fallback.
 
 Current limitation:
@@ -200,8 +201,8 @@ Example object payload:
 ```json
 {
   "modePrompts": {
-    "shortFacts": "one factual sentence, max 120 characters",
-    "longFacts": "one or two short sentences, max 280 characters total"
+    "shortFacts": "up to five concise local-context facts, up to 700 characters",
+    "longFacts": "up to seven concise contextual facts, up to 900 characters total"
   },
   "users": {
     "rider-a": {
@@ -295,6 +296,11 @@ JSON body:
     "county": "Gloucestershire",
     "region": "England",
     "country": "United Kingdom"
+  },
+  "riderContext": {
+    "homeCountry": "United Kingdom",
+    "homeRegion": "West Midlands",
+    "familiarRegions": ["England", "Cotswolds"]
   }
 }
 ```
@@ -308,6 +314,7 @@ Fields:
 | `factMode` | Yes | String | `shortFacts`, `longFacts` | Requested fact depth. The proxy owns prompt selection and rejects unknown values with `400`. |
 | `countryContext` | No | String or `null` | Non-empty country name when known | Disambiguates places with reused names. |
 | `placeHierarchy` | Yes | Object | `street`, `town`, `county`, `region`, `country` string values or omitted/null | Current reverse-geocoded hierarchy. Coordinates are not sent. |
+| `riderContext` | No | Object | `homeCountry`, `homeRegion`, `familiarRegions` | Optional rider context to avoid obvious geography. |
 
 The iOS app must map `BoundaryType.factLabel` directly to `boundary`.
 
@@ -356,7 +363,7 @@ Fields:
 
 | Field | Required | Type | Meaning |
 |-------|----------|------|---------|
-| `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 120 characters. `longFacts` is capped at 280 characters. |
+| `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 700 characters. `longFacts` is capped at 900 characters. |
 
 ## Error Responses
 
@@ -373,8 +380,8 @@ The iOS app must not speak raw error text.
 
 The returned `fact` must be:
 
-- `shortFacts`: one sentence and no more than 120 characters.
-- `longFacts`: one or two short sentences and no more than 280 characters.
+- `shortFacts`: up to 5 short sentences and no more than 700 characters.
+- `longFacts`: up to 7 short sentences and no more than 900 characters.
 - Factual and neutral.
 - Useful as ambient place context.
 - Short enough to keep the total spoken announcement ride-safe.
@@ -403,7 +410,7 @@ Exact command:
 curl -sS -X POST http://127.0.0.1:3000/v1/fact \
   -H "Authorization: Bearer dev-token" \
   -H "Content-Type: application/json" \
-  -d '{"boundary":"town","placeName":"Stroud","factMode":"shortFacts","countryContext":"United Kingdom","placeHierarchy":{"town":"Stroud","county":"Gloucestershire","region":"England","country":"United Kingdom"}}'
+  -d '{"boundary":"town","placeName":"Stroud","factMode":"shortFacts","countryContext":"United Kingdom","placeHierarchy":{"town":"Stroud","county":"Gloucestershire","region":"England","country":"United Kingdom"},"riderContext":{"homeCountry":"United Kingdom","homeRegion":"West Midlands","familiarRegions":["England","Cotswolds"]}}'
 ```
 
 Expected result:

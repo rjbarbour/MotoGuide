@@ -46,15 +46,15 @@ final class FactPhraseBuilderTests: XCTestCase {
     }
 
     func testSanitizeTruncatesLongFacts() {
-        let long = String(repeating: "a", count: 150)
+        let long = String(repeating: "a", count: 1_000)
         let sanitized = FactPhraseBuilder.sanitize(long)
-        XCTAssertEqual(sanitized?.count, 120)
+        XCTAssertEqual(sanitized?.count, 700)
     }
 
     func testLongFactsUseLongerBoundedSanitizer() {
-        let long = String(repeating: "a", count: 300)
+        let long = String(repeating: "a", count: 900)
         let sanitized = FactPhraseBuilder.sanitize(long, mode: .longFacts)
-        XCTAssertEqual(sanitized?.count, 280)
+        XCTAssertEqual(sanitized?.count, 900)
     }
 }
 
@@ -272,6 +272,56 @@ final class ProxyFactGeneratorTests: XCTestCase {
         let fact = try await generator.fact(for: request)
 
         XCTAssertEqual(fact, "A longer but still bounded place blurb.")
+    }
+
+    func testPostsRiderContextToProxy() async throws {
+        let endpoint = self.endpoint
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            factMode: .shortFacts,
+            countryContext: "United Kingdom",
+            placeHierarchy: PlaceHierarchy(
+                street: nil,
+                town: "Stroud",
+                county: "Gloucestershire",
+                region: "England",
+                country: "United Kingdom"
+            ),
+            riderContext: RiderContext(
+                homeCountry: "United Kingdom",
+                homeRegion: "West Midlands",
+                familiarRegions: ["England", "Cotswolds"]
+            )
+        )
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            let body = try self.requestBodyData(from: urlRequest)
+            let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+
+            let riderContext = try XCTUnwrap(json?["riderContext"] as? [String: Any])
+            XCTAssertEqual(riderContext["homeCountry"] as? String, "United Kingdom")
+            XCTAssertEqual(riderContext["homeRegion"] as? String, "West Midlands")
+            XCTAssertEqual(riderContext["familiarRegions"] as? [String], ["England", "Cotswolds"])
+
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data(#"{\"fact\":\"Great spot for a ride.\"}"#.utf8))
+        }
+
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        let fact = try await generator.fact(for: request)
+
+        XCTAssertEqual(fact, "Great spot for a ride.")
     }
 
     func testDefaultEndpointUsesProductionFlyProxyFromContract() async throws {

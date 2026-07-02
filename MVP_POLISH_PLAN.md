@@ -20,29 +20,28 @@ This plan defines polish appropriate for a **first-time user** preparing for fie
 
 | Step | What happens | Rider sees / hears |
 |------|----------------|-------------------|
-| **Launch** | App opens to a **home screen** (Map tab when M6 lands; interim: a simple **Ride** or **Now** screen) | One-line product purpose: *"Place awareness for your ride — works alongside your nav app."* |
-| **Permissions** | In-app explanation **before** iOS location prompt; request When In Use first, upgrade to Always after rider taps "Start ride" | Plain copy: why background location is needed (announcements while screen is off / nav app in foreground) |
+| **Launch** | App opens to the **Location** screen after onboarding | Current place, hierarchy, last spoken phrase, mode, and location status |
+| **Permissions** | In-app explanation **before** iOS location prompt; request location after onboarding | Plain copy: why background location is needed (announcements while screen is off / nav app in foreground) |
 | **What to expect** | Short onboarding (2–3 cards or one scrollable screen), skippable | *"You'll hear town and county names as you ride. Keep your nav app running. Connect your helmet headset."* Example announcement. Quiet mode explained. |
 | **First configuration** | Sensible defaults pre-selected; optional "Customise" link | Announcement style picker (Natural / Names only / Short facts / Quiet). Short Facts pre-selected. Advanced settings collapsed. |
-| **Start ride** | Rider mounts phone, opens nav app, starts MotoGuide (or it auto-starts tracking after onboarding) | Status: **Listening**, current place hierarchy, last spoken phrase, mode badge |
-| **During ride** | Audio on boundary changes; screen optional | Glanceable status if tab opened at a stop; no interaction required while moving |
+| **Ride begins** | Rider mounts phone, opens nav app, and leaves MotoGuide running after onboarding | Status: **Always running**, current place hierarchy, last spoken phrase, mode badge |
+| **During ride** | Audio on boundary changes; screen optional | Glanceable status if Location is open at a stop; no interaction required while moving |
 | **After ride** | Optional: review last announcements in Log | Log shows rider-friendly place names, not raw coordinates first |
 
-### 1.2 What confuses a PoC user today
+### 1.2 Remaining first-time rider risks
 
-| Pain point | Current behaviour | Why it hurts |
-|------------|-------------------|--------------|
-| **No onboarding** | App opens straight to Settings | Rider does not know MotoGuide is not a nav app, or what it will say |
-| **Permissions without context** | `requestAlwaysAuthorization()` on `LocationManager` init; generic plist strings | iOS dialog appears before value is explained; "provide better services" is vague |
-| **Settings as home tab** | `TabView` leads with Settings | Feels like a config panel, not a product |
-| **Debug controls visible** | Test Mode, Speak After Every Geocode (Debug), 1-second interval | Looks broken or overwhelming; easy to enable pathological speech |
-| **Developer Log tab** | Coordinates, JSON-ish address fields, manual Log button | Useful for dev; alien to a rider |
-| **Internal language** | "Check Interval", "Geocode", "Nation", "Announce" section | Jargon; "Nation" ≠ "England" in rider mental model |
-| **No live status** | `lastKnownAddress` exists but is not shown on Settings | Rider cannot confirm "it knows where I am" before riding |
-| **No permission-denied UX** | Errors only `print()` to console | Silent failure if location denied |
-| **No empty states** | Log empty list; no "waiting for GPS" | Rider thinks app is broken |
-| **Announcement style unclear** | "Natural" undefined | Rider does not know difference from Names only / Short facts |
-| **Bluetooth delay slider** | 0–3 s slider with no explanation | Tuning knob without label; most riders should never see it |
+| Risk | Current behaviour | Why it matters |
+|------|-------------------|----------------|
+| **Physical behavior unverified** | OTA deployment to Robert's iPhone is recorded, but launch/ride behavior still needs field validation | Field testing must confirm permissions, background tracking, headset audio, and proxy facts on the phone |
+| **Debug controls visible** | Test Mode, Speak After Every Geocode, Bluetooth delay, and proxy diagnostics are nested under Advanced / Developer | Useful for development, but still too easy for a rider to create noisy behavior |
+| **Developer Log language** | Log still uses developer naming and exposes coordinates directly | Useful for field debugging, but not yet rider-friendly History |
+| **Internal language remains** | "Location check frequency", "Speak After Every Geocode", and "Natural" still need a rider-language pass | Jargon makes the app feel unfinished |
+| **Proxy/audio recovery incomplete** | Location and geocoder failures are visible, but proxy and audio failures mostly rely on diagnostics or console output | A rider needs visible fallback status if facts or speech fail |
+| **Fact quality too banal** | Short Facts are capped at 700 characters and Long Facts at 900, with concise and practical prompts | Adult touring riders need specific, locally meaningful context, not obvious encyclopaedia snippets |
+| **TTS voice quality unknown** | App currently asks for default `en-GB` voice | Helmet speech should use the best installed enhanced/premium iOS voice and allow preview/selection |
+| **Location screen incomplete** | Summary, hierarchy, last spoken phrase, quiet status, basic map, speed-gated map interaction, and key empty states exist | Full-map layout, compact overlays, nearby towns, previous street, doubled default map area, stopped-only zoom presets, and presentation tests remain |
+| **Announcement style unclear** | "Natural" is still undefined in the UI | Rider may not understand the difference from Names Only / Short Facts |
+| **Bluetooth delay exposed** | 0-3 s slider is visible in Advanced | Most riders should not need to tune this before a field ride |
 
 ### 1.3 Assumptions
 
@@ -61,13 +60,13 @@ Grouped for MVP1 field readiness. **Must** = before first external rider or M8; 
 
 - 2–3 screen onboarding: purpose, how it differs from nav, helmet + background location note.
 - Replace plist usage strings with rider-facing copy, e.g. *"MotoGuide uses your location to announce towns and counties while you ride, even when the screen is off or another app is open."*
-- Defer `requestAlwaysAuthorization()` until after onboarding + explicit "Start" (aligns with M1 open question).
-- Add `NSLocationAlwaysAndWhenInUseUsageDescription` if missing (simulator logs show gap).
+- Request location only after onboarding has explained why it is needed.
+- Keep `NSLocationAlwaysUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`, and `NSLocationWhenInUseUsageDescription` rider-facing.
 - Post-denial screen: Open Settings deep link, explain limited functionality.
 
 ### 2.2 Default settings for real rides — **Must**
 
-- Hide or collapse debug: Test Mode, Speak After Every Geocode, 1 s / 2 s intervals → **Advanced** or `#if DEBUG` only.
+- Hide or collapse debug: Test Mode, Speak After Every Geocode, Bluetooth delay, and proxy diagnostics → **Advanced**, **Developer**, or `#if DEBUG` only.
 - Default interval **10 s** for real rides.
 - Street announcements **off** (already default in `BoundaryAnnouncementSettings.ridingDefaults`).
 - Pre-select **Short Facts** announcement style.
@@ -89,28 +88,25 @@ Rename UI only where rider-visible; keep code identifiers stable.
 
 ### 2.4 Status at a glance — **Must** (interim), **Should** (full with M6)
 
-**Before Map tab (interim Must):**
+**Location screen (M6):**
 
-- Add compact **status header** on home/settings: current town/county, announcement mode, listening indicator.
+- Keep compact status header: current place, announcement mode, and always-running indicator.
 - Show **last spoken** phrase and timestamp.
-- "Updating location…" / "Waiting for GPS" empty state.
+- Show "Waiting for GPS", permission-denied, and geocoder-failure states.
+- Move to a map-first layout per `MAP_SITUATIONAL_AWARENESS.md`: full map, compact overlay, current place, mode, and last phrase.
+- Show roughly twice the current map area by default.
+- Keep Quiet mode visible on Location.
 
-**With Map tab (Should, M6):**
+### 2.5 Empty states and entry points — **Should**
 
-- Map as default tab with hierarchy stack per `MAP_SITUATIONAL_AWARENESS.md`.
-- Quiet mode banner on Map: *"Announcements muted"*.
-
-### 2.5 Empty states and tab structure — **Should**
-
-| Tab (target) | Role |
+| Entry (target) | Role |
 |--------------|------|
-| **Map** (default, M6) | Where am I; hierarchy; nearby towns |
-| **Ride** or **Now** (interim if Map not ready) | Status + last spoken + start/pause |
-| **Settings** | Simple + Advanced sections |
-| **Log** | Ride history; rename to **History**; place names first, coordinates in disclosure |
+| **Location** (primary screen) | Where am I; hierarchy; nearby towns |
+| **Settings** (toolbar sheet) | Simple + Advanced sections |
+| **Log / History** (toolbar sheet) | Ride history; place names first, coordinates in disclosure |
 
 - Log empty state: *"Announcements will appear here as you ride."*
-- Consider demoting Log to secondary placement (last tab).
+- Keep Log in the toolbar for field debugging; rename to History later if broader testing starts.
 
 ### 2.6 Visual design basics — **Should**
 
@@ -122,18 +118,35 @@ Not App Store polish. Minimum:
 - System background; avoid default plain `Form` grey slab feel with one accent colour.
 - App icon and launch screen: existing assets OK for MVP1; no marketing screenshots.
 
-### 2.7 Error and permission-denied handling — **Must**
+### 2.7 Voice quality — **Should before repeated field testing**
+
+- Enumerate installed iOS voices on Robert's iPhone.
+- Prefer `en-GB` premium/enhanced voices over default quality voices.
+- Add a small Voice setting with a preview phrase.
+- Keep the selected voice, rate, pitch, and volume stable across launches.
+- Test through the Nex Xcom headset; phone-speaker quality is not enough.
+
+### 2.8 Error and permission-denied handling — **Must**
 
 - Surface location errors in UI (not only `print`).
 - States: denied, restricted, reduced accuracy, no GPS fix, geocoder failure.
 - Copy: actionable, calm, short.
 - Audio session failure: non-blocking banner.
 
-### 2.8 What NOT to do yet — explicit deferrals
+### 2.9 Fact quality — **Should before broader testing**
+
+- Treat Short Facts as a useful short blurb, not a tiny trivia sentence. Target roughly the current Long Facts length.
+- Make Long Facts longer and richer, but still bounded and interruptible.
+- Assume adult, middle-aged touring riders. Avoid patronising explanations and school-level definitions.
+- Add optional coarse home/familiar-region context so familiar places are not explained as if the rider knows nothing about them.
+- Examples of bad output: "Wales is a country in the UK"; "Gloucestershire is a county in England"; generic population or administrative facts without why it matters.
+- Examples of better output: a local industry, border story, road/landscape context, architectural marker, historic event, or why the place is notable on a ride.
+
+### 2.10 What NOT to do yet — explicit deferrals
 
 | Defer | Reason |
 |-------|--------|
-| App Store submission polish | MILESTONES.md out of scope for MVP1 |
+| Full App Store launch/submission polish | MVP1 only needs review-risk notes before field trial |
 | Accounts, sign-in, cloud sync | No MVP1 value |
 | Route planning, turn-by-turn, POI handoff | MVP2 |
 | Full custom instruction UI | M7 |
@@ -189,8 +202,12 @@ Not App Store polish. Minimum:
 | `speakAfterEveryGeocode` | false | false | Hidden |
 | `testMode` | false | false | Hidden |
 | `bluetoothDelaySeconds` | 0.5 | 0.5 | Hidden |
-| Default tab | Settings | **Map** (post-M6) or **Ride/Now** interim | |
+| Default screen | Location | **Location** | Keep Location as home |
 | Permission timing | on init | after onboarding | |
+| Voice | default `en-GB` | Best installed premium/enhanced `en-GB` | Add preview setting |
+| Short Facts length | 700 chars | About current Long Facts length | Implemented |
+| Long Facts length | 900 chars | Longer bounded blurb | Implemented |
+| Home context | none | Coarse home/familiar region only | No exact home address |
 
 `BoundaryAnnouncementSettings.ridingDefaults` in code already matches most ride defaults. Keep the `10 s` interval and Short Facts default; focus polish on permission timing and UI exposure, not these defaults.
 
@@ -284,12 +301,15 @@ Rationale:
 | 5 | Complete Location home screen status and map context | M6 |
 | 6 | Error and permission-denied states | — |
 | 7 | Log → History presentation; empty states | — |
-| 8 | Map tab as default home | M6 |
+| 8 | Location screen as default home | M6 |
 | 9 | Quiet indicator on Map | M6 |
 | 10 | Visual pass (typography, symbols, spacing) | 1–7 |
 | 11 | Update ride test checklist for first-time flow | M4 checklist |
 | 12 | App Review and privacy readiness notes | 1–7 |
 | 13 | Info.plist background-mode audit | 1–7 |
+| 14 | Better TTS voice selection and preview | Physical phone |
+| 15 | Fact prompt/contract update for richer Short/Long Facts and home context | Proxy contract |
+| 16 | Map-first Location layout with compact overlay and doubled default map area | M6 |
 
 ### 5.3 Done criteria
 
@@ -300,7 +320,7 @@ Rationale:
 - [ ] Settings Simple section has ≤ 3 decision areas; Advanced holds debug and tuning.
 - [ ] No rider-visible use of "geocode" or "Nation" without explanation.
 - [ ] Default interval is 10 s; street off; Short Facts mode selected.
-- [ ] Map tab is default (when M6 complete) with quiet banner when applicable.
+- [ ] Location screen is default with quiet banner when applicable.
 - [ ] Simulator and device smoke test documented for first-time path.
 - [ ] App Review and privacy risks are documented before broader external testing.
 - [ ] Ready for the 2026-07-03 field trial without developer briefing.

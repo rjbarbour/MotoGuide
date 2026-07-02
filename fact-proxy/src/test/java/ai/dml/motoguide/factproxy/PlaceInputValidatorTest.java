@@ -61,4 +61,19 @@ class PlaceInputValidatorTest {
         assertThrows(BadRequestException.class, () -> PlaceInputValidator.validatePlaceName("a".repeat(97)));
         assertThrows(BadRequestException.class, () -> PlaceInputValidator.validatePlaceName("12345"));
     }
+
+    @Test
+    void acceptsRiderContextFamiliarRegions() {
+        var regions = PlaceInputValidator.validateFamiliarRegions(java.util.List.of("England", "Cotswolds", "Scotland"));
+        assertEquals(java.util.List.of("England", "Cotswolds", "Scotland"), regions);
+    }
+
+    @Test
+    void rejectsRiderContextFamiliarRegionsOverMaxEntries() {
+        var manyRegions = java.util.Collections.nCopies(13, "Region");
+        org.junit.jupiter.api.Assertions.assertThrows(
+                BadRequestException.class,
+                () -> PlaceInputValidator.validateFamiliarRegions(manyRegions)
+        );
+    }
 }

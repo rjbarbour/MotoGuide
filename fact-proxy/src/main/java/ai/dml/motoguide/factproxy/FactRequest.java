@@ -11,8 +11,19 @@ public record FactRequest(
         String placeName,
         String factMode,
         @JsonProperty("countryContext") String countryContext,
-        PlaceHierarchy placeHierarchy
+        PlaceHierarchy placeHierarchy,
+        RiderContext riderContext
 ) {
+    public FactRequest(
+            String boundary,
+            String placeName,
+            String factMode,
+            String countryContext,
+            PlaceHierarchy placeHierarchy
+    ) {
+        this(boundary, placeName, factMode, countryContext, placeHierarchy, null);
+    }
+
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
     private static final Set<String> ALLOWED_BOUNDARIES = Set.of(
             "country", "nation", "county", "town", "street"
@@ -39,6 +50,9 @@ public record FactRequest(
             throw new BadRequestException("placeHierarchy is required");
         }
         ValidatedPlaceHierarchy validatedPlaceHierarchy = placeHierarchy.validateAndNormalize();
+        ValidatedRiderContext validatedRiderContext = riderContext == null
+                ? new ValidatedRiderContext(null, null, java.util.List.of())
+                : riderContext.validateAndNormalize();
 
         return new ValidatedFactRequest(
                 normalizedBoundary,
@@ -46,7 +60,8 @@ public record FactRequest(
                 normalizedFactMode,
                 normalizedCountryContext,
                 userId,
-                validatedPlaceHierarchy
+                validatedPlaceHierarchy,
+                validatedRiderContext
         );
     }
 
@@ -76,6 +91,38 @@ record ValidatedFactRequest(
         FactMode factMode,
         String countryContext,
         String userId,
-        ValidatedPlaceHierarchy placeHierarchy
+        ValidatedPlaceHierarchy placeHierarchy,
+        ValidatedRiderContext riderContext
+) {
+}
+
+record RiderContext(
+        @JsonProperty("homeCountry") String homeCountry,
+        @JsonProperty("homeRegion") String homeRegion,
+        @JsonProperty("familiarRegions") java.util.List<String> familiarRegions
+) {
+    public RiderContext {
+        if (familiarRegions == null) {
+            familiarRegions = java.util.List.of();
+        }
+    }
+
+    public RiderContext() {
+        this(null, null, java.util.List.of());
+    }
+
+    public ValidatedRiderContext validateAndNormalize() {
+        return new ValidatedRiderContext(
+                PlaceInputValidator.validateOptionalCountryName(homeCountry, "riderContext.homeCountry"),
+                PlaceInputValidator.validateOptionalPlaceName(homeRegion, "riderContext.homeRegion"),
+                PlaceInputValidator.validateFamiliarRegions(familiarRegions)
+        );
+    }
+}
+
+record ValidatedRiderContext(
+        String homeCountry,
+        String homeRegion,
+        java.util.List<String> familiarRegions
 ) {
 }

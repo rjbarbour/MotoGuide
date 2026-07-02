@@ -92,6 +92,11 @@ Returns `200` with body `ok`.
     "county": "Gloucestershire",
     "region": "England",
     "country": "United Kingdom"
+  },
+  "riderContext": {
+    "homeCountry": "United Kingdom",
+    "homeRegion": "West Midlands",
+    "familiarRegions": ["England", "Cotswolds"]
   }
 }
 ```
@@ -104,7 +109,7 @@ The iOS app sends place hierarchy only. It does not send prompt text, model mess
 
 ```json
 {
-  "fact": "One bounded factual sentence."
+  "fact": "A compact historical or practical rider-relevant fact."
 }
 ```
 
@@ -122,7 +127,7 @@ curl -sS http://127.0.0.1:3000/health
 curl -sS -X POST http://127.0.0.1:3000/v1/fact \
   -H "Authorization: Bearer dev-token" \
   -H "Content-Type: application/json" \
-  -d '{"boundary":"town","placeName":"Stroud","factMode":"shortFacts","countryContext":"United Kingdom","placeHierarchy":{"town":"Stroud","county":"Gloucestershire","region":"England","country":"United Kingdom"}}'
+  -d '{"boundary":"town","placeName":"Stroud","factMode":"shortFacts","countryContext":"United Kingdom","placeHierarchy":{"town":"Stroud","county":"Gloucestershire","region":"England","country":"United Kingdom"},"riderContext":{"homeCountry":"United Kingdom","homeRegion":"West Midlands","familiarRegions":["England","Cotswolds"]}}'
 ```
 
 ## Fly.io deploy
@@ -130,15 +135,35 @@ curl -sS -X POST http://127.0.0.1:3000/v1/fact \
 ```bash
 cd /Users/rob_dev/DocsLocal/motoguide/repo/fact-proxy
 
-# First time only — app name must be unique on Fly
-fly apps create motoguide-fact-proxy
+# Option A: manual deploy (current)
+./build.sh
+fly deploy
 
+# Option B: Terraform-managed app shell + GitHub Action deployment
+cd fact-proxy/terraform
+FLY_API_TOKEN=fo1_... terraform init -input=false
+FLY_API_TOKEN=fo1_... terraform apply
+
+cd ..
+flyctl deploy --config fly.toml
+```
+
+GitHub Action for this flow: `.github/workflows/fact-proxy-deploy.yml`
+
+Secrets are managed through GitHub repository/organization secrets and injected at runtime:
+
+```bash
+FLY_API_TOKEN=fo1_...
+OPENAI_API_KEY=sk-...
+MOTOGUIDE_PROXY_TOKEN=...
+```
+
+Then secrets are set via:
+
+```bash
 fly secrets set \
   OPENAI_API_KEY="sk-..." \
   MOTOGUIDE_PROXY_TOKEN="$(openssl rand -hex 24)"
-
-./build.sh
-fly deploy
 ```
 
 After deploy:
