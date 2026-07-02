@@ -147,9 +147,12 @@ paths:
         Validates a place request, calls the server-side LLM provider, sanitizes
         the generated text, and returns one bounded fact. The iOS app sends
         only `factMode`, boundary/place fields, and place hierarchy. It never
-        sends prompt text, arbitrary model messages, OpenAI configuration, or
-        coordinates. The proxy owns prompt selection for `shortFacts` and
-        `longFacts`. The iOS app must fall back to the base place announcement
+        sends arbitrary model messages, OpenAI configuration, ElevenLabs
+        configuration, or coordinates. The proxy owns prompt selection for
+        `shortFacts` and `longFacts`. Optional rider context text, home region
+        preferences, and fact-interest categories are treated as bounded user
+        preference data, not as system prompt text. The iOS app must fall back
+        to the base place announcement
         for any non-200 response, invalid response body, rejected fact, missing
         token, or request timeout.
       operationId: createPlaceFact
@@ -181,7 +184,8 @@ paths:
       x-openai-api-key-location: Server-side only. Never store the OpenAI API key in the iOS app or repository.
       x-speech-safety-rules:
         - Short Facts may use up to 5 concise sentences.
-        - Long Facts may use up to 7 concise sentences.
+        - Long Facts may use up to 8 concise sentences.
+        - Short Facts prioritises geographic/cultural context over rider-coaching details.
         - Factual and neutral.
         - Useful as ambient place context.
         - Short enough to keep the total spoken announcement ride-safe.
@@ -213,6 +217,12 @@ paths:
                     familiarRegions:
                       - England
                       - Cotswolds
+                    factInterestCategories:
+                      - geographyBasics
+                      - locationFacts
+                      - pointsOfInterest
+                      - history
+                    customFactInstructions: engineering and old roads
       responses:
         "200":
           description: One sanitized bounded fact.
@@ -234,6 +244,63 @@ paths:
           description: Proxy is misconfigured, including missing server-side proxy token.
         "502":
           description: OpenAI returned an error or unusable response.
+  /v1/speech:
+    post:
+      tags:
+        - Speech
+      summary: Generate ride-safe speech audio through ElevenLabs
+      description: |
+        Validates bounded rider-facing text, calls ElevenLabs server-side, and
+        returns MP3 audio. The iOS app sends only the text to speak. It never
+        sends an ElevenLabs API key, voice id, model id, output format, prompt
+        text, or coordinates. The proxy owns all ElevenLabs configuration.
+      operationId: createSpeech
+      security:
+        - MotoGuideProxyToken: []
+      parameters:
+        - in: header
+          name: X-MotoGuide-Device-Id
+          description: |
+            Optional approved-device identifier. Required when
+            MOTOGUIDE_DEVICE_BINDING_REQUIRED=true.
+          required: false
+          schema:
+            type: string
+            minLength: 4
+            maxLength: 64
+      x-ios-keychain-service: MotoGuideProxy
+      x-ios-device-id-keychain-service: MotoGuideDeviceId
+      x-ios-timeout-seconds: 3
+      x-ios-fallback: Fall back to local Apple AVSpeechSynthesizer speech.
+      x-elevenlabs-api-key-location: Server-side only. Never store the ElevenLabs API key in the iOS app or repository.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeechRequest"
+            examples:
+              phrase:
+                value:
+                  text: Stroud was known for its wool trade.
+      responses:
+        "200":
+          description: MP3 audio for the submitted speech text.
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid JSON, missing text, or overlong text.
+        "401":
+          description: Missing or wrong proxy bearer token.
+        "415":
+          description: Unsupported content type. Proxy only accepts application/json.
+        "500":
+          description: Proxy is misconfigured, including missing server-side proxy token.
+        "502":
+          description: ElevenLabs returned an error or unusable response.
   /admin/diagnostics:
     get:
       tags:
@@ -400,12 +467,55 @@ components:
           items:
             $ref: "#/components/schemas/OptionalPlaceName"
           description: Optional familiar regions to avoid repeating generic explanations.
+        factInterestCategories:
+          type: array
+          maxItems: 7
+          items:
+            type: string
+            enum:
+              - safetyAdvice
+              - geographyBasics
+              - locationFacts
+              - pointsOfInterest
+              - history
+              - culture
+              - landmarks
+          description: Optional rider-selected fact categories.
+        customFactInstructions:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 240
+          pattern: "^[A-Za-z0-9 .,'’&()\\-]+$"
+          description: |
+            Optional rider preference hint for fact focus, such as "old roads,
+            engineering, local industry". This is untrusted user preference
+            data, not system prompt text. The proxy validates and wraps it in
+            fixed safety instructions.
       example:
         homeCountry: United Kingdom
         homeRegion: West Midlands
         familiarRegions:
           - England
           - Cotswolds
+        factInterestCategories:
+          - geographyBasics
+          - locationFacts
+          - pointsOfInterest
+          - history
+        customFactInstructions: engineering and old roads
+    SpeechRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1400
+          description: Bounded rider-facing text to synthesize as speech.
+          example: Stroud was known for its wool trade.
     FactResponse:
       type: object
       additionalProperties: false
@@ -415,10 +525,10 @@ components:
         fact:
           type: string
           minLength: 1
-          maxLength: 1100
-          description: |
-            Sanitized ride-safe fact. shortFacts responses are bounded to 900
-            characters; longFacts responses are bounded to 1100 characters.
+          maxLength: 1500
+      description: |
+        Sanitized ride-safe fact. shortFacts responses are bounded to 1100
+        characters; longFacts responses are bounded to 1500 characters.
           example: Known for its wool trade.
     DiagnosticsRequest:
       type: object

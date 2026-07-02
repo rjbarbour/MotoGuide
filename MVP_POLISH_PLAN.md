@@ -1,7 +1,7 @@
 # MotoGuide MVP Polish Plan
 
-Date: 2026-07-02  
-Status: Planning only — prepare implementation before the 2026-07-03 field trial  
+Date: 2026-07-03  
+Status: Implementation in progress — keep synchronized before the 2026-07-03 field trial  
 Audience: First-time rider using MotoGuide as a situational-awareness companion alongside normal navigation
 
 ## Context
@@ -37,9 +37,9 @@ This plan defines polish appropriate for a **first-time user** preparing for fie
 | **Developer Log language** | Log still uses developer naming and exposes coordinates directly | Useful for field debugging, but not yet rider-friendly History |
 | **Internal language remains** | "Location check frequency", "Speak After Every Geocode", and "Natural" still need a rider-language pass | Jargon makes the app feel unfinished |
 | **Proxy/audio recovery incomplete** | Location and geocoder failures are visible, but proxy and audio failures mostly rely on diagnostics or console output | A rider needs visible fallback status if facts or speech fail |
-| **Fact quality too banal** | Short Facts are capped at 900 characters and Long Facts at 1100, with concise and practical prompts | Adult touring riders need specific, locally meaningful context, not obvious encyclopaedia snippets |
-| **TTS voice quality unknown** | App currently asks for default `en-GB` voice | Helmet speech should use the best installed enhanced/premium iOS voice and allow preview/selection |
-| **Location screen incomplete** | Summary, hierarchy, last spoken phrase, quiet status, basic map, speed-gated map interaction, and key empty states exist | Full-map layout, compact overlays, nearby towns, previous street, doubled default map area, stopped-only zoom presets, and presentation tests remain |
+| **Fact quality too banal** | Short Facts are capped at 1100 characters and Long Facts at 1500, with concise and practical prompts | Adult touring riders need specific, locally meaningful context, not obvious encyclopaedia snippets |
+| **TTS voice quality poor** | Apple voices remain available, but ride-facing quality is not good enough | Try ElevenLabs through the proxy, keep Apple speech as fallback, and validate through the Nex Xcom headset |
+| **Location screen incomplete** | Full-map layout, compact overlays, summary, context line, last spoken phrase, quiet status, speed-gated map interaction, manual zoom/reset controls, and key empty states exist | Nearby towns, previous street, stopped-only zoom presets, presentation tests, and field readability pass remain |
 | **Announcement style unclear** | "Natural" is still undefined in the UI | Rider may not understand the difference from Names Only / Short Facts |
 | **Bluetooth delay exposed** | 0-3 s slider is visible in Advanced | Most riders should not need to tune this before a field ride |
 
@@ -93,8 +93,8 @@ Rename UI only where rider-visible; keep code identifiers stable.
 - Keep compact status header: current place, announcement mode, and always-running indicator.
 - Show **last spoken** phrase and timestamp.
 - Show "Waiting for GPS", permission-denied, and geocoder-failure states.
-- Move to a map-first layout per `MAP_SITUATIONAL_AWARENESS.md`: full map, compact overlay, current place, mode, and last phrase.
-- Show roughly twice the current map area by default.
+- Keep the map-first layout per `MAP_SITUATIONAL_AWARENESS.md`: full map, compact overlay, current place, mode, and last phrase.
+- Add nearby towns, previous street, stopped-only zoom presets, and presentation tests.
 - Keep Quiet mode visible on Location.
 
 ### 2.5 Empty states and entry points — **Should**
@@ -120,10 +120,11 @@ Not App Store polish. Minimum:
 
 ### 2.7 Voice quality — **Should before repeated field testing**
 
-- Enumerate installed iOS voices on Robert's iPhone.
-- Prefer `en-GB` premium/enhanced voices over default quality voices.
-- Add a small Voice setting with a preview phrase.
-- Keep the selected voice, rate, pitch, and volume stable across launches.
+- Keep installed Apple voices available as fallback.
+- Add proxy-backed ElevenLabs speech as the first non-Apple provider.
+- Keep ElevenLabs API key, voice id, model id, and output format server-side.
+- Add a small speech provider setting and keep the preview path.
+- Keep the selected provider, voice fallback, rate, pitch, and volume stable across launches.
 - Test through the Nex Xcom headset; phone-speaker quality is not enough.
 
 ### 2.8 Error and permission-denied handling — **Must**
@@ -149,7 +150,7 @@ Not App Store polish. Minimum:
 | Full App Store launch/submission polish | MVP1 only needs review-risk notes before field trial |
 | Accounts, sign-in, cloud sync | No MVP1 value |
 | Route planning, turn-by-turn, POI handoff | MVP2 |
-| Full custom instruction UI | M7 |
+| Open-ended rider questions | M7 |
 | Deterministic UK place data and offline boundary lookup | Post-field-trial M3 |
 | Administrative boundary polygons on map | Post-field-trial M3 |
 | CarPlay, widgets, lock screen | Later |
@@ -205,8 +206,8 @@ Not App Store polish. Minimum:
 | Default screen | Location | **Location** | Keep Location as home |
 | Permission timing | on init | after onboarding | |
 | Voice | default `en-GB` | Best installed premium/enhanced `en-GB` | Add preview setting |
-| Short Facts length | 900 chars | About current Long Facts length | Implemented |
-| Long Facts length | 1100 chars | Longer bounded blurb | Implemented |
+| Short Facts length | 1100 chars | About current Long Facts length | Implemented |
+| Long Facts length | 1500 chars | Longer bounded blurb | Implemented |
 | Home context | none | Coarse home/familiar region only | No exact home address |
 
 `BoundaryAnnouncementSettings.ridingDefaults` in code already matches most ride defaults. Keep the `10 s` interval and Short Facts default; focus polish on permission timing and UI exposure, not these defaults.
@@ -285,7 +286,7 @@ Rationale:
 - M2 delivers announcement modes and policy; polish renames and defaults should align with M2 completion, but full journey needs a complete **Location** home screen.
 - M4 real-ride audio validation can use a **lightweight** subset of Must items (permissions copy, hide debug, status header).
 - M8 field trial should not run on raw PoC chrome.
-- M7 custom instructions remain post-polish; avoid scope creep.
+- Controlled rider preference hints are in scope now because they improve fact quality without adding open-ended rider questions.
 - M3 deterministic place data is deferred until after field trial.
 
 **Parallel track:** Must items marked in §2 can start during M4 as "M6.5a" if field testing begins before Map lands.
@@ -307,7 +308,7 @@ Rationale:
 | 11 | Update ride test checklist for first-time flow | M4 checklist |
 | 12 | App Review and privacy readiness notes | 1–7 |
 | 13 | Info.plist background-mode audit | 1–7 |
-| 14 | Better TTS voice selection and preview | Physical phone |
+| 14 | ElevenLabs proxy TTS with Apple fallback | Physical phone |
 | 15 | Fact prompt/contract update for richer Short/Long Facts and home context | Proxy contract |
 | 16 | Map-first Location layout with compact overlay and doubled default map area | M6 |
 
@@ -333,7 +334,7 @@ Rationale:
 - First-time riders need a clear story: **companion audio for place awareness**, not navigation, before the location permission dialog.
 - **Must-have polish:** onboarding, permission copy, hide debug controls, rider language, live status, error states, confirmed defaults (10 s interval, Short Facts, no street).
 - **Should-have:** complete Location home, History tab polish, basic visual consistency, Simple vs Advanced settings.
-- **Defer:** deterministic place data, App Store launch polish, accounts, routing, CarPlay, boundary polygons, custom instructions UI.
+- **Defer:** deterministic place data, App Store launch polish, accounts, routing, CarPlay, boundary polygons, open-ended rider questions.
 - Settings simplify to **Announcement style** + **What to announce**; everything else in Advanced.
 - Code defaults for interval, content mode, and boundaries are already ride-sensible; main gaps are **permission timing** and **UI exposure**.
 - Milestone 6.5 sits between Location completion (M6) and Field Trial (M8).

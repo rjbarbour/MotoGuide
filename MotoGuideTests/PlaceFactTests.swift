@@ -48,13 +48,13 @@ final class FactPhraseBuilderTests: XCTestCase {
     func testSanitizeTruncatesLongFacts() {
         let long = String(repeating: "a", count: 1_000)
         let sanitized = FactPhraseBuilder.sanitize(long)
-        XCTAssertEqual(sanitized?.count, 900)
+        XCTAssertEqual(sanitized?.count, 1100)
     }
 
     func testLongFactsUseLongerBoundedSanitizer() {
-        let long = String(repeating: "a", count: 1_200)
+        let long = String(repeating: "a", count: 1_600)
         let sanitized = FactPhraseBuilder.sanitize(long, mode: .longFacts)
-        XCTAssertEqual(sanitized?.count, 1100)
+        XCTAssertEqual(sanitized?.count, 1500)
     }
 }
 
@@ -291,7 +291,9 @@ final class ProxyFactGeneratorTests: XCTestCase {
             riderContext: RiderContext(
                 homeCountry: "United Kingdom",
                 homeRegion: "West Midlands",
-                familiarRegions: ["England", "Cotswolds"]
+                familiarRegions: ["England", "Cotswolds"],
+                factInterestCategories: [.geographyBasics, .locationFacts, .history],
+                customFactInstructions: "engineering and old roads"
             )
         )
 
@@ -303,6 +305,12 @@ final class ProxyFactGeneratorTests: XCTestCase {
             XCTAssertEqual(riderContext["homeCountry"] as? String, "United Kingdom")
             XCTAssertEqual(riderContext["homeRegion"] as? String, "West Midlands")
             XCTAssertEqual(riderContext["familiarRegions"] as? [String], ["England", "Cotswolds"])
+            XCTAssertEqual(riderContext["customFactInstructions"] as? String, "engineering and old roads")
+            XCTAssertEqual(riderContext["factInterestCategories"] as? [String], [
+                "geographyBasics",
+                "locationFacts",
+                "history"
+            ])
 
             let response = HTTPURLResponse(
                 url: endpoint,
@@ -373,6 +381,63 @@ final class ProxyFactGeneratorTests: XCTestCase {
         let fact = try await generator.fact(for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil))
 
         XCTAssertEqual(fact, "Known for its wool trade.")
+    }
+
+    func testProxySpeechGeneratorPostsTextAndReturnsAudio() async throws {
+        let endpoint = URL(string: "https://example.test/v1/speech")!
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            XCTAssertEqual(urlRequest.url, endpoint)
+            XCTAssertEqual(urlRequest.httpMethod, "POST")
+            XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "Authorization"), "Bearer proxy-token")
+            XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "Content-Type"), "application/json")
+
+            let body = try self.requestBodyData(from: urlRequest)
+            let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+            XCTAssertEqual(json?["text"] as? String, "Known for its wool trade.")
+
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "audio/mpeg"]
+            )!
+            return (response, Data([1, 2, 3]))
+        }
+
+        let generator = ProxySpeechGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        let audio = try await generator.speechAudio(for: "Known for its wool trade.")
+
+        XCTAssertEqual(audio, Data([1, 2, 3]))
+    }
+
+    func testProxySpeechGeneratorUsesProductionSpeechEndpointByDefault() async throws {
+        let expectedEndpoint = URL(string: "https://motoguide-fact-proxy.fly.dev/v1/speech")!
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            XCTAssertEqual(urlRequest.url, expectedEndpoint)
+            let response = HTTPURLResponse(
+                url: expectedEndpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "audio/mpeg"]
+            )!
+            return (response, Data([4, 5, 6]))
+        }
+
+        let generator = ProxySpeechGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession()
+        )
+
+        let audio = try await generator.speechAudio(for: "Known for its wool trade.")
+
+        XCTAssertEqual(audio, Data([4, 5, 6]))
     }
 
     func testMissingProxyTokenThrowsBeforeNetworkRequest() async {

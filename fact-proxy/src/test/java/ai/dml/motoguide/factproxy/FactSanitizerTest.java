@@ -49,14 +49,14 @@ class FactSanitizerTest {
 
     @Test
     void sanitizeTruncatesLongFacts() {
-        String longFact = "a".repeat(1000);
-        assertEquals(900, FactSanitizer.sanitize(longFact).length());
+        String longFact = "a".repeat(1_200);
+        assertEquals(1100, FactSanitizer.sanitize(longFact).length());
     }
 
     @Test
     void sanitizeAllowsLongFactsWithinLongModeBound() {
-        String longFact = "a".repeat(1100);
-        assertEquals(1100, FactSanitizer.sanitize(longFact, FactMode.LONG_FACTS).length());
+        String longFact = "a".repeat(1500);
+        assertEquals(1500, FactSanitizer.sanitize(longFact, FactMode.LONG_FACTS).length());
     }
 
     @Test

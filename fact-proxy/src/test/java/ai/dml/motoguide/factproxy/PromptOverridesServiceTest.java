@@ -232,6 +232,32 @@ class PromptOverridesServiceTest {
             String hostAllowlist
     ) {
         for (var constructor : MotoGuideProperties.class.getDeclaredConstructors()) {
+            if (constructor.getParameterCount() == 17) {
+                try {
+                    return (MotoGuideProperties) constructor.newInstance(
+                            "proxy-token",
+                            null,
+                            30,
+                            false,
+                            null,
+                            null,
+                            enabled,
+                            objectUrl,
+                            refreshSeconds,
+                            null,
+                            false,
+                            null,
+                            hostAllowlist,
+                            null,
+                            null,
+                            null,
+                            null
+                    );
+                } catch (ReflectiveOperationException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+
             if (constructor.getParameterCount() == 13) {
                 try {
                     return (MotoGuideProperties) constructor.newInstance(

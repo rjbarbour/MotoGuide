@@ -229,8 +229,8 @@ Enhancement work:
 - Keep `LOCAL_LLM_FACTS_FALLBACK_PLAN.md` as an alternative if OpenAI cost, latency, connectivity, privacy, or quality becomes a blocker.
 - Add a content-depth parameter, including names only, Short Facts, and Long Facts.
 - Revise fact length targets:
-- Short Facts: up to 5 concise sentences, up to 900 characters.
-- Long Facts: up to 7 concise sentences, up to 1100 characters, still safe to hear while riding and interruptible.
+- Short Facts: up to 5 concise sentences, up to 1100 characters.
+- Long Facts: up to 8 concise sentences, up to 1500 characters, still safe to hear while riding and interruptible.
 - Revise prompt style: avoid banal encyclopaedia facts, obvious administrative definitions, trivia without relevance, and patronising explanations. Prefer specific local history, landscape, road context, industry, architecture, border changes, notable people, or why the place matters.
 - Add optional rider familiarity context to the contract, such as `homeCountry`, `homeRegion`, or `familiarRegions`, without sending an exact home address. Use it only to tune what not to explain.
 - Add rules for when facts are spoken.
@@ -254,18 +254,19 @@ Target outcome: MotoGuide sounds less robotic and more suitable for helmet liste
 
 Work:
 
-- Enumerate available `AVSpeechSynthesisVoice.speechVoices()` on the physical iPhone.
-- Prefer installed `en-GB` voices with `.premium` quality, then `.enhanced`, then default quality.
-- Add a small Settings control for voice choice with a short preview phrase.
-- Keep a sensible automatic default so a rider does not need to configure voice before first use.
+- Keep installed Apple voices available as fallback.
+- Add ElevenLabs speech through the proxy as the first non-Apple provider.
+- Keep ElevenLabs API key, voice id, model id, and output format on the proxy only.
+- Add a small Settings control for speech provider and keep a short preview phrase.
+- Keep a sensible automatic default so a rider does not need to configure speech before first use.
 - Test speech through the Nex Xcom headset, not only the phone speaker.
-- Record preferred voice name, identifier, quality, rate, pitch, and volume in a status note.
+- Record selected provider, fallback voice name, identifier, quality, rate, pitch, and volume in a status note.
 
 Done when:
 
-- MotoGuide uses the best available installed `en-GB` voice by default, or clearly falls back if it is unavailable.
-- The rider can preview and choose another installed voice.
-- The selected voice remains intelligible through the helmet at riding volume.
+- MotoGuide can use proxy-backed ElevenLabs speech and clearly falls back to Apple speech if it is unavailable.
+- The rider can preview and choose the speech provider.
+- The selected provider remains intelligible through the helmet at riding volume.
 
 ## Milestone 6: Location Screen Completion
 
@@ -338,10 +339,10 @@ Target outcome: MotoGuide can adapt announcement style without making the ride e
 
 Enhancement work:
 
-- Expose a controlled custom instruction field for announcement preferences.
+- Expose a controlled rider preference field for announcement fact focus.
 - Support different instruction presets by boundary type, such as town, county, region, country, landmark, and history.
 - Add guardrails for maximum sentence count and maximum spoken duration.
-- Add tests for custom instructions that are too long, too vague, or unsafe.
+- Add tests for rider preferences that are too long, too vague, or unsafe.
 
 Done when:
 
@@ -358,7 +359,7 @@ First field trial target: 2026-07-03.
 Build-scope stop point:
 
 - Stop feature work after Milestone 6 and Milestone 6.5 are ready enough for one real ride.
-- Do not add deterministic place data, custom instructions, listening, POI handoff, rider questions, accounts, analytics, or route planning before this field trial.
+- Do not add deterministic place data, open-ended rider questions, listening, POI handoff, accounts, analytics, or route planning before this field trial.
 
 Work:
 

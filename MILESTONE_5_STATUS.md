@@ -45,8 +45,8 @@ Human-readable companion: `FACT_PROXY_CONTRACT.md`.
 - Town: `You are in Stonehouse, Gloucestershire`
 - Region: `Welcome to Wales. You are in Chepstow, Monmouthshire`
 - Country: `Welcome to France. You are in Calais, Pas-de-Calais`
-- Short Facts now use the 900-character bound and up to 5 concise sentences.
-- Long Facts now use the 1100-character bound and up to 7 concise sentences.
+- Short Facts now use the 1100-character bound and up to 5 concise sentences.
+- Long Facts now use the 1500-character bound and up to 8 concise sentences.
 - Current Short Facts and Long Facts append bounded LLM content after the base phrase according to the selected mode.
 
 ## Proxy API
@@ -101,8 +101,8 @@ If the proxy token is missing, the proxy errors, or the request times out after 
 
 Update the proxy contract and implementation before broader testing:
 
-- Short Facts: up to 5 concise sentences, up to 900 characters.
-- Long Facts: up to 7 concise sentences, up to 1100 characters; still safe, interruptible, and non-instructional.
+- Short Facts: up to 5 concise sentences, up to 1100 characters.
+- Long Facts: up to 8 concise sentences, up to 1500 characters; still safe, interruptible, and non-instructional.
 - Prompt style: specific, locally meaningful, and adult-level. Avoid banal administrative definitions.
 - Home/familiar context: allow iOS to send coarse context such as `homeCountry`, `homeRegion`, or `familiarRegions` so the proxy can avoid obvious explanations.
 - Tests: add route-place fixtures and assertions for length, mode selection, sanitization, no prompt leakage, no raw coordinates, and no schoolbook definitions.

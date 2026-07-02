@@ -90,29 +90,53 @@ struct SpeechVoiceOption: Identifiable, Hashable {
 
 private enum LocationManagerDefaults {
     static let preferredVoiceIdentifierKey = "MotoGuidePreferredVoiceIdentifier"
+    static let speechProviderKey = "MotoGuideSpeechProvider"
     static let homeCountryKey = "MotoGuideHomeCountry"
     static let homeRegionKey = "MotoGuideHomeRegion"
     static let familiarRegionsKey = "MotoGuideFamiliarRegions"
+    static let customFactInstructionsKey = "MotoGuideCustomFactInstructions"
+    static let factInterestCategoriesKey = "MotoGuideFactInterestCategories"
+}
+
+enum SpeechProvider: String, CaseIterable, Identifiable {
+    case apple
+    case proxyElevenLabs
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .apple: return "Apple voice"
+        case .proxyElevenLabs: return "ElevenLabs via proxy"
+        }
+    }
 }
 
 @MainActor
-class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate {
+class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate, AVAudioPlayerDelegate {
     static let movingMapInteractionThresholdMetersPerSecond = 8.0 / 3.6
 
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
     private let speechSynthesizer = AVSpeechSynthesizer()
     private let speechDelegate = SpeechSynthesizerDelegateBridge()
+    private let proxySpeechGenerator = ProxySpeechGenerator()
+    private var proxyAudioPlayer: AVAudioPlayer?
+    private var speechPlaybackToken = UUID()
     private var previousAddress: Address?
     private var lastUpdateTime: Date?
     private var testIndex = 0
     private var announcementQueue = AnnouncementQueue()
     private var delayWorkItem: DispatchWorkItem?
     private var currentlySpeakingBoundary: BoundaryType?
+    private var activeSpeechPlan: AnnouncementPlan?
+    private var interruptedSpeechPlan: AnnouncementPlan?
+    private var interruptionResumeWorkItem: DispatchWorkItem?
     private let factGenerator: PlaceFactGenerating
     private var inFlightFactTask: Task<Void, Never>?
     private var activeAnnouncementToken = UUID()
     private var wantsRideTracking = false
+    private let externalAudioResumeDelaySeconds: TimeInterval = 3
 
     @Published var lastKnownLocation: CLLocationCoordinate2D?
     @Published var lastKnownAddress: Address?
@@ -131,6 +155,14 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     ) ?? "" {
         didSet {
             UserDefaults.standard.set(preferredVoiceIdentifier, forKey: LocationManagerDefaults.preferredVoiceIdentifierKey)
+        }
+    }
+
+    @Published var speechProvider: SpeechProvider = SpeechProvider(
+        rawValue: UserDefaults.standard.string(forKey: LocationManagerDefaults.speechProviderKey) ?? ""
+    ) ?? .apple {
+        didSet {
+            UserDefaults.standard.set(speechProvider.rawValue, forKey: LocationManagerDefaults.speechProviderKey)
         }
     }
 
@@ -153,6 +185,24 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             UserDefaults.standard.set(familiarRegions, forKey: LocationManagerDefaults.familiarRegionsKey)
         }
     }
+
+    @Published var customFactInstructions: String = UserDefaults.standard.string(
+        forKey: LocationManagerDefaults.customFactInstructionsKey
+    ) ?? "" {
+        didSet {
+            UserDefaults.standard.set(customFactInstructions, forKey: LocationManagerDefaults.customFactInstructionsKey)
+        }
+    }
+    @Published var factInterestCategories: [FactInterestCategory] = Self.loadFactInterestCategories() {
+        didSet {
+            UserDefaults.standard.set(
+                factInterestCategories
+                    .map(\.rawValue)
+                    .joined(separator: ","),
+                forKey: LocationManagerDefaults.factInterestCategoriesKey
+            )
+        }
+    }
     @Published private(set) var isTracking = false
     @Published private(set) var lastSpokenPhrase: String?
     @Published private(set) var lastSpokenAt: Date?
@@ -168,6 +218,14 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         return currentSpeedMetersPerSecond < Self.movingMapInteractionThresholdMetersPerSecond
     }
 
+    private var isSpeechOutputActive: Bool {
+        speechSynthesizer.isSpeaking || proxyAudioPlayer?.isPlaying == true
+    }
+
+    private var shouldYieldToPrimaryAudio: Bool {
+        AVAudioSession.sharedInstance().secondaryAudioShouldBeSilencedHint
+    }
+
     var onAddressChange: ((Address) -> Void)?
     var onRideLog: ((CLLocationCoordinate2D, Address, String?) -> Void)?
 
@@ -176,11 +234,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         super.init()
         speechDelegate.onFinish = { [weak self] in
             Task { @MainActor in
+                self?.activeSpeechPlan = nil
                 self?.currentlySpeakingBoundary = nil
             }
         }
         speechDelegate.onCancel = { [weak self] in
             Task { @MainActor in
+                self?.activeSpeechPlan = nil
                 self?.currentlySpeakingBoundary = nil
             }
         }
@@ -195,6 +255,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             self,
             selector: #selector(handleAudioSessionInterruption(_:)),
             name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSecondaryAudioHint(_:)),
+            name: AVAudioSession.silenceSecondaryAudioHintNotification,
             object: AVAudioSession.sharedInstance()
         )
 
@@ -265,7 +331,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         RiderContext(
             homeCountry: normalizeContextValue(homeCountry),
             homeRegion: normalizeContextValue(homeRegion),
-            familiarRegions: parseFamiliarRegionsNormalized()
+            familiarRegions: parseFamiliarRegionsNormalized(),
+            factInterestCategories: factInterestCategories,
+            customFactInstructions: normalizeContextValue(customFactInstructions)
         )
     }
 
@@ -305,9 +373,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     func previewSelectedVoice() {
-        speechSynthesizer.stopSpeaking(at: .immediate)
+        stopSpeechOutput()
         announcementQueue.clearPending()
-        currentlySpeakingBoundary = nil
         speak(
             text: "MotoGuide can speak in this voice. Keep the road in front of you, rider.",
             shouldRecordTestLog: false,
@@ -318,6 +385,15 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private func normalizeContextValue(_ value: String) -> String? {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return normalized.isEmpty ? nil : normalized
+    }
+
+    private static func loadFactInterestCategories() -> [FactInterestCategory] {
+        let stored = UserDefaults.standard.string(forKey: LocationManagerDefaults.factInterestCategoriesKey) ?? ""
+        let values = stored
+            .split(separator: ",")
+            .map { FactInterestCategory(rawValue: String($0)) }
+            .compactMap { $0 }
+        return values.isEmpty ? FactInterestCategory.defaultSelections : values
     }
 
     private func parseFamiliarRegionsNormalized() -> [String] {
@@ -438,7 +514,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func enqueueAnnouncement(_ plan: AnnouncementPlan) {
-        if speechSynthesizer.isSpeaking, let speakingBoundary = currentlySpeakingBoundary {
+        if isSpeechOutputActive, let speakingBoundary = currentlySpeakingBoundary {
             if AnnouncementQueue.shouldDropWhileSpeaking(
                 newBoundary: plan.boundary,
                 currentlySpeaking: speakingBoundary
@@ -451,8 +527,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 newBoundary: plan.boundary,
                 currentlySpeaking: speakingBoundary
             ) {
-                speechSynthesizer.stopSpeaking(at: .immediate)
-                currentlySpeakingBoundary = nil
+                stopSpeechOutput()
             }
         }
 
@@ -482,7 +557,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             return
         }
 
-        if speechSynthesizer.isSpeaking, let speakingBoundary = currentlySpeakingBoundary {
+        if isSpeechOutputActive, let speakingBoundary = currentlySpeakingBoundary {
             if AnnouncementQueue.shouldDropWhileSpeaking(
                 newBoundary: pending.boundary,
                 currentlySpeaking: speakingBoundary
@@ -496,7 +571,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 newBoundary: pending.boundary,
                 currentlySpeaking: speakingBoundary
             ) {
-                speechSynthesizer.stopSpeaking(at: .immediate)
+                stopSpeechOutput()
             }
         }
 
@@ -510,9 +585,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
         delayWorkItem?.cancel()
         announcementQueue.clearPending()
-        if speechSynthesizer.isSpeaking {
-            speechSynthesizer.stopSpeaking(at: .immediate)
-        }
+        stopSpeechOutput()
         speak(text: text, boundary: currentlySpeakingBoundary, shouldRecordTestLog: false)
     }
 
@@ -603,20 +676,64 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
 
         if interruptionType == .began {
-            if speechSynthesizer.isSpeaking {
-                print("Speech interrupted, stopping immediately.")
-                speechSynthesizer.stopSpeaking(at: .immediate)
-                currentlySpeakingBoundary = nil
-            }
+            pauseForPrimaryAudio(reason: "Audio session interruption began.")
         } else if interruptionType == .ended {
             guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
             let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-            if options.contains(.shouldResume),
-               let pending = announcementQueue.pending {
-                print("Speech interruption ended, resuming pending announcement.")
-                deliverAnnouncement(id: pending.id)
+            if options.contains(.shouldResume) {
+                scheduleInterruptedSpeechResume(reason: "Audio session interruption ended.")
             }
         }
+    }
+
+    @objc private func handleSecondaryAudioHint(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionSilenceSecondaryAudioHintTypeKey] as? UInt,
+              let hintType = AVAudioSession.SilenceSecondaryAudioHintType(rawValue: typeValue) else {
+            return
+        }
+
+        switch hintType {
+        case .begin:
+            pauseForPrimaryAudio(reason: "Primary audio started.")
+        case .end:
+            scheduleInterruptedSpeechResume(reason: "Primary audio ended.")
+        @unknown default:
+            return
+        }
+    }
+
+    private func pauseForPrimaryAudio(reason: String) {
+        interruptionResumeWorkItem?.cancel()
+        interruptionResumeWorkItem = nil
+
+        if let activeSpeechPlan {
+            interruptedSpeechPlan = activeSpeechPlan
+        } else if let pending = announcementQueue.pending {
+            interruptedSpeechPlan = AnnouncementPlan(text: pending.text, boundary: pending.boundary)
+            announcementQueue.clearPending(id: pending.id)
+            delayWorkItem?.cancel()
+            delayWorkItem = nil
+        }
+
+        if isSpeechOutputActive {
+            print("\(reason) MotoGuide speech stopped.")
+            stopSpeechOutput()
+        }
+    }
+
+    private func scheduleInterruptedSpeechResume(reason: String) {
+        guard let plan = interruptedSpeechPlan else { return }
+
+        interruptionResumeWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.interruptedSpeechPlan == plan else { return }
+            self.interruptedSpeechPlan = nil
+            self.speak(text: plan.text, boundary: plan.boundary, shouldRecordTestLog: false)
+        }
+        interruptionResumeWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + externalAudioResumeDelaySeconds, execute: workItem)
+        print("\(reason) MotoGuide will resume after \(externalAudioResumeDelaySeconds)s.")
     }
 
     private func speak(
@@ -626,6 +743,29 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         ignoreQuietMode: Bool = false
     ) {
         guard ignoreQuietMode || contentMode != .quiet else { return }
+        if shouldYieldToPrimaryAudio {
+            interruptedSpeechPlan = AnnouncementPlan(text: text, boundary: boundary ?? .street)
+            print("Primary audio is active. MotoGuide speech deferred.")
+            return
+        }
+        currentlySpeakingBoundary = boundary
+        activeSpeechPlan = AnnouncementPlan(text: text, boundary: boundary ?? .street)
+        print("Speaking: \(text)")
+        lastSpokenPhrase = text
+        lastSpokenAt = Date()
+        if shouldRecordTestLog {
+            recordTestLog(utteredPhrase: text)
+        }
+
+        if speechProvider == .proxyElevenLabs {
+            speakWithProxy(text: text, boundary: boundary)
+            return
+        }
+
+        speakWithApple(text: text, boundary: boundary)
+    }
+
+    private func speakWithApple(text: String, boundary: BoundaryType?) {
         guard AVSpeechSynthesisVoice.speechVoices().count > 0 else {
             print("No available voices.")
             return
@@ -635,17 +775,52 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             return
         }
 
-        currentlySpeakingBoundary = boundary
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = preferredVoice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        print("Speaking: \(text)")
-        lastSpokenPhrase = text
-        lastSpokenAt = Date()
-        if shouldRecordTestLog {
-            recordTestLog(utteredPhrase: text)
-        }
         speechSynthesizer.speak(utterance)
+    }
+
+    private func speakWithProxy(text: String, boundary: BoundaryType?) {
+        proxyAudioPlayer?.stop()
+        let playbackToken = UUID()
+        speechPlaybackToken = playbackToken
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let audioData = try await proxySpeechGenerator.speechAudio(for: text)
+                await MainActor.run {
+                    guard self.speechPlaybackToken == playbackToken else { return }
+                    do {
+                        let player = try AVAudioPlayer(data: audioData)
+                        self.proxyAudioPlayer = player
+                        player.delegate = self
+                        player.prepareToPlay()
+                        player.play()
+                    } catch {
+                        ProxyDiagnostics.log("Speech", "Could not play proxy TTS audio: \(error.localizedDescription). Falling back to Apple speech.")
+                        self.speakWithApple(text: text, boundary: boundary)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    ProxyDiagnostics.log("Speech", "Proxy TTS failed: \(error.localizedDescription). Falling back to Apple speech.")
+                    self.speakWithApple(text: text, boundary: boundary)
+                }
+            }
+        }
+    }
+
+    private func stopSpeechOutput() {
+        speechPlaybackToken = UUID()
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        if proxyAudioPlayer?.isPlaying == true {
+            proxyAudioPlayer?.stop()
+        }
+        activeSpeechPlan = nil
+        currentlySpeakingBoundary = nil
     }
 
     private func resolveSpeechVoice() -> AVSpeechSynthesisVoice? {
@@ -703,6 +878,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             return 1
         @unknown default:
             return 1
+        }
+    }
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in
+            activeSpeechPlan = nil
+            currentlySpeakingBoundary = nil
         }
     }
 

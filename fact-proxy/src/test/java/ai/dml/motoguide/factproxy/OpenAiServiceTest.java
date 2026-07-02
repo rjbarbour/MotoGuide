@@ -40,7 +40,7 @@ class OpenAiServiceTest {
             JsonNode payload = objectMapper.readTree(requestBody.get());
             assertEquals("Known for its wool trade.", fact);
             assertEquals("gpt-test-runtime", payload.path("model").asText());
-            assertEquals(560, payload.path("max_completion_tokens").asInt());
+            assertEquals(700, payload.path("max_completion_tokens").asInt());
             assertEquals(true, payload.path("max_tokens").isMissingNode());
         } finally {
             server.stop(0);
@@ -83,7 +83,7 @@ class OpenAiServiceTest {
             ).validateAndNormalize());
 
             JsonNode payload = objectMapper.readTree(requestBody.get());
-            assertEquals(760, payload.path("max_completion_tokens").asInt());
+            assertEquals(1000, payload.path("max_completion_tokens").asInt());
             String systemPrompt = payload.path("messages").path(0).path("content").asText();
             assertEquals(true, systemPrompt.contains("LONG PROMPT"));
             assertEquals(true, systemPrompt.contains("For longFacts"));
@@ -224,6 +224,32 @@ class OpenAiServiceTest {
             String promptOverridesHostAllowlist
     ) {
         for (var constructor : MotoGuideProperties.class.getDeclaredConstructors()) {
+            if (constructor.getParameterCount() == 17) {
+                try {
+                    return (MotoGuideProperties) constructor.newInstance(
+                            proxyToken,
+                            adminToken,
+                            rateLimitPerMinute,
+                            diagnosticsEnabled,
+                            shortFactPrompt,
+                            longFactPrompt,
+                            promptOverridesEnabled,
+                            promptOverridesObjectUrl,
+                            promptOverridesRefreshSeconds,
+                            promptOverridesAuthToken,
+                            deviceBindingRequired,
+                            trustedDeviceIds,
+                            promptOverridesHostAllowlist,
+                            null,
+                            null,
+                            null,
+                            null
+                    );
+                } catch (ReflectiveOperationException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+
             if (constructor.getParameterCount() == 13) {
                 try {
                     return (MotoGuideProperties) constructor.newInstance(

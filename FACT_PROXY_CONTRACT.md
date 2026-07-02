@@ -12,7 +12,9 @@ Keep the iOS app, fact proxy server, tests, and markdown in sync with the OpenAP
 
 The fact proxy contract lets MotoGuide ask for one bounded place fact without storing or sending an OpenAI API key from the iOS app.
 
-The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the MotoGuide fact proxy. It also sends optional rider context (`homeCountry`, `homeRegion`, `familiarRegions`) so the proxy can avoid explaining obvious or redundant geography.
+The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the MotoGuide fact proxy. It also sends optional rider context (`homeCountry`, `homeRegion`, `familiarRegions`, `customFactInstructions`) and optional `factInterestCategories` so the proxy can tune fact focus toward geography, culture, history, landmarks, and practical rider context without sending prompts.
+
+Speech is proxied separately through ElevenLabs. The iOS app sends bounded text to `/v1/speech`; the proxy owns the ElevenLabs API key, voice id, model id, and output format.
 The proxy validates the request, chooses the server-side prompt for `shortFacts` or `longFacts`, calls OpenAI server-side, sanitizes the model output, and returns a bounded fact.
 
 The iOS app must not send prompt text, arbitrary model messages, OpenAI configuration, raw coordinates, or an OpenAI API key.
@@ -201,8 +203,8 @@ Example object payload:
 ```json
 {
   "modePrompts": {
-    "shortFacts": "up to five concise local-context facts, up to 900 characters",
-    "longFacts": "up to seven concise contextual facts, up to 1100 characters total"
+    "shortFacts": "up to five concise local-context facts, up to 1100 characters",
+    "longFacts": "up to eight concise contextual facts, up to 1500 characters total"
   },
   "users": {
     "rider-a": {
@@ -297,11 +299,18 @@ JSON body:
     "region": "England",
     "country": "United Kingdom"
   },
-  "riderContext": {
-    "homeCountry": "United Kingdom",
-    "homeRegion": "West Midlands",
-    "familiarRegions": ["England", "Cotswolds"]
-  }
+"riderContext": {
+  "homeCountry": "United Kingdom",
+  "homeRegion": "West Midlands",
+  "familiarRegions": ["England", "Cotswolds"],
+  "factInterestCategories": [
+    "geographyBasics",
+    "locationFacts",
+    "pointsOfInterest",
+    "history"
+  ],
+  "customFactInstructions": "engineering and old roads"
+}
 }
 ```
 
@@ -314,7 +323,7 @@ Fields:
 | `factMode` | Yes | String | `shortFacts`, `longFacts` | Requested fact depth. The proxy owns prompt selection and rejects unknown values with `400`. |
 | `countryContext` | No | String or `null` | Non-empty country name when known | Disambiguates places with reused names. |
 | `placeHierarchy` | Yes | Object | `street`, `town`, `county`, `region`, `country` string values or omitted/null | Current reverse-geocoded hierarchy. Coordinates are not sent. |
-| `riderContext` | No | Object | `homeCountry`, `homeRegion`, `familiarRegions` | Optional rider context to avoid obvious geography. |
+| `riderContext` | No | Object | `homeCountry`, `homeRegion`, `familiarRegions`, `factInterestCategories`, `customFactInstructions` | Optional rider context to avoid obvious geography and tune fact focus by selected themes. |
 
 The iOS app must map `BoundaryType.factLabel` directly to `boundary`.
 
@@ -337,6 +346,17 @@ Input hardening:
 - Inputs must contain at least one Latin letter.
 - Inputs must use only Latin letters, digits where useful, spaces, and common UK place-name punctuation: `.`, `,`, `'`, `’`, `&`, `(`, `)`, `-`.
 - `countryContext` is stricter and does not allow digits or `&`.
+- `riderContext.customFactInstructions` is optional, capped at 240 characters, and treated as untrusted rider preference data rather than model/system prompt text.
+- `riderContext.factInterestCategories` is optional. Accepted values are:
+  - `safetyAdvice`
+  - `geographyBasics`
+  - `locationFacts`
+  - `pointsOfInterest`
+  - `history`
+  - `culture`
+  - `landmarks`
+  Up to 7 entries are allowed.
+- `riderContext.customFactInstructions` must not contain control language such as `system`, `ignore`, `return`, `json`, `script`, or `tool`.
 - Inputs with more than 10 whitespace-separated words are rejected.
 - Inputs with repeated suspicious punctuation are rejected.
 - Obvious prompt-injection terms such as `ignore`, `system`, `developer`, `prompt`, `instruction`, `json`, `return`, `output`, `script`, and `tool` are rejected.
@@ -363,7 +383,7 @@ Fields:
 
 | Field | Required | Type | Meaning |
 |-------|----------|------|---------|
-| `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 900 characters. `longFacts` is capped at 1100 characters. |
+| `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 1100 characters. `longFacts` is capped at 1500 characters. |
 
 ## Error Responses
 
@@ -376,12 +396,55 @@ Fields:
 
 The iOS app must not speak raw error text.
 
+## Speech Request
+
+Endpoint:
+
+```http
+POST /v1/speech
+Authorization: Bearer <MOTOGUIDE_PROXY_TOKEN>
+Content-Type: application/json
+Accept: audio/mpeg
+```
+
+JSON body:
+
+```json
+{
+  "text": "Stroud was known for its wool trade."
+}
+```
+
+Fields:
+
+| Field | Required | Type | Allowed values | Meaning |
+|-------|----------|------|----------------|---------|
+| `text` | Yes | String | 1 to 1400 characters | Rider-facing text to synthesize. |
+
+Success response:
+
+```http
+200 OK
+Content-Type: audio/mpeg
+```
+
+The proxy calls ElevenLabs server-side using environment configuration:
+
+| Variable | Required | Meaning |
+|----------|----------|---------|
+| `ELEVENLABS_API_KEY` | Yes for `/v1/speech` | ElevenLabs API key. Server-side only. |
+| `ELEVENLABS_VOICE_ID` | No | Voice id. Defaults to the configured service default. |
+| `ELEVENLABS_MODEL_ID` | No | Model id. Defaults to `eleven_multilingual_v2`. |
+| `ELEVENLABS_OUTPUT_FORMAT` | No | Output format. Defaults to `mp3_44100_128`. |
+
+The iOS app must fall back to local Apple speech if `/v1/speech` returns an error, invalid audio, missing token, or timeout.
+
 ## Speech Safety Rules
 
 The returned `fact` must be:
 
-- `shortFacts`: up to 5 short sentences and no more than 900 characters.
-- `longFacts`: up to 7 short sentences and no more than 1100 characters.
+- `shortFacts`: up to 5 short sentences and no more than 1100 characters.
+- `longFacts`: up to 8 short sentences and no more than 1500 characters.
 - Factual and neutral.
 - Useful as ambient place context.
 - Short enough to keep the total spoken announcement ride-safe.
@@ -410,7 +473,7 @@ Exact command:
 curl -sS -X POST http://127.0.0.1:3000/v1/fact \
   -H "Authorization: Bearer dev-token" \
   -H "Content-Type: application/json" \
-  -d '{"boundary":"town","placeName":"Stroud","factMode":"shortFacts","countryContext":"United Kingdom","placeHierarchy":{"town":"Stroud","county":"Gloucestershire","region":"England","country":"United Kingdom"},"riderContext":{"homeCountry":"United Kingdom","homeRegion":"West Midlands","familiarRegions":["England","Cotswolds"]}}'
+  -d '{"boundary":"town","placeName":"Stroud","factMode":"shortFacts","countryContext":"United Kingdom","placeHierarchy":{"town":"Stroud","county":"Gloucestershire","region":"England","country":"United Kingdom"},"riderContext":{"homeCountry":"United Kingdom","homeRegion":"West Midlands","familiarRegions":["England","Cotswolds"],"customFactInstructions":"engineering and old roads"}}'
 ```
 
 Expected result:
@@ -421,4 +484,20 @@ Expected result:
 }
 ```
 
-The exact sentence can vary because it is generated by the server-side LLM.
+Exact command:
+
+```bash
+curl -sS -X POST http://127.0.0.1:3000/v1/speech \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -o /tmp/motoguide-speech.mp3 \
+  -d '{"text":"Stroud was known for its wool trade."}'
+```
+
+Expected result:
+
+```text
+/tmp/motoguide-speech.mp3 exists and contains MP3 audio.
+```
+
+The exact fact sentence can vary because it is generated by the server-side LLM.

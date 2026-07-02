@@ -12,6 +12,10 @@ motoguide:
   prompt-overrides-auth-token: ${MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN:}
   short-fact-prompt: ${MOTOGUIDE_SHORT_FACT_PROMPT:}
   long-fact-prompt: ${MOTOGUIDE_LONG_FACT_PROMPT:}
+  eleven-labs-api-key: ${ELEVENLABS_API_KEY:}
+  eleven-labs-voice-id: ${ELEVENLABS_VOICE_ID:JBFqnCBsd6RMkjVDRZzb}
+  eleven-labs-model-id: ${ELEVENLABS_MODEL_ID:eleven_multilingual_v2}
+  eleven-labs-output-format: ${ELEVENLABS_OUTPUT_FORMAT:mp3_44100_128}
 
 openai:
   api-key: ${OPENAI_API_KEY:}

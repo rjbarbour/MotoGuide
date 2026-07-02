@@ -51,7 +51,7 @@ public record FactRequest(
         }
         ValidatedPlaceHierarchy validatedPlaceHierarchy = placeHierarchy.validateAndNormalize();
         ValidatedRiderContext validatedRiderContext = riderContext == null
-                ? new ValidatedRiderContext(null, null, java.util.List.of())
+                ? new ValidatedRiderContext(null, null, java.util.List.of(), null, java.util.List.of())
                 : riderContext.validateAndNormalize();
 
         return new ValidatedFactRequest(
@@ -99,23 +99,30 @@ record ValidatedFactRequest(
 record RiderContext(
         @JsonProperty("homeCountry") String homeCountry,
         @JsonProperty("homeRegion") String homeRegion,
-        @JsonProperty("familiarRegions") java.util.List<String> familiarRegions
+        @JsonProperty("familiarRegions") java.util.List<String> familiarRegions,
+        @JsonProperty("customFactInstructions") String customFactInstructions,
+        @JsonProperty("factInterestCategories") java.util.List<String> factInterestCategories
 ) {
     public RiderContext {
         if (familiarRegions == null) {
             familiarRegions = java.util.List.of();
         }
+        if (factInterestCategories == null) {
+            factInterestCategories = java.util.List.of();
+        }
     }
 
     public RiderContext() {
-        this(null, null, java.util.List.of());
+        this(null, null, java.util.List.of(), null, java.util.List.of());
     }
 
     public ValidatedRiderContext validateAndNormalize() {
         return new ValidatedRiderContext(
                 PlaceInputValidator.validateOptionalCountryName(homeCountry, "riderContext.homeCountry"),
                 PlaceInputValidator.validateOptionalPlaceName(homeRegion, "riderContext.homeRegion"),
-                PlaceInputValidator.validateFamiliarRegions(familiarRegions)
+                PlaceInputValidator.validateFamiliarRegions(familiarRegions),
+                PlaceInputValidator.validateCustomFactInstructions(customFactInstructions),
+                PlaceInputValidator.validateFactInterestCategories(factInterestCategories)
         );
     }
 }
@@ -123,6 +130,8 @@ record RiderContext(
 record ValidatedRiderContext(
         String homeCountry,
         String homeRegion,
-        java.util.List<String> familiarRegions
+        java.util.List<String> familiarRegions,
+        String customFactInstructions,
+        java.util.List<String> factInterestCategories
 ) {
 }

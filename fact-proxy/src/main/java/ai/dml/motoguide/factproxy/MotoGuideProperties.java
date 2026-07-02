@@ -22,7 +22,11 @@ public record MotoGuideProperties(
         String promptOverridesAuthToken,
         boolean deviceBindingRequired,
         String trustedDeviceIds,
-        String promptOverridesHostAllowlist
+        String promptOverridesHostAllowlist,
+        String elevenLabsApiKey,
+        String elevenLabsVoiceId,
+        String elevenLabsModelId,
+        String elevenLabsOutputFormat
 ) {
     public Set<String> trustedDeviceIdSet() {
         return csvToSet(trustedDeviceIds);

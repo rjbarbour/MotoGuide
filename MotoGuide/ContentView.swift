@@ -206,6 +206,7 @@ private struct LocationScreenView: View {
     @ObservedObject var locationManager: LocationManager
     let onRepeat: () -> Void
     let mapLabelScale: Double
+    @AppStorage("MotoGuideRepeatHintDismissed") private var repeatHintDismissed = false
 
     private enum OverlayLayout {
         static let horizontalPad: CGFloat = 12
@@ -231,7 +232,10 @@ private struct LocationScreenView: View {
             VStack(alignment: .leading, spacing: OverlayLayout.verticalPad) {
                 currentInformationPanel
                     .contentShape(Rectangle())
-                    .onTapGesture(perform: onRepeat)
+                    .onTapGesture {
+                        repeatHintDismissed = true
+                        onRepeat()
+                    }
                 statusPanel
                 if locationManager.testMode {
                     Button {
@@ -265,6 +269,14 @@ private struct LocationScreenView: View {
                     .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
                     .lineLimit(OverlayLayout.hierarchyLineLimit)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !repeatHintDismissed {
+                Label("Tap the place name to repeat it", systemImage: "speaker.wave.2")
+                    .font(.system(size: scaledFont(14)))
+                    .fontWeight(.medium)
+                    .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.92))
+                    .padding(.top, 2)
             }
 
             Divider()
@@ -627,6 +639,13 @@ private struct SettingsView: View {
                             Text(voice.pickerLabel).tag(voice.identifier)
                         }
                     }
+                    .disabled(locationManager.speechProvider != .apple)
+
+                    Picker("Speech provider", selection: $locationManager.speechProvider) {
+                        ForEach(SpeechProvider.allCases) { provider in
+                            Text(provider.label).tag(provider)
+                        }
+                    }
 
                     if let recommendation = locationManager.recommendedSpeechVoice() {
                         Text("Recommended: \(recommendation.displayName) \(recommendation.localeIdentifier)")
@@ -649,14 +668,32 @@ private struct SettingsView: View {
                 }
 
                 Section("Rider Context") {
-                    TextField("Home country", text: $locationManager.homeCountry, prompt: Text("Optional"))
-                    TextField("Home region", text: $locationManager.homeRegion, prompt: Text("Optional"))
-                    TextField("Familiar regions", text: $locationManager.familiarRegions, prompt: Text("Optional, comma-separated"))
+                    TextField(
+                        "Home country",
+                        text: $locationManager.homeCountry,
+                        prompt: Text("Example: United Kingdom")
+                    )
+                    TextField(
+                        "Home region",
+                        text: $locationManager.homeRegion,
+                        prompt: Text("Example: West Midlands")
+                    )
+                    TextField(
+                        "Places you already know",
+                        text: $locationManager.familiarRegions,
+                        prompt: Text("Example: England, Cotswolds")
+                    )
                         .textInputAutocapitalization(.words)
 
-                    Text("Provide home context so facts can avoid obvious or repeated geography.")
+                    Text("What should the fact feed focus on?")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Text("Answering these once helps avoid basic explanations.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    FactInterestCategoryPicker(selectedCategories: $locationManager.factInterestCategories)
                 }
 
                 Section("Advanced") {
@@ -682,6 +719,23 @@ private struct SettingsView: View {
                             in: 0...3,
                             step: 0.1
                         )
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Custom fact focus (advanced)")
+                            .font(.headline)
+
+                        TextField(
+                            "Custom preference note",
+                            text: $locationManager.customFactInstructions,
+                            prompt: Text("Example: engineering details, old roads, old rail.")
+                        )
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled()
+
+                        Text("Optional free-form preference for all fact themes.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     DisclosureGroup("Developer") {
@@ -744,6 +798,37 @@ private struct SectionToggleRows: View {
             Toggle("County", isOn: $locationManager.announceCounty)
             Toggle("Region", isOn: $locationManager.announceNation)
             Toggle("Country", isOn: $locationManager.announceCountry)
+        }
+    }
+}
+
+private struct FactInterestCategoryPicker: View {
+    @Binding var selectedCategories: [FactInterestCategory]
+
+    var body: some View {
+        ForEach(FactInterestCategory.allCases) { category in
+            VStack(alignment: .leading, spacing: 2) {
+                Toggle(
+                    category.label,
+                    isOn: Binding(
+                        get: { selectedCategories.contains(category) },
+                        set: { isSelected in
+                            var set = Set(selectedCategories)
+                            if isSelected {
+                                set.insert(category)
+                            } else {
+                                set.remove(category)
+                            }
+                            selectedCategories = FactInterestCategory.allCases
+                                .filter { set.contains($0) }
+                        }
+                    )
+                )
+                Text(category.prompt)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 32)
+            }
         }
     }
 }

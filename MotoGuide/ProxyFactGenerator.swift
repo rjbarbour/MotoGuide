@@ -119,6 +119,12 @@ enum FactProxyContract {
             .appendingPathComponent("fact")
     }
 
+    static func speechEndpoint(baseURL: URL = productionBaseURL) -> URL {
+        baseURL
+            .appendingPathComponent("v1")
+            .appendingPathComponent("speech")
+    }
+
     static func healthEndpoint(baseURL: URL = productionBaseURL) -> URL {
         baseURL.appendingPathComponent("health")
     }
@@ -209,6 +215,63 @@ struct ProxyFactGenerator: PlaceFactGenerating {
     }
 }
 
+struct ProxySpeechGenerator {
+    typealias ProxyTokenProvider = () -> String?
+    typealias DeviceIdProvider = () -> String?
+
+    private let proxyTokenProvider: ProxyTokenProvider
+    private let deviceIdProvider: DeviceIdProvider
+    private let session: URLSession
+    private let endpoint: URL
+
+    init(
+        proxyTokenProvider: @escaping ProxyTokenProvider = { KeychainCredentialLoader.loadMotoGuideProxyToken() },
+        deviceIdProvider: @escaping DeviceIdProvider = { KeychainCredentialLoader.loadMotoGuideDeviceId() },
+        session: URLSession = .shared,
+        baseURL: URL = FactProxyContract.productionBaseURL,
+        endpoint: URL? = nil
+    ) {
+        self.proxyTokenProvider = proxyTokenProvider
+        self.deviceIdProvider = deviceIdProvider
+        self.session = session
+        self.endpoint = endpoint ?? FactProxyContract.speechEndpoint(baseURL: baseURL)
+    }
+
+    func speechAudio(for text: String) async throws -> Data {
+        guard let proxyToken = proxyTokenProvider(), !proxyToken.isEmpty else {
+            ProxyDiagnostics.log("Speech", "Missing proxy token. No speech request sent.")
+            throw PlaceFactError.missingProxyToken
+        }
+
+        var urlRequest = URLRequest(url: endpoint)
+        urlRequest.httpMethod = "POST"
+        urlRequest.timeoutInterval = FactProxyContract.iosTimeoutSeconds
+        urlRequest.setValue("Bearer \(proxyToken)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let deviceId = deviceIdProvider()?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !deviceId.isEmpty {
+            urlRequest.setValue(deviceId, forHTTPHeaderField: "X-MotoGuide-Device-Id")
+        }
+        urlRequest.httpBody = try JSONEncoder().encode(SpeechProxyRequest(text: text))
+
+        ProxyDiagnostics.log("Speech", "Preparing POST \(endpoint.absoluteString), textLength=\(text.count)")
+        await ProxyDiagnostics.logResolution(for: endpoint)
+
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let http = response as? HTTPURLResponse else {
+            throw PlaceFactError.invalidResponse
+        }
+        ProxyDiagnostics.log("Speech", "HTTP \(http.statusCode), \(data.count) byte(s) received.")
+        guard (200...299).contains(http.statusCode) else {
+            throw PlaceFactError.httpError(http.statusCode)
+        }
+        guard !data.isEmpty else {
+            throw PlaceFactError.invalidResponse
+        }
+        return data
+    }
+}
+
 struct ProxyHealthChecker {
     // Contract: public GET /health returns text/plain "ok" and does not require bearer auth.
     private let session: URLSession
@@ -268,4 +331,8 @@ private struct FactProxyRequest: Encodable {
 
 private struct FactProxyResponse: Decodable {
     let fact: String
+}
+
+private struct SpeechProxyRequest: Encodable {
+    let text: String
 }

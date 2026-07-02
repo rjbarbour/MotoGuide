@@ -16,10 +16,16 @@ public class FactController {
     private static final String USER_HEADER = "X-MotoGuide-User-Id";
 
     private final OpenAiService openAiService;
+    private final ElevenLabsSpeechService elevenLabsSpeechService;
     private final DiagnosticsSettings diagnosticsSettings;
 
-    public FactController(OpenAiService openAiService, DiagnosticsSettings diagnosticsSettings) {
+    public FactController(
+            OpenAiService openAiService,
+            ElevenLabsSpeechService elevenLabsSpeechService,
+            DiagnosticsSettings diagnosticsSettings
+    ) {
         this.openAiService = openAiService;
+        this.elevenLabsSpeechService = elevenLabsSpeechService;
         this.diagnosticsSettings = diagnosticsSettings;
     }
 
@@ -60,6 +66,24 @@ public class FactController {
             );
         }
         return new FactResponse(fact);
+    }
+
+    @PostMapping(path = "/v1/speech", consumes = MediaType.APPLICATION_JSON_VALUE, produces = "audio/mpeg")
+    // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
+    public ResponseEntity<byte[]> speech(@RequestBody(required = false) SpeechRequest request) {
+        if (request == null) {
+            throw new BadRequestException("request body is required");
+        }
+
+        ValidatedSpeechRequest validatedRequest = request.validateAndNormalize();
+        if (diagnosticsSettings.enabled()) {
+            log.info("event=speech_request_valid textLength={}", validatedRequest.text().length());
+        }
+
+        byte[] audio = elevenLabsSpeechService.generateSpeech(validatedRequest);
+        return ResponseEntity.ok()
+                .contentType(MediaType.valueOf("audio/mpeg"))
+                .body(audio);
     }
 
     private static String normalizeUserId(String userId) {

@@ -6,10 +6,55 @@ enum FactMode: String, CaseIterable, Equatable {
 
     var maxFactLength: Int {
         switch self {
-        case .shortFacts: return 900
-        case .longFacts: return 1100
+        case .shortFacts: return 1100
+        case .longFacts: return 1500
         }
     }
+}
+
+enum FactInterestCategory: String, CaseIterable, Identifiable, Codable, Equatable {
+    case safetyAdvice
+    case geographyBasics
+    case locationFacts
+    case pointsOfInterest
+    case history
+    case culture
+    case landmarks
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .safetyAdvice: return "Safety and cautions"
+        case .geographyBasics: return "Geography and place identity"
+        case .locationFacts: return "Location facts and local identity"
+        case .pointsOfInterest: return "Points of interest"
+        case .history: return "History and heritage"
+        case .culture: return "Culture and character"
+        case .landmarks: return "Landmarks and features"
+        }
+    }
+
+    var prompt: String {
+        switch self {
+        case .safetyAdvice: return "Safety and cautions (brief, route-neutral)"
+        case .geographyBasics: return "Geography and local identity"
+        case .locationFacts: return "Location facts and what makes this place useful while riding"
+        case .pointsOfInterest: return "Points of interest and named places"
+        case .history: return "History and local context"
+        case .culture: return "Culture and local character"
+        case .landmarks: return "Landmarks and built environment"
+        }
+    }
+
+    static let defaultSelections: [FactInterestCategory] = [
+        .geographyBasics,
+        .locationFacts,
+        .pointsOfInterest,
+        .history,
+        .culture,
+        .landmarks
+    ]
 }
 
 struct PlaceHierarchy: Equatable, Codable {
@@ -61,16 +106,28 @@ struct RiderContext: Equatable, Codable {
     let homeCountry: String?
     let homeRegion: String?
     let familiarRegions: [String]
+    let factInterestCategories: [FactInterestCategory]
+    let customFactInstructions: String?
 
-    static let empty = RiderContext(homeCountry: nil, homeRegion: nil, familiarRegions: [])
+    static let empty = RiderContext(
+        homeCountry: nil,
+        homeRegion: nil,
+        familiarRegions: [],
+        factInterestCategories: FactInterestCategory.defaultSelections,
+        customFactInstructions: nil
+    )
 
     init(
         homeCountry: String?,
         homeRegion: String?,
-        familiarRegions: [String] = []
+        familiarRegions: [String] = [],
+        factInterestCategories: [FactInterestCategory] = FactInterestCategory.defaultSelections,
+        customFactInstructions: String? = nil
     ) {
         self.homeCountry = PlaceNameNormalizer.normalizeOptional(homeCountry)
         self.homeRegion = PlaceNameNormalizer.normalizeOptional(homeRegion)
+        self.customFactInstructions = PlaceNameNormalizer.normalizeOptional(customFactInstructions)
+        self.factInterestCategories = factInterestCategories.removingDuplicatesPreserveOrder()
 
         var normalizedRegions: [String] = []
         for region in familiarRegions {
@@ -104,7 +161,11 @@ struct PlaceFactRequest: Equatable {
             PlaceNameNormalizer.normalize(placeHierarchy.country ?? ""),
             PlaceNameNormalizer.normalize(riderContext.homeCountry ?? ""),
             PlaceNameNormalizer.normalize(riderContext.homeRegion ?? ""),
-            PlaceNameNormalizer.normalize(riderContext.familiarRegions.joined(separator: ","))
+            PlaceNameNormalizer.normalize(riderContext.familiarRegions.joined(separator: ",")),
+            PlaceNameNormalizer.normalize(
+                riderContext.factInterestCategories.map(\.rawValue).joined(separator: ",")
+            ),
+            PlaceNameNormalizer.normalize(riderContext.customFactInstructions ?? "")
         ].joined(separator: ":")
     }
 
@@ -122,6 +183,19 @@ struct PlaceFactRequest: Equatable {
         self.countryContext = countryContext
         self.placeHierarchy = placeHierarchy
         self.riderContext = riderContext
+    }
+}
+
+private extension Array where Element == FactInterestCategory {
+    func removingDuplicatesPreserveOrder() -> [FactInterestCategory] {
+        var seen = Set<String>()
+        var ordered: [FactInterestCategory] = []
+        for element in self {
+            if seen.insert(element.rawValue).inserted {
+                ordered.append(element)
+            }
+        }
+        return ordered
     }
 }
 

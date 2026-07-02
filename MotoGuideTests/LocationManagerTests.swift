@@ -4,10 +4,10 @@ import CoreLocation
 
 final class LocationManagerTests: XCTestCase {
     @MainActor
-    func testDefaultsUseLiveModeAndShortFacts() {
+    func testDefaultsUseMVPTestModeAndShortFacts() {
         let locationManager = LocationManager()
 
-        XCTAssertFalse(locationManager.testMode)
+        XCTAssertTrue(locationManager.testMode)
         XCTAssertEqual(locationManager.contentMode, .shortFacts)
     }
 

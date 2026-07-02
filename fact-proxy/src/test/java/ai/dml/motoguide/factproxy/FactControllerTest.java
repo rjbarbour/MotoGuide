@@ -35,6 +35,9 @@ class FactControllerTest {
     @MockitoBean
     private OpenAiService openAiService;
 
+    @MockitoBean
+    private ElevenLabsSpeechService elevenLabsSpeechService;
+
     @Test
     void healthIsOpen() throws Exception {
         mockMvc.perform(get("/health"))
@@ -81,6 +84,59 @@ class FactControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().exists(RequestInstrumentationFilter.REQUEST_ID_HEADER))
                 .andExpect(jsonPath("$.fact").value("Known for its wool trade."));
+    }
+
+    @Test
+    void speechRequiresAuth() throws Exception {
+        mockMvc.perform(post("/v1/speech")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"text":"Known for its wool trade."}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void speechReturnsAudio() throws Exception {
+        when(elevenLabsSpeechService.generateSpeech(any())).thenReturn(new byte[] {1, 2, 3});
+
+        mockMvc.perform(post("/v1/speech")
+                        .header("Authorization", "Bearer test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"text":"Known for its wool trade."}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "audio/mpeg"))
+                .andExpect(content().bytes(new byte[] {1, 2, 3}));
+    }
+
+    @Test
+    void speechRejectsMissingText() throws Exception {
+        mockMvc.perform(post("/v1/speech")
+                        .header("Authorization", "Bearer test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"text":"   "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("text is required"));
+
+        verify(elevenLabsSpeechService, never()).generateSpeech(any());
+    }
+
+    @Test
+    void speechRejectsUnknownField() throws Exception {
+        mockMvc.perform(post("/v1/speech")
+                        .header("Authorization", "Bearer test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"text":"Known for its wool trade.","voiceId":"client-controlled"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("request body is invalid"));
+
+        verify(elevenLabsSpeechService, never()).generateSpeech(any());
     }
 
     @Test

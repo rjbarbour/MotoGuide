@@ -6,20 +6,22 @@ import java.util.stream.Collectors;
 public enum FactMode {
     SHORT_FACTS(
             "shortFacts",
-            900,
-            560,
+            1100,
+            700,
             5,
-            "Give up to five concise, practical facts focused on why this place is worth noticing while riding. "
-                    + "Prioritise local history, distinctive geography, or practical observations. "
-                    + "Skip basic administrative definitions unless they are genuinely useful context."
+            "Give up to five concise, ride-relevant facts that are mostly geographic and cultural, "
+                    + "with a practical angle for riders passing through. "
+                    + "Prioritise geography, landmarks, and local distinctiveness over generic definitions. "
+                    + "Keep practical or safety advice brief and only when truly relevant."
     ),
     LONG_FACTS(
             "longFacts",
-            1100,
-            760,
-            7,
-            "Give up to seven concise local-context sentences with history, geography, or practical rider relevance. "
-                    + "Prioritise what is distinctive about this place, especially facts that are useful to a rider passing through or near it."
+            1500,
+            1000,
+            8,
+            "Give up to eight concise local-context sentences with geography, cultural character, and practical significance. "
+                    + "Prioritise what is distinctive about this place and why it matters to a rider nearby. "
+                    + "Keep practical or safety framing brief and only when truly relevant."
     );
 
     private final String wireValue;
