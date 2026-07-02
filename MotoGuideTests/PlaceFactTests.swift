@@ -161,7 +161,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
             XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "Authorization"), "Bearer proxy-token")
             XCTAssertEqual(urlRequest.value(forHTTPHeaderField: "Content-Type"), "application/json")
 
-            let body = try XCTUnwrap(urlRequest.httpBody)
+            let body = try self.requestBodyData(from: urlRequest)
             let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
             XCTAssertEqual(json?["boundary"] as? String, "town")
             XCTAssertEqual(json?["placeName"] as? String, "Stroud")
@@ -211,7 +211,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
         )
 
         MockURLProtocol.requestHandler = { urlRequest in
-            let body = try XCTUnwrap(urlRequest.httpBody)
+            let body = try self.requestBodyData(from: urlRequest)
             let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
             XCTAssertEqual(json?["factMode"] as? String, "longFacts")
             let hierarchy = try XCTUnwrap(json?["placeHierarchy"] as? [String: Any])
@@ -353,6 +353,34 @@ final class ProxyFactGeneratorTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
+    }
+
+    private func requestBodyData(from request: URLRequest) throws -> Data {
+        if let body = request.httpBody {
+            return body
+        }
+
+        let stream = try XCTUnwrap(request.httpBodyStream)
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 1_024
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let bytesRead = stream.read(buffer, maxLength: bufferSize)
+            if bytesRead < 0 {
+                throw stream.streamError ?? PlaceFactError.invalidResponse
+            }
+            if bytesRead == 0 {
+                break
+            }
+            data.append(buffer, count: bytesRead)
+        }
+
+        return data
     }
 }
 
