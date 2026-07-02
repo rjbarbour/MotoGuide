@@ -1,6 +1,6 @@
 # MotoGuide High-Level Plan
 
-Date: 2026-07-01
+Date: 2026-07-02
 
 ## Product Goal
 
@@ -43,6 +43,17 @@ Out of scope for MVP1:
 - Europe-wide coverage.
 - Car support.
 - App Store launch polish.
+- Deterministic offline place/boundary data.
+
+## Current Roadmap Decisions
+
+Date: 2026-07-02
+
+- Keep MVP1 defaults as `10 s` location check interval, Short Facts content mode, street off, and town, county, region, and country on.
+- Defer the deterministic UK place context layer until after MVP1 field trial. Use Apple reverse geocoding plus proxy-backed facts for MVP1.
+- Finish the Location screen before field trial. It should feel like the app's home, not a developer panel.
+- Add first-time rider polish and app-quality review readiness before field trial.
+- Stop the MVP1 build scope at Location screen completion plus first-time rider polish. The first field trial target is 2026-07-03.
 
 ## Milestone 0: Project Setup And Baseline Verification
 
@@ -135,9 +146,17 @@ Done when:
 - The UI makes speech frequency rules visible.
 - Default settings are conservative enough for a first road test.
 
-## Milestone 3: UK Place Context Layer
+## Milestone 3: Deferred UK Place Context Layer
 
 Target outcome: MotoGuide can move beyond raw reverse-geocoded address text while preserving the existing reverse-geocode path as a fallback.
+
+Status: Deferred until after MVP1 field trial.
+
+MVP1 decision:
+
+- Do not block the 2026-07-03 field trial on deterministic place data.
+- Do not add offline boundary lookup, administrative polygons, or local place datasets before the first field trial.
+- Keep current reverse geocoding as the MVP1 place hierarchy source.
 
 Existing baseline:
 
@@ -218,7 +237,7 @@ Done when:
 - Quiet mode remains silent.
 - The fact instruction is constrained enough that announcements remain ride-safe.
 
-## Milestone 6: Situational Awareness Map
+## Milestone 6: Location Screen Completion
 
 Target outcome: riders can glance at the Location screen and understand where they are in the geographic hierarchy and relative to nearby towns, without turn-by-turn navigation.
 
@@ -229,14 +248,15 @@ Existing baseline:
 - `LocationManager` provides throttled coordinates and reverse-geocoded `Address`.
 - `BoundaryType` and `AnnouncementPolicy` define the street → town → county → region → country hierarchy.
 - `ContentView` has a primary Location screen with toolbar Settings and Log.
+- The app already shows a current-place summary, hierarchy, last spoken phrase, quiet-mode status, and a basic MapKit map.
 
 Enhancement work:
 
-- Add a **Location** screen with a single MapKit map and a context stack above it.
-- Show summary line, hierarchy panel, previous street (when changed), and nearest towns with distances.
+- Complete the **Location** screen with a single MapKit map and context stack.
+- Show summary line, hierarchy panel, previous street when changed, and nearby towns with distances.
 - Auto-follow user location with context-aware default zoom; speed-gated zoom presets when stopped.
 - Reuse shared `LocationManager` state; support test mode on the Gloucestershire fixture.
-- Do **not** add administrative boundary polygons in M6 — defer to Milestone 3.
+- Do **not** add deterministic boundary data or administrative polygons in M6.
 - Use `MKLocalSearch` (or equivalent) for nearest-town context; geocoder for hierarchy text.
 - Extract testable pure functions for summary, hierarchy rows, and distance/bearing formatting.
 - Show Quiet mode indicator on Location when announcements are muted.
@@ -250,6 +270,34 @@ Done when:
 - Unit tests cover hierarchy presentation and nearby-town formatting logic.
 - A rider can orient themselves at a brief stop without using a navigation app.
 - Design doc open questions are resolved or logged as follow-ups.
+
+## Milestone 6.5: First-Time Rider Polish And Review Readiness
+
+Target outcome: MotoGuide feels like a focused rider app, not a developer test harness, and avoids obvious App Store review problems before broader testing.
+
+Design reference: `MVP_POLISH_PLAN.md`
+
+Work:
+
+- Keep onboarding short: purpose, not navigation, helmet audio, background location, and what the rider will hear.
+- Request location permission only after the app explains why it is needed.
+- Make the Location screen the first screen.
+- Split Settings into simple controls and Advanced developer/tuning controls.
+- Hide or collapse Test Mode, Speak After Every Geocode, Bluetooth delay, and proxy diagnostics.
+- Surface permission, GPS, geocoder, proxy, and audio-session failures in the UI with short recovery actions.
+- Rename rider-visible copy from internal terms to rider terms: road, town, county, region, country, Short Facts, Quiet.
+- Make the Log rider-readable as History while keeping enough detail for field debugging.
+- Audit Info.plist background modes and permission strings before App Store or TestFlight review.
+- Draft App Review notes that explain the demo route, background location use, helmet audio use, and proxy-backed facts.
+- Draft privacy notes for location use, fact proxy requests, retention, and deletion/consent expectations.
+
+Done when:
+
+- A new rider can launch, understand the app, allow location, and see live status without a developer briefing.
+- Debug/tuning controls are not in the primary path.
+- The app explains when it is waiting for permission, GPS, geocoding, audio, or proxy facts.
+- Apple review risks are documented: background location, background audio, privacy details, backend availability, and generated fact content.
+- The app is ready to install on the physical iPhone for the 2026-07-03 field trial.
 
 ## Milestone 7: Custom Announcement Instructions
 
@@ -272,6 +320,13 @@ Done when:
 
 Target outcome: decide whether the separate audio companion is useful enough to continue.
 
+First field trial target: 2026-07-03.
+
+Build-scope stop point:
+
+- Stop feature work after Milestone 6 and Milestone 6.5 are ready enough for one real ride.
+- Do not add deterministic place data, custom instructions, listening, POI handoff, rider questions, accounts, analytics, or route planning before this field trial.
+
 Work:
 
 - Run several rides on familiar and unfamiliar roads.
@@ -283,6 +338,7 @@ Work:
 
 Done when:
 
+- First checkpoint: one ride report from 2026-07-03 records whether GPS, background behavior, helmet audio, fact timing, and Location screen status worked.
 - There are at least 3 ride reports.
 - MVP1 defaults have been adjusted from real use.
 - The next build direction is explicit.
@@ -345,8 +401,8 @@ Decision criteria:
 
 ## Immediate Next Steps
 
-1. Trust the developer certificate on the iPhone.
-2. Launch MotoGuide on the iPhone from Xcode.
-3. Record the launch result in `MILESTONE_0_STATUS.md`.
-4. Run simulator tests again or record the remaining simulator launch blocker.
-5. Start Milestone 1 by replacing placeholder tests and adding tests for current speech modes.
+1. Finish Milestone 6 Location screen completion.
+2. Finish Milestone 6.5 first-time rider polish and review-readiness notes.
+3. Build, install, and launch MotoGuide on Robert's iPhone.
+4. Run the first MVP1 field trial on 2026-07-03.
+5. Record the ride result, then decide whether to continue with more field rides or fix blockers first.
