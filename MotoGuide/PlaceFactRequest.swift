@@ -69,7 +69,12 @@ struct PlaceFactRequest: Equatable {
             factMode.rawValue,
             String(boundary.rawValue),
             PlaceNameNormalizer.normalize(placeName),
-            PlaceNameNormalizer.normalize(countryContext ?? "")
+            PlaceNameNormalizer.normalize(countryContext ?? ""),
+            PlaceNameNormalizer.normalize(placeHierarchy.street ?? ""),
+            PlaceNameNormalizer.normalize(placeHierarchy.town ?? ""),
+            PlaceNameNormalizer.normalize(placeHierarchy.county ?? ""),
+            PlaceNameNormalizer.normalize(placeHierarchy.region ?? ""),
+            PlaceNameNormalizer.normalize(placeHierarchy.country ?? "")
         ].joined(separator: ":")
     }
 

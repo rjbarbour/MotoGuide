@@ -86,15 +86,47 @@ final class PlaceFactCacheTests: XCTestCase {
 
         XCTAssertNotEqual(short.cacheKey, long.cacheKey)
     }
+
+    func testCacheKeyIncludesPlaceHierarchy() {
+        let first = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Newport",
+            factMode: .shortFacts,
+            countryContext: "United Kingdom",
+            placeHierarchy: PlaceHierarchy(
+                street: "High Street",
+                town: "Newport",
+                county: "Shropshire",
+                region: "England",
+                country: "United Kingdom"
+            )
+        )
+
+        let second = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Newport",
+            factMode: .shortFacts,
+            countryContext: "United Kingdom",
+            placeHierarchy: PlaceHierarchy(
+                street: "North Road",
+                town: "Newport",
+                county: "Pembrokeshire",
+                region: "Wales",
+                country: "United Kingdom"
+            )
+        )
+
+        XCTAssertNotEqual(first.cacheKey, second.cacheKey)
+    }
 }
 
 final class CachedPlaceFactGeneratorTests: XCTestCase {
     func testUsesCacheOnSecondLookup() async throws {
         let mock = MockPlaceFactGenerator()
-        mock.factsByCacheKey["shortFacts:3:stroud:united kingdom"] = "A steep Cotswold town."
         let cache = PlaceFactCache(loadPersisted: false)
         let generator = CachedPlaceFactGenerator(generator: mock, cache: cache)
         let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: "United Kingdom")
+        mock.factsByCacheKey[request.cacheKey] = "A steep Cotswold town."
 
         let first = try await generator.fact(for: request)
         let second = try await generator.fact(for: request)
@@ -416,8 +448,8 @@ final class PlaceFactFetcherTests: XCTestCase {
     func testTimeoutReturnsNilWhenGeneratorIsSlow() async {
         let mock = MockPlaceFactGenerator()
         mock.delayNanoseconds = 5_000_000_000
-        mock.factsByCacheKey["shortFacts:3:stroud"] = "Too late."
         let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+        mock.factsByCacheKey[request.cacheKey] = "Too late."
 
         let fact = await PlaceFactFetcher.fact(for: request, using: mock, timeout: 0.2)
 
@@ -426,8 +458,8 @@ final class PlaceFactFetcherTests: XCTestCase {
 
     func testReturnsFactWhenGeneratorIsFast() async {
         let mock = MockPlaceFactGenerator()
-        mock.factsByCacheKey["shortFacts:3:stroud"] = "A market town below the escarpment."
         let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+        mock.factsByCacheKey[request.cacheKey] = "A market town below the escarpment."
 
         let fact = await PlaceFactFetcher.fact(for: request, using: mock, timeout: 2)
 
