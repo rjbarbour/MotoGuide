@@ -61,12 +61,19 @@ x-deployment:
     MOTOGUIDE_LONG_FACT_PROMPT:
       default: built-in long fact prompt
       description: Optional server-side prompt override for longFacts requests. Never sent by iOS.
+    MOTOGUIDE_DEVICE_BINDING_REQUIRED:
+      default: false
+      description: When true, requires X-MotoGuide-Device-Id to be in MOTOGUIDE_TRUSTED_DEVICE_IDS.
+    MOTOGUIDE_TRUSTED_DEVICE_IDS:
+      description: Comma-separated list of allowed X-MotoGuide-Device-Id values when device binding is required.
+    MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST:
+      description: Optional comma-separated host allowlist for prompt override JSON fetches.
     OPENAI_MODEL:
       default: gpt-4o-mini
       description: OpenAI model selected by the Fly runtime environment.
     RATE_LIMIT_PER_MINUTE:
       default: 30
-      description: Per-IP request limit for authenticated proxy calls.
+      description: Request limit for authenticated proxy calls, with user/device identity preference then IP fallback.
 x-current-security-model:
   transport: HTTPS through Fly.io public ingress.
   appAuthentication: Shared bearer token in the Authorization header.
@@ -75,7 +82,8 @@ x-current-security-model:
   openAiKeyExposure: Server-side only. Never store the OpenAI API key in the iOS app or repository.
   currentLimitations:
     - A leaked MOTOGUIDE_PROXY_TOKEN can call the proxy until rotated or rate-limited.
-    - The MVP proxy does not yet bind requests to a specific app install, Apple App Attest key, user, or approved device.
+    - A leaked MOTOGUIDE_PROXY_TOKEN can still be used by any bearer until rotated or rate-limited.
+    - Device binding is optional and must be enabled explicitly for non-Playground traffic.
   plannedHardening:
     - Per-device registration.
     - Apple App Attest assertion verification.
@@ -151,6 +159,16 @@ paths:
         - in: header
           name: X-MotoGuide-User-Id
           description: Optional rider/user identifier for server-side prompt override lookup.
+          required: false
+          schema:
+            type: string
+            minLength: 4
+            maxLength: 64
+        - in: header
+          name: X-MotoGuide-Device-Id
+          description: |
+            Optional approved-device identifier. Required when
+            MOTOGUIDE_DEVICE_BINDING_REQUIRED=true.
           required: false
           schema:
             type: string

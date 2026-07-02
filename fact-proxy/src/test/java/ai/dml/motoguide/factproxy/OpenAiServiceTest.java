@@ -67,6 +67,9 @@ class OpenAiServiceTest {
                     false,
                     null,
                     60,
+                    null,
+                    false,
+                    null,
                     null
             );
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint, properties);
@@ -130,6 +133,9 @@ class OpenAiServiceTest {
                     true,
                     overrideUrl,
                     1,
+                    null,
+                    false,
+                    null,
                     null
             );
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint, properties);
@@ -195,6 +201,9 @@ class OpenAiServiceTest {
                 false,
                 null,
                 60,
+                null,
+                false,
+                null,
                 null
         );
     }

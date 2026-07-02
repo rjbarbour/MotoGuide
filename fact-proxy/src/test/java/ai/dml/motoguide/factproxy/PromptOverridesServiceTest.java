@@ -138,6 +138,40 @@ class PromptOverridesServiceTest {
         ));
     }
 
+    @Test
+    void ignoresPromptOverrideHostNotOnAllowlist() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/prompt-overrides.json", exchange -> {
+            String responseBody = """
+                    {
+                      "modePrompts": {
+                        "shortFacts": "Nope"
+                      }
+                    }
+                    """;
+            byte[] response = responseBody.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            try (OutputStream outputStream = exchange.getResponseBody()) {
+                outputStream.write(response);
+            }
+        });
+        server.start();
+
+        try {
+            String objectUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/prompt-overrides.json";
+            PromptOverridesService service = serviceWithOverridesEnabled(objectUrl, false, "prompts.example");
+            assertNull(service.resolvePromptOverride(
+                    FactMode.SHORT_FACTS,
+                    "rider-42",
+                    "town",
+                    new ValidatedPlaceHierarchy("Road", "Stroud", "Gloucestershire", "England", "United Kingdom")
+            ));
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private static PromptOverridesService serviceWithOverridesEnabled(String objectUrl, int refreshSeconds) {
         MotoGuideProperties properties = new MotoGuideProperties(
                 "proxy-token",
@@ -149,6 +183,9 @@ class PromptOverridesServiceTest {
                 true,
                 objectUrl,
                 refreshSeconds,
+                null,
+                false,
+                null,
                 null
         );
         return new PromptOverridesService(
@@ -159,6 +196,10 @@ class PromptOverridesServiceTest {
     }
 
     private static PromptOverridesService serviceWithOverridesEnabled(String objectUrl, boolean enabled) {
+        return serviceWithOverridesEnabled(objectUrl, enabled, null);
+    }
+
+    private static PromptOverridesService serviceWithOverridesEnabled(String objectUrl, boolean enabled, String hostAllowlist) {
         MotoGuideProperties properties = new MotoGuideProperties(
                 "proxy-token",
                 null,
@@ -169,7 +210,10 @@ class PromptOverridesServiceTest {
                 enabled,
                 objectUrl,
                 60,
-                null
+                null,
+                false,
+                null,
+                hostAllowlist
         );
         return new PromptOverridesService(
                 HttpClient.newHttpClient(),

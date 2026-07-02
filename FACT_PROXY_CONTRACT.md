@@ -96,7 +96,10 @@ Runtime configuration:
 | `MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL` | (not set) | Optional URL for prompt override JSON. |
 | `MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS` | `60` | Poll interval for override updates from object storage. |
 | `MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN` | (not set) | Optional bearer token for override object download. |
-| `RATE_LIMIT_PER_MINUTE` | `30` | Per-IP request limit for authenticated proxy calls. |
+| `MOTOGUIDE_DEVICE_BINDING_REQUIRED` | `false` | Require approved devices via `X-MotoGuide-Device-Id` when true. |
+| `MOTOGUIDE_TRUSTED_DEVICE_IDS` | (not set) | Comma-separated allowed `X-MotoGuide-Device-Id` values when device binding is required. |
+| `MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST` | (not set) | Optional comma-separated host allowlist for prompt overrides fetches. |
+| `RATE_LIMIT_PER_MINUTE` | `30` | Per identity (trusted user/device if provided, else IP) request limit for authenticated proxy calls. |
 
 Health check:
 
@@ -137,6 +140,14 @@ Optional request header for prompt overrides:
 X-MotoGuide-User-Id: rider-42
 ```
 
+Optional approved-device header:
+
+```http
+X-MotoGuide-Device-Id: helmet-001
+```
+
+When `MOTOGUIDE_DEVICE_BINDING_REQUIRED=true`, `X-MotoGuide-Device-Id` must be present and in `MOTOGUIDE_TRUSTED_DEVICE_IDS`.
+
 The iOS app reads this token from the iOS Keychain generic-password item with service:
 
 ```text
@@ -153,7 +164,7 @@ Current MVP security model:
 - The OpenAI key is stored only as the Fly secret `OPENAI_API_KEY`.
 - The proxy only exposes a narrow place-fact endpoint; clients cannot send arbitrary OpenAI prompts, model names, endpoints, or message arrays.
 - The proxy validates `boundary`, `factMode`, `placeName`, `countryContext`, and `placeHierarchy`.
-- The proxy rate-limits by client IP.
+- The proxy rate-limits by user ID or device ID if provided, with IP fallback.
 
 Current limitation:
 

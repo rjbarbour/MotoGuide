@@ -18,6 +18,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Service
@@ -163,7 +164,7 @@ public class PromptOverridesService {
     }
 
     private PromptOverrides fetchPromptOverrides(String objectUrl) throws IOException, InterruptedException {
-        URI promptOverridesUri = parsePromptOverridesUri(objectUrl);
+        URI promptOverridesUri = parsePromptOverridesUriWithAllowlist(objectUrl);
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(promptOverridesUri)
                 .timeout(REQUEST_TIMEOUT)
@@ -194,6 +195,18 @@ public class PromptOverridesService {
         }
         if (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme)) {
             throw new IllegalArgumentException("prompt override object url must use http or https");
+        }
+        return uri;
+    }
+
+    private URI parsePromptOverridesUriWithAllowlist(String objectUrl) {
+        URI uri = parsePromptOverridesUri(objectUrl);
+        Set<String> allowedHosts = properties.promptOverridesHostAllowlistSet();
+        if (!allowedHosts.isEmpty()) {
+            String host = uri.getHost();
+            if (host == null || !allowedHosts.contains(host.toLowerCase(Locale.ROOT))) {
+                throw new IllegalArgumentException("prompt override object host is not allowlisted");
+            }
         }
         return uri;
     }

@@ -21,6 +21,8 @@ import java.util.regex.Pattern;
 public class RateLimitFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
     private static final String FLY_CLIENT_IP_HEADER = "Fly-Client-IP";
+    private static final String USER_ID_HEADER = "X-MotoGuide-User-Id";
+    private static final String DEVICE_ID_HEADER = "X-MotoGuide-Device-Id";
     private static final Pattern CLIENT_IP_PATTERN = Pattern.compile("^[0-9a-fA-F:\\.:%]+$");
 
     private final MotoGuideProperties properties;
@@ -32,7 +34,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return "/health".equals(request.getRequestURI());
+        String path = request.getRequestURI();
+        return "/health".equals(path) || path.startsWith("/admin/");
     }
 
     @Override
@@ -41,11 +44,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String clientIp = clientIp(request);
+        String clientKey = requestIdentityKey(request);
         int limit = Math.max(properties.rateLimitPerMinute(), 1);
         Instant cutoff = Instant.now().minusSeconds(60);
 
-        Deque<Instant> timestamps = requestsByIp.computeIfAbsent(clientIp, ignored -> new ArrayDeque<>());
+        Deque<Instant> timestamps = requestsByIp.computeIfAbsent(clientKey, ignored -> new ArrayDeque<>());
         synchronized (timestamps) {
             while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(cutoff)) {
                 timestamps.removeFirst();
@@ -54,7 +57,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 log.warn("event=rate_limit_exceeded status=429 limitPerMinute={}", limit);
                 response.sendError(429, "Rate limit exceeded");
                 if (timestamps.isEmpty()) {
-                    requestsByIp.remove(clientIp, timestamps);
+                    requestsByIp.remove(clientKey, timestamps);
                 }
                 return;
             }
@@ -62,6 +65,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String requestIdentityKey(HttpServletRequest request) {
+        String userId = UserIdSanitizer.normalizeAndValidate(request.getHeader(USER_ID_HEADER));
+        if (userId != null) {
+            return "user:" + userId;
+        }
+        String deviceId = DeviceIdSanitizer.normalize(request.getHeader(DEVICE_ID_HEADER));
+        if (deviceId != null) {
+            return "device:" + deviceId;
+        }
+        return "ip:" + clientIp(request);
     }
 
     private String clientIp(HttpServletRequest request) {
