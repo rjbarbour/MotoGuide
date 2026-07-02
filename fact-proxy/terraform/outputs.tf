@@ -5,5 +5,5 @@ output "app_name" {
 
 output "app_url" {
   description = "Managed Fly app URL."
-  value       = fly_app.fact_proxy.appurl
+  value       = fly_app.fact_proxy.app_url
 }

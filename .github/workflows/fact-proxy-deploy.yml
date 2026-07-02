@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "fact-proxy/**"
+      - ".github/workflows/fact-proxy-deploy.yml"
 
 env:
   FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'motoguide-fact-proxy' }}
@@ -55,7 +56,11 @@ jobs:
             fly_app_name = "${FLY_APP_NAME}"
             fly_org = "${FLY_APP_ORG}"
           EOF
-          terraform import fly_app.fact_proxy "${FLY_APP_NAME}" || true
+          if flyctl status -a "${FLY_APP_NAME}" >/dev/null 2>&1; then
+            terraform import fly_app.fact_proxy "${FLY_APP_NAME}"
+          else
+            echo "::notice::No existing app state found for ${FLY_APP_NAME}; Terraform will create it."
+          fi
           terraform plan -out=fact-proxy.tfplan -input=false
           terraform apply -input=false -auto-approve fact-proxy.tfplan
 
