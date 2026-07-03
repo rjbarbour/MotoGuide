@@ -12,6 +12,8 @@ Primary user: a touring motorcyclist on long rides, international trips, or unfa
 
 Core value: help the rider know where they are and why it matters without looking at a screen.
 
+Long-term vision: MotoGuide can range from silent display-only place awareness, through sparse boundary announcements, to an adaptive always-on tour guide. The rider controls frequency, length, topics, and detail level. Later versions should learn what the rider is interested in, answer place questions, suggest worthwhile stops, and hand selected destinations to an existing navigation app.
+
 ## Current Product Shape
 
 The existing GitHub prototype is an iOS SwiftUI app:
@@ -30,8 +32,11 @@ Current prototype capabilities:
 - Reverse-geocode coordinates into street, town, county, region, and country.
 - Natural announcement phrasing, e.g. `Welcome to Wales. You are in Chepstow, Monmouthshire`.
 - Announcement modes: Natural, Names Only, Short Facts (proxy-backed LLM), Long Facts (proxy-backed LLM), Quiet.
-- Single-slot announcement queue with Bluetooth audio delay.
+- Single-slot announcement queue with Bluetooth audio delay and primary-audio interruption handling.
 - Boundary priority: country → nation → county → town → street.
+- Rider context fields for home country, home region, familiar regions, fact interests, and custom fact focus.
+- Speech provider setting with Apple voice selection/preview and proxy-backed ElevenLabs option.
+- Map-first Location screen with compact overlay, manual zoom/reset controls, visible location/geocoder states, and moving-state map lock.
 - Test mode with named Gloucestershire route coordinates.
 - Unit tests for address, announcements, facts (mocked), first-run state, and route fixture.
 - Short/Long Facts OpenAPI contract: `FACT_PROXY_OPENAPI.yaml`.
@@ -41,8 +46,8 @@ Current interface:
 - Location is the primary screen.
 - Toolbar gear opens Settings.
 - Toolbar history/list button opens Log.
-- Settings top level: announcement style and what to announce.
-- Settings Advanced: location check frequency, Test Mode, Speak After Every Geocode, Bluetooth delay, proxy diagnostics, reset onboarding.
+- Settings top level: Quiet Mode, announcement style, voice, speech provider, what to announce, and rider context.
+- Settings Advanced: location check frequency, map label scale, Bluetooth delay, custom fact focus, Developer controls for Test Mode, Speak After Every Geocode, proxy diagnostics, and reset onboarding.
 
 Log: scrollable history and manual test/current-location log button.
 
@@ -72,6 +77,8 @@ Build the MVP as one narrow mobile prototype:
 
 Do not expand into general travel planning, route planning, social ride tracking, or full AI tour guiding until MVP1 works on real rides.
 
+MVP1 is a functional proof and private-beta learning tool. Do not treat MVP1 as the whole commercial proposition. Use it to prove real-ride feasibility, safety, trust, and interest in the broader MotoGuide vision.
+
 ## Product Decisions
 
 ### MVP1
@@ -87,13 +94,17 @@ Do not expand into general travel planning, route planning, social ride tracking
 
 ### MVP2
 
-- Add listening and navigation handoff.
-- Example flow: MotoGuide suggests a point of interest and the rider replies to navigate there.
+- Add explicit listening, nearby POI discovery, longer optional descriptions, and navigation handoff.
+- Example flow: MotoGuide suggests a nearby point of interest; the rider asks for more detail; MotoGuide gives a bounded description; the rider says "navigate to Caernarfon Castle"; MotoGuide hands the destination to Google Maps, Apple Maps, or another chosen navigation target.
+- Keep MotoGuide separate from route planning. It may help choose or describe a destination, but the navigation app owns the route.
+- Listening must start bounded and controllable as a safe route toward the always-on guide vision, not as a rejection of that vision.
+- Longer descriptions should be explicit, interruptible, and preferably stopped-only or rider-enabled while moving.
+- Begin learning preferences through simple feedback such as topics, "more like this", "less history", "shorter", and "more detail".
 - Choose the first navigation app or handoff target before implementation.
 
 ### Later Versions
 
-- Add open-ended rider questions.
+- Add open-ended rider questions after MVP2 validates listening and POI handoff, then expand toward adaptive always-on touring where the rider chooses how much guidance they want.
 - Expose custom instructions for announcement style and content preferences.
 - Support different instructions by boundary type, such as town, county, region, country, landmark, or history.
 - Expand from UK-only to UK and Europe.
@@ -111,6 +122,8 @@ Open questions:
 
 - How should custom instructions be constrained so rider-facing speech stays short and safe?
 - Which navigation apps should MVP2 target first for POI handoff?
+- Should rider voice questions be allowed while moving, stopped-only, or disabled by default?
+- Which POI sources are acceptable for MVP2: pre-generated touring packs, Apple/MapKit search, Wikipedia/Wikidata, OpenStreetMap, server API, or live LLM?
 
 ## Related Local Context
 
@@ -128,6 +141,14 @@ ICB catalogue context:
 - Local repo: `/Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue`
 - GitHub repo: `https://github.com/rjbarbour/icb-catalogue-processing.git`
 - MotoGuide ICB: `/Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue/staged_icbs/6a1047a6a591ed37d9fd4e0e.md`
+
+Market validation context:
+
+- Business validation plan: `/Users/rob_dev/DocsLocal/motoguide/repo/BUSINESS_VALIDATION_PLAN.md`
+- PMF Factory / 100 Tasks review: `/Users/rob_dev/DocsLocal/motoguide/repo/PMF_FACTORY_100_TASKS_REVIEW.md`
+- Current 14-day validation sprint: `/Users/rob_dev/DocsLocal/motoguide/repo/TWO_WEEK_MARKET_VALIDATION_PLAN.md`
+- Deep-research report: `/Users/rob_dev/DocsLocal/motoguide/resources/MotoGuide_market_deep-research-report.md`
+- Supporting landing-page tool: `/Users/rob_dev/DocsLocal/landing_page_tool`
 
 Notion operating references read on 2026-07-02:
 
@@ -166,10 +187,12 @@ All agents work in one checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`. Ther
 
 Batch changes, then validate once:
 
-1. Implement a coherent chunk of work (feature slice, bugfix, or polish group).
-2. Run a compile check (`xcodebuild build` for the physical device destination).
-3. Deploy to the iPhone if connected (see Device Deploy).
-4. Run the simulator unit test suite only at meaningful checkpoints — not after every small edit.
+1. **First** capture the requested work in plan/spec docs before touching implementation. Update the relevant plan files (for example `MVP_POLISH_PLAN.md`, `MILESTONE_5_STATUS.md`, `MILESTONES.md`, and any active feature spec) with the exact ask, acceptance criteria, and rationale.
+2. Confirm the plan and implementation files are in sync before coding.
+3. Implement a coherent chunk of work (feature slice, bugfix, or polish group).
+4. Run a compile check (`xcodebuild build` for the physical device destination).
+5. Deploy to the iPhone if connected (see Device Deploy).
+6. Run the simulator unit test suite only at meaningful checkpoints — not after every small edit.
 
 ### When to run simulator tests
 
