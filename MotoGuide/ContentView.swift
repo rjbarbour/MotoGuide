@@ -151,17 +151,24 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
-                        Text("MotoGuide")
+                        Text(AppBuildMetadata.shouldShow(testMode: locationManager.testMode) ? AppBuildMetadata.titlePrimaryLabel : "MotoGuide")
                             .font(.headline)
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.75), radius: 2, x: 0, y: 1)
                             .lineLimit(1)
-                        if locationManager.testMode {
-                            Text(AppBuildMetadata.versionLabel)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            .minimumScaleFactor(0.72)
+                        if AppBuildMetadata.shouldShow(testMode: locationManager.testMode) {
+                            Text(AppBuildMetadata.titleTimestampLabel)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white.opacity(0.96))
+                                .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
                         }
                     }
+                    .frame(maxWidth: 178)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("MotoGuide")
+                    .accessibilityLabel(AppBuildMetadata.shouldShow(testMode: locationManager.testMode) ? "\(AppBuildMetadata.titlePrimaryLabel), \(AppBuildMetadata.titleTimestampLabel)" : "MotoGuide")
                 }
 
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -295,7 +302,7 @@ private struct LocationScreenView: View {
                 LocationMapView(
                     coordinate: locationManager.lastKnownLocation,
                     locationStatus: locationManager.locationStatus,
-                    allowsInteraction: locationManager.allowsMapInteraction,
+                    allowsInteraction: true,
                     mapLabelScale: mapLabelScale
                 )
                 .ignoresSafeArea()
@@ -323,10 +330,10 @@ private struct LocationScreenView: View {
                         }
                     }
                     .padding(.horizontal, 12)
-                    .padding(.bottom, OverlayLayout.verticalPad * 2)
+                    .padding(.bottom, OverlayLayout.verticalPad * 2 + geometry.safeAreaInsets.bottom)
                 }
                 .frame(
-                    height: panelHeight(for: geometry.size.height),
+                    height: panelHeight(for: geometry.size.height) + geometry.safeAreaInsets.bottom,
                     alignment: .top
                 )
                 .frame(maxWidth: .infinity)
@@ -349,13 +356,9 @@ private struct LocationScreenView: View {
                         .stroke(panelStyle.divider.opacity(0.22), lineWidth: 1)
                 )
                 .padding(.horizontal, 0)
-                .padding(.bottom, 0)
+                .padding(.bottom, -geometry.safeAreaInsets.bottom)
                 .padding(.top, isInfoPanelExpanded ? 22 : 44)
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isInfoPanelExpanded.toggle()
-                    }
-                }
+                .ignoresSafeArea(edges: .bottom)
                 .offset(y: panelDragOffset)
                 .gesture(panelDragGesture(totalHeight: geometry.size.height))
             }
@@ -517,18 +520,16 @@ private struct LocationScreenView: View {
                 panelDragOffset = max(-120, min(80, value.translation.height))
             }
             .onEnded { value in
-                defer {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        panelDragOffset = 0
+                let translation = value.translation.height
+                let predicted = value.predictedEndTranslation.height
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    panelDragOffset = 0
+                    if translation < -36 || predicted < -96 {
+                        isInfoPanelExpanded = true
+                    } else if translation > 36 || predicted > 96 {
+                        isInfoPanelExpanded = false
                     }
                 }
-
-                let compact = max(188, totalHeight * Self.compactPanelBaseFactor)
-                let expanded = min(totalHeight * Self.expandedPanelBaseFactor, 760)
-                let velocity = value.predictedEndTranslation.height
-                let midpoint = (compact + expanded) / 2
-                let targetHeight = panelHeight(for: totalHeight) - velocity / 10
-                isInfoPanelExpanded = targetHeight > midpoint
             }
     }
 
@@ -573,9 +574,9 @@ private struct LocationMapView: View {
         static let maximum: CLLocationDistance = 150_000
     }
 
-    private let controlButtonSize: CGFloat = 124
-    private let controlHitArea: CGFloat = 152
-    private let controlButtonSpacing: CGFloat = 14
+    private let controlButtonSize: CGFloat = 93
+    private let controlHitArea: CGFloat = 114
+    private let controlButtonSpacing: CGFloat = 10
     private let controlOffsetTop: CGFloat = 188
     private let zoomStep: CLLocationDistance = 1.3
 
@@ -589,7 +590,7 @@ private struct LocationMapView: View {
                 ZStack(alignment: .topTrailing) {
                     Map(
                         position: $cameraPosition,
-                        interactionModes: allowsInteraction ? .all : []
+                        interactionModes: .all
                     ) {
                         Annotation("Current Location", coordinate: snapshot.coordinate) {
                             VStack(spacing: 2) {
@@ -701,11 +702,14 @@ private struct LocationMapView: View {
     }
 
     private func centerOnCurrentLocationIfNeeded(_ snapshot: CoordinateSnapshot, shouldReset: Bool) {
-        guard shouldReset else { return }
-
         if !hasInitializedCamera {
             hasInitializedCamera = true
+            setCamera(to: snapshot.coordinate, spanMeters: mapSpanMeters)
+            followsLocation = false
+            return
         }
+
+        guard shouldReset else { return }
         resetMap(to: snapshot.coordinate)
     }
 
@@ -745,19 +749,22 @@ private struct LocationMapView: View {
                     .contentShape(Rectangle())
 
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color(red: 0.98, green: 0.98, blue: 0.98), lineWidth: 1.4)
+                    .stroke(Color(red: 0.98, green: 0.98, blue: 0.98), lineWidth: 2.0)
                     .background(Color.clear)
                     .frame(width: controlButtonSize, height: controlButtonSize)
+                    .shadow(color: .black.opacity(0.85), radius: 3, x: 0, y: 1)
 
                 RoundedRectangle(cornerRadius: 12)
                     .inset(by: 3)
-                    .stroke(Color(red: 0.86, green: 0.86, blue: 0.86), lineWidth: 0.9)
+                    .stroke(Color(red: 0.86, green: 0.86, blue: 0.86), lineWidth: 1.2)
                     .frame(width: controlButtonSize, height: controlButtonSize)
+                    .shadow(color: .black.opacity(0.75), radius: 2, x: 0, y: 1)
 
                 Image(systemName: systemName)
-                    .font(.system(size: scaledFont(39), weight: .bold))
+                    .font(.system(size: scaledFont(29), weight: .bold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(Color.white)
+                    .shadow(color: .black.opacity(0.9), radius: 2, x: 0, y: 1)
             }
             .frame(width: controlHitArea, height: controlHitArea, alignment: .center)
             .accessibilityLabel(systemName == "plus" ? "Zoom in" : "Zoom out")
@@ -773,19 +780,22 @@ private struct LocationMapView: View {
             Button(action: { resetMap(to: snapshot.coordinate) }) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color(red: 0.98, green: 0.98, blue: 0.98), lineWidth: 1.4)
+                        .stroke(Color(red: 0.98, green: 0.98, blue: 0.98), lineWidth: 2.0)
                         .background(Color.clear)
                         .frame(width: controlButtonSize, height: controlButtonSize)
+                        .shadow(color: .black.opacity(0.85), radius: 3, x: 0, y: 1)
 
                     RoundedRectangle(cornerRadius: 12)
                         .inset(by: 3)
-                        .stroke(Color(red: 0.86, green: 0.86, blue: 0.86), lineWidth: 0.9)
+                        .stroke(Color(red: 0.86, green: 0.86, blue: 0.86), lineWidth: 1.2)
                         .frame(width: controlButtonSize, height: controlButtonSize)
+                        .shadow(color: .black.opacity(0.75), radius: 2, x: 0, y: 1)
 
                     Image(systemName: "location.north")
-                        .font(.system(size: scaledFont(34), weight: .semibold))
+                        .font(.system(size: scaledFont(26), weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(Color.white)
+                        .shadow(color: .black.opacity(0.9), radius: 2, x: 0, y: 1)
                 }
                 .frame(width: controlHitArea, height: controlHitArea, alignment: .center)
                 .contentShape(Rectangle())
@@ -1545,7 +1555,7 @@ private let isoDateFormatter: ISO8601DateFormatter = {
 private enum AppBuildMetadata {
     private static let buildDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
     }()
@@ -1555,6 +1565,31 @@ private enum AppBuildMetadata {
         let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
         let buildStamp = formattedBuildTimestamp(buildNumber) ?? buildNumber
         return "MotoGuide v\(shortVersion)  ·  \(buildStamp)"
+    }
+
+    static var titleDetailLabel: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        let buildStamp = formattedBuildTimestamp(buildNumber) ?? "build \(buildNumber)"
+        return "v\(shortVersion)  ·  \(buildStamp)"
+    }
+
+    static var titlePrimaryLabel: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+        return "MotoGuide v\(shortVersion)"
+    }
+
+    static var titleTimestampLabel: String {
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        return formattedBuildTimestamp(buildNumber) ?? "build \(buildNumber)"
+    }
+
+    static func shouldShow(testMode: Bool) -> Bool {
+#if DEBUG
+        return true
+#else
+        return testMode
+#endif
     }
 
     private static func formattedBuildTimestamp(_ buildNumber: String) -> String? {

@@ -43,6 +43,8 @@ This plan defines polish appropriate for a **first-time user** preparing for fie
 | **Location screen incomplete** | Full-map layout, compact overlays, summary, context line, last spoken phrase, quiet status, speed-gated map interaction, manual zoom/reset controls, and key empty states exist | Nearby towns, previous street, stopped-only zoom presets, presentation tests, and field readability pass remain |
 | **Status line and map controls** | Location screen shows redundant status text and zoom button behavior remains unclear in real use | Remove duplicate `Location is active.` status in normal mode; make zoom controls direction and hit area obvious and reliable |
 | **Build metadata visibility** | Build version and timestamp not consistently shown in the main screen title area | Show compact build metadata on main screen in test mode |
+| **Map panel and panning regressions** | The bottom sheet does not reach the bottom edge, can get stuck expanded, and map panning can be disabled by ride-state gating | Use a Google Maps-style bottom sheet fixed to the bottom edge, support swipe up and down, and keep map panning available until the rider explicitly taps reset to recenter |
+| **Map control sizing** | Plus, minus, and reset controls are now oversized after increasing hit areas | Keep them glove-friendly but reduce visual size to roughly three quarters of the current size, with full-button hit targets and no overlap |
 | **Settings readability and hit targets** | Settings still uses compact rows, placeholder-only context fields, low-contrast secondary text, and toggle controls where the effective target can feel like the switch | Settings must be readable outdoors on a motorbike: high contrast, larger type, clear labels, full-width tappable rows, and enough vertical spacing for gloved use |
 | **Announcement style unclear** | "Natural" is still undefined in the UI | Rider may not understand the difference from Names Only / Short Facts |
 | **Bluetooth delay exposed** | 0-3 s slider is visible in Advanced | Most riders should not need to tune this before a field ride |
@@ -100,8 +102,11 @@ Rename UI only where rider-visible; keep code identifiers stable.
 - Keep the map-first layout per `MAP_SITUATIONAL_AWARENESS.md`: full map, compact overlay, current place, mode, and last phrase.
 - Add nearby towns, previous street, stopped-only zoom presets, and presentation tests.
 - Show low-level location status text only in test mode to reduce non-signal clutter at ride speed.
+- Show compact semantic version and ISO-like build timestamp clearly near the MotoGuide title in test mode.
 - Keep Quiet mode visible on Location.
 - Keep map controls reliable: zoom in/out and reset should have a larger, explicit hit area and predictable behavior.
+- Keep map panning available on the Location screen; do not re-disable panning based on current speed during MVP field testing.
+- Bottom information panel should behave like a Google Maps-style bottom sheet: anchored to the bottom safe edge, swipe up to expand, swipe down to collapse, and no dead strip below it.
 
 ### 2.5 Empty states and entry points — **Should**
 
@@ -127,6 +132,7 @@ Not App Store polish. Minimum:
 - Settings row labels should use strong contrast and at least title3-scale text for interactive rows.
 - Toggle-style rows should make the whole row tappable, not just the switch.
 - Rider context fields need visible question labels; example text must not be the only label.
+- Location map controls must keep a large hit target but avoid obscuring the toolbar or key map content; the visible plus, minus, and reset affordances should be smaller than the previous oversized pass.
 
 ### 2.7 Voice quality — **Should before repeated field testing**
 
@@ -341,6 +347,7 @@ Rationale:
 | 15 | Fact prompt/contract update for richer Short/Long Facts and home context | Proxy contract |
 | 16 | Map-first Location layout with compact overlay and doubled default map area | M6 |
 | 17 | Settings readability pass: high contrast, larger text, full-width hit targets, explicit rider-context labels | M6.5 |
+| 18 | Location screen regression pass: visible version/timestamp, anchored bottom sheet, reversible sheet drag, smaller map controls, and always-available map panning | M6 |
 
 ### 5.3 Done criteria
 
@@ -352,6 +359,9 @@ Rationale:
 - [ ] Location status row shows only actionable states; normal ride view does not display generic `Location is active`.
 - [ ] Map zoom controls have a visibly larger, full-area hit target and consistent zoom-in/zoom-out behavior.
 - [ ] Build metadata line appears beneath "MotoGuide" on main screen in test mode.
+- [ ] Bottom sheet reaches the bottom edge, expands upward, collapses downward, and does not block map panning outside the sheet.
+- [ ] Map can be panned by swipe; new location updates do not recenter unless reset/follow is active.
+- [ ] Plus, minus, and reset controls are reduced to roughly three quarters of the previous visual size while preserving a usable hit area.
 - [ ] Settings strings use consistent rider language and explicit labels for context inputs.
 - [ ] Settings rows remain readable under glare/vibration assumptions: strong contrast, large type, full-width hit targets, and no placeholder-only labels.
 - [ ] No rider-visible use of "geocode" or "Nation" without explanation.
