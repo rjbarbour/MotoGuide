@@ -102,10 +102,6 @@ struct ContentView: View {
             .navigationTitle("Moto Guide")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text("Moto Guide")
-                        .font(.headline.weight(.semibold))
-                }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         showLog = true
@@ -228,6 +224,20 @@ private struct LocationScreenView: View {
                 mapLabelScale: mapLabelScale
             )
             .ignoresSafeArea()
+            .overlay(alignment: .topLeading) {
+                if locationManager.testMode {
+                    Text(AppBuildMetadata.versionLabel)
+                        .font(.system(size: scaledFont(12)))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .padding(.top, 8)
+                        .padding(.leading, 8)
+                }
+            }
 
             VStack(alignment: .leading, spacing: OverlayLayout.verticalPad) {
                 currentInformationPanel
@@ -370,7 +380,7 @@ private struct LocationMapView: View {
         static let maximum: CLLocationDistance = 120_000
     }
 
-    private let controlButtonSize: CGFloat = 52
+    private let controlButtonSize: CGFloat = 66
 
     private var snapshot: CoordinateSnapshot? {
         coordinate.map(CoordinateSnapshot.init)
@@ -380,10 +390,10 @@ private struct LocationMapView: View {
         Group {
             if let snapshot {
                 ZStack(alignment: .topTrailing) {
-                    Map(
-                        position: $cameraPosition,
-                        interactionModes: allowsInteraction ? .all : []
-                    ) {
+                Map(
+                    position: $cameraPosition,
+                    interactionModes: allowsInteraction ? .all : []
+                ) {
                         Annotation("Current Location", coordinate: snapshot.coordinate) {
                             VStack(spacing: 2) {
                                 Image(systemName: "mappin.circle.fill")
@@ -424,25 +434,9 @@ private struct LocationMapView: View {
                             adjustMapZoom(by: 1.25)
                         }
 
-                        Button {
-                            resetMap(to: snapshot.coordinate)
-                        } label: {
-                            Label("Reset", systemImage: "location.magnifyingglass")
-                                .font(.system(size: scaledFont(15), weight: .semibold))
-                                .lineLimit(1)
-                                .frame(minWidth: controlButtonSize, minHeight: 24)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 10)
-                        .background(Color.black.opacity(0.35))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.9), lineWidth: 2)
-                        }
-                        .foregroundStyle(Color.white)
+                        resetMapButton
                     }
-                    .padding(.top, 12)
+                    .padding(.top, 86)
                     .padding(.trailing, 12)
                 }
             } else {
@@ -551,17 +545,48 @@ private struct LocationMapView: View {
     private func mapControlButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: scaledFont(24), weight: .bold))
+                .font(.system(size: scaledFont(33), weight: .bold))
                 .frame(width: controlButtonSize, height: controlButtonSize)
                 .foregroundStyle(Color.white)
-                .background(Color.black.opacity(0.35))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.9), lineWidth: 2)
+                        .stroke(Color.white.opacity(0.95), lineWidth: 1.2)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .inset(by: 3)
+                        .stroke(Color.white.opacity(0.75), lineWidth: 1)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var resetMapButton: some View {
+        if let snapshot {
+            Button(action: { resetMap(to: snapshot.coordinate) }) {
+                Image(systemName: "location.north")
+                    .font(.system(size: scaledFont(22), weight: .bold))
+                    .frame(width: controlButtonSize, height: controlButtonSize)
+                    .foregroundStyle(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.95), lineWidth: 1.2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .inset(by: 3)
+                            .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Reset map to current location")
+            .accessibilityHint("Moves map center back to your current location.")
+        } else {
+            EmptyView()
+        }
     }
 
     private func clampSpan(_ meters: CLLocationDistance) -> CLLocationDistance {
@@ -989,3 +1014,35 @@ private let isoDateFormatter: ISO8601DateFormatter = {
     formatter.formatOptions = [.withInternetDateTime]
     return formatter
 }()
+
+private enum AppBuildMetadata {
+    private static let buildDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
+    }()
+
+    static var versionLabel: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        let buildStamp = formattedBuildTimestamp(buildNumber) ?? buildNumber
+        return "MotoGuide v\(shortVersion)  ·  \(buildStamp)"
+    }
+
+    private static func formattedBuildTimestamp(_ buildNumber: String) -> String? {
+        let compact = buildNumber.replacingOccurrences(of: ".", with: "")
+        if compact.count >= 8 {
+            let datePart = String(compact.prefix(8))
+            let timePart = compact.count > 8 ? String(compact.dropFirst(8).prefix(4)) : nil
+            let parseInput = timePart == nil ? "\(datePart)0000" : "\(datePart)\(timePart!)"
+            let parser = DateFormatter()
+            parser.dateFormat = "yyyyMMddHHmm"
+            parser.timeZone = TimeZone(secondsFromGMT: 0)
+            if let date = parser.date(from: parseInput) {
+                return "build \(buildDateFormatter.string(from: date)) UTC"
+            }
+        }
+        return nil
+    }
+}
