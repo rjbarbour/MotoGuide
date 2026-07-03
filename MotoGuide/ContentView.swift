@@ -285,7 +285,7 @@ private struct LocationScreenView: View {
     @State private var isInfoPanelExpanded = false
     @State private var panelDragOffset: CGFloat = 0
     private static let compactPanelBaseFactor: CGFloat = 0.24
-    private static let expandedPanelBaseFactor: CGFloat = 0.56
+    private static let expandedPanelBaseFactor: CGFloat = 0.5
 
     private enum OverlayLayout {
         static let verticalPad: CGFloat = 8
@@ -329,11 +329,11 @@ private struct LocationScreenView: View {
                                 }
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, OverlayLayout.verticalPad * 2 + geometry.safeAreaInsets.bottom)
+                .padding(.horizontal, 12)
+                    .padding(.bottom, OverlayLayout.verticalPad * 2)
                 }
                 .frame(
-                    height: panelHeight(for: geometry.size.height) + geometry.safeAreaInsets.bottom,
+                    height: panelHeight(for: geometry.size.height),
                     alignment: .top
                 )
                 .frame(maxWidth: .infinity)
@@ -356,8 +356,6 @@ private struct LocationScreenView: View {
                         .stroke(panelStyle.divider.opacity(0.22), lineWidth: 1)
                 )
                 .padding(.horizontal, 0)
-                .padding(.bottom, -geometry.safeAreaInsets.bottom)
-                .padding(.top, isInfoPanelExpanded ? 22 : 44)
                 .ignoresSafeArea(edges: .bottom)
                 .offset(y: panelDragOffset)
                 .gesture(panelDragGesture(totalHeight: geometry.size.height))
@@ -508,8 +506,8 @@ private struct LocationScreenView: View {
 
     private func panelHeight(for totalHeight: CGFloat) -> CGFloat {
         let compact = max(188, totalHeight * Self.compactPanelBaseFactor)
-        let expanded = min(totalHeight * Self.expandedPanelBaseFactor, 600)
-        let dragInfluence = max(-150, min(150, panelDragOffset))
+        let expanded = min(totalHeight * Self.expandedPanelBaseFactor, 520)
+        let dragInfluence = max(-100, min(100, panelDragOffset))
         let height = isInfoPanelExpanded ? expanded : compact
         return min(expanded, max(compact, height - dragInfluence))
     }
@@ -517,16 +515,16 @@ private struct LocationScreenView: View {
     private func panelDragGesture(totalHeight: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { value in
-                panelDragOffset = max(-110, min(80, value.translation.height))
+                panelDragOffset = max(-90, min(72, value.translation.height))
             }
             .onEnded { value in
                 let translation = value.translation.height
                 let predicted = value.predictedEndTranslation.height
                 withAnimation(.easeInOut(duration: 0.2)) {
                     panelDragOffset = 0
-                    if translation < -28 || predicted < -78 {
+                    if translation < -22 || predicted < -66 {
                         isInfoPanelExpanded = true
-                    } else if translation > 28 || predicted > 78 {
+                    } else if translation > 22 || predicted > 66 {
                         isInfoPanelExpanded = false
                     }
                 }
