@@ -839,15 +839,18 @@ private struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Announcements") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    SettingsCard(title: "Announcements", palette: palette) {
                     Text("Choose when and how MotoGuide should speak while you ride.")
-                        .font(.body)
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundStyle(palette.secondaryText)
                         .listRowBackground(palette.rowBackground)
 
-                    Toggle(
-                        "Quiet mode",
+                    SettingsToggleRow(
+                        title: "Quiet mode",
+                        subtitle: "Stop MotoGuide speaking.",
                         isOn: Binding(
                             get: { locationManager.contentMode == .quiet },
                             set: { isQuiet in
@@ -866,51 +869,71 @@ private struct SettingsView: View {
                                     locationManager.contentMode = savedMode ?? lastNonQuietMode
                                 }
                             }
-                        )
+                        ),
+                        palette: palette
                     )
-                    .font(.title3)
-                    .toggleStyle(.switch)
-                    .controlSize(.regular)
-                    .listRowBackground(palette.rowBackground)
 
-                    Toggle("Interrupt music while speaking", isOn: $locationManager.interruptsMusic)
-                        .font(.title3)
-                        .toggleStyle(.switch)
-                        .controlSize(.regular)
-                        .listRowBackground(palette.rowBackground)
+                    SettingsToggleRow(
+                        title: "Interrupt music while speaking",
+                        subtitle: "Lower music so announcements are clearer.",
+                        isOn: $locationManager.interruptsMusic,
+                        palette: palette
+                    )
 
                     Text("Defaults: rider-safe interruption priority. Music is lowered so announcements are clearer.")
-                        .font(.body)
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundStyle(palette.secondaryText)
                         .padding(.bottom, 2)
                         .listRowBackground(palette.rowBackground)
 
-                    Picker("Announcement Style", selection: $locationManager.contentMode) {
-                        ForEach(ContentMode.allCases) { mode in
-                            Text(mode.label).tag(mode)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Announcement style")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(palette.primaryText)
+                        Picker("Announcement style", selection: $locationManager.contentMode) {
+                            ForEach(ContentMode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .font(.title3.weight(.semibold))
+                        .tint(palette.accent)
                     }
-                    .font(.title3)
-                    .tint(palette.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .listRowBackground(palette.rowBackground)
 
-                    Picker("Voice", selection: $locationManager.preferredVoiceIdentifier) {
-                        ForEach(locationManager.availableSpeechVoices()) { voice in
-                            Text(voice.pickerLabel).tag(voice.identifier)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Apple voice")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(palette.primaryText)
+                        Picker("Apple voice", selection: $locationManager.preferredVoiceIdentifier) {
+                            ForEach(locationManager.availableSpeechVoices()) { voice in
+                                Text(voice.pickerLabel).tag(voice.identifier)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .disabled(locationManager.speechProvider != .apple)
+                        .font(.title3.weight(.semibold))
+                        .tint(palette.accent)
                     }
-                    .disabled(locationManager.speechProvider != .apple)
-                    .font(.title3)
-                    .tint(palette.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .listRowBackground(palette.rowBackground)
 
-                    Picker("Speech provider", selection: $locationManager.speechProvider) {
-                        ForEach(SpeechProvider.allCases) { provider in
-                            Text(provider.label).tag(provider)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Speech provider")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(palette.primaryText)
+                        Picker("Speech provider", selection: $locationManager.speechProvider) {
+                            ForEach(SpeechProvider.allCases) { provider in
+                                Text(provider.label).tag(provider)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .font(.title3.weight(.semibold))
+                        .tint(palette.accent)
                     }
-                    .font(.title3)
-                    .tint(palette.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .listRowBackground(palette.rowBackground)
 
                     if let recommendation = locationManager.recommendedSpeechVoice() {
@@ -924,28 +947,34 @@ private struct SettingsView: View {
                     Button("Preview voice") {
                         locationManager.previewSelectedVoice()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .font(.title3.weight(.semibold))
                     .tint(palette.accent)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .contentShape(Rectangle())
                     .listRowBackground(palette.rowBackground)
-                }
+                    }
 
-                Section("When to announce") {
-                    Text("Control what changes trigger announcements.")
-                        .font(.body)
+                    SettingsCard(title: "When to announce", palette: palette) {
+                    Text("Set which new boundary should trigger speech.")
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundStyle(palette.secondaryText)
                         .listRowBackground(palette.rowBackground)
 
                     SectionToggleRows(locationManager: locationManager, palette: palette)
 
                     Text("Set the minimum delay after one boundary announcement before MotoGuide can announce again.")
-                        .font(.body)
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundStyle(palette.secondaryText)
                         .listRowBackground(palette.rowBackground)
 
                     Text(
                         boundarySpeechSummary(seconds: locationManager.boundarySpeechCooldownSeconds)
                     )
-                    .font(.body)
+                    .font(.title3)
+                    .fontWeight(.semibold)
                     .foregroundStyle(palette.secondaryText)
                     .listRowBackground(palette.rowBackground)
 
@@ -968,54 +997,51 @@ private struct SettingsView: View {
                     )
                     .tint(palette.accent)
                     .listRowBackground(palette.rowBackground)
-                }
+                    }
 
-                Section("Local Riding Hints") {
-                    Text("Help MotoGuide stay relevant and avoid repeating what you already know.")
-                        .font(.body)
+                    SettingsCard(title: "Rider Context", palette: palette) {
+                    Text("Help MotoGuide avoid obvious facts about places you already know.")
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundStyle(palette.secondaryText)
                         .listRowBackground(palette.rowBackground)
 
-                    TextField(
-                        "Home country",
+                    SettingsTextFieldRow(
+                        title: "Which country are you most familiar with?",
+                        example: "Example: United Kingdom",
                         text: $locationManager.homeCountry,
-                        prompt: Text("e.g., United Kingdom")
+                        palette: palette
                     )
-                    .font(.title3)
-                    .textFieldStyle(.roundedBorder)
-                    .listRowBackground(palette.rowBackground)
-                    TextField(
-                        "Home region",
+
+                    SettingsTextFieldRow(
+                        title: "Which region do you know best?",
+                        example: "Example: Cornwall",
                         text: $locationManager.homeRegion,
-                        prompt: Text("e.g., Cornwall")
+                        palette: palette
                     )
-                    .font(.title3)
-                    .textFieldStyle(.roundedBorder)
-                    .listRowBackground(palette.rowBackground)
-                    TextField(
-                        "Places you already know",
+
+                    SettingsTextFieldRow(
+                        title: "Which places should MotoGuide treat as familiar?",
+                        example: "Example: Somerset, Devon, London",
                         text: $locationManager.familiarRegions,
-                        prompt: Text("e.g., Somerset, Devon, London")
+                        palette: palette
                     )
-                    .textContentType(.none)
-                    .textInputAutocapitalization(.words)
-                    .font(.title3)
-                    .textFieldStyle(.roundedBorder)
-                    .listRowBackground(palette.rowBackground)
 
                     Text("Use these values to prioritise useful local context.")
-                        .font(.body)
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundStyle(palette.secondaryText)
                         .listRowBackground(palette.rowBackground)
                     FactInterestCategoryPicker(selectedCategories: $locationManager.factInterestCategories, palette: palette)
-                }
+                    }
 
-                Section("Advanced") {
-                    Toggle("Night mode", isOn: $nightMode)
-                        .font(.title3)
-                        .toggleStyle(.switch)
-                        .controlSize(.regular)
-                        .listRowBackground(palette.rowBackground)
+                    SettingsCard(title: "Advanced", palette: palette) {
+                    SettingsToggleRow(
+                        title: "Night mode",
+                        subtitle: "Use red text on black for night riding.",
+                        isOn: $nightMode,
+                        palette: palette
+                    )
 
                     Text("Location update frequency")
                         .font(.title2)
@@ -1039,7 +1065,8 @@ private struct SettingsView: View {
                             .foregroundStyle(palette.primaryText)
                         Slider(value: $mapLabelScale, in: 0.8...1.8, step: 0.1)
                         Text("Larger values make map and overlay text easier to read while riding.")
-                            .font(.body)
+                            .font(.title3)
+                            .fontWeight(.semibold)
                             .foregroundStyle(palette.secondaryText)
                         .listRowBackground(palette.rowBackground)
                     }
@@ -1065,36 +1092,43 @@ private struct SettingsView: View {
                             .fontWeight(.bold)
                             .foregroundStyle(palette.primaryText)
 
-                        TextField(
-                            "Custom preference note",
+                        SettingsTextFieldRow(
+                            title: "What else should facts focus on?",
+                            example: "Example: engineering details, old roads, old rail.",
                             text: $locationManager.customFactInstructions,
-                            prompt: Text("Example: engineering details, old roads, old rail.")
+                            palette: palette
                         )
-                        .textInputAutocapitalization(.sentences)
-                        .autocorrectionDisabled()
-                        .textFieldStyle(.roundedBorder)
-                        .font(.title3)
-                        .listRowBackground(palette.rowBackground)
 
                         Text("Optional: add one short note to change fact focus across all themes.")
-                            .font(.body)
+                            .font(.title3)
+                            .fontWeight(.semibold)
                             .foregroundStyle(palette.secondaryText)
                             .listRowBackground(palette.rowBackground)
                     }
                     .listRowBackground(palette.rowBackground)
 
                     DisclosureGroup("Developer") {
-                        Toggle("Test Mode", isOn: $locationManager.testMode)
-                            .font(.title3)
-                            .toggleStyle(.switch)
-                        Toggle("Speak After Every Geocode", isOn: $locationManager.speakAfterEveryGeocode)
-                            .font(.title3)
-                            .toggleStyle(.switch)
+                        SettingsToggleRow(
+                            title: "Test Mode",
+                            subtitle: "Use the Gloucestershire test route.",
+                            isOn: $locationManager.testMode,
+                            palette: palette
+                        )
+                        SettingsToggleRow(
+                            title: "Speak after every location lookup",
+                            subtitle: "Developer-only noisy speech mode.",
+                            isOn: $locationManager.speakAfterEveryGeocode,
+                            palette: palette
+                        )
 
 #if DEBUG
                         DisclosureGroup("Proxy Diagnostics") {
-                            Toggle("Enabled", isOn: $proxyDiagnosticsEnabled)
-                                .toggleStyle(.switch)
+                            SettingsToggleRow(
+                                title: "Enabled",
+                                subtitle: "Show proxy HTTP diagnostics in the app.",
+                                isOn: $proxyDiagnosticsEnabled,
+                                palette: palette
+                            )
                                 .onChange(of: proxyDiagnosticsEnabled) { _, isEnabled in
                                     if !isEnabled {
                                         debugLog.clear()
@@ -1111,15 +1145,18 @@ private struct SettingsView: View {
                             showResetConfirmation = true
                         }
                     }
+                    }
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 32)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .scrollContentBackground(.hidden)
             .background(palette.pageBackground)
             .foregroundStyle(palette.primaryText)
             .tint(palette.accent)
-            .listSectionSpacing(14)
+            .environment(\.colorScheme, .dark)
             .onAppear {
                 if let savedMode = UserDefaults.standard.string(forKey: Self.lastNonQuietModeKey),
                    let savedContentMode = ContentMode(rawValue: savedMode) {
@@ -1160,6 +1197,8 @@ private struct SettingsPalette {
     let pageBackground: Color
     let sectionBackground: Color
     let rowBackground: Color
+    let fieldBackground: Color
+    let fieldBorder: Color
     let primaryText: Color
     let secondaryText: Color
     let accent: Color
@@ -1168,10 +1207,138 @@ private struct SettingsPalette {
         let nightPrimary = Color(red: 1.0, green: 0.30, blue: 0.18)
         pageBackground = Color.black
         sectionBackground = Color(red: 0.07, green: 0.07, blue: 0.07)
-        rowBackground = nightMode ? Color(red: 0.10, green: 0.10, blue: 0.10) : Color(red: 0.16, green: 0.16, blue: 0.16)
+        rowBackground = nightMode ? Color(red: 0.08, green: 0.08, blue: 0.08) : Color(red: 0.12, green: 0.12, blue: 0.12)
+        fieldBackground = nightMode ? Color(red: 0.03, green: 0.03, blue: 0.03) : Color(red: 0.18, green: 0.18, blue: 0.18)
+        fieldBorder = nightMode ? Color(red: 0.85, green: 0.20, blue: 0.14) : Color(red: 0.55, green: 0.55, blue: 0.55)
         primaryText = nightMode ? nightPrimary : Color(red: 0.97, green: 0.97, blue: 0.97)
-        secondaryText = nightMode ? Color(red: 1.0, green: 0.72, blue: 0.63) : Color(red: 0.84, green: 0.84, blue: 0.84)
+        secondaryText = nightMode ? Color(red: 1.0, green: 0.76, blue: 0.68) : Color(red: 0.92, green: 0.92, blue: 0.92)
         accent = nightMode ? Color(red: 1.0, green: 0.45, blue: 0.35) : Color(red: 0.00, green: 0.48, blue: 1.00)
+    }
+}
+
+private struct SettingsSectionHeader: View {
+    let title: String
+    let palette: SettingsPalette
+
+    init(_ title: String, palette: SettingsPalette) {
+        self.title = title
+        self.palette = palette
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.title2.weight(.bold))
+            .foregroundStyle(palette.primaryText)
+            .textCase(nil)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+private struct SettingsCard<Content: View>: View {
+    let title: String
+    let palette: SettingsPalette
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSectionHeader(title, palette: palette)
+                .padding(.top, 0)
+
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 18)
+        .background(palette.rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+private struct SettingsToggleRow: View {
+    let title: String
+    let subtitle: String?
+    @Binding var isOn: Bool
+    let palette: SettingsPalette
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            HStack(alignment: .center, spacing: 18) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(palette.primaryText)
+                        .lineLimit(2)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(palette.secondaryText)
+                            .lineLimit(3)
+                    }
+                }
+
+                Spacer(minLength: 12)
+
+                Toggle("", isOn: $isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .tint(palette.accent)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 72)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .background(palette.rowBackground)
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(palette.rowBackground)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(subtitle == nil ? title : "\(title). \(subtitle!)")
+        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+private struct SettingsTextFieldRow: View {
+    let title: String
+    let example: String
+    @Binding var text: String
+    let palette: SettingsPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(palette.primaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            TextField("Optional", text: $text, prompt: Text("Optional"))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(palette.primaryText)
+                .textContentType(.none)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(palette.fieldBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(palette.fieldBorder, lineWidth: 1)
+                )
+
+            Text(example)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(palette.secondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+        .listRowBackground(palette.rowBackground)
     }
 }
 
@@ -1180,19 +1347,13 @@ private struct SectionToggleRows: View {
     let palette: SettingsPalette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionToggle(title: "Street", isOn: $locationManager.announceStreet, palette: palette)
+        Group {
+            SectionToggle(title: "Road", isOn: $locationManager.announceStreet, palette: palette)
             SectionToggle(title: "Town", isOn: $locationManager.announceTown, palette: palette)
             SectionToggle(title: "County", isOn: $locationManager.announceCounty, palette: palette)
             SectionToggle(title: "Region", isOn: $locationManager.announceNation, palette: palette)
             SectionToggle(title: "Country", isOn: $locationManager.announceCountry, palette: palette)
         }
-        .font(.title3)
-        .foregroundStyle(palette.primaryText)
-        .tint(palette.accent)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .padding(.vertical, 2)
     }
 }
 
@@ -1202,16 +1363,7 @@ private struct SectionToggle: View {
     let palette: SettingsPalette
 
     var body: some View {
-        Toggle(title, isOn: $isOn)
-            .padding(.vertical, 14)
-            .toggleStyle(.switch)
-            .tint(palette.accent)
-            .font(.title3)
-            .contentShape(Rectangle())
-            .foregroundStyle(palette.primaryText)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 56)
-            .listRowBackground(palette.rowBackground)
+        SettingsToggleRow(title: title, subtitle: nil, isOn: $isOn, palette: palette)
     }
 }
 
@@ -1221,42 +1373,24 @@ private struct FactInterestCategoryPicker: View {
 
     var body: some View {
         ForEach(FactInterestCategory.allCases) { category in
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle(
-                    category.label,
-                    isOn: Binding(
-                        get: { selectedCategories.contains(category) },
-                        set: { isSelected in
-                            var set = Set(selectedCategories)
-                            if isSelected {
-                                set.insert(category)
-                            } else {
-                                set.remove(category)
-                            }
-                            selectedCategories = FactInterestCategory.allCases
-                                .filter { set.contains($0) }
+            SettingsToggleRow(
+                title: category.label,
+                subtitle: category.prompt,
+                isOn: Binding(
+                    get: { selectedCategories.contains(category) },
+                    set: { isSelected in
+                        var set = Set(selectedCategories)
+                        if isSelected {
+                            set.insert(category)
+                        } else {
+                            set.remove(category)
                         }
-                    )
-                )
-                .font(.body)
-                .foregroundStyle(palette.primaryText)
-                .toggleStyle(.switch)
-                .tint(palette.accent)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .padding(.vertical, 14)
-                .padding(.trailing, 4)
-                .listRowBackground(palette.rowBackground)
-
-                Text(category.prompt)
-                    .font(.body)
-                    .foregroundStyle(palette.secondaryText)
-                    .padding(.leading, 44)
-                    .padding(.bottom, 4)
-                    .padding(.trailing, 6)
-                    .lineLimit(3)
-            }
-            .listRowBackground(palette.rowBackground)
+                        selectedCategories = FactInterestCategory.allCases
+                            .filter { set.contains($0) }
+                    }
+                ),
+                palette: palette
+            )
         }
     }
 }

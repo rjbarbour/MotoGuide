@@ -43,6 +43,7 @@ This plan defines polish appropriate for a **first-time user** preparing for fie
 | **Location screen incomplete** | Full-map layout, compact overlays, summary, context line, last spoken phrase, quiet status, speed-gated map interaction, manual zoom/reset controls, and key empty states exist | Nearby towns, previous street, stopped-only zoom presets, presentation tests, and field readability pass remain |
 | **Status line and map controls** | Location screen shows redundant status text and zoom button behavior remains unclear in real use | Remove duplicate `Location is active.` status in normal mode; make zoom controls direction and hit area obvious and reliable |
 | **Build metadata visibility** | Build version and timestamp not consistently shown in the main screen title area | Show compact build metadata on main screen in test mode |
+| **Settings readability and hit targets** | Settings still uses compact rows, placeholder-only context fields, low-contrast secondary text, and toggle controls where the effective target can feel like the switch | Settings must be readable outdoors on a motorbike: high contrast, larger type, clear labels, full-width tappable rows, and enough vertical spacing for gloved use |
 | **Announcement style unclear** | "Natural" is still undefined in the UI | Rider may not understand the difference from Names Only / Short Facts |
 | **Bluetooth delay exposed** | 0-3 s slider is visible in Advanced | Most riders should not need to tune this before a field ride |
 
@@ -122,6 +123,10 @@ Not App Store polish. Minimum:
 - Readable type scale: status line ≥ title3.
 - System background; avoid default plain `Form` grey slab feel with one accent colour.
 - App icon and launch screen: existing assets OK for MVP1; no marketing screenshots.
+- Settings must assume glare, vibration, and brief glances from a stopped or slow-moving motorbike.
+- Settings row labels should use strong contrast and at least title3-scale text for interactive rows.
+- Toggle-style rows should make the whole row tappable, not just the switch.
+- Rider context fields need visible question labels; example text must not be the only label.
 
 ### 2.7 Voice quality — **Should before repeated field testing**
 
@@ -335,6 +340,7 @@ Rationale:
 | 14 | ElevenLabs proxy TTS with Apple fallback | Physical phone |
 | 15 | Fact prompt/contract update for richer Short/Long Facts and home context | Proxy contract |
 | 16 | Map-first Location layout with compact overlay and doubled default map area | M6 |
+| 17 | Settings readability pass: high contrast, larger text, full-width hit targets, explicit rider-context labels | M6.5 |
 
 ### 5.3 Done criteria
 
@@ -347,6 +353,7 @@ Rationale:
 - [ ] Map zoom controls have a visibly larger, full-area hit target and consistent zoom-in/zoom-out behavior.
 - [ ] Build metadata line appears beneath "MotoGuide" on main screen in test mode.
 - [ ] Settings strings use consistent rider language and explicit labels for context inputs.
+- [ ] Settings rows remain readable under glare/vibration assumptions: strong contrast, large type, full-width hit targets, and no placeholder-only labels.
 - [ ] No rider-visible use of "geocode" or "Nation" without explanation.
 - [ ] Default interval is 10 s; street off; Short Facts mode selected.
 - [ ] Location screen is default with quiet banner when applicable.
