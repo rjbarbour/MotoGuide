@@ -146,9 +146,24 @@ struct ContentView: View {
                 },
                 mapLabelScale: mapLabelScale
             )
-            .navigationTitle(locationManager.testMode ? AppBuildMetadata.versionLabel : "MotoGuide")
+            .navigationTitle("MotoGuide")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("MotoGuide")
+                            .font(.headline)
+                            .lineLimit(1)
+                        if locationManager.testMode {
+                            Text(AppBuildMetadata.versionLabel)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("MotoGuide")
+                }
+
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         showLog = true
@@ -454,17 +469,16 @@ private struct LocationScreenView: View {
 
             Divider()
 
-            Label("Location status", systemImage: "location")
-                .font(.system(size: scaledFont(15)))
-                .foregroundStyle(panelStyle.secondaryText)
-            Label(locationManager.locationStatus.riderMessage, systemImage: locationManager.locationStatus.needsSettingsAction ? "location.slash" : "location")
-                .font(.system(size: scaledFont(18), weight: .semibold))
-                .foregroundStyle(
-                    locationManager.locationStatus.needsSettingsAction
-                    ? panelStyle.warningText
-                    : panelStyle.primaryText
-                )
-                .padding(.bottom, 2)
+            if locationManager.testMode && locationManager.locationStatus != .active {
+                Label(locationManager.locationStatus.riderMessage, systemImage: locationManager.locationStatus.needsSettingsAction ? "location.slash" : "location")
+                    .font(.system(size: scaledFont(18), weight: .semibold))
+                    .foregroundStyle(
+                        locationManager.locationStatus.needsSettingsAction
+                        ? panelStyle.warningText
+                        : panelStyle.primaryText
+                    )
+                    .padding(.bottom, 2)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
@@ -726,6 +740,10 @@ private struct LocationMapView: View {
     private func mapControlButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             ZStack {
+                Color.clear
+                    .frame(width: controlHitArea, height: controlHitArea)
+                    .contentShape(Rectangle())
+
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color(red: 0.98, green: 0.98, blue: 0.98), lineWidth: 1.4)
                     .background(Color.clear)
@@ -742,11 +760,11 @@ private struct LocationMapView: View {
                     .foregroundStyle(Color.white)
             }
             .frame(width: controlHitArea, height: controlHitArea, alignment: .center)
-            .contentShape(Rectangle())
             .accessibilityLabel(systemName == "plus" ? "Zoom in" : "Zoom out")
             .accessibilityHint("Adjust map zoom")
         }
         .buttonStyle(.plain)
+        .frame(width: controlHitArea, height: controlHitArea)
     }
 
     @ViewBuilder
@@ -909,13 +927,6 @@ private struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .tint(palette.accent)
                     .listRowBackground(palette.rowBackground)
-
-                    if let phrase = locationManager.lastSpokenPhrase {
-                        Text("Current voice phrase: \(phrase)")
-                            .font(.body)
-                            .foregroundStyle(palette.secondaryText)
-                            .listRowBackground(palette.rowBackground)
-                    }
                 }
 
                 Section("When to announce") {
@@ -1006,13 +1017,13 @@ private struct SettingsView: View {
                         .controlSize(.regular)
                         .listRowBackground(palette.rowBackground)
 
-                    Text("Location check frequency")
+                    Text("Location update frequency")
                         .font(.title2)
                         .bold()
                         .foregroundStyle(palette.primaryText)
                         .listRowBackground(palette.rowBackground)
 
-                    Picker("Location check frequency", selection: $locationManager.locationCheckInterval) {
+                    Picker("Location update frequency", selection: $locationManager.locationCheckInterval) {
                         ForEach(intervals, id: \.self) { interval in
                             Text("\(interval) seconds").tag(interval)
                         }

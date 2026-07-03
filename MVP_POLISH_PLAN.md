@@ -37,9 +37,12 @@ This plan defines polish appropriate for a **first-time user** preparing for fie
 | **Developer Log language** | Log still uses developer naming and exposes coordinates directly | Useful for field debugging, but not yet rider-friendly History |
 | **Internal language remains** | "Location check frequency", "Speak After Every Geocode", and "Natural" still need a rider-language pass | Jargon makes the app feel unfinished |
 | **Proxy/audio recovery incomplete** | Location and geocoder failures are visible, but proxy and audio failures mostly rely on diagnostics or console output | A rider needs visible fallback status if facts or speech fail |
-| **Fact quality too banal** | Short Facts are capped at 1100 characters and Long Facts at 1500, with concise and practical prompts | Adult touring riders need specific, locally meaningful context, not obvious encyclopaedia snippets |
+| **Fact sequence repetition** | Refined prompts produce better isolated facts, but nearby towns can repeat Cotswolds, limestone, stone buildings, wool, cloth, mills, and old-route language | Adult touring riders need specific, locally meaningful context that stays fresh across a ride sequence |
 | **TTS voice quality poor** | Apple voices remain available, but ride-facing quality is not good enough | Try ElevenLabs through the proxy, keep Apple speech as fallback, and validate through the Nex Xcom headset |
+| **Busy riding conditions** | Announcements are sparse and can be muted, but they are not yet delayed by cornering, braking, acceleration, or unstable heading | Add ride-aware announcements after MVP1 if field testing shows timing distraction |
 | **Location screen incomplete** | Full-map layout, compact overlays, summary, context line, last spoken phrase, quiet status, speed-gated map interaction, manual zoom/reset controls, and key empty states exist | Nearby towns, previous street, stopped-only zoom presets, presentation tests, and field readability pass remain |
+| **Status line and map controls** | Location screen shows redundant status text and zoom button behavior remains unclear in real use | Remove duplicate `Location is active.` status in normal mode; make zoom controls direction and hit area obvious and reliable |
+| **Build metadata visibility** | Build version and timestamp not consistently shown in the main screen title area | Show compact build metadata on main screen in test mode |
 | **Announcement style unclear** | "Natural" is still undefined in the UI | Rider may not understand the difference from Names Only / Short Facts |
 | **Bluetooth delay exposed** | 0-3 s slider is visible in Advanced | Most riders should not need to tune this before a field ride |
 
@@ -95,7 +98,9 @@ Rename UI only where rider-visible; keep code identifiers stable.
 - Show "Waiting for GPS", permission-denied, and geocoder-failure states.
 - Keep the map-first layout per `MAP_SITUATIONAL_AWARENESS.md`: full map, compact overlay, current place, mode, and last phrase.
 - Add nearby towns, previous street, stopped-only zoom presets, and presentation tests.
+- Show low-level location status text only in test mode to reduce non-signal clutter at ride speed.
 - Keep Quiet mode visible on Location.
+- Keep map controls reliable: zoom in/out and reset should have a larger, explicit hit area and predictable behavior.
 
 ### 2.5 Empty states and entry points — **Should**
 
@@ -136,12 +141,26 @@ Not App Store polish. Minimum:
 
 ### 2.9 Fact quality — **Should before broader testing**
 
-- Treat Short Facts as a useful short blurb, not a tiny trivia sentence. Target roughly the current Long Facts length.
-- Make Long Facts longer and richer, but still bounded and interruptible.
+- Treat Short Facts as a useful short blurb, not a tiny trivia sentence. Current refined target: 35-45 words.
+- Make Long Facts richer but still bounded and interruptible. Current refined target: 75-90 words.
 - Assume adult, middle-aged touring riders. Avoid patronising explanations and school-level definitions.
 - Add optional coarse home/familiar-region context so familiar places are not explained as if the rider knows nothing about them.
+- Add ride-sequence context before broader testing: previous spoken places, previous topics, avoid topics, desired novelty, and familiarity policy.
+- Add a small topic memory for the last 3-5 spoken facts.
+- Prefer names-only or silence over filler when the next town has no distinct fact after recent nearby announcements.
+- Add a home quiet radius setting after MVP1 field validation: Off, 5 miles, 10 miles, 25 miles.
 - Examples of bad output: "Wales is a country in the UK"; "Gloucestershire is a county in England"; generic population or administrative facts without why it matters.
 - Examples of better output: a local industry, border story, road/landscape context, architectural marker, historic event, or why the place is notable on a ride.
+
+### 2.9.1 Ride-aware announcements — **Post-field-trial unless timing distracts**
+
+- Use **announcements** as the standard word for rider-facing speech.
+- Use **Ride-aware announcements** for the feature that delays speech while the ride looks busy.
+- Delay announcements while cornering, braking, accelerating, rapidly changing heading, or when motion/course data is uncertain.
+- Release only the latest relevant held announcement when stopped or riding steadily.
+- Do not play a backlog after a bend, roundabout, village hazard, or junction sequence.
+- Add a max hold time, then shorten to names-only or drop stale content.
+- Keep Quiet mode as the hard override.
 
 ### 2.10 What NOT to do yet — explicit deferrals
 
@@ -150,7 +169,7 @@ Not App Store polish. Minimum:
 | Full App Store launch/submission polish | MVP1 only needs review-risk notes before field trial |
 | Accounts, sign-in, cloud sync | No MVP1 value |
 | Route planning, turn-by-turn, POI handoff | MVP2 |
-| Open-ended rider questions | M7 |
+| Open-ended rider questions | M10 |
 | Deterministic UK place data and offline boundary lookup | Post-field-trial M3 |
 | Administrative boundary polygons on map | Post-field-trial M3 |
 | CarPlay, widgets, lock screen | Later |
@@ -203,12 +222,14 @@ Not App Store polish. Minimum:
 | `speakAfterEveryGeocode` | false | false | Hidden |
 | `testMode` | false | false | Hidden |
 | `bluetoothDelaySeconds` | 0.5 | 0.5 | Hidden |
+| Ride-aware announcements | none | Post-field-trial option | Delay speech while busy; speak latest update when stopped or steady |
 | Default screen | Location | **Location** | Keep Location as home |
 | Permission timing | on init | after onboarding | |
 | Voice | default `en-GB` | Best installed premium/enhanced `en-GB` | Add preview setting |
-| Short Facts length | 1100 chars | About current Long Facts length | Implemented |
-| Long Facts length | 1500 chars | Longer bounded blurb | Implemented |
+| Short Facts length | 35-45 words | Useful short blurb | Refined prompt target |
+| Long Facts length | 75-90 words | Richer bounded blurb | Refined prompt target |
 | Home context | none | Coarse home/familiar region only | No exact home address |
+| Home quiet radius | none | Post-field-trial | Off / 5 / 10 / 25 miles; no exact home address sent to proxy |
 
 `BoundaryAnnouncementSettings.ridingDefaults` in code already matches most ride defaults. Keep the `10 s` interval and Short Facts default; focus polish on permission timing and UI exposure, not these defaults.
 
@@ -222,6 +243,7 @@ Use this as the implementation bar for the first-time rider polish.
 
 - One primary job per screen. Location answers "where am I?", Settings answers "what should MotoGuide say?", History answers "what did it say?".
 - Audio remains the primary ride interface. The screen is for setup, stops, and quick confidence checks.
+- Announcements should happen at suitable moments. Delay or drop speech rather than talking over demanding riding conditions.
 - Progressive disclosure. First-run and simple Settings show only the decisions a rider needs. Advanced holds debug and tuning.
 - Every waiting state is visible. Permission, GPS, geocoder, proxy facts, and audio setup must not fail silently.
 - Every recovery path is human-operable. Use short copy and direct actions such as Open Settings, Try Again, or Switch to Names Only.
@@ -239,6 +261,8 @@ Use this as the implementation bar for the first-time rider polish.
 - Blank screens while waiting for GPS or denied permissions.
 - Route, ETA, turn banner, search, or POI UI that makes MotoGuide look like navigation.
 - Speech that sounds like an instruction to ride, turn, speed up, stop, or make a safety decision.
+- Speech that continues through demanding cornering, braking, acceleration, or complex junction work when it could have been delayed.
+- Backlog playback after a held period.
 - Blocking core announcements on the fact proxy.
 - Claims that generated facts are exhaustive, authoritative, live safety data, or emergency information.
 - Hidden backend requirements during review or TestFlight.
@@ -319,6 +343,10 @@ Rationale:
 - [ ] Denied permission shows recovery UI, not a blank screen.
 - [ ] Home tab shows current place and last announcement within one glance.
 - [ ] Settings Simple section has ≤ 3 decision areas; Advanced holds debug and tuning.
+- [ ] Location status row shows only actionable states; normal ride view does not display generic `Location is active`.
+- [ ] Map zoom controls have a visibly larger, full-area hit target and consistent zoom-in/zoom-out behavior.
+- [ ] Build metadata line appears beneath "MotoGuide" on main screen in test mode.
+- [ ] Settings strings use consistent rider language and explicit labels for context inputs.
 - [ ] No rider-visible use of "geocode" or "Nation" without explanation.
 - [ ] Default interval is 10 s; street off; Short Facts mode selected.
 - [ ] Location screen is default with quiet banner when applicable.
