@@ -3,6 +3,29 @@ import CoreLocation
 import MapKit
 import UIKit
 
+private struct RoundedCornerShape: Shape {
+    let topLeadingRadius: CGFloat
+    let topTrailingRadius: CGFloat
+    let bottomLeadingRadius: CGFloat
+    let bottomTrailingRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var corners: UIRectCorner = []
+        if topLeadingRadius > 0 { corners.insert(.topLeft) }
+        if topTrailingRadius > 0 { corners.insert(.topRight) }
+        if bottomLeadingRadius > 0 { corners.insert(.bottomLeft) }
+        if bottomTrailingRadius > 0 { corners.insert(.bottomRight) }
+        let radius = [topLeadingRadius, topTrailingRadius, bottomLeadingRadius, bottomTrailingRadius].max() ?? 0
+
+        let bezier = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(bezier.cgPath)
+    }
+}
+
 private struct RideLogEntry: Identifiable {
     let id = UUID()
     let timestamp: Date
@@ -111,6 +134,8 @@ struct ContentView: View {
     @State private var showResetCompleteMessage = false
     @State private var showSettings = false
     @State private var showLog = false
+    @State private var settingsDetent: PresentationDetent = .large
+    @State private var logDetent: PresentationDetent = .large
 
     var body: some View {
         NavigationStack {
@@ -121,7 +146,7 @@ struct ContentView: View {
                 },
                 mapLabelScale: mapLabelScale
             )
-            .navigationTitle("Moto Guide")
+            .navigationTitle(locationManager.testMode ? AppBuildMetadata.versionLabel : "MotoGuide")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -152,15 +177,24 @@ struct ContentView: View {
                 showResetConfirmation: $showResetConfirmation,
                 debugLog: debugLog
             )
+            .presentationDetents([.medium, .large], selection: $settingsDetent)
+            .presentationDragIndicator(.visible)
+            .presentationContentInteraction(.resizes)
 #else
             SettingsView(
                 locationManager: locationManager,
                 showResetConfirmation: $showResetConfirmation
             )
+            .presentationDetents([.medium, .large], selection: $settingsDetent)
+            .presentationDragIndicator(.visible)
+            .presentationContentInteraction(.resizes)
 #endif
         }
         .sheet(isPresented: $showLog) {
             LogHistoryView(locationManager: locationManager, logs: $logs)
+                .presentationDetents([.medium, .large], selection: $logDetent)
+                .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.resizes)
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView(firstRunState: firstRunState) {
@@ -225,174 +259,285 @@ private struct LocationScreenView: View {
     let onRepeat: () -> Void
     let mapLabelScale: Double
     @AppStorage("MotoGuideRepeatHintDismissed") private var repeatHintDismissed = false
+    @AppStorage("MotoGuideNightMode") private var nightMode = false
+    @State private var isInfoPanelExpanded = false
+    @State private var panelDragOffset: CGFloat = 0
+    private static let compactPanelBaseFactor: CGFloat = 0.24
+    private static let expandedPanelBaseFactor: CGFloat = 0.86
 
     private enum OverlayLayout {
-        static let horizontalPad: CGFloat = 12
         static let verticalPad: CGFloat = 8
         static let cornerRadius: CGFloat = 12
+        static let handleHeight: CGFloat = 24
         static let summaryLineLimit: Int = 2
-        static let hierarchyLineLimit: Int = 1
+        static let hierarchyLineLimit: Int = 2
         static let phraseLineLimit: Int = 3
-        static let panelBackgroundOpacity: Double = 0.82
-        static let panelTextColor: Color = .white
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            LocationMapView(
-                coordinate: locationManager.lastKnownLocation,
-                locationStatus: locationManager.locationStatus,
-                allowsInteraction: locationManager.allowsMapInteraction,
-                mapLabelScale: mapLabelScale
-            )
-            .ignoresSafeArea()
-            .overlay(alignment: .topLeading) {
-                if locationManager.testMode {
-                    Text(AppBuildMetadata.versionLabel)
-                        .font(.system(size: scaledFont(12)))
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding(.top, 8)
-                        .padding(.leading, 8)
-                }
-            }
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                LocationMapView(
+                    coordinate: locationManager.lastKnownLocation,
+                    locationStatus: locationManager.locationStatus,
+                    allowsInteraction: locationManager.allowsMapInteraction,
+                    mapLabelScale: mapLabelScale
+                )
+                .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: OverlayLayout.verticalPad) {
-                currentInformationPanel
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        repeatHintDismissed = true
-                        onRepeat()
+                VStack(spacing: 0) {
+                    handleBar
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        compactInfoPanel
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                repeatHintDismissed = true
+                                onRepeat()
+                            }
+                        Divider()
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                        if isInfoPanelExpanded {
+                            expandedInfoPanel
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    repeatHintDismissed = true
+                                    onRepeat()
+                                }
+                        }
                     }
-                statusPanel
-                if locationManager.testMode {
-                    Button {
-                        locationManager.logTestLocation()
-                    } label: {
-                        Label("Next test location", systemImage: "arrow.forward.circle")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, OverlayLayout.verticalPad * 2)
                 }
+                .frame(
+                    height: panelHeight(for: geometry.size.height),
+                    alignment: .top
+                )
+                .frame(maxWidth: .infinity)
+                .background(panelStyle.background)
+                .clipShape(
+                    RoundedCornerShape(
+                        topLeadingRadius: OverlayLayout.cornerRadius,
+                        topTrailingRadius: OverlayLayout.cornerRadius,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0
+                    )
+                )
+                .overlay(
+                    RoundedCornerShape(
+                        topLeadingRadius: OverlayLayout.cornerRadius,
+                        topTrailingRadius: OverlayLayout.cornerRadius,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0
+                    )
+                        .stroke(panelStyle.divider.opacity(0.22), lineWidth: 1)
+                )
+                .padding(.horizontal, 0)
+                .padding(.bottom, 0)
+                .padding(.top, isInfoPanelExpanded ? 22 : 44)
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isInfoPanelExpanded.toggle()
+                    }
+                }
+                .offset(y: panelDragOffset)
+                .gesture(panelDragGesture(totalHeight: geometry.size.height))
             }
-            .padding(.horizontal, OverlayLayout.horizontalPad)
-            .padding(.bottom, OverlayLayout.horizontalPad)
         }
-        .background(Color(.systemGroupedBackground))
     }
 
-    private var currentInformationPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var compactInfoPanel: some View {
+            VStack(alignment: .leading, spacing: 12) {
             let summaryLines = LocationSummaryFormatter.summaryLines(for: locationManager.lastKnownAddress)
 
             if let topLine = summaryLines.first {
                 Text(topLine)
-                    .font(.system(size: scaledFont(28)))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(OverlayLayout.panelTextColor)
+                    .font(.system(size: scaledFont(31), weight: .bold))
+                    .textCase(.none)
+                    .foregroundStyle(panelStyle.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .lineLimit(OverlayLayout.summaryLineLimit)
             } else {
                 Text("Waiting for location")
-                    .font(.system(size: scaledFont(28)))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(OverlayLayout.panelTextColor)
+                    .font(.system(size: scaledFont(31), weight: .bold))
+                    .textCase(.none)
+                    .foregroundStyle(panelStyle.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if summaryLines.indices.contains(1) {
                 let contextLine = summaryLines[1]
                 Text(contextLine)
-                    .font(.system(size: scaledFont(20)))
-                    .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
+                    .font(.system(size: scaledFont(21), weight: .semibold))
+                    .foregroundStyle(panelStyle.secondaryText)
                     .lineLimit(OverlayLayout.hierarchyLineLimit)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let contextLine = LocationSummaryFormatter.contextLine(for: locationManager.lastKnownAddress) {
                 Text(contextLine)
-                    .font(.system(size: scaledFont(20)))
-                    .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
+                    .font(.system(size: scaledFont(21), weight: .semibold))
+                    .foregroundStyle(panelStyle.secondaryText)
                     .lineLimit(OverlayLayout.hierarchyLineLimit)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if !repeatHintDismissed {
                 Label("Tap here to repeat the phrase, or tap again to stop speech", systemImage: "speaker.wave.2")
-                    .font(.system(size: scaledFont(14)))
+                    .font(.system(size: scaledFont(17), weight: .semibold))
                     .fontWeight(.medium)
-                    .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.92))
+                    .foregroundStyle(panelStyle.secondaryText)
                     .padding(.top, 2)
             }
+        }
+        .padding()
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Tap to repeat when finished; tap while speaking to stop.")
+    }
 
-            Divider()
+    private var expandedInfoPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            statusPanel
 
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Location status", systemImage: "location")
-                    .font(.system(size: scaledFont(11)))
-                    .foregroundStyle(Color.white.opacity(0.85))
-                Label(locationManager.locationStatus.riderMessage, systemImage: locationManager.locationStatus.needsSettingsAction ? "location.slash" : "location")
-                    .font(.system(size: scaledFont(13)))
-                    .foregroundStyle(locationManager.locationStatus.needsSettingsAction ? .orange : Color.white.opacity(0.9))
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Last spoken phrase")
-                    .font(.system(size: scaledFont(12)))
-                    .foregroundStyle(Color.white.opacity(0.85))
+                    .font(.system(size: scaledFont(15), weight: .bold))
+                    .foregroundStyle(panelStyle.secondaryText)
                     .textCase(.uppercase)
                 Text(locationManager.lastSpokenPhrase ?? "No spoken phrase yet")
-                    .font(.system(size: scaledFont(17)))
-                    .foregroundStyle(OverlayLayout.panelTextColor)
+                    .font(.system(size: scaledFont(22), weight: .semibold))
+                    .foregroundStyle(panelStyle.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .lineLimit(OverlayLayout.phraseLineLimit)
                 if let timestamp = locationManager.lastSpokenAt {
                     Text(isoDateFormatter.string(from: timestamp))
-                        .font(.system(size: scaledFont(11)))
-                        .foregroundStyle(Color.white.opacity(0.85))
+                        .font(.system(size: scaledFont(14)))
+                        .foregroundStyle(panelStyle.secondaryText)
+                        .padding(.top, 1)
                 }
             }
+
+            if locationManager.testMode {
+                Button {
+                    locationManager.logTestLocation()
+                } label: {
+                    Label("Next test location", systemImage: "arrow.forward.circle")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(panelStyle.accent)
+                .controlSize(.small)
+            }
         }
-        .padding()
-        .background(Color.black.opacity(OverlayLayout.panelBackgroundOpacity))
-        .clipShape(RoundedRectangle(cornerRadius: OverlayLayout.cornerRadius))
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Tap to repeat when finished; tap while speaking to stop.")
+        .padding(.horizontal, 12)
+        .padding(.bottom, 4)
     }
 
     private var statusPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(locationManager.contentMode.label)
-                    .font(.system(size: scaledFont(16)))
+                    .font(.system(size: scaledFont(20), weight: .bold))
                     .fontWeight(.semibold)
-                    .foregroundStyle(OverlayLayout.panelTextColor)
+                    .foregroundStyle(panelStyle.primaryText)
                 Spacer()
                 if locationManager.contentMode == .quiet {
                     Label("Quiet", systemImage: "speaker.slash.fill")
-                        .font(.system(size: scaledFont(12)))
-                        .foregroundStyle(.orange)
+                        .font(.system(size: scaledFont(14)))
+                        .foregroundStyle(panelStyle.warningText)
                 } else {
                     Label("Always running", systemImage: "location.fill")
-                        .font(.system(size: scaledFont(12)))
-                        .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
+                        .font(.system(size: scaledFont(14)))
+                        .foregroundStyle(panelStyle.primaryText)
                 }
             }
+
+            Divider()
+
+            Label("Location status", systemImage: "location")
+                .font(.system(size: scaledFont(15)))
+                .foregroundStyle(panelStyle.secondaryText)
+            Label(locationManager.locationStatus.riderMessage, systemImage: locationManager.locationStatus.needsSettingsAction ? "location.slash" : "location")
+                .font(.system(size: scaledFont(18), weight: .semibold))
+                .foregroundStyle(
+                    locationManager.locationStatus.needsSettingsAction
+                    ? panelStyle.warningText
+                    : panelStyle.primaryText
+                )
+                .padding(.bottom, 2)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.black.opacity(OverlayLayout.panelBackgroundOpacity))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private func scaledFont(_ points: CGFloat) -> CGFloat {
-        max(11, points * CGFloat(mapLabelScale))
+        max(14, points * CGFloat(mapLabelScale))
+    }
+
+    private var handleBar: some View {
+        HStack {
+            Spacer()
+            Capsule()
+                .fill(panelStyle.divider.opacity(isInfoPanelExpanded ? 0.9 : 0.7))
+                .frame(width: 86, height: 8)
+            Spacer()
+        }
+        .padding(.top, 10)
+        .padding(.bottom, 6)
+        .frame(height: OverlayLayout.handleHeight)
+        .contentShape(Capsule())
+    }
+
+    private func panelHeight(for totalHeight: CGFloat) -> CGFloat {
+        let compact = max(188, totalHeight * Self.compactPanelBaseFactor)
+        let expanded = min(totalHeight * Self.expandedPanelBaseFactor, 760)
+        let dragInfluence = max(-150, min(150, panelDragOffset))
+        let height = isInfoPanelExpanded ? expanded : compact
+        return min(expanded, max(compact, height - dragInfluence))
+    }
+
+    private func panelDragGesture(totalHeight: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 6)
+            .onChanged { value in
+                panelDragOffset = max(-120, min(80, value.translation.height))
+            }
+            .onEnded { value in
+                defer {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        panelDragOffset = 0
+                    }
+                }
+
+                let compact = max(188, totalHeight * Self.compactPanelBaseFactor)
+                let expanded = min(totalHeight * Self.expandedPanelBaseFactor, 760)
+                let velocity = value.predictedEndTranslation.height
+                let midpoint = (compact + expanded) / 2
+                let targetHeight = panelHeight(for: totalHeight) - velocity / 10
+                isInfoPanelExpanded = targetHeight > midpoint
+            }
+    }
+
+    private var panelStyle: LocationInfoPanelStyle {
+        LocationInfoPanelStyle(nightMode: nightMode)
+    }
+}
+
+private struct LocationInfoPanelStyle {
+    let background: Color
+    let primaryText: Color
+    let secondaryText: Color
+    let divider: Color
+    let warningText: Color
+    let accent: Color
+
+    init(nightMode: Bool) {
+        background = Color.black.opacity(0.94)
+        divider = Color.white.opacity(0.85)
+        warningText = .orange
+        primaryText = nightMode ? Color(red: 1.0, green: 0.38, blue: 0.30) : .white
+        secondaryText = nightMode ? Color(red: 1.0, green: 0.72, blue: 0.66) : Color(white: 0.94)
+        accent = nightMode ? Color(red: 1.0, green: 0.46, blue: 0.35) : .blue
     }
 }
 
@@ -409,12 +554,16 @@ private struct LocationMapView: View {
     @State private var mapSpanMeters: CLLocationDistance = MapZoom.area
 
     private enum MapZoom {
-        static let area: CLLocationDistance = 6_000
-        static let minimum: CLLocationDistance = 2_000
-        static let maximum: CLLocationDistance = 120_000
+        static let area: CLLocationDistance = 1_200
+        static let minimum: CLLocationDistance = 600
+        static let maximum: CLLocationDistance = 150_000
     }
 
-    private let controlButtonSize: CGFloat = 82
+    private let controlButtonSize: CGFloat = 124
+    private let controlHitArea: CGFloat = 152
+    private let controlButtonSpacing: CGFloat = 14
+    private let controlOffsetTop: CGFloat = 188
+    private let zoomStep: CLLocationDistance = 1.3
 
     private var snapshot: CoordinateSnapshot? {
         coordinate.map(CoordinateSnapshot.init)
@@ -424,10 +573,10 @@ private struct LocationMapView: View {
         Group {
             if let snapshot {
                 ZStack(alignment: .topTrailing) {
-                Map(
-                    position: $cameraPosition,
-                    interactionModes: allowsInteraction ? .all : []
-                ) {
+                    Map(
+                        position: $cameraPosition,
+                        interactionModes: allowsInteraction ? .all : []
+                    ) {
                         Annotation("Current Location", coordinate: snapshot.coordinate) {
                             VStack(spacing: 2) {
                                 Image(systemName: "mappin.circle.fill")
@@ -435,42 +584,43 @@ private struct LocationMapView: View {
                                     .foregroundStyle(.blue)
                                     .shadow(radius: 2)
                                 Text("You")
-                                    .font(.system(size: scaledFont(16), weight: .bold))
+                                    .font(.system(size: scaledFont(20), weight: .bold))
                                     .foregroundStyle(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.black.opacity(0.55))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.black.opacity(0.22))
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onAppear {
-                        centerOnCurrentLocationIfNeeded(snapshot)
+                        centerOnCurrentLocationIfNeeded(snapshot, shouldReset: true)
                     }
                     .onChange(of: snapshot) { _, newValue in
-                        centerOnCurrentLocationIfNeeded(newValue)
+                        centerOnCurrentLocationIfNeeded(newValue, shouldReset: followsLocation)
                     }
-                    .onChange(of: cameraPosition) {
+                    .onChange(of: cameraPosition) { _, newValue in
                         guard !isProgrammaticCameraUpdate else {
                             isProgrammaticCameraUpdate = false
                             return
                         }
+                        guard newValue.camera != nil || newValue.region != nil else { return }
                         followsLocation = false
                     }
 
-                VStack(spacing: 10) {
+                    VStack(spacing: controlButtonSpacing) {
                         mapControlButton(systemName: "plus") {
-                            adjustMapZoom(by: 0.8)
+                            adjustMapZoom(by: 1 / zoomStep)
                         }
 
                         mapControlButton(systemName: "minus") {
-                            adjustMapZoom(by: 1.25)
+                            adjustMapZoom(by: zoomStep)
                         }
 
                         resetMapButton
                     }
-                    .padding(.top, 122)
+                    .padding(.top, controlOffsetTop)
                     .padding(.trailing, 12)
                 }
             } else {
@@ -536,16 +686,13 @@ private struct LocationMapView: View {
         return nil
     }
 
-    private func centerOnCurrentLocationIfNeeded(_ snapshot: CoordinateSnapshot) {
+    private func centerOnCurrentLocationIfNeeded(_ snapshot: CoordinateSnapshot, shouldReset: Bool) {
+        guard shouldReset else { return }
+
         if !hasInitializedCamera {
             hasInitializedCamera = true
-            moveCamera(to: snapshot.coordinate)
-            return
         }
-
-        if followsLocation {
-            moveCamera(to: snapshot.coordinate)
-        }
+        resetMap(to: snapshot.coordinate)
     }
 
     private func resetMap(to center: CLLocationCoordinate2D) {
@@ -578,20 +725,26 @@ private struct LocationMapView: View {
 
     private func mapControlButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: scaledFont(44), weight: .bold))
-                .frame(width: controlButtonSize, height: controlButtonSize)
-                .foregroundStyle(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.95), lineWidth: 1.2)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .inset(by: 3)
-                        .stroke(Color.white.opacity(0.75), lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(red: 0.98, green: 0.98, blue: 0.98), lineWidth: 1.4)
+                    .background(Color.clear)
+                    .frame(width: controlButtonSize, height: controlButtonSize)
+
+                RoundedRectangle(cornerRadius: 12)
+                    .inset(by: 3)
+                    .stroke(Color(red: 0.86, green: 0.86, blue: 0.86), lineWidth: 0.9)
+                    .frame(width: controlButtonSize, height: controlButtonSize)
+
+                Image(systemName: systemName)
+                    .font(.system(size: scaledFont(39), weight: .bold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.white)
+            }
+            .frame(width: controlHitArea, height: controlHitArea, alignment: .center)
+            .contentShape(Rectangle())
+            .accessibilityLabel(systemName == "plus" ? "Zoom in" : "Zoom out")
+            .accessibilityHint("Adjust map zoom")
         }
         .buttonStyle(.plain)
     }
@@ -600,20 +753,25 @@ private struct LocationMapView: View {
     private var resetMapButton: some View {
         if let snapshot {
             Button(action: { resetMap(to: snapshot.coordinate) }) {
-                Image(systemName: "location.north")
-                    .font(.system(size: scaledFont(34), weight: .bold))
-                    .frame(width: controlButtonSize, height: controlButtonSize)
-                    .foregroundStyle(Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.95), lineWidth: 1.2)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .inset(by: 3)
-                            .stroke(Color.white.opacity(0.75), lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(red: 0.98, green: 0.98, blue: 0.98), lineWidth: 1.4)
+                        .background(Color.clear)
+                        .frame(width: controlButtonSize, height: controlButtonSize)
+
+                    RoundedRectangle(cornerRadius: 12)
+                        .inset(by: 3)
+                        .stroke(Color(red: 0.86, green: 0.86, blue: 0.86), lineWidth: 0.9)
+                        .frame(width: controlButtonSize, height: controlButtonSize)
+
+                    Image(systemName: "location.north")
+                        .font(.system(size: scaledFont(34), weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.white)
+                }
+                .frame(width: controlHitArea, height: controlHitArea, alignment: .center)
+                .contentShape(Rectangle())
+                .accessibilityHint("Move map center back to your current location and restore map following.")
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Reset map to current location")
@@ -628,7 +786,7 @@ private struct LocationMapView: View {
     }
 
     private func scaledFont(_ points: CGFloat) -> CGFloat {
-        max(11, points * CGFloat(mapLabelScale))
+        max(15, points * CGFloat(mapLabelScale))
     }
 }
 
@@ -653,6 +811,7 @@ private struct SettingsView: View {
     @State private var lastNonQuietMode: ContentMode = .shortFacts
     private static let lastNonQuietModeKey = "MotoGuideLastNonQuietContentMode"
     @AppStorage("MotoGuideMapLabelScale") private var mapLabelScale = 1.0
+    @AppStorage("MotoGuideNightMode") private var nightMode = false
 #if DEBUG
     @ObservedObject var debugLog: DebugLogStore
     @AppStorage(ProxyDiagnostics.enabledKey) private var proxyDiagnosticsEnabled = false
@@ -664,8 +823,13 @@ private struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Announcements") {
+                    Text("Choose when and how MotoGuide should speak while you ride.")
+                        .font(.body)
+                        .foregroundStyle(palette.secondaryText)
+                        .listRowBackground(palette.rowBackground)
+
                     Toggle(
-                        "Quiet Mode",
+                        "Quiet mode",
                         isOn: Binding(
                             get: { locationManager.contentMode == .quiet },
                             set: { isQuiet in
@@ -686,18 +850,31 @@ private struct SettingsView: View {
                             }
                         )
                     )
+                    .font(.title3)
+                    .toggleStyle(.switch)
+                    .controlSize(.regular)
+                    .listRowBackground(palette.rowBackground)
 
-                    Toggle("Interrupt Music While Speaking", isOn: $locationManager.interruptsMusic)
+                    Toggle("Interrupt music while speaking", isOn: $locationManager.interruptsMusic)
+                        .font(.title3)
+                        .toggleStyle(.switch)
+                        .controlSize(.regular)
+                        .listRowBackground(palette.rowBackground)
 
-                    Text("Default uses bike-safe prioritization: music is ducked so announcements are easier to hear.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Defaults: rider-safe interruption priority. Music is lowered so announcements are clearer.")
+                        .font(.body)
+                        .foregroundStyle(palette.secondaryText)
+                        .padding(.bottom, 2)
+                        .listRowBackground(palette.rowBackground)
 
                     Picker("Announcement Style", selection: $locationManager.contentMode) {
                         ForEach(ContentMode.allCases) { mode in
                             Text(mode.label).tag(mode)
                         }
                     }
+                    .font(.title3)
+                    .tint(palette.accent)
+                    .listRowBackground(palette.rowBackground)
 
                     Picker("Voice", selection: $locationManager.preferredVoiceIdentifier) {
                         ForEach(locationManager.availableSpeechVoices()) { voice in
@@ -705,91 +882,177 @@ private struct SettingsView: View {
                         }
                     }
                     .disabled(locationManager.speechProvider != .apple)
+                    .font(.title3)
+                    .tint(palette.accent)
+                    .listRowBackground(palette.rowBackground)
 
                     Picker("Speech provider", selection: $locationManager.speechProvider) {
                         ForEach(SpeechProvider.allCases) { provider in
                             Text(provider.label).tag(provider)
                         }
                     }
+                    .font(.title3)
+                    .tint(palette.accent)
+                    .listRowBackground(palette.rowBackground)
 
                     if let recommendation = locationManager.recommendedSpeechVoice() {
                         Text("Recommended: \(recommendation.displayName) \(recommendation.localeIdentifier)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.body)
+                            .foregroundStyle(palette.secondaryText)
+                            .padding(.vertical, 2)
+                            .listRowBackground(palette.rowBackground)
                     }
 
                     Button("Preview voice") {
                         locationManager.previewSelectedVoice()
                     }
                     .buttonStyle(.bordered)
+                    .tint(palette.accent)
+                    .listRowBackground(palette.rowBackground)
 
                     if let phrase = locationManager.lastSpokenPhrase {
                         Text("Current voice phrase: \(phrase)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.body)
+                            .foregroundStyle(palette.secondaryText)
+                            .listRowBackground(palette.rowBackground)
                     }
                 }
 
                 Section("When to announce") {
-                    Text("Set when a new boundary should trigger speech.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Control what changes trigger announcements.")
+                        .font(.body)
+                        .foregroundStyle(palette.secondaryText)
+                        .listRowBackground(palette.rowBackground)
 
-                    SectionToggleRows(locationManager: locationManager)
+                    SectionToggleRows(locationManager: locationManager, palette: palette)
+
+                    Text("Set the minimum delay after one boundary announcement before MotoGuide can announce again.")
+                        .font(.body)
+                        .foregroundStyle(palette.secondaryText)
+                        .listRowBackground(palette.rowBackground)
+
+                    Text(
+                        boundarySpeechSummary(seconds: locationManager.boundarySpeechCooldownSeconds)
+                    )
+                    .font(.body)
+                    .foregroundStyle(palette.secondaryText)
+                    .listRowBackground(palette.rowBackground)
+
+                    HStack {
+                        Text("Boundary trigger delay")
+                            .font(.title3)
+                        Spacer()
+                        Text("\(locationManager.boundarySpeechCooldownSeconds) sec")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(palette.primaryText)
+                    }
+                    Slider(
+                        value: Binding(
+                            get: { Double(locationManager.boundarySpeechCooldownSeconds) },
+                            set: { locationManager.boundarySpeechCooldownSeconds = Int($0) }
+                        ),
+                        in: 0...60,
+                        step: 1
+                    )
+                    .tint(palette.accent)
+                    .listRowBackground(palette.rowBackground)
                 }
 
-                Section("Rider Context") {
+                Section("Local Riding Hints") {
+                    Text("Help MotoGuide stay relevant and avoid repeating what you already know.")
+                        .font(.body)
+                        .foregroundStyle(palette.secondaryText)
+                        .listRowBackground(palette.rowBackground)
+
                     TextField(
-                        "Home country (optional)",
+                        "Home country",
                         text: $locationManager.homeCountry,
                         prompt: Text("e.g., United Kingdom")
                     )
+                    .font(.title3)
+                    .textFieldStyle(.roundedBorder)
+                    .listRowBackground(palette.rowBackground)
                     TextField(
-                        "Home region (optional)",
+                        "Home region",
                         text: $locationManager.homeRegion,
                         prompt: Text("e.g., Cornwall")
                     )
+                    .font(.title3)
+                    .textFieldStyle(.roundedBorder)
+                    .listRowBackground(palette.rowBackground)
                     TextField(
                         "Places you already know",
                         text: $locationManager.familiarRegions,
                         prompt: Text("e.g., Somerset, Devon, London")
                     )
-                        .textInputAutocapitalization(.words)
+                    .textContentType(.none)
+                    .textInputAutocapitalization(.words)
+                    .font(.title3)
+                    .textFieldStyle(.roundedBorder)
+                    .listRowBackground(palette.rowBackground)
 
-                    Text("Use these once and MotoGuide will tailor facts to your familiarity.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    FactInterestCategoryPicker(selectedCategories: $locationManager.factInterestCategories)
+                    Text("Use these values to prioritise useful local context.")
+                        .font(.body)
+                        .foregroundStyle(palette.secondaryText)
+                        .listRowBackground(palette.rowBackground)
+                    FactInterestCategoryPicker(selectedCategories: $locationManager.factInterestCategories, palette: palette)
                 }
 
                 Section("Advanced") {
+                    Toggle("Night mode", isOn: $nightMode)
+                        .font(.title3)
+                        .toggleStyle(.switch)
+                        .controlSize(.regular)
+                        .listRowBackground(palette.rowBackground)
+
+                    Text("Location check frequency")
+                        .font(.title2)
+                        .bold()
+                        .foregroundStyle(palette.primaryText)
+                        .listRowBackground(palette.rowBackground)
+
                     Picker("Location check frequency", selection: $locationManager.locationCheckInterval) {
                         ForEach(intervals, id: \.self) { interval in
                             Text("\(interval) seconds").tag(interval)
                         }
                     }
+                    .font(.title3)
+                    .tint(palette.accent)
+                    .listRowBackground(palette.rowBackground)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Map label scale: \(mapLabelScale, specifier: "%.1f")x")
-                            .font(.headline)
+                            .font(.title2)
+                            .bold()
+                            .foregroundStyle(palette.primaryText)
                         Slider(value: $mapLabelScale, in: 0.8...1.8, step: 0.1)
-                        Text("Larger values make on-map labels and overlay text easier to read while riding.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text("Larger values make map and overlay text easier to read while riding.")
+                            .font(.body)
+                            .foregroundStyle(palette.secondaryText)
+                        .listRowBackground(palette.rowBackground)
                     }
+                    .listRowBackground(palette.rowBackground)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Bluetooth Audio Delay: \(locationManager.bluetoothDelaySeconds, specifier: "%.1f")s")
+                        Text("Bluetooth audio delay: \(locationManager.bluetoothDelaySeconds, specifier: "%.1f")s")
+                            .font(.title2)
+                            .bold()
+                            .foregroundStyle(palette.primaryText)
                         Slider(
                             value: $locationManager.bluetoothDelaySeconds,
                             in: 0...3,
                             step: 0.1
                         )
+                        .padding(.bottom, 2)
                     }
+                    .listRowBackground(palette.rowBackground)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Custom fact focus (advanced)")
-                            .font(.headline)
+                        Text("Custom fact focus")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(palette.primaryText)
 
                         TextField(
                             "Custom preference note",
@@ -798,19 +1061,29 @@ private struct SettingsView: View {
                         )
                         .textInputAutocapitalization(.sentences)
                         .autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+                        .font(.title3)
+                        .listRowBackground(palette.rowBackground)
 
-                        Text("Optional free-form preference for all fact themes.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text("Optional: add one short note to change fact focus across all themes.")
+                            .font(.body)
+                            .foregroundStyle(palette.secondaryText)
+                            .listRowBackground(palette.rowBackground)
                     }
+                    .listRowBackground(palette.rowBackground)
 
                     DisclosureGroup("Developer") {
                         Toggle("Test Mode", isOn: $locationManager.testMode)
+                            .font(.title3)
+                            .toggleStyle(.switch)
                         Toggle("Speak After Every Geocode", isOn: $locationManager.speakAfterEveryGeocode)
+                            .font(.title3)
+                            .toggleStyle(.switch)
 
 #if DEBUG
                         DisclosureGroup("Proxy Diagnostics") {
                             Toggle("Enabled", isOn: $proxyDiagnosticsEnabled)
+                                .toggleStyle(.switch)
                                 .onChange(of: proxyDiagnosticsEnabled) { _, isEnabled in
                                     if !isEnabled {
                                         debugLog.clear()
@@ -830,6 +1103,12 @@ private struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(palette.pageBackground)
+            .foregroundStyle(palette.primaryText)
+            .tint(palette.accent)
+            .listSectionSpacing(14)
             .onAppear {
                 if let savedMode = UserDefaults.standard.string(forKey: Self.lastNonQuietModeKey),
                    let savedContentMode = ContentMode(rawValue: savedMode) {
@@ -852,28 +1131,86 @@ private struct SettingsView: View {
             }
         }
     }
+
+    private var palette: SettingsPalette {
+        SettingsPalette(nightMode: nightMode)
+    }
+
+    private func boundarySpeechSummary(seconds: Int) -> String {
+        if seconds == 0 {
+            "Announcements speak on every boundary change."
+        } else {
+            "Minimum gap: \(seconds) second\(seconds == 1 ? "" : "s") between boundary announcements."
+        }
+    }
+}
+
+private struct SettingsPalette {
+    let pageBackground: Color
+    let sectionBackground: Color
+    let rowBackground: Color
+    let primaryText: Color
+    let secondaryText: Color
+    let accent: Color
+
+    init(nightMode: Bool) {
+        let nightPrimary = Color(red: 1.0, green: 0.30, blue: 0.18)
+        pageBackground = Color.black
+        sectionBackground = Color(red: 0.07, green: 0.07, blue: 0.07)
+        rowBackground = nightMode ? Color(red: 0.10, green: 0.10, blue: 0.10) : Color(red: 0.16, green: 0.16, blue: 0.16)
+        primaryText = nightMode ? nightPrimary : Color(red: 0.97, green: 0.97, blue: 0.97)
+        secondaryText = nightMode ? Color(red: 1.0, green: 0.72, blue: 0.63) : Color(red: 0.84, green: 0.84, blue: 0.84)
+        accent = nightMode ? Color(red: 1.0, green: 0.45, blue: 0.35) : Color(red: 0.00, green: 0.48, blue: 1.00)
+    }
 }
 
 private struct SectionToggleRows: View {
     @ObservedObject var locationManager: LocationManager
+    let palette: SettingsPalette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle("Street (new road)", isOn: $locationManager.announceStreet)
-            Toggle("Town (new town)", isOn: $locationManager.announceTown)
-            Toggle("County (new county)", isOn: $locationManager.announceCounty)
-            Toggle("Region (new region)", isOn: $locationManager.announceNation)
-            Toggle("Country (new country)", isOn: $locationManager.announceCountry)
+        VStack(alignment: .leading, spacing: 14) {
+            SectionToggle(title: "Street", isOn: $locationManager.announceStreet, palette: palette)
+            SectionToggle(title: "Town", isOn: $locationManager.announceTown, palette: palette)
+            SectionToggle(title: "County", isOn: $locationManager.announceCounty, palette: palette)
+            SectionToggle(title: "Region", isOn: $locationManager.announceNation, palette: palette)
+            SectionToggle(title: "Country", isOn: $locationManager.announceCountry, palette: palette)
         }
+        .font(.title3)
+        .foregroundStyle(palette.primaryText)
+        .tint(palette.accent)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .padding(.vertical, 2)
+    }
+}
+
+private struct SectionToggle: View {
+    let title: String
+    @Binding var isOn: Bool
+    let palette: SettingsPalette
+
+    var body: some View {
+        Toggle(title, isOn: $isOn)
+            .padding(.vertical, 14)
+            .toggleStyle(.switch)
+            .tint(palette.accent)
+            .font(.title3)
+            .contentShape(Rectangle())
+            .foregroundStyle(palette.primaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 56)
+            .listRowBackground(palette.rowBackground)
     }
 }
 
 private struct FactInterestCategoryPicker: View {
     @Binding var selectedCategories: [FactInterestCategory]
+    let palette: SettingsPalette
 
     var body: some View {
         ForEach(FactInterestCategory.allCases) { category in
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 6) {
                 Toggle(
                     category.label,
                     isOn: Binding(
@@ -890,11 +1227,25 @@ private struct FactInterestCategoryPicker: View {
                         }
                     )
                 )
+                .font(.body)
+                .foregroundStyle(palette.primaryText)
+                .toggleStyle(.switch)
+                .tint(palette.accent)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .padding(.vertical, 14)
+                .padding(.trailing, 4)
+                .listRowBackground(palette.rowBackground)
+
                 Text(category.prompt)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 32)
+                    .font(.body)
+                    .foregroundStyle(palette.secondaryText)
+                    .padding(.leading, 44)
+                    .padding(.bottom, 4)
+                    .padding(.trailing, 6)
+                    .lineLimit(3)
             }
+            .listRowBackground(palette.rowBackground)
         }
     }
 }
