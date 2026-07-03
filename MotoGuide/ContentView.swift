@@ -285,7 +285,7 @@ private struct LocationScreenView: View {
     @State private var isInfoPanelExpanded = false
     @State private var panelDragOffset: CGFloat = 0
     private static let compactPanelBaseFactor: CGFloat = 0.24
-    private static let expandedPanelBaseFactor: CGFloat = 0.86
+    private static let expandedPanelBaseFactor: CGFloat = 0.56
 
     private enum OverlayLayout {
         static let verticalPad: CGFloat = 8
@@ -508,7 +508,7 @@ private struct LocationScreenView: View {
 
     private func panelHeight(for totalHeight: CGFloat) -> CGFloat {
         let compact = max(188, totalHeight * Self.compactPanelBaseFactor)
-        let expanded = min(totalHeight * Self.expandedPanelBaseFactor, 760)
+        let expanded = min(totalHeight * Self.expandedPanelBaseFactor, 600)
         let dragInfluence = max(-150, min(150, panelDragOffset))
         let height = isInfoPanelExpanded ? expanded : compact
         return min(expanded, max(compact, height - dragInfluence))
@@ -517,16 +517,16 @@ private struct LocationScreenView: View {
     private func panelDragGesture(totalHeight: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { value in
-                panelDragOffset = max(-120, min(80, value.translation.height))
+                panelDragOffset = max(-110, min(80, value.translation.height))
             }
             .onEnded { value in
                 let translation = value.translation.height
                 let predicted = value.predictedEndTranslation.height
                 withAnimation(.easeInOut(duration: 0.2)) {
                     panelDragOffset = 0
-                    if translation < -36 || predicted < -96 {
+                    if translation < -28 || predicted < -78 {
                         isInfoPanelExpanded = true
-                    } else if translation > 36 || predicted > 96 {
+                    } else if translation > 28 || predicted > 78 {
                         isInfoPanelExpanded = false
                     }
                 }
@@ -1585,11 +1585,7 @@ private enum AppBuildMetadata {
     }
 
     static func shouldShow(testMode: Bool) -> Bool {
-#if DEBUG
-        return true
-#else
         return testMode
-#endif
     }
 
     private static func formattedBuildTimestamp(_ buildNumber: String) -> String? {

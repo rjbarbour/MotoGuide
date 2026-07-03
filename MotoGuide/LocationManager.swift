@@ -94,6 +94,7 @@ private enum LocationManagerDefaults {
     static let customFactInstructionsKey = "MotoGuideCustomFactInstructions"
     static let factInterestCategoriesKey = "MotoGuideFactInterestCategories"
     static let boundarySpeechCooldownSecondsKey = "MotoGuideBoundarySpeechCooldownSeconds"
+    static let testModeKey = "MotoGuideTestMode"
 }
 
 enum SpeechProvider: String, CaseIterable, Identifiable {
@@ -266,7 +267,17 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var announceCountry: Bool = true
     @Published var contentMode: ContentMode = .shortFacts
     @Published var bluetoothDelaySeconds: Double = 0.5
-    @Published var testMode: Bool = false
+    @Published var testMode: Bool = {
+        let key = LocationManagerDefaults.testModeKey
+        if UserDefaults.standard.object(forKey: key) == nil {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: key)
+    }() {
+        didSet {
+            UserDefaults.standard.set(testMode, forKey: LocationManagerDefaults.testModeKey)
+        }
+    }
     @Published var interruptsMusic: Bool = {
         guard UserDefaults.standard.object(forKey: LocationManagerDefaults.interruptsMusicKey) != nil else {
             return true
