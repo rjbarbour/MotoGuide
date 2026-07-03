@@ -46,6 +46,7 @@ This plan defines polish appropriate for a **first-time user** preparing for fie
 | **Map panel and panning regressions** | The bottom sheet does not reach the bottom edge, can get stuck expanded, and map panning can be disabled by ride-state gating | Use a Google Maps-style bottom sheet fixed to the bottom edge, support swipe up and down, and keep map panning available until the rider explicitly taps reset to recenter |
 | **Map control sizing** | Plus, minus, and reset controls are now oversized after increasing hit areas | Keep them glove-friendly but reduce visual size to roughly three quarters of the current size, with full-button hit targets and no overlap |
 | **Settings readability and hit targets** | Settings still uses compact rows, placeholder-only context fields, low-contrast secondary text, and toggle controls where the effective target can feel like the switch | Settings must be readable outdoors on a motorbike: high contrast, larger type, clear labels, full-width tappable rows, and enough vertical spacing for gloved use |
+| **Speech provider routing drift** | Premium Voice / ElevenLabs can be used for some announcements, then Apple speech is heard for England/Wales-style boundary announcements | Speech provider selection must exist in one routing path. Roads, towns, regions, countries, repeat speech, and generated facts must all use the selected provider, with Apple fallback only after a provider failure |
 | **Announcement style unclear** | "Natural" is still undefined in the UI | Rider may not understand the difference from Names Only / Short Facts |
 | **Bluetooth delay exposed** | 0-3 s slider is visible in Advanced | Most riders should not need to tune this before a field ride |
 
@@ -141,6 +142,8 @@ Not App Store polish. Minimum:
 - Keep ElevenLabs API key, voice id, model id, and output format server-side.
 - Add a small speech provider setting and keep the preview path.
 - Keep the selected provider, voice fallback, rate, pitch, and volume stable across launches.
+- Centralise speech-provider routing so natural/names-only boundary announcements, proxy facts, repeat speech, test-route speech, and region/country announcements do not use separate Apple-only paths.
+- Apple voice fallback is allowed only when the selected Premium Voice path fails or is unavailable; it must not be selected implicitly by boundary type.
 - Test through the Nex Xcom headset; phone-speaker quality is not enough.
 
 ### 2.8 Error and permission-denied handling — **Must**
@@ -348,6 +351,7 @@ Rationale:
 | 16 | Map-first Location layout with compact overlay and doubled default map area | M6 |
 | 17 | Settings readability pass: high contrast, larger text, full-width hit targets, explicit rider-context labels | M6.5 |
 | 18 | Location screen regression pass: visible version/timestamp, anchored bottom sheet, reversible sheet drag, smaller map controls, and always-available map panning | M6 |
+| 19 | Speech provider routing refactor: one selected-provider path for all announcements, including England/Wales region/country speech | M5.5 |
 
 ### 5.3 Done criteria
 
@@ -364,6 +368,9 @@ Rationale:
 - [ ] Plus, minus, and reset controls are reduced to roughly three quarters of the previous visual size while preserving a usable hit area.
 - [ ] Settings strings use consistent rider language and explicit labels for context inputs.
 - [ ] Settings rows remain readable under glare/vibration assumptions: strong contrast, large type, full-width hit targets, and no placeholder-only labels.
+- [ ] Premium Voice selection routes every announcement through the proxy speech provider unless that provider fails.
+- [ ] Region/country announcements such as England/Wales use the same speech provider path as road/town announcements.
+- [ ] A regression test proves provider routing does not vary by boundary type or announcement source.
 - [ ] No rider-visible use of "geocode" or "Nation" without explanation.
 - [ ] Default interval is 10 s; street off; Short Facts mode selected.
 - [ ] Location screen is default with quiet banner when applicable.

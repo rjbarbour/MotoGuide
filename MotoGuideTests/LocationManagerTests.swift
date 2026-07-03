@@ -1,6 +1,29 @@
 import XCTest
 import CoreLocation
+import AVFoundation
 @testable import MotoGuide
+
+@MainActor
+private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
+    struct Request: Equatable {
+        let text: String
+        let provider: SpeechProvider
+        let boundary: BoundaryType?
+    }
+
+    var isSpeaking = false
+    var onFinish: (() -> Void)?
+    var onCancel: (() -> Void)?
+    private(set) var requests: [Request] = []
+
+    func speak(text: String, boundary: BoundaryType?, provider: SpeechProvider, appleVoice: AVSpeechSynthesisVoice?) {
+        requests.append(Request(text: text, provider: provider, boundary: boundary))
+    }
+
+    func stop() {
+        isSpeaking = false
+    }
+}
 
 final class LocationManagerTests: XCTestCase {
     @MainActor
@@ -9,6 +32,7 @@ final class LocationManagerTests: XCTestCase {
 
         XCTAssertFalse(locationManager.testMode)
         XCTAssertEqual(locationManager.contentMode, .shortFacts)
+        XCTAssertEqual(locationManager.speechProvider, .proxyElevenLabs)
         XCTAssertTrue(locationManager.interruptsMusic)
     }
 
@@ -43,7 +67,7 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testMovingLocationLocksMapInteraction() {
+    func testMovingLocationStillAllowsMapInteraction() {
         let locationManager = LocationManager()
         locationManager.testMode = false
 
@@ -58,7 +82,7 @@ final class LocationManagerTests: XCTestCase {
         )
         locationManager.locationManager(CLLocationManager(), didUpdateLocations: [movingLocation])
 
-        XCTAssertFalse(locationManager.allowsMapInteraction)
+        XCTAssertTrue(locationManager.allowsMapInteraction)
     }
 
     @MainActor
@@ -107,5 +131,19 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(rows.map(\.label), ["Street", "Town", "County", "Region", "Country"])
         XCTAssertEqual(rows.map(\.value), ["B4066", "Nailsworth", "Gloucestershire", "England", "United Kingdom"])
         XCTAssertEqual(rows.first?.isCurrent, true)
+    }
+
+    @MainActor
+    func testPremiumVoiceRoutesEveryBoundaryThroughSelectedSpeechProvider() {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(speechOutput: speechOutput)
+        locationManager.speechProvider = .proxyElevenLabs
+
+        for boundary in BoundaryType.allCases {
+            locationManager.speakForTesting(text: "Boundary test for \(boundary.factLabel)", boundary: boundary)
+        }
+
+        XCTAssertEqual(speechOutput.requests.map(\.provider), Array(repeating: .proxyElevenLabs, count: BoundaryType.allCases.count))
+        XCTAssertEqual(speechOutput.requests.map(\.boundary), BoundaryType.allCases)
     }
 }

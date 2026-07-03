@@ -93,6 +93,7 @@ private enum LocationManagerDefaults {
     static let familiarRegionsKey = "MotoGuideFamiliarRegions"
     static let customFactInstructionsKey = "MotoGuideCustomFactInstructions"
     static let factInterestCategoriesKey = "MotoGuideFactInterestCategories"
+    static let boundarySpeechCooldownSecondsKey = "MotoGuideBoundarySpeechCooldownSeconds"
 }
 
 enum SpeechProvider: String, CaseIterable, Identifiable {
@@ -103,25 +104,134 @@ enum SpeechProvider: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .apple: return "Apple voices (recommended)"
+        case .apple: return "Apple voices"
         case .proxyElevenLabs: return "Premium voice (ElevenLabs)"
         }
     }
 }
 
 @MainActor
-class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate, AVAudioPlayerDelegate {
+protocol SpeechOutputEngine: AnyObject {
+    var isSpeaking: Bool { get }
+    var onFinish: (() -> Void)? { get set }
+    var onCancel: (() -> Void)? { get set }
+
+    func speak(text: String, boundary: BoundaryType?, provider: SpeechProvider, appleVoice: AVSpeechSynthesisVoice?)
+    func stop()
+}
+
+@MainActor
+final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
+    private let speechSynthesizer = AVSpeechSynthesizer()
+    private let proxySpeechGenerator: ProxySpeechGenerator
+    private var proxyAudioPlayer: AVAudioPlayer?
+    private var playbackToken = UUID()
+
+    var onFinish: (() -> Void)?
+    var onCancel: (() -> Void)?
+
+    var isSpeaking: Bool {
+        speechSynthesizer.isSpeaking || proxyAudioPlayer?.isPlaying == true
+    }
+
+    init(proxySpeechGenerator: ProxySpeechGenerator = ProxySpeechGenerator()) {
+        self.proxySpeechGenerator = proxySpeechGenerator
+        super.init()
+        speechSynthesizer.delegate = self
+    }
+
+    func speak(text: String, boundary: BoundaryType?, provider: SpeechProvider, appleVoice: AVSpeechSynthesisVoice?) {
+        switch provider {
+        case .proxyElevenLabs:
+            speakWithProxy(text: text, boundary: boundary, appleVoice: appleVoice)
+        case .apple:
+            speakWithApple(text: text, boundary: boundary, appleVoice: appleVoice)
+        }
+    }
+
+    func stop() {
+        playbackToken = UUID()
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        if proxyAudioPlayer?.isPlaying == true {
+            proxyAudioPlayer?.stop()
+        }
+    }
+
+    private func speakWithProxy(text: String, boundary: BoundaryType?, appleVoice: AVSpeechSynthesisVoice?) {
+        proxyAudioPlayer?.stop()
+        let token = UUID()
+        playbackToken = token
+        ProxyDiagnostics.log("Speech", "Routing \(boundary?.factLabel ?? "unknown") speech through Premium Voice, textLength=\(text.count).")
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let audioData = try await proxySpeechGenerator.speechAudio(for: text)
+                await MainActor.run {
+                    guard self.playbackToken == token else { return }
+                    do {
+                        let player = try AVAudioPlayer(data: audioData)
+                        self.proxyAudioPlayer = player
+                        player.delegate = self
+                        player.prepareToPlay()
+                        player.play()
+                    } catch {
+                        ProxyDiagnostics.log("Speech", "Could not play proxy TTS audio: \(error.localizedDescription). Falling back to Apple speech.")
+                        self.speakWithApple(text: text, boundary: boundary, appleVoice: appleVoice)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    ProxyDiagnostics.log("Speech", "Proxy TTS failed: \(error.localizedDescription). Falling back to Apple speech.")
+                    self.speakWithApple(text: text, boundary: boundary, appleVoice: appleVoice)
+                }
+            }
+        }
+    }
+
+    private func speakWithApple(text: String, boundary: BoundaryType?, appleVoice: AVSpeechSynthesisVoice?) {
+        guard let appleVoice else {
+            ProxyDiagnostics.log("Speech", "No usable Apple voice for fallback.")
+            return
+        }
+
+        ProxyDiagnostics.log("Speech", "Routing \(boundary?.factLabel ?? "unknown") speech through Apple voice \(appleVoice.identifier).")
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = appleVoice
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        speechSynthesizer.speak(utterance)
+    }
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in
+            onFinish?()
+        }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            onFinish?()
+        }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            onCancel?()
+        }
+    }
+}
+
+@MainActor
+class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate {
     static let movingMapInteractionThresholdMetersPerSecond = 8.0 / 3.6
 
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
-    private let speechSynthesizer = AVSpeechSynthesizer()
-    private let speechDelegate = SpeechSynthesizerDelegateBridge()
-    private let proxySpeechGenerator = ProxySpeechGenerator()
-    private var proxyAudioPlayer: AVAudioPlayer?
-    private var speechPlaybackToken = UUID()
+    private let speechOutput: SpeechOutputEngine
     private var previousAddress: Address?
     private var lastUpdateTime: Date?
+    private var lastBoundaryAnnouncementTime: Date?
     private var testIndex = 0
     private var announcementQueue = AnnouncementQueue()
     private var delayWorkItem: DispatchWorkItem?
@@ -139,6 +249,16 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var lastKnownAddress: Address?
     @Published var speakAfterEveryGeocode: Bool = false
     @Published var locationCheckInterval: Int = 10
+    @Published var boundarySpeechCooldownSeconds: Int = UserDefaults.standard.object(
+        forKey: LocationManagerDefaults.boundarySpeechCooldownSecondsKey
+    ) as? Int ?? 10 {
+        didSet {
+            UserDefaults.standard.set(
+                boundarySpeechCooldownSeconds,
+                forKey: LocationManagerDefaults.boundarySpeechCooldownSecondsKey
+            )
+        }
+    }
     @Published var announceStreet: Bool = false
     @Published var announceTown: Bool = true
     @Published var announceCounty: Bool = true
@@ -168,7 +288,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     @Published var speechProvider: SpeechProvider = SpeechProvider(
         rawValue: UserDefaults.standard.string(forKey: LocationManagerDefaults.speechProviderKey) ?? ""
-    ) ?? .apple {
+    ) ?? .proxyElevenLabs {
         didSet {
             UserDefaults.standard.set(speechProvider.rawValue, forKey: LocationManagerDefaults.speechProviderKey)
         }
@@ -222,7 +342,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private var isSpeechOutputActive: Bool {
-        speechSynthesizer.isSpeaking || proxyAudioPlayer?.isPlaying == true
+        speechOutput.isSpeaking
     }
 
     private var shouldYieldToPrimaryAudio: Bool {
@@ -232,22 +352,21 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     var onAddressChange: ((Address) -> Void)?
     var onRideLog: ((CLLocationCoordinate2D, Address, String?) -> Void)?
 
-    init(factGenerator: PlaceFactGenerating? = nil) {
+    init(
+        factGenerator: PlaceFactGenerating? = nil,
+        speechOutput: SpeechOutputEngine? = nil
+    ) {
         self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
+        self.speechOutput = speechOutput ?? DefaultSpeechOutputEngine()
         super.init()
-        speechDelegate.onFinish = { [weak self] in
-            Task { @MainActor in
-                self?.activeSpeechPlan = nil
-                self?.currentlySpeakingBoundary = nil
-            }
+        self.speechOutput.onFinish = { [weak self] in
+            self?.activeSpeechPlan = nil
+            self?.currentlySpeakingBoundary = nil
         }
-        speechDelegate.onCancel = { [weak self] in
-            Task { @MainActor in
-                self?.activeSpeechPlan = nil
-                self?.currentlySpeakingBoundary = nil
-            }
+        self.speechOutput.onCancel = { [weak self] in
+            self?.activeSpeechPlan = nil
+            self?.currentlySpeakingBoundary = nil
         }
-        speechSynthesizer.delegate = speechDelegate
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.pausesLocationUpdatesAutomatically = false
@@ -480,18 +599,38 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             return
         }
 
+        if shouldSuppressBoundarySpeech() {
+            if previousAddress != address {
+                previousAddress = address
+            }
+            if testMode {
+                recordTestLog(utteredPhrase: nil)
+            }
+            print("Boundary announcement suppressed due cooldown.")
+            return
+        }
+
         previousAddress = address
         if !testMode {
             onAddressChange?(address)
         }
 
         if let factMode = contentMode.factMode {
+            lastBoundaryAnnouncementTime = Date()
             fetchFactAndEnqueue(plan: plan, address: address, mode: factMode)
         } else if contentMode != .quiet {
+            lastBoundaryAnnouncementTime = Date()
             enqueueAnnouncement(plan)
         } else if testMode {
             recordTestLog(utteredPhrase: nil)
         }
+    }
+
+    private func shouldSuppressBoundarySpeech() -> Bool {
+        guard boundarySpeechCooldownSeconds > 0 else { return false }
+        guard let lastBoundaryAnnouncementTime else { return false }
+
+        return Date().timeIntervalSince(lastBoundaryAnnouncementTime) < TimeInterval(boundarySpeechCooldownSeconds)
     }
 
     private func recordTestLog(utteredPhrase: String?) {
@@ -541,6 +680,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
 
         previousAddress = address
+        lastBoundaryAnnouncementTime = Date()
         let plan = AnnouncementPlan(text: speechText, boundary: .town)
         enqueueAnnouncement(plan)
     }
@@ -797,71 +937,20 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             recordTestLog(utteredPhrase: text)
         }
 
-        if speechProvider == .proxyElevenLabs {
-            speakWithProxy(text: text, boundary: boundary)
-            return
-        }
-
-        speakWithApple(text: text, boundary: boundary)
-    }
-
-    private func speakWithApple(text: String, boundary: BoundaryType?) {
-        guard AVSpeechSynthesisVoice.speechVoices().count > 0 else {
-            print("No available voices.")
-            return
-        }
-        guard let preferredVoice = resolveSpeechVoice() else {
-            print("No usable voices.")
-            return
-        }
-
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = preferredVoice
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        speechSynthesizer.speak(utterance)
-    }
-
-    private func speakWithProxy(text: String, boundary: BoundaryType?) {
-        proxyAudioPlayer?.stop()
-        let playbackToken = UUID()
-        speechPlaybackToken = playbackToken
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let audioData = try await proxySpeechGenerator.speechAudio(for: text)
-                await MainActor.run {
-                    guard self.speechPlaybackToken == playbackToken else { return }
-                    do {
-                        let player = try AVAudioPlayer(data: audioData)
-                        self.proxyAudioPlayer = player
-                        player.delegate = self
-                        player.prepareToPlay()
-                        player.play()
-                    } catch {
-                        ProxyDiagnostics.log("Speech", "Could not play proxy TTS audio: \(error.localizedDescription). Falling back to Apple speech.")
-                        self.speakWithApple(text: text, boundary: boundary)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    ProxyDiagnostics.log("Speech", "Proxy TTS failed: \(error.localizedDescription). Falling back to Apple speech.")
-                    self.speakWithApple(text: text, boundary: boundary)
-                }
-            }
-        }
+        speechOutput.speak(text: text, boundary: boundary, provider: speechProvider, appleVoice: resolveSpeechVoice())
     }
 
     private func stopSpeechOutput() {
-        speechPlaybackToken = UUID()
-        if speechSynthesizer.isSpeaking {
-            speechSynthesizer.stopSpeaking(at: .immediate)
-        }
-        if proxyAudioPlayer?.isPlaying == true {
-            proxyAudioPlayer?.stop()
-        }
+        speechOutput.stop()
         activeSpeechPlan = nil
         currentlySpeakingBoundary = nil
     }
+
+#if DEBUG
+    func speakForTesting(text: String, boundary: BoundaryType) {
+        speak(text: text, boundary: boundary, shouldRecordTestLog: false, ignoreQuietMode: true)
+    }
+#endif
 
     private func resolveSpeechVoice() -> AVSpeechSynthesisVoice? {
         let voices = AVSpeechSynthesisVoice.speechVoices()
@@ -922,13 +1011,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
     }
 
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in
-            activeSpeechPlan = nil
-            currentlySpeakingBoundary = nil
-        }
-    }
-
     func logTestLocation() {
         let waypoint = TestRouteFixture.waypoint(at: testIndex)
         testIndex = (testIndex + 1) % TestRouteFixture.waypoints.count
@@ -966,18 +1048,5 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 self.processResolvedAddress(address)
             }
         }
-    }
-}
-
-private final class SpeechSynthesizerDelegateBridge: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
-    var onFinish: (@Sendable () -> Void)?
-    var onCancel: (@Sendable () -> Void)?
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        onFinish?()
-    }
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        onCancel?()
     }
 }
