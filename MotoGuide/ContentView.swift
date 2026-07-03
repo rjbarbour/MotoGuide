@@ -20,6 +20,17 @@ struct LocationHierarchyRow: Equatable, Identifiable {
 }
 
 enum LocationSummaryFormatter {
+    static func summaryLines(for address: Address?) -> [String] {
+        guard let address else { return [] }
+        let firstRow = dedupe([valid(address.street), valid(address.town)]).joined(separator: ", ")
+        let secondRow = dedupe([valid(address.county), valid(address.administrativeArea), valid(address.country)]).joined(separator: " · ")
+
+        return [
+            firstRow.isEmpty ? nil : firstRow,
+            secondRow.isEmpty ? nil : secondRow
+        ].compactMap { $0 }
+    }
+
     static func summary(for address: Address?) -> String {
         guard let address else { return "Waiting for location" }
         let parts = [
@@ -73,6 +84,17 @@ enum LocationSummaryFormatter {
 
     private static func valid(_ value: String) -> String? {
         Address.isValidPlaceName(value) ? value : nil
+    }
+
+    private static func dedupe(_ values: [String?]) -> [String] {
+        var valuesSeen: [String] = []
+        for value in values.compactMap({ $0 }) {
+            let normalized = value.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            if !valuesSeen.contains(where: { $0.lowercased() == normalized }) {
+                valuesSeen.append(value)
+            }
+        }
+        return valuesSeen
     }
 }
 
@@ -266,16 +288,33 @@ private struct LocationScreenView: View {
 
     private var currentInformationPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(LocationSummaryFormatter.summary(for: locationManager.lastKnownAddress))
-                .font(.system(size: scaledFont(24)))
-                .fontWeight(.semibold)
-                .foregroundStyle(OverlayLayout.panelTextColor)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineLimit(OverlayLayout.summaryLineLimit)
+            let summaryLines = LocationSummaryFormatter.summaryLines(for: locationManager.lastKnownAddress)
 
-            if let contextLine = LocationSummaryFormatter.contextLine(for: locationManager.lastKnownAddress) {
+            if let topLine = summaryLines.first {
+                Text(topLine)
+                    .font(.system(size: scaledFont(28)))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(OverlayLayout.panelTextColor)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(OverlayLayout.summaryLineLimit)
+            } else {
+                Text("Waiting for location")
+                    .font(.system(size: scaledFont(28)))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(OverlayLayout.panelTextColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if summaryLines.indices.contains(1) {
+                let contextLine = summaryLines[1]
                 Text(contextLine)
-                    .font(.system(size: scaledFont(18)))
+                    .font(.system(size: scaledFont(20)))
+                    .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
+                    .lineLimit(OverlayLayout.hierarchyLineLimit)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let contextLine = LocationSummaryFormatter.contextLine(for: locationManager.lastKnownAddress) {
+                Text(contextLine)
+                    .font(.system(size: scaledFont(20)))
                     .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
                     .lineLimit(OverlayLayout.hierarchyLineLimit)
                     .fixedSize(horizontal: false, vertical: true)
@@ -343,11 +382,6 @@ private struct LocationScreenView: View {
                         .font(.system(size: scaledFont(12)))
                         .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.9))
                 }
-                if !locationManager.allowsMapInteraction {
-                    Label("Map locked", systemImage: "lock.fill")
-                        .font(.system(size: scaledFont(12)))
-                        .foregroundStyle(OverlayLayout.panelTextColor.opacity(0.8))
-                }
             }
         }
         .padding(.vertical, 8)
@@ -375,12 +409,12 @@ private struct LocationMapView: View {
     @State private var mapSpanMeters: CLLocationDistance = MapZoom.area
 
     private enum MapZoom {
-        static let area: CLLocationDistance = 16_000
+        static let area: CLLocationDistance = 6_000
         static let minimum: CLLocationDistance = 2_000
         static let maximum: CLLocationDistance = 120_000
     }
 
-    private let controlButtonSize: CGFloat = 66
+    private let controlButtonSize: CGFloat = 82
 
     private var snapshot: CoordinateSnapshot? {
         coordinate.map(CoordinateSnapshot.init)
@@ -436,7 +470,7 @@ private struct LocationMapView: View {
 
                         resetMapButton
                     }
-                    .padding(.top, 86)
+                    .padding(.top, 122)
                     .padding(.trailing, 12)
                 }
             } else {
@@ -545,7 +579,7 @@ private struct LocationMapView: View {
     private func mapControlButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: scaledFont(33), weight: .bold))
+                .font(.system(size: scaledFont(44), weight: .bold))
                 .frame(width: controlButtonSize, height: controlButtonSize)
                 .foregroundStyle(Color.white)
                 .overlay(
@@ -567,7 +601,7 @@ private struct LocationMapView: View {
         if let snapshot {
             Button(action: { resetMap(to: snapshot.coordinate) }) {
                 Image(systemName: "location.north")
-                    .font(.system(size: scaledFont(22), weight: .bold))
+                    .font(.system(size: scaledFont(34), weight: .bold))
                     .frame(width: controlButtonSize, height: controlButtonSize)
                     .foregroundStyle(Color.white)
                     .overlay(
@@ -694,40 +728,37 @@ private struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                Section("When to announce") {
+                    Text("Set when a new boundary should trigger speech.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     SectionToggleRows(locationManager: locationManager)
                 }
 
                 Section("Rider Context") {
                     TextField(
-                        "What country are you from?",
+                        "Home country (optional)",
                         text: $locationManager.homeCountry,
-                        prompt: Text("Optional")
+                        prompt: Text("e.g., United Kingdom")
                     )
                     TextField(
-                        "What region feels familiar?",
+                        "Home region (optional)",
                         text: $locationManager.homeRegion,
-                        prompt: Text("Optional")
+                        prompt: Text("e.g., Cornwall")
                     )
                     TextField(
                         "Places you already know",
                         text: $locationManager.familiarRegions,
-                        prompt: Text("Optional, comma-separated")
+                        prompt: Text("e.g., Somerset, Devon, London")
                     )
                         .textInputAutocapitalization(.words)
 
-                    Text("Answer these once so facts stay useful rather than repetitive.")
+                    Text("Use these once and MotoGuide will tailor facts to your familiarity.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-
-                    Text("What should the fact feed focus on?")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text("Answering these once helps avoid basic explanations.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
                     FactInterestCategoryPicker(selectedCategories: $locationManager.factInterestCategories)
                 }
 
@@ -827,12 +858,12 @@ private struct SectionToggleRows: View {
     @ObservedObject var locationManager: LocationManager
 
     var body: some View {
-        DisclosureGroup("What to announce") {
-            Toggle("Street", isOn: $locationManager.announceStreet)
-            Toggle("Town", isOn: $locationManager.announceTown)
-            Toggle("County", isOn: $locationManager.announceCounty)
-            Toggle("Region", isOn: $locationManager.announceNation)
-            Toggle("Country", isOn: $locationManager.announceCountry)
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Street (new road)", isOn: $locationManager.announceStreet)
+            Toggle("Town (new town)", isOn: $locationManager.announceTown)
+            Toggle("County (new county)", isOn: $locationManager.announceCounty)
+            Toggle("Region (new region)", isOn: $locationManager.announceNation)
+            Toggle("Country (new country)", isOn: $locationManager.announceCountry)
         }
     }
 }

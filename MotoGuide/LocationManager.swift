@@ -73,11 +73,7 @@ struct SpeechVoiceOption: Identifiable, Hashable {
 
     var pickerLabel: String {
         if isRecommended {
-            return "\(displayLabel) · Recommended"
-        }
-
-        if isSafeDefaultCandidate {
-            return "\(displayLabel) · Optional"
+            return "\(displayLabel) · Premium"
         }
 
         return displayLabel
@@ -107,8 +103,8 @@ enum SpeechProvider: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .apple: return "Apple voice"
-        case .proxyElevenLabs: return "ElevenLabs via proxy"
+        case .apple: return "Apple voices (recommended)"
+        case .proxyElevenLabs: return "Premium voice (ElevenLabs)"
         }
     }
 }
@@ -222,12 +218,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published private(set) var currentSpeedMetersPerSecond: CLLocationSpeed?
 
     var allowsMapInteraction: Bool {
-        guard !testMode,
-              let currentSpeedMetersPerSecond,
-              currentSpeedMetersPerSecond >= 0 else {
-            return true
-        }
-        return currentSpeedMetersPerSecond < Self.movingMapInteractionThresholdMetersPerSecond
+        true
     }
 
     private var isSpeechOutputActive: Bool {
@@ -350,9 +341,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     func availableSpeechVoices() -> [SpeechVoiceOption] {
-        let voices = AVSpeechSynthesisVoice.speechVoices()
-        return voices
-            .filter { !$0.language.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let englishVoices = AVSpeechSynthesisVoice.speechVoices().filter {
+            $0.language.hasPrefix("en")
+        }
+
+        let options = englishVoices
+            .filter { !$0.identifier.isEmpty && !$0.language.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .map { voice in
                 SpeechVoiceOption(
                     identifier: voice.identifier,
@@ -378,6 +372,25 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
                 return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
             }
+
+        var deduped: [SpeechVoiceOption] = []
+        var seen: Set<String> = []
+        for option in options {
+            if deduped.count >= 4 { break }
+            if seen.insert(option.identifier).inserted {
+                deduped.append(option)
+            }
+        }
+
+        if deduped.count < 4 {
+            for option in options
+                .filter({ !deduped.contains($0) }) {
+                if deduped.count >= 4 { break }
+                deduped.append(option)
+            }
+        }
+
+        return deduped
     }
 
     func recommendedSpeechVoice() -> SpeechVoiceOption? {
@@ -860,8 +873,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func ensurePreferredVoiceSelection() {
-        if let first = availableSpeechVoices().first, !first.identifier.isEmpty {
-            preferredVoiceIdentifier = availableSpeechVoices().first(where: { $0.identifier == preferredVoiceIdentifier })?.identifier
+        let voices = availableSpeechVoices()
+        if let first = voices.first, !first.identifier.isEmpty {
+            preferredVoiceIdentifier = voices.first(where: { $0.identifier == preferredVoiceIdentifier })?.identifier
                 ?? first.identifier
             return
         }
