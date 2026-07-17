@@ -37,7 +37,7 @@ Use Wikimedia APIs as the first source candidate:
 - Geosearch around the current coordinate for nearby notable places.
 - Wikidata IDs where useful for stable identity and caching.
 
-Do not scrape rendered Wikipedia pages. Use APIs with a clear MotoGuide User-Agent and cache responses.
+Do not scrape rendered Wikipedia pages. Use APIs with a clear RideHorizon User-Agent and cache responses.
 
 ## Local Model
 

@@ -1,0 +1,6 @@
+{
+  "modePrompts": {
+    "shortFacts": "Write 35 to 45 words for an adult touring rider, using one sentence or two short sentences. Lead with one concrete local anchor: river, canal, hill, industry, building material, historic route, market, landmark, or border story. For POIs, describe the object or site directly. Avoid schoolbook definitions, roadcraft, hazard warnings, traffic or weather filler, and exact claims unless confident.",
+    "longFacts": "Write 75 to 90 words for an adult touring rider, using two to four concise sentences. Use specific anchors from landscape, industry, architecture, waterways, border history, notable people, markets, old roads, or landmarks. For POIs, describe the object or site directly. Connect the anchors into a useful place picture. Avoid administrative definitions, roadcraft, hazard warnings, traffic or weather filler, and exact claims unless confident."
+  }
+}

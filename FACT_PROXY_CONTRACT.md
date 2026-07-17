@@ -1,4 +1,4 @@
-# MotoGuide Fact Proxy Contract
+# RideHorizon Fact Proxy Contract
 
 Date: 2026-07-02
 
@@ -10,9 +10,9 @@ Keep the iOS app, fact proxy server, tests, and markdown in sync with the OpenAP
 
 ## Purpose
 
-The fact proxy contract lets MotoGuide ask for one bounded place fact without storing or sending an OpenAI API key from the iOS app.
+The fact proxy contract lets RideHorizon ask for one bounded place fact without storing or sending an OpenAI API key from the iOS app.
 
-The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the MotoGuide fact proxy. It also sends optional rider context (`homeCountry`, `homeRegion`, `familiarRegions`, `customFactInstructions`) and optional `factInterestCategories` so the proxy can tune fact focus toward geography, culture, history, landmarks, and practical rider context without sending prompts.
+The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the RideHorizon fact proxy. It also sends optional rider context (`homeCountry`, `homeRegion`, `familiarRegions`, `customFactInstructions`) and optional `factInterestCategories` so the proxy can tune fact focus toward geography, culture, history, landmarks, and practical rider context without sending prompts.
 
 Speech is proxied separately through ElevenLabs. The iOS app sends bounded text to `/v1/speech`; the proxy owns the ElevenLabs API key, voice id, model id, and output format.
 The proxy validates the request, chooses the server-side prompt for `shortFacts` or `longFacts`, calls OpenAI server-side, sanitizes the model output, and returns a bounded fact.
@@ -21,12 +21,12 @@ The iOS app must not send prompt text, arbitrary model messages, OpenAI configur
 
 ## Implementations
 
-- iOS client: `MotoGuide/ProxyFactGenerator.swift`
-- iOS token loader: `MotoGuide/KeychainCredentialLoader.swift`
-- iOS tests: `MotoGuideTests/PlaceFactTests.swift`, `ProxyFactGeneratorTests`
-- Proxy endpoint: `fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactController.java`
-- Proxy request model: `fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactRequest.java`
-- Proxy response model: `fact-proxy/src/main/java/ai/dml/motoguide/factproxy/FactResponse.java`
+- iOS client: `RideHorizon/ProxyFactGenerator.swift`
+- iOS token loader: `RideHorizon/KeychainCredentialLoader.swift`
+- iOS tests: `RideHorizonTests/PlaceFactTests.swift`, `ProxyFactGeneratorTests`
+- Proxy endpoint: `fact-proxy/src/main/java/ai/dml/ridehorizon/factproxy/FactController.java`
+- Proxy request model: `fact-proxy/src/main/java/ai/dml/ridehorizon/factproxy/FactRequest.java`
+- Proxy response model: `fact-proxy/src/main/java/ai/dml/ridehorizon/factproxy/FactResponse.java`
 - Proxy docs: `fact-proxy/README.md`
 - OpenAPI spec: `FACT_PROXY_OPENAPI.yaml`
 
@@ -41,7 +41,7 @@ ruby -e 'require "yaml"; doc = YAML.load_file("/Users/rob_dev/DocsLocal/motoguid
 Expected result:
 
 ```text
-OpenAPI YAML parsed: MotoGuide Fact Proxy API 0.1.0
+OpenAPI YAML parsed: RideHorizon Fact Proxy API 0.1.0
 ```
 
 ## Endpoint
@@ -49,7 +49,7 @@ OpenAPI YAML parsed: MotoGuide Fact Proxy API 0.1.0
 Production endpoint:
 
 ```text
-https://motoguide-fact-proxy.fly.dev/v1/fact
+https://ridehorizon.digitalmercenaries.ai/v1/fact
 ```
 
 Local endpoint:
@@ -64,11 +64,11 @@ Date verified: 2026-07-01.
 
 | Field | Value |
 |-------|-------|
-| Fly app | `motoguide-fact-proxy` |
+| Fly app | `ridehorizon-fact-proxy` |
 | Fly org | `dml` |
-| Hostname | `motoguide-fact-proxy.fly.dev` |
+| Hostname | `ridehorizon.digitalmercenaries.ai` |
 | Primary region | `lhr` |
-| Image | `motoguide-fact-proxy:deployment-01KWFY4N628G4137Y7BMQPN6P9` |
+| Image | `ridehorizon-fact-proxy:deployment-01KWFY4N628G4137Y7BMQPN6P9` |
 | Shared IPv4 | `66.241.125.198` |
 | Dedicated IPv6 | `2a09:8280:1::13b:6469:0` |
 
@@ -84,30 +84,30 @@ Required Fly secrets:
 | Secret | Status |
 |--------|--------|
 | `OPENAI_API_KEY` | Deployed |
-| `MOTOGUIDE_PROXY_TOKEN` | Deployed |
-| `MOTOGUIDE_ADMIN_TOKEN` | Optional; enables admin diagnostics endpoint when deployed |
+| `RIDEHORIZON_PROXY_TOKEN` | Deployed |
+| `RIDEHORIZON_ADMIN_TOKEN` | Optional; enables admin diagnostics endpoint when deployed |
 
 Runtime configuration:
 
 | Environment variable | Default | Meaning |
 |----------------------|---------|---------|
 | `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model selected by the Fly runtime environment. |
-| `MOTOGUIDE_DIAGNOSTICS_ENABLED` | `false` | Enables verbose proxy diagnostics at startup. |
-| `MOTOGUIDE_SHORT_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `shortFacts`. Never sent by iOS. |
-| `MOTOGUIDE_LONG_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `longFacts`. Never sent by iOS. |
-| `MOTOGUIDE_PROMPT_OVERRIDES_ENABLED` | `false` | When `true`, load prompt overrides from object storage. |
-| `MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL` | (not set) | Optional URL for prompt override JSON. |
-| `MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS` | `60` | Poll interval for override updates from object storage. |
-| `MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN` | (not set) | Optional bearer token for override object download. |
-| `MOTOGUIDE_DEVICE_BINDING_REQUIRED` | `false` | Require approved devices via `X-MotoGuide-Device-Id` when true. |
-| `MOTOGUIDE_TRUSTED_DEVICE_IDS` | (not set) | Comma-separated allowed `X-MotoGuide-Device-Id` values when device binding is required. |
-| `MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST` | (not set) | Comma-separated host allowlist. Required when `MOTOGUIDE_PROMPT_OVERRIDES_ENABLED=true`. |
+| `RIDEHORIZON_DIAGNOSTICS_ENABLED` | `false` | Enables verbose proxy diagnostics at startup. |
+| `RIDEHORIZON_SHORT_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `shortFacts`. Never sent by iOS. |
+| `RIDEHORIZON_LONG_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `longFacts`. Never sent by iOS. |
+| `RIDEHORIZON_PROMPT_OVERRIDES_ENABLED` | `false` | When `true`, load prompt overrides from object storage. |
+| `RIDEHORIZON_PROMPT_OVERRIDES_OBJECT_URL` | (not set) | Optional URL for prompt override JSON. |
+| `RIDEHORIZON_PROMPT_OVERRIDES_REFRESH_SECONDS` | `60` | Poll interval for override updates from object storage. |
+| `RIDEHORIZON_PROMPT_OVERRIDES_AUTH_TOKEN` | (not set) | Optional bearer token for override object download. |
+| `RIDEHORIZON_DEVICE_BINDING_REQUIRED` | `false` | Require approved devices via `X-RideHorizon-Device-Id` when true. |
+| `RIDEHORIZON_TRUSTED_DEVICE_IDS` | (not set) | Comma-separated allowed `X-RideHorizon-Device-Id` values when device binding is required. |
+| `RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST` | (not set) | Comma-separated host allowlist. Required when `RIDEHORIZON_PROMPT_OVERRIDES_ENABLED=true`. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Per identity (trusted user/device if provided, else IP) request limit for authenticated proxy calls. |
 
 Health check:
 
 ```bash
-curl -fsS https://motoguide-fact-proxy.fly.dev/health
+curl -fsS https://ridehorizon.digitalmercenaries.ai/health
 ```
 
 Expected result:
@@ -119,7 +119,7 @@ ok
 If local DNS is still propagating, this equivalent command verifies the Fly public route through the assigned shared IPv4:
 
 ```bash
-curl -fsS --resolve motoguide-fact-proxy.fly.dev:443:66.241.125.198 https://motoguide-fact-proxy.fly.dev/health
+curl -fsS --resolve ridehorizon.digitalmercenaries.ai:443:66.241.125.198 https://ridehorizon.digitalmercenaries.ai/health
 ```
 
 Expected result:
@@ -133,44 +133,44 @@ ok
 Every `POST /v1/fact` request must include:
 
 ```http
-Authorization: Bearer <MOTOGUIDE_PROXY_TOKEN>
+Authorization: Bearer <RIDEHORIZON_PROXY_TOKEN>
 Content-Type: application/json
 ```
 
 Optional request header for prompt overrides:
 
 ```http
-X-MotoGuide-User-Id: rider-42
+X-RideHorizon-User-Id: rider-42
 ```
 
 Optional approved-device header:
 
 ```http
-X-MotoGuide-Device-Id: helmet-001
+X-RideHorizon-Device-Id: helmet-001
 ```
 
-When `MOTOGUIDE_DEVICE_BINDING_REQUIRED=true`, `X-MotoGuide-Device-Id` must be present and in `MOTOGUIDE_TRUSTED_DEVICE_IDS`.
+When `RIDEHORIZON_DEVICE_BINDING_REQUIRED=true`, `X-RideHorizon-Device-Id` must be present and in `RIDEHORIZON_TRUSTED_DEVICE_IDS`.
 
 The iOS app reads this token from the iOS Keychain generic-password item with service:
 
 ```text
-MotoGuideProxy
+RideHorizonProxy
 ```
 
 When device binding is enabled, the iOS app reads the optional approved-device identifier from a separate iOS Keychain generic-password item with service:
 
 ```text
-MotoGuideDeviceId
+RideHorizonDeviceId
 ```
 
-If that item exists, iOS sends it as `X-MotoGuide-Device-Id`. If it is absent, iOS omits the header; keep `MOTOGUIDE_DEVICE_BINDING_REQUIRED=false` until approved device IDs have been provisioned on app installs.
+If that item exists, iOS sends it as `X-RideHorizon-Device-Id`. If it is absent, iOS omits the header; keep `RIDEHORIZON_DEVICE_BINDING_REQUIRED=false` until approved device IDs have been provisioned on app installs.
 
 The OpenAI API key must stay server-side. It must be configured only on the proxy host, for example as the Fly.io secret `OPENAI_API_KEY`.
 
 Current MVP security model:
 
 - Transport is HTTPS through Fly.io public ingress.
-- App authentication is a shared bearer token: `MOTOGUIDE_PROXY_TOKEN`.
+- App authentication is a shared bearer token: `RIDEHORIZON_PROXY_TOKEN`.
 - The app stores only the proxy token, not the OpenAI key.
 - The OpenAI key is stored only as the Fly secret `OPENAI_API_KEY`.
 - The proxy only exposes a narrow place-fact endpoint; clients cannot send arbitrary OpenAI prompts, model names, endpoints, or message arrays.
@@ -179,7 +179,7 @@ Current MVP security model:
 
 Current limitation:
 
-- If `MOTOGUIDE_PROXY_TOKEN` is extracted from the app or device, the holder can call `/v1/fact` until the token is rotated, rate limits apply, or server-side controls block it.
+- If `RIDEHORIZON_PROXY_TOKEN` is extracted from the app or device, the holder can call `/v1/fact` until the token is rotated, rate limits apply, or server-side controls block it.
 
 Planned hardening:
 
@@ -191,12 +191,12 @@ Planned hardening:
 
 Prompt override configuration (server-side only):
 
-- If `MOTOGUIDE_PROMPT_OVERRIDES_ENABLED=true`, the proxy resolves prompt overrides in this order:
-  1. `users` (by `X-MotoGuide-User-Id` header)
+- If `RIDEHORIZON_PROMPT_OVERRIDES_ENABLED=true`, the proxy resolves prompt overrides in this order:
+  1. `users` (by `X-RideHorizon-User-Id` header)
   2. `hierarchies` map keyed by `<boundary>:<normalized name>`
   3. `boundaries` map by boundary (`town`, `county`, etc.)
   4. `modePrompts`
-  5. environment variables `MOTOGUIDE_SHORT_FACT_PROMPT` and `MOTOGUIDE_LONG_FACT_PROMPT`
+  5. environment variables `RIDEHORIZON_SHORT_FACT_PROMPT` and `RIDEHORIZON_LONG_FACT_PROMPT`
 
 Example object payload:
 
@@ -255,11 +255,11 @@ Diagnostics control:
 
 - Baseline request logs remain on so app-reported `X-Request-Id` values can be matched to Fly logs.
 - Verbose diagnostics are off by default.
-- Set `MOTOGUIDE_DIAGNOSTICS_ENABLED=true` to enable verbose diagnostics at process startup.
-- `GET /admin/diagnostics` returns the current setting when `MOTOGUIDE_ADMIN_TOKEN` is configured.
+- Set `RIDEHORIZON_DIAGNOSTICS_ENABLED=true` to enable verbose diagnostics at process startup.
+- `GET /admin/diagnostics` returns the current setting when `RIDEHORIZON_ADMIN_TOKEN` is configured.
 - `PUT /admin/diagnostics` with `{"enabled": true}` or `{"enabled": false}` changes the setting for the current running proxy process.
-- The admin endpoint requires `Authorization: Bearer <MOTOGUIDE_ADMIN_TOKEN>`.
-- If `MOTOGUIDE_ADMIN_TOKEN` is not configured, `/admin/diagnostics` returns `404`.
+- The admin endpoint requires `Authorization: Bearer <RIDEHORIZON_ADMIN_TOKEN>`.
+- If `RIDEHORIZON_ADMIN_TOKEN` is not configured, `/admin/diagnostics` returns `404`.
 - Runtime changes are process-local. On a multi-machine Fly deployment, prefer the environment variable for a consistent fleet-wide setting.
 
 Live debugging command:
@@ -282,7 +282,7 @@ POST /v1/fact
 Optional header:
 
 ```http
-X-MotoGuide-User-Id: <stable rider identifier>
+X-RideHorizon-User-Id: <stable rider identifier>
 ```
 
 JSON body:
@@ -403,7 +403,7 @@ Endpoint:
 
 ```http
 POST /v1/speech
-Authorization: Bearer <MOTOGUIDE_PROXY_TOKEN>
+Authorization: Bearer <RIDEHORIZON_PROXY_TOKEN>
 Content-Type: application/json
 Accept: audio/mpeg
 ```
@@ -429,6 +429,31 @@ Success response:
 Content-Type: audio/mpeg
 ```
 
+Provider failure response:
+
+```http
+502 Bad Gateway
+Content-Type: application/json
+```
+
+```json
+{
+  "error": "Premium voice is temporarily unavailable.",
+  "code": "RH-TTS-02"
+}
+```
+
+The message is deliberately neutral. The proxy must never return the raw ElevenLabs response body or expose account, credit, quota, authentication, or billing details to the app.
+
+Diagnostic codes:
+
+| Code | Operator meaning | Rider-facing treatment |
+|------|------------------|------------------------|
+| `RH-TTS-01` | Provider authentication or server configuration | Show only the neutral message and code in Test Mode diagnostics. |
+| `RH-TTS-02` | Provider account capacity | Show only the neutral message and code in Test Mode diagnostics. |
+| `RH-TTS-03` | Provider throttling | Show only the neutral message and code in Test Mode diagnostics. |
+| `RH-TTS-04` | Other provider or transport failure | Show only the neutral message and code in Test Mode diagnostics. |
+
 The proxy calls ElevenLabs server-side using environment configuration:
 
 | Variable | Required | Meaning |
@@ -438,7 +463,12 @@ The proxy calls ElevenLabs server-side using environment configuration:
 | `ELEVENLABS_MODEL_ID` | No | Model id. Defaults to `eleven_multilingual_v2`. |
 | `ELEVENLABS_OUTPUT_FORMAT` | No | Output format. Defaults to `mp3_44100_128`. |
 
-The iOS app must fall back to local Apple speech if `/v1/speech` returns an error, invalid audio, missing token, or timeout.
+The iOS app treats `/v1/speech` separately from fact generation:
+
+- Speech timeout: `15 s`.
+- Fact timeout: `3 s`.
+- Speech diagnostics should log request elapsed time to completion / last byte.
+- Apple speech fallback is feature-flagged during MVP and defaults off; when fallback is off, errors should be visible in Test Mode instead of silently speaking Apple.
 
 ## Speech Safety Rules
 
@@ -456,9 +486,9 @@ The current iOS sanitizer rejects empty facts, questions, and `you should` phras
 
 ## Timeout And Fallback
 
-The iOS app uses a 3-second timeout through `PlaceFactFetcher`.
+The iOS app uses a 3-second fact timeout through `PlaceFactFetcher`.
 
-If the proxy token is missing, the request fails, the proxy returns an error, response JSON is invalid, the fact is rejected by the sanitizer, or the timeout expires, MotoGuide must speak the base place announcement without a fact.
+If the proxy token is missing, the request fails, the proxy returns an error, response JSON is invalid, the fact is rejected by the sanitizer, or the timeout expires, RideHorizon must speak the base place announcement without a fact.
 
 Example fallback:
 
@@ -491,14 +521,14 @@ Exact command:
 curl -sS -X POST http://127.0.0.1:3000/v1/speech \
   -H "Authorization: Bearer dev-token" \
   -H "Content-Type: application/json" \
-  -o /tmp/motoguide-speech.mp3 \
+  -o /tmp/ridehorizon-speech.mp3 \
   -d '{"text":"Stroud was known for its wool trade."}'
 ```
 
 Expected result:
 
 ```text
-/tmp/motoguide-speech.mp3 exists and contains MP3 audio.
+/tmp/ridehorizon-speech.mp3 exists and contains MP3 audio.
 ```
 
 The exact fact sentence can vary because it is generated by the server-side LLM.

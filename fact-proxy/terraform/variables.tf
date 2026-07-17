@@ -1,7 +1,7 @@
 variable "fly_app_name" {
   description = "Fly application name to manage."
   type        = string
-  default     = "motoguide-fact-proxy"
+  default     = "ridehorizon-fact-proxy"
 }
 
 variable "fly_org" {

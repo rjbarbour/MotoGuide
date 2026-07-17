@@ -1,11 +1,11 @@
 # Location Screen Situational Awareness — Design
 
-Date: 2026-07-02
-Status: MVP1 completion scope (Milestone 6)
+Date: 2026-07-03
+Status: MVP1 completion scope (Milestone 6) — map-first shell implemented; nearby towns, previous street, stopped-only zoom presets, presentation tests, and field readability pass remain
 
 ## Purpose
 
-MotoGuide is an ambient place-awareness companion, not a navigation app. Navigation apps answer: *turn here, in 200 m, take the second exit*. MotoGuide answers: *where am I in the landscape, and what larger places am I near or inside?*
+RideHorizon is an ambient place-awareness companion, not a navigation app. Navigation apps answer: *turn here, in 200 m, take the second exit*. RideHorizon answers: *where am I in the landscape, and what larger places am I near or inside?*
 
 The Location screen gives riders a **glanceable geographic context screen** they can open at a stoplight, fuel stop, or scenic pull-off. It complements helmet audio announcements and does not compete with turn-by-turn navigation for attention while moving.
 
@@ -13,7 +13,7 @@ MVP1 decision: complete the Location screen using live coordinate, Apple reverse
 
 ### vs navigation apps
 
-| Navigation apps | MotoGuide Location screen |
+| Navigation apps | RideHorizon Location screen |
 |-----------------|-------------------|
 | Route, ETA, next manoeuvre | Current place in hierarchy |
 | Street-level turn detail | County / region / country context |
@@ -21,7 +21,7 @@ MVP1 decision: complete the Location screen using live coordinate, Apple reverse
 | Corners and junctions | Nearby towns and distances |
 | Optimised for driving decisions | Optimised for orientation |
 
-MotoGuide should remain mountable beside a nav app: nav on one screen corner, MotoGuide Location available when the rider deliberately opens the app.
+RideHorizon should remain mountable beside a nav app: nav on one screen corner, RideHorizon Location available when the rider deliberately opens the app.
 
 ## Recommendation: map-first single map + compact overlay
 
@@ -46,7 +46,7 @@ A compact **overlay or bottom sheet** supplies current place, hierarchy, last ph
 
 Current app structure: **Location** is the primary screen. **Settings** opens from the toolbar gear. **Log** opens from the toolbar history/list button. There is no Start/Pause control.
 
-Updated direction after phone review: the current stack is useful but too panel-heavy. Move towards a **full map with compact overlays**, similar in spirit to motorcycle map apps, while keeping MotoGuide's role distinct from navigation.
+Current implementation status: the app now uses a **full map with compact overlays**, similar in spirit to motorcycle map apps, while keeping RideHorizon's role distinct from navigation. The remaining work is to finish the compact context layer around that map.
 
 ```
 ┌─────────────────────────────────────┐
@@ -113,17 +113,24 @@ Share the same throttled geocode path as announcements (`locationCheckInterval`)
 
 ## MVP scope (Milestone 6)
 
-**In scope**
+**Already implemented**
 
 - **Location** screen as the default app screen.
 - Map-first layout with compact current-place overlay.
-- Compact context: summary, hierarchy, previous street, nearby towns.
+- Compact context: summary, hierarchy, last spoken phrase, Quiet mode, location/geocoder states.
 - Single MapKit map, user-following, context-aware default zoom showing roughly twice the current area.
-- Stopped-only zoom presets (or speed-gated).
+- Speed-gated map interaction.
 - Test mode parity with existing fixture.
-- Unit tests for: hierarchy presentation from `Address`, nearby-town sorting/formatting, summary text builder, previous-street visibility rules.
 - Preview / simulator support without live GPS.
 - Visible states for waiting for GPS, location denied, geocoder failure, and Quiet mode.
+
+**Remaining in scope**
+
+- Previous street when changed.
+- Nearby towns with distances and compass bearing.
+- Stopped-only zoom presets.
+- Unit tests for: hierarchy presentation from `Address`, nearby-town sorting/formatting, summary text builder, previous-street visibility rules.
+- Field readability pass on the physical phone.
 
 **Out of scope for M6**
 
@@ -151,7 +158,7 @@ Share the same throttled geocode path as announcements (`locationCheckInterval`)
 |---------|---------------------------|
 | **Settings** | Source of truth for announcement style, intervals, test mode, boundary toggles. Location **displays** current `Address` and does not change speech policy. Quiet mode is visible on Location. |
 | **Log** | Timestamped history of address changes. Location shows **now**; Log shows **then**. No merge in M6; future enhancement can jump from a log row to the map region. |
-| **Location** | Read-mostly. No ride controls beyond Test Mode stepping and later stopped-only zoom presets. Riders configure behaviour in Settings, review history in Log, orient themselves on Location. |
+| **Location** | Read-mostly. No ride controls beyond Test Mode stepping and stopped-only zoom presets. Riders configure behaviour in Settings, review history in Log, orient themselves on Location. |
 
 Shared state: existing `LocationManager` (`@StateObject` in `ContentView`) — map view is another consumer of `lastKnownLocation`, `lastKnownAddress`, and test mode.
 
@@ -189,6 +196,6 @@ Physical validation: confirm a 2-second glance at a stop provides useful context
 
 - Product definition: `AGENTS.md`
 - Milestones: `MILESTONES.md` (Milestone 6)
-- Address model: `MotoGuide/Address.swift`
-- Boundary ordering: `MotoGuide/BoundaryType.swift`, `MotoGuide/AnnouncementPolicy.swift`
-- Current screen: `MotoGuide/ContentView.swift`
+- Address model: `RideHorizon/Address.swift`
+- Boundary ordering: `RideHorizon/BoundaryType.swift`, `RideHorizon/AnnouncementPolicy.swift`
+- Current screen: `RideHorizon/ContentView.swift`

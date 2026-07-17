@@ -8,7 +8,7 @@ Milestone 0 is complete for local checkout, project inspection, and simulator un
 
 Physical iPhone deployment is now recorded as completed over the newer CoreDevice / OTA path.
 
-This thread installed and launched MotoGuide on Robert's iPhone over OTA on 2026-07-02. The companion thread also observed the phone via `xcrun devicectl list devices` as `Roberts-iPhone-17.coredevice.local`. `xcodebuild -showdestinations` may still fail to list the phone even when CoreDevice can see it.
+This thread installed and launched RideHorizon on Robert's iPhone over OTA on 2026-07-02. The companion thread also observed the phone via `xcrun devicectl list devices` as `Roberts-iPhone-17.coredevice.local`. `xcodebuild -showdestinations` may still fail to list the phone even when CoreDevice can see it.
 
 ## Local Checkout
 
@@ -18,7 +18,7 @@ Path:
 /Users/rob_dev/DocsLocal/motoguide/repo
 ```
 
-Expected result: this folder contains `.git`, `MotoGuide.xcodeproj`, `MotoGuide/`, `MotoGuideTests/`, `MotoGuideUITests/`, `AGENTS.md`, and `MILESTONES.md`.
+Expected result: this folder contains `.git`, `RideHorizon.xcodeproj`, `RideHorizon/`, `RideHorizonTests/`, `RideHorizonUITests/`, `AGENTS.md`, and `MILESTONES.md`.
 
 Actual result: present.
 
@@ -33,8 +33,8 @@ git remote -v
 Expected result:
 
 ```text
-origin	https://github.com/rjbarbour/MotoGuide.git (fetch)
-origin	https://github.com/rjbarbour/MotoGuide.git (push)
+origin	https://github.com/rjbarbour/RideHorizon.git (fetch)
+origin	https://github.com/rjbarbour/RideHorizon.git (push)
 ```
 
 Actual result: matched.
@@ -44,7 +44,7 @@ Actual result: matched.
 Command:
 
 ```bash
-xcodebuild -list -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj
+xcodebuild -list -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj
 ```
 
 Expected result: prints the project targets, build configurations, and schemes.
@@ -53,16 +53,16 @@ Actual result:
 
 ```text
 Targets:
-    MotoGuide
-    MotoGuideTests
-    MotoGuideUITests
+    RideHorizon
+    RideHorizonTests
+    RideHorizonUITests
 
 Build Configurations:
     Debug
     Release
 
 Schemes:
-    MotoGuide
+    RideHorizon
 ```
 
 ## Historical Simulator Test Attempt
@@ -70,10 +70,10 @@ Schemes:
 Command:
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS Simulator,name=iPhone 15' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 15' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData
 ```
 
-Expected result: the MotoGuide unit and UI test targets build and run in an iOS Simulator.
+Expected result: the RideHorizon unit and UI test targets build and run in an iOS Simulator.
 
 Actual result: failed with exit code `70`.
 
@@ -87,13 +87,13 @@ Unable to find a device matching the provided destination specifier:
 Additional destination check:
 
 ```bash
-xcodebuild -showdestinations -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide
+xcodebuild -showdestinations -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon
 ```
 
 Actual result:
 
 ```text
-Ineligible destinations for the "MotoGuide" scheme:
+Ineligible destinations for the "RideHorizon" scheme:
 { platform:iOS, name:Any iOS Device, error:iOS 26.2 is not installed. Please download and install the platform from Xcode > Settings > Components. }
 ```
 
@@ -104,7 +104,7 @@ XcodeBuildMCP simulator list result: no enabled simulators.
 Command:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'generic/platform=iOS Simulator' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'generic/platform=iOS Simulator' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData
 ```
 
 Expected result: compile the app for a generic iOS Simulator destination.
@@ -124,10 +124,10 @@ The build reached Swift compilation setup but failed during asset catalog compil
 Command:
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -only-testing:MotoGuideTests
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -only-testing:RideHorizonTests
 ```
 
-Expected result: the MotoGuide unit test target builds and runs in the iOS Simulator.
+Expected result: the RideHorizon unit test target builds and runs in the iOS Simulator.
 
 Actual result: **BUILD SUCCEEDED** and **TEST SUCCEEDED** on iPhone 17 simulator running iOS 26.3.1. This result was recorded in `MILESTONE_1_STATUS.md` on 2026-07-01.
 
@@ -141,7 +141,7 @@ Hostname: Roberts-iPhone-17.coredevice.local
 Identifier: B0D90B81-8AC6-57B6-AC4E-717EA505D3DD
 ```
 
-Expected result: MotoGuide is installed on Robert's iPhone without a USB cable after the phone remains visible to CoreDevice.
+Expected result: RideHorizon is installed on Robert's iPhone without a USB cable after the phone remains visible to CoreDevice.
 
 Actual result: OTA install and launch completed successfully on 2026-07-02.
 
@@ -156,28 +156,28 @@ Expected result: prints `Robert's iPhone 17` as `available (paired)`.
 Actual result: `Robert's iPhone 17` was available over `Roberts-iPhone-17.coredevice.local`.
 
 ```bash
-xcodebuild build -quiet -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'generic/platform=iOS' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
+xcodebuild build -quiet -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'generic/platform=iOS' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
 ```
 
-Expected result: builds `DerivedData/Build/Products/Debug-iphoneos/MotoGuide.app`.
+Expected result: builds `DerivedData/Build/Products/Debug-iphoneos/RideHorizon.app`.
 
 Actual result: build succeeded.
 
 ```bash
-xcrun devicectl device install app --device B0D90B81-8AC6-57B6-AC4E-717EA505D3DD /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData/Build/Products/Debug-iphoneos/MotoGuide.app
+xcrun devicectl device install app --device B0D90B81-8AC6-57B6-AC4E-717EA505D3DD /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData/Build/Products/Debug-iphoneos/RideHorizon.app
 ```
 
-Expected result: installs MotoGuide on Robert's iPhone.
+Expected result: installs RideHorizon on Robert's iPhone.
 
-Actual result: installed bundle `ai.dml.MotoGuide`.
+Actual result: installed bundle `ai.digitalmercenaries.ridehorizon`.
 
 ```bash
-xcrun devicectl device process launch --device B0D90B81-8AC6-57B6-AC4E-717EA505D3DD ai.dml.MotoGuide
+xcrun devicectl device process launch --device B0D90B81-8AC6-57B6-AC4E-717EA505D3DD ai.digitalmercenaries.ridehorizon
 ```
 
-Expected result: launches MotoGuide on Robert's iPhone.
+Expected result: launches RideHorizon on Robert's iPhone.
 
-Actual result: launched application with bundle identifier `ai.dml.MotoGuide`.
+Actual result: launched application with bundle identifier `ai.digitalmercenaries.ridehorizon`.
 
 ## Human-Operable Next Steps
 
@@ -200,7 +200,7 @@ Expected result: prints `Robert's iPhone` or `Roberts-iPhone-17.coredevice.local
 If using the older Xcode destination path, this command may or may not list the phone:
 
 ```bash
-xcodebuild -showdestinations -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide 2>&1 | rg "Robert's iPhone"
+xcodebuild -showdestinations -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon 2>&1 | rg "Robert's iPhone"
 ```
 
 Expected result: prints a destination line for `Robert's iPhone` when Xcode exposes the phone as a run destination.
@@ -208,25 +208,25 @@ Expected result: prints a destination line for `Robert's iPhone` when Xcode expo
 1. Build, install, and launch on Robert's iPhone:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
 ```
 
-Expected result: MotoGuide builds for Robert's iPhone.
+Expected result: RideHorizon builds for Robert's iPhone.
 
 2. Install the app:
 
 ```bash
-xcrun devicectl device install app --device 00008150-000C70883E87401C /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData/Build/Products/Debug-iphoneos/MotoGuide.app
+xcrun devicectl device install app --device 00008150-000C70883E87401C /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData/Build/Products/Debug-iphoneos/RideHorizon.app
 ```
 
-Expected result: the latest MotoGuide build installs on Robert's iPhone.
+Expected result: the latest RideHorizon build installs on Robert's iPhone.
 
 3. Launch the app:
 
 ```bash
-xcrun devicectl device process launch --device 00008150-000C70883E87401C ai.dml.MotoGuide
+xcrun devicectl device process launch --device 00008150-000C70883E87401C ai.digitalmercenaries.ridehorizon
 ```
 
-Expected result: MotoGuide opens on Robert's iPhone.
+Expected result: RideHorizon opens on Robert's iPhone.
 
-Actual result on 2026-07-02: MotoGuide launched over OTA using CoreDevice.
+Actual result on 2026-07-02: RideHorizon launched over OTA using CoreDevice.

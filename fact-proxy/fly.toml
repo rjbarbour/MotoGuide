@@ -1,8 +1,8 @@
-# fly.toml app configuration file generated for motoguide-fact-proxy.
+# fly.toml app configuration file generated for ridehorizon-fact-proxy.
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 
-app = 'motoguide-fact-proxy'
+app = 'ridehorizon-fact-proxy'
 primary_region = 'lhr'
 
 [build]

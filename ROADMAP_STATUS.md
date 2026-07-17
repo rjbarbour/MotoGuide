@@ -1,6 +1,12 @@
-# MotoGuide Roadmap Status
+# RideHorizon Roadmap Status
 
 Date: 2026-07-03
+
+## 2026-07-17 Identity Migration
+
+`REBRANDING_PLAN.md` defines the clean identity migration before the first App Store Connect upload. The renamed proxy must not be deployed until its secret retrieval complies with AXON SOP: Secret Management in Agentic AI Development v3.0.
+
+The local source migration is complete and the renamed proxy unit suite passes. iOS signing awaits the new Apple App ID and the developer account in Xcode; unsigned asset compilation is currently blocked by the unavailable CoreSimulator runtime.
 
 Purpose: keep the roadmap and codebase status in sync. This file records what is implemented, what is partial, what is deferred, and what remains before MVP1 field trial.
 
@@ -18,7 +24,7 @@ The plans are now aligned with the codebase at a high level:
 - Fact quality review on 2026-07-03 shows isolated facts improved, but ride sequences still repeat regional topics. The next fact-quality step is ride context, topic memory, and sequence evaluation.
 - The commercial vision is broader than MVP1: user-controlled guidance from silent mode to adaptive always-on tour guide, with POI discovery, voice questions, rider preferences, and navigation handoff.
 - PMF Factory / 100 Tasks review is now captured in `PMF_FACTORY_100_TASKS_REVIEW.md`; use it to keep validation work focused and to avoid premature scale/funding/org tasks.
-- Deep-research report is available at `/Users/rob_dev/DocsLocal/motoguide/resources/MotoGuide_market_deep-research-report.md`.
+- Deep-research report is available at `/Users/rob_dev/DocsLocal/motoguide/resources/RideHorizon_market_deep-research-report.md`.
 - Current market-validation operating plan is `TWO_WEEK_MARKET_VALIDATION_PLAN.md`.
 
 ## Status By Milestone
@@ -31,7 +37,7 @@ The plans are now aligned with the codebase at a high level:
 | M3 UK place context layer | Deferred | Reverse geocoding remains the MVP1 source | Offline deterministic place/boundary lookup deferred until after field trial |
 | M4 Real-ride audio validation | Not complete | Background location/audio modes and audio session code exist | Must validate on iPhone with Nex Xcom headset and normal navigation app |
 | M5 Facts MVP | Partial | Proxy-backed Short Facts and Long Facts, cache, timeout fallback, refined 35-45 word Short Facts and 75-90 word Long Facts prompts, rider context fields, fact-interest categories, custom fact focus, tests | Sequence quality remains weak: add ride context, topic memory, avoid-topics, optional response topics/novelty, home quiet radius, and sequence-specific evaluation; proxy deployment/domain remains operational work |
-| M5.5 Speech voice and audio quality | Partial | Apple voice enumeration, preferred voice selection, preview button, speech provider setting, proxy ElevenLabs TTS client path, centralized speech output engine, Premium Voice default, provider-route diagnostics, Apple fallback after proxy failure, and provider-routing regression test exist | Validate installed voices and proxy ElevenLabs route on phone/Nex Xcom; confirm secret/config on proxy; simulator test runner currently hangs before executing tests |
+| M5.5 Speech voice and audio quality | Partial | Apple voice enumeration, preferred voice selection, preview button, speech provider setting, proxy ElevenLabs TTS client path, centralized speech output engine, Premium Voice default, provider-route diagnostics, developer-flagged Apple fallback, and provider-routing regression test exist | Validate installed voices and proxy ElevenLabs route on phone/Nex Xcom; confirm secret/config on proxy; fallback flag defaults off so proxy/ElevenLabs failures are visible; simulator test runner currently hangs before executing tests |
 | M6 Location screen completion | Partial | Location is the home screen; map-first full-screen layout, compact overlay, summary/context line, last spoken phrase, Quiet state, visible location/geocoder states, manual zoom/reset controls, and Google Maps-style bottom sheet direction exist | Build metadata visibility, panning reliability, bottom-sheet anchoring/reversibility, nearby towns, previous street, stopped-only zoom presets, presentation tests, and final field readability pass |
 | M6.5 First-time rider polish | Partial | Onboarding exists; tracking starts after onboarding; Location-first structure exists; top-level settings are separated from Advanced/Developer; location permission strings are rider-facing; rider context settings exist | Settings readability pass for glare/vibration/gloved use, History polish, final rider-language pass, proxy/audio visible recovery states, App Review/privacy notes |
 | M7 Custom instructions | Not started | None | Post-field-trial |
@@ -43,21 +49,21 @@ The plans are now aligned with the codebase at a high level:
 
 ## Code Evidence Checked
 
-- `MotoGuide/LocationManager.swift`: `locationCheckInterval = 10`, `contentMode = .shortFacts`, `testMode = false`, onboarding-triggered `beginRideTracking()`, quiet-mode guards, fact fetch fallback, rider context, voice selection, speech-provider selection, last spoken phrase.
-- `MotoGuide/BoundaryType.swift`: `natural`, `namesOnly`, `shortFacts`, `longFacts`, and `quiet` modes.
-- `MotoGuide/ContentView.swift`: Location-first map screen, compact overlay, summary/context line, last spoken phrase, quiet indicator, manual map controls, Settings and Log sheets, visible location failure states, and bottom-sheet panel.
-- `MotoGuide/ContentView.swift` pending fix: status message visibility, build metadata line in main header, zoom in/out reliability, bottom-sheet anchoring/reversibility, map panning availability, settings-string consolidation, and motorbike-readable Settings rows.
-- `MotoGuide/LocationManager.swift`: speech provider routing is centralized in a `SpeechOutputEngine`; Premium Voice / ElevenLabs is the default provider and region/country boundary speech enters the same route as road/town speech.
-- `MotoGuideTests/LocationManagerTests.swift`: regression coverage asserts every boundary type routes through the selected Premium Voice provider.
-- `MotoGuide/OnboardingView.swift`: three-page first-run explanation.
-- `MotoGuideTests`: tests cover content modes, location defaults, announcement policy, and place facts.
+- `RideHorizon/LocationManager.swift`: `locationCheckInterval = 10`, `contentMode = .shortFacts`, `testMode = false`, onboarding-triggered `beginRideTracking()`, quiet-mode guards, fact fetch fallback, rider context, voice selection, speech-provider selection, last spoken phrase.
+- `RideHorizon/BoundaryType.swift`: `natural`, `namesOnly`, `shortFacts`, `longFacts`, and `quiet` modes.
+- `RideHorizon/ContentView.swift`: Location-first map screen, compact overlay, summary/context line, last spoken phrase, quiet indicator, manual map controls, Settings and Log sheets, visible location failure states, and bottom-sheet panel.
+- `RideHorizon/ContentView.swift` pending fix: status message visibility, build metadata line in main header, zoom in/out reliability, bottom-sheet anchoring/reversibility, map panning availability, settings-string consolidation, and motorbike-readable Settings rows.
+- `RideHorizon/LocationManager.swift`: speech provider routing is centralized in a `SpeechOutputEngine`; Premium Voice / ElevenLabs is the default provider and region/country boundary speech enters the same route as road/town speech.
+- `RideHorizonTests/LocationManagerTests.swift`: regression coverage asserts every boundary type routes through the selected Premium Voice provider.
+- `RideHorizon/OnboardingView.swift`: three-page first-run explanation.
+- `RideHorizonTests`: tests cover content modes, location defaults, announcement policy, and place facts.
 
 ## MVP2 Direction Notes
 
 - Keep MVP1 passive: sparse place announcements, facts, quiet mode, and reliable helmet audio.
 - MVP2 can add explicit listening and POI handoff after real-ride value is proven. This is the first controlled step toward the always-on tour-guide vision.
-- Example MVP2 flow: MotoGuide says there are nearby places worth visiting; the rider asks for more detail; MotoGuide gives a bounded description; the rider says "navigate to Caernarfon Castle"; MotoGuide hands the selected POI to the chosen navigation app.
-- This remains separate from route planning. MotoGuide may choose or describe a destination, but navigation apps own routing.
+- Example MVP2 flow: RideHorizon says there are nearby places worth visiting; the rider asks for more detail; RideHorizon gives a bounded description; the rider says "navigate to Caernarfon Castle"; RideHorizon hands the selected POI to the chosen navigation app.
+- This remains separate from route planning. RideHorizon may choose or describe a destination, but navigation apps own routing.
 - Open-ended rider questions are M10, after the simpler POI suggestion and handoff flow is validated.
 - Later versions should test adaptive preferences: topic interests, more/less detail, shorter/longer speech, regions, trip style, and whether riders want an always-on guide for parts of a journey.
 
@@ -82,7 +88,7 @@ The plans are now aligned with the codebase at a high level:
 - `ROADMAP_STATUS.md` is the current implementation-status ledger.
 - `MVP_POLISH_PLAN.md` is the quality/spec bar for M6.5.
 - `MAP_SITUATIONAL_AWARENESS.md` is the Location screen design spec.
-- `PMF_FACTORY_100_TASKS_REVIEW.md` maps MotoGuide to the local PMF Factory and 100 Tasks material.
+- `PMF_FACTORY_100_TASKS_REVIEW.md` maps RideHorizon to the local PMF Factory and 100 Tasks material.
 - `TWO_WEEK_MARKET_VALIDATION_PLAN.md` turns the deep-research report into the current 14-day validation sprint.
 - `MILESTONE_*_STATUS.md` files are historical status notes and should be updated when a milestone changes state.
 
@@ -92,13 +98,13 @@ The plans are now aligned with the codebase at a high level:
    Expected result: nearby towns, previous street, stopped-only zoom presets, presentation tests, and final field readability pass are present.
 
 2. Finish M6.5 first-time rider polish.
-   Expected result: a first-time rider can start and understand MotoGuide without using debug settings, with remaining History/proxy/audio recovery polish tracked separately if it does not block the first ride.
+   Expected result: a first-time rider can start and understand RideHorizon without using debug settings, with remaining History/proxy/audio recovery polish tracked separately if it does not block the first ride.
 
 3. Improve facts and audio quality.
    Expected result: real-ride Short/Long Facts are useful to an adult touring rider, repeated nearby places do not restate the same regional topics, the selected Apple voice is acceptable, and the optional ElevenLabs proxy path is either validated or left off for field trial.
 
 4. Confirm the OTA-installed build works on Robert's iPhone.
-   Expected result: MotoGuide opens, requests/uses location correctly, speaks through the expected audio route, and is ready for field testing.
+   Expected result: RideHorizon opens, requests/uses location correctly, speaks through the expected audio route, and is ready for field testing.
 
 5. Run the first MVP1 field trial on 2026-07-03.
    Expected result: one ride report records GPS, background behavior, headset audio, fact timing, and Location screen usefulness.

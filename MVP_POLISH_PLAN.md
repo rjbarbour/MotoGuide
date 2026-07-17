@@ -1,12 +1,12 @@
-# MotoGuide MVP Polish Plan
+# RideHorizon MVP Polish Plan
 
 Date: 2026-07-03  
 Status: Implementation in progress — keep synchronized before the 2026-07-03 field trial  
-Audience: First-time rider using MotoGuide as a situational-awareness companion alongside normal navigation
+Audience: First-time rider using RideHorizon as a situational-awareness companion alongside normal navigation
 
 ## Context
 
-MotoGuide is now a working technical proof of concept with early product shape. Core location, reverse-geocoding, announcement policy, content modes, proxy-backed facts, onboarding, a primary Location screen, and helmet-audio support are implemented. The remaining MVP1 polish is about field readiness: clear first-run flow, complete Location screen, rider-facing settings, visible failure states, and review-safe privacy/location behavior.
+RideHorizon is now a working technical proof of concept with early product shape. Core location, reverse-geocoding, announcement policy, content modes, proxy-backed facts, onboarding, a primary Location screen, and helmet-audio support are implemented. The remaining MVP1 polish is about field readiness: clear first-run flow, complete Location screen, rider-facing settings, visible failure states, and review-safe privacy/location behavior.
 
 MVP1 goal (from `AGENTS.md` and `MILESTONES.md`): a UK motorbike audio companion that speaks short place context on meaningful boundary changes, with Short Facts as the default mode — **not** turn-by-turn navigation.
 
@@ -24,7 +24,7 @@ This plan defines polish appropriate for a **first-time user** preparing for fie
 | **Permissions** | In-app explanation **before** iOS location prompt; request location after onboarding | Plain copy: why background location is needed (announcements while screen is off / nav app in foreground) |
 | **What to expect** | Short onboarding (2–3 cards or one scrollable screen), skippable | *"You'll hear town and county names as you ride. Keep your nav app running. Connect your helmet headset."* Example announcement. Quiet mode explained. |
 | **First configuration** | Sensible defaults pre-selected; optional "Customise" link | Announcement style picker (Natural / Names only / Short facts / Quiet). Short Facts pre-selected. Advanced settings collapsed. |
-| **Ride begins** | Rider mounts phone, opens nav app, and leaves MotoGuide running after onboarding | Status: **Always running**, current place hierarchy, last spoken phrase, mode badge |
+| **Ride begins** | Rider mounts phone, opens nav app, and leaves RideHorizon running after onboarding | Status: **Always running**, current place hierarchy, last spoken phrase, mode badge |
 | **During ride** | Audio on boundary changes; screen optional | Glanceable status if Location is open at a stop; no interaction required while moving |
 | **After ride** | Optional: review last announcements in Log | Log shows rider-friendly place names, not raw coordinates first |
 
@@ -65,8 +65,38 @@ Grouped for MVP1 field readiness. **Must** = before first external rider or M8; 
 
 ### 2.1 Onboarding and permissions copy — **Must**
 
+#### 2026-07-17 onboarding and map presentation pass — **In progress**
+
+Acceptance criteria:
+
+- Onboarding reserves the Back-button space on every page so Next/Get Started never moves vertically.
+- Three onboarding cards use legible, licensed touring imagery that speaks to adventure-tourers and cruiser day-trippers: woodland road, coast road, and alpine pass. Each card overlays a small RideHorizon wordmark; the main Location screen has a subtle equivalent mark.
+- The onboarding page indicator remains visible over every image, including on light scenes.
+- Enabling Test Mode immediately displays and reverse-geocodes the first Gloucestershire test waypoint; the rider does not have to press Next before seeing a place.
+- The Location information sheet is flush with the physical bottom edge. The map’s plus, minus, and recenter controls retain their hit area but sit roughly two thirds of a visible button height higher.
+- Diagnose ElevenLabs speech end-to-end without printing, moving, or changing a secret. Fix only a confirmed code/proxy defect; deployment remains subject to the secret-management SOP.
+
+Licensing decision:
+
+- Source imagery only from Wikimedia Commons files whose listed licence permits the intended private-beta use. Keep source, author, and licence in an in-app/photo-attribution record before release; prefer public-domain/CC0 where usable.
+
+2026-07-17 implementation result:
+
+- Added forest, coast, and alpine onboarding images with a dark readability overlay, static navigation spacing, visible page indicator, and a compact RideHorizon mark. Attribution is recorded in `ONBOARDING_IMAGE_ATTRIBUTION.md`.
+- Anchored the Location screen to the lower physical edge and raised the map controls by 62 points while retaining their existing 114-point hit targets.
+- Test Mode now seeds the first test-route waypoint immediately when tracking starts or Test Mode is enabled.
+- Map controls use a top offset of 100 points. The starting map span is 3.6 km (three times the former 1.2 km span), and the visible map-width label updates after every zoom action. Map zoom remains session-only and is not restored after relaunch.
+- Build and USB installation passed on the primary iPhone.
+- ElevenLabs diagnosis: `https://ridehorizon.digitalmercenaries.ai/health` fails DNS resolution as of 2026-07-17. The renamed iOS app also correctly uses the new `RideHorizonProxy` Keychain service, so its former development proxy token is intentionally unavailable. No remote proxy logs could be read because Fly returned HTTP 401. Do not deploy or copy credentials until the DNS and secret-store migration has been designed under the binding secret-management SOP.
+
+Temporary proxy compatibility decision, 2026-07-17:
+
+- Keep using the healthy pre-rename Fly endpoint while the RideHorizon hostname and compliant deployment path are prepared. It is isolated behind one source-level switch, defaulted on for this private-beta build.
+- Do not attempt to reuse the old app’s Keychain item: changing the bundle ID also changes the default Keychain access group. The device proxy credential must be stored directly in RideHorizon’s own Keychain service, without logging or duplicating it.
+- Remove both compatibility paths when `ridehorizon.digitalmercenaries.ai` resolves and its proxy has a compliant runtime secret retrieval mechanism.
+
 - 2–3 screen onboarding: purpose, how it differs from nav, helmet + background location note.
-- Replace plist usage strings with rider-facing copy, e.g. *"MotoGuide uses your location to announce towns and counties while you ride, even when the screen is off or another app is open."*
+- Replace plist usage strings with rider-facing copy, e.g. *"RideHorizon uses your location to announce towns and counties while you ride, even when the screen is off or another app is open."*
 - Request location only after onboarding has explained why it is needed.
 - Keep `NSLocationAlwaysUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`, and `NSLocationWhenInUseUsageDescription` rider-facing.
 - Post-denial screen: Open Settings deep link, explain limited functionality.
@@ -103,7 +133,7 @@ Rename UI only where rider-visible; keep code identifiers stable.
 - Keep the map-first layout per `MAP_SITUATIONAL_AWARENESS.md`: full map, compact overlay, current place, mode, and last phrase.
 - Add nearby towns, previous street, stopped-only zoom presets, and presentation tests.
 - Show low-level location status text only in test mode to reduce non-signal clutter at ride speed.
-- Show compact semantic version and ISO-like build timestamp clearly near the MotoGuide title in test mode.
+- Show compact semantic version and ISO-like build timestamp clearly near the RideHorizon title in test mode.
 - Keep Quiet mode visible on Location.
 - Keep map controls reliable: zoom in/out and reset should have a larger, explicit hit area and predictable behavior.
 - Keep map panning available on the Location screen; do not re-disable panning based on current speed during MVP field testing.
@@ -137,13 +167,15 @@ Not App Store polish. Minimum:
 
 ### 2.7 Voice quality — **Should before repeated field testing**
 
-- Keep installed Apple voices available as fallback.
+- Keep installed Apple voices available as an explicitly enabled developer fallback.
 - Add proxy-backed ElevenLabs speech as the first non-Apple provider.
 - Keep ElevenLabs API key, voice id, model id, and output format server-side.
 - Add a small speech provider setting and keep the preview path.
 - Keep the selected provider, voice fallback, rate, pitch, and volume stable across launches.
 - Centralise speech-provider routing so natural/names-only boundary announcements, proxy facts, repeat speech, test-route speech, and region/country announcements do not use separate Apple-only paths.
-- Apple voice fallback is allowed only when the selected Premium Voice path fails or is unavailable; it must not be selected implicitly by boundary type.
+- Apple voice fallback is allowed only when the selected Premium Voice path fails or is unavailable and the developer fallback feature flag is enabled; it must not be selected implicitly by boundary type or by Test Mode.
+- In Test Mode, Premium Voice failures must show a visible main-screen error so rate limits, missing proxy token, HTTP failures, or audio playback errors are not hidden in the developer diagnostics log.
+- The expanded Location bottom sheet must allow the Premium Voice error and current spoken/fact text to be read together; use extra expanded height and scrolling rather than clipping.
 - Test through the Nex Xcom headset; phone-speaker quality is not enough.
 
 ### 2.8 Error and permission-denied handling — **Must**
@@ -255,7 +287,7 @@ Use this as the implementation bar for the first-time rider polish.
 
 ### 4.1 Product principles
 
-- One primary job per screen. Location answers "where am I?", Settings answers "what should MotoGuide say?", History answers "what did it say?".
+- One primary job per screen. Location answers "where am I?", Settings answers "what should RideHorizon say?", History answers "what did it say?".
 - Audio remains the primary ride interface. The screen is for setup, stops, and quick confidence checks.
 - Announcements should happen at suitable moments. Delay or drop speech rather than talking over demanding riding conditions.
 - Progressive disclosure. First-run and simple Settings show only the decisions a rider needs. Advanced holds debug and tuning.
@@ -273,7 +305,7 @@ Use this as the implementation bar for the first-time rider polish.
 - Debug controls in the primary rider path.
 - Jargon such as geocode, Nation, or check interval on first-run screens.
 - Blank screens while waiting for GPS or denied permissions.
-- Route, ETA, turn banner, search, or POI UI that makes MotoGuide look like navigation.
+- Route, ETA, turn banner, search, or POI UI that makes RideHorizon look like navigation.
 - Speech that sounds like an instruction to ride, turn, speed up, stop, or make a safety decision.
 - Speech that continues through demanding cornering, braking, acceleration, or complex junction work when it could have been delayed.
 - Backlog playback after a held period.
@@ -291,13 +323,13 @@ Sources checked on 2026-07-02:
 
 Review risks to address before TestFlight or App Store review:
 
-- **Location Services:** Location is core to MotoGuide, but permission copy must clearly explain background town/county announcements. Do not imply emergency, autonomous vehicle control, or navigation safety features.
+- **Location Services:** Location is core to RideHorizon, but permission copy must clearly explain background town/county announcements. Do not imply emergency, autonomous vehicle control, or navigation safety features.
 - **Background modes:** Audit Info.plist background modes. Keep only modes that are genuinely used and explain background location/audio in App Review notes.
 - **Privacy policy:** Draft a clear policy covering device location use, Apple reverse geocoding, fact proxy requests, retained data, logs, and deletion/consent requests.
 - **App Privacy labels:** Inventory all data collection before submission. Fact proxy requests should avoid exact coordinates where possible; document whether place names, country context, request IDs, or diagnostics are collected.
 - **Generated facts:** Keep prompts and sanitization bounded. Facts must be short, non-instructional, and safe to ignore while riding.
 - **Backend availability:** The fact proxy must be live during review. If review needs a token, provide it in App Review notes or provide a demo mode.
-- **Metadata accuracy:** Describe MotoGuide as an audio place-awareness companion, not a navigation app, not a safety app, and not an emergency service.
+- **Metadata accuracy:** Describe RideHorizon as an audio place-awareness companion, not a navigation app, not a safety app, and not an emergency service.
 - **Physical safety:** The app must not encourage interaction while riding. Setup happens before the ride or at a stop.
 - **Support and contact:** Add support/privacy links before public App Store submission. For the 2026-07-03 field trial, record the missing items as review blockers, not field blockers.
 
@@ -362,7 +394,7 @@ Rationale:
 - [ ] Settings Simple section has ≤ 3 decision areas; Advanced holds debug and tuning.
 - [ ] Location status row shows only actionable states; normal ride view does not display generic `Location is active`.
 - [ ] Map zoom controls have a visibly larger, full-area hit target and consistent zoom-in/zoom-out behavior.
-- [ ] Build metadata line appears beneath "MotoGuide" on main screen in test mode.
+- [ ] Build metadata line appears beneath "RideHorizon" on main screen in test mode.
 - [ ] Bottom sheet reaches the bottom edge, expands upward, collapses downward, and does not block map panning outside the sheet.
 - [ ] Map can be panned by swipe; new location updates do not recenter unless reset/follow is active.
 - [ ] Plus, minus, and reset controls are reduced to roughly three quarters of the previous visual size while preserving a usable hit area.
@@ -382,7 +414,7 @@ Rationale:
 
 ## 6. Executive Summary
 
-- MotoGuide works technically and has early product shape; the remaining MVP1 gap is field readiness.
+- RideHorizon works technically and has early product shape; the remaining MVP1 gap is field readiness.
 - First-time riders need a clear story: **companion audio for place awareness**, not navigation, before the location permission dialog.
 - **Must-have polish:** onboarding, permission copy, hide debug controls, rider language, live status, error states, confirmed defaults (10 s interval, Short Facts, no street).
 - **Should-have:** complete Location home, History tab polish, basic visual consistency, Simple vs Advanced settings.

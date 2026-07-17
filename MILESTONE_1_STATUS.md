@@ -10,12 +10,12 @@ Milestone 1 is complete in code. The location and speech prototype is split into
 
 ### Address formatting separated
 
-- Added `MotoGuide/Address.swift` with the `Address` model and `AddressFormatter` for spoken text.
+- Added `RideHorizon/Address.swift` with the `Address` model and `AddressFormatter` for spoken text.
 - Removed address formatting from `LocationManager.swift`.
 
 ### Announcement logic separated
 
-- Added `MotoGuide/AnnouncementDecision.swift` with pure functions for:
+- Added `RideHorizon/AnnouncementDecision.swift` with pure functions for:
   - address change detection
   - repeat-preference handling
   - speech text generation
@@ -23,7 +23,7 @@ Milestone 1 is complete in code. The location and speech prototype is split into
 
 ### Test route fixture
 
-- Added `MotoGuide/TestRouteFixture.swift` with 11 named waypoints along the Gloucestershire test route (Nailsworth to Stonehouse).
+- Added `RideHorizon/TestRouteFixture.swift` with 11 named waypoints along the Gloucestershire test route (Nailsworth to Stonehouse).
 - `LocationManager.logTestLocation()` cycles through `TestRouteFixture.waypoints`.
 
 ### View cleanup
@@ -33,10 +33,10 @@ Milestone 1 is complete in code. The location and speech prototype is split into
 
 ### Unit tests
 
-- `MotoGuideTests/AddressTests.swift` — equality, formatting, JSON.
-- `MotoGuideTests/AnnouncementDecisionTests.swift` — change detection, repeat rules, speech text.
-- `MotoGuideTests/TestRouteFixtureTests.swift` — waypoint count, coordinate consistency, route bounds.
-- Updated `MotoGuideTests/LocationManagerTests.swift` — interval throttling and test-mode behaviour.
+- `RideHorizonTests/AddressTests.swift` — equality, formatting, JSON.
+- `RideHorizonTests/AnnouncementDecisionTests.swift` — change detection, repeat rules, speech text.
+- `RideHorizonTests/TestRouteFixtureTests.swift` — waypoint count, coordinate consistency, route bounds.
+- Updated `RideHorizonTests/LocationManagerTests.swift` — interval throttling and test-mode behaviour.
 
 ## Done Criteria
 
@@ -51,7 +51,7 @@ Milestone 1 is complete in code. The location and speech prototype is split into
 Command:
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS Simulator,name=iPhone 15' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 15' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData
 ```
 
 Expected result: all unit tests pass in the iOS Simulator.
@@ -61,7 +61,7 @@ Actual result: **BUILD SUCCEEDED** and **TEST SUCCEEDED** on iPhone 17 simulator
 Command used:
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -only-testing:MotoGuideTests
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -only-testing:RideHorizonTests
 ```
 
 17 unit tests passed across `AddressTests`, `AnnouncementDecisionTests`, `TestRouteFixtureTests`, and `LocationManagerTests`.

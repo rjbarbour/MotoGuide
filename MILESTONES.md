@@ -1,17 +1,23 @@
-# MotoGuide High-Level Plan
+# RideHorizon High-Level Plan
 
-Date: 2026-07-02
+Date: 2026-07-03
+
+## 2026-07-17 Identity Migration
+
+The prototype is being cleanly renamed from RideHorizon to RideHorizon before the first App Store Connect build upload. See `REBRANDING_PLAN.md` for the binding identity map, acceptance criteria, and deployment constraint. This migration changes the app's bundle identifier, source namespaces, proxy contract names, and current documentation; it does not change the rider-safety product scope.
 
 ## Product Goal
 
-Build MotoGuide into a real-ride iPhone audio companion that gives motorcyclists short, useful spoken place context while they follow their normal navigation app.
+Build RideHorizon into a real-ride iPhone audio companion that gives motorcyclists short, useful spoken place context while they follow their normal navigation app.
+
+Long-term vision: RideHorizon should scale from silent display-only place awareness, through sparse boundary announcements, to an adaptive always-on tour guide that learns the rider's interests, preferred detail level, regions, and trip context. The rider should be able to control how much it speaks, ask general place questions, get richer descriptions, discover worthwhile stops, and hand selected destinations to a navigation app without RideHorizon becoming the route planner.
 
 ## Existing Baseline
 
 The current codebase is not a blank slate. It already contains:
 
 - A SwiftUI app with controls for test mode, speak-after-every-geocode, location check interval, repeated address components, and manual logging.
-- `LocationManager`, which requests location, reverse-geocodes coordinates, throttles location updates by interval, handles background audio setup, and speaks with `AVSpeechSynthesizer`.
+- `LocationManager`, which requests location, reverse-geocodes coordinates, throttles location updates by interval, handles background audio setup, speaks with Apple speech, and can use proxy-backed ElevenLabs speech with Apple fallback.
 - `Address` and `AddressFormatter`, which separate address data and spoken text formatting.
 - `AnnouncementDecision`, which decides whether to speak, which address components to include, and how repeat preferences behave.
 - `TestRouteFixture`, a named Gloucestershire route with 11 fixed coordinates for manual and simulator testing.
@@ -45,9 +51,11 @@ Out of scope for MVP1:
 - App Store launch polish.
 - Deterministic offline place/boundary data.
 
+MVP1 is the functional proof and trust-building step, not the full commercial thesis. It should prove that the app can run on a real ride, speak at useful moments, avoid distraction, and make riders want to try a richer RideHorizon. Willingness-to-pay testing should include the full tour-guide vision as well as the MVP1 feature set.
+
 ## Current Roadmap Decisions
 
-Date: 2026-07-02
+Date: 2026-07-03
 
 - Keep MVP1 defaults as `10 s` location check interval, Short Facts content mode, street off, and town, county, region, and country on.
 - Defer the deterministic UK place context layer until after MVP1 field trial. Use Apple reverse geocoding plus proxy-backed facts for MVP1.
@@ -55,9 +63,14 @@ Date: 2026-07-02
 - Add first-time rider polish and app-quality review readiness before field trial.
 - Stop the MVP1 build scope at Location screen completion plus first-time rider polish. The first field trial target is 2026-07-03.
 - Add a near-term audio-quality task: choose a better installed iOS TTS voice, prefer enhanced/premium `en-GB` voices when available, and expose a small previewable voice setting.
-- Improve fact quality before broader testing: Short Facts should be about as long as the current Long Facts, Long Facts should be longer, and both should assume an adult, middle-aged touring rider rather than explaining obvious schoolbook context.
-- Add optional coarse home/familiar-region context, for example home country/region only, so the proxy can avoid telling an English rider basic facts such as Wales being part of the UK.
-- Move the Location screen towards a map-first layout: full-height map with compact overlay information, roughly twice the current visible map area, and no navigation-style route UI.
+- Use **announcements** as the standard user-facing word for RideHorizon speech. Avoid "utterances", "interruptions", "notifications", and navigation-style "guidance".
+- Add ride-aware announcement timing after MVP1 field validation: delay place announcements while riding looks busy, such as hard braking, hard acceleration, cornering, rapid heading changes, or noisy GPS/course; speak the latest held announcement when stopped or riding steadily.
+- Improve fact quality before broader testing: Short Facts should be 35-45 words, Long Facts should be 75-90 words, and both should assume an adult touring rider rather than explaining obvious schoolbook context.
+- Treat fact quality as a ride-sequence problem, not only an isolated prompt problem. Add optional ride context so the proxy can avoid repeating regional setup across nearby towns.
+- Add optional coarse home/familiar-region context and a later home quiet radius so the app can avoid facts near familiar places. Do not send an exact home address.
+- Keep the implemented map-first Location screen and finish the remaining M6 items: nearby towns, previous street, stopped-only zoom presets, presentation tests, and field readability pass.
+- Keep the long-term product narrative visible during validation: the app can range from silent to always-on guidance, with user-controlled detail and interests.
+- Use `TWO_WEEK_MARKET_VALIDATION_PLAN.md` as the current market-validation sprint after the deep-research report at `/Users/rob_dev/DocsLocal/motoguide/resources/RideHorizon_market_deep-research-report.md`.
 
 ## Milestone 0: Project Setup And Baseline Verification
 
@@ -67,30 +80,30 @@ Existing baseline:
 
 - The repository is cloned at `/Users/rob_dev/DocsLocal/motoguide/repo`.
 - `AGENTS.md`, `MILESTONES.md`, and `MILESTONE_0_STATUS.md` exist in the repository root.
-- Xcode sees the `MotoGuide` scheme.
+- Xcode sees the `RideHorizon` scheme.
 - CoreDevice has seen `Robert's iPhone` over the OTA path as `Roberts-iPhone-17.coredevice.local`; `xcodebuild -showdestinations` may not always list it.
 - Xcode now has an iPhone 17 Pro Max simulator runtime available.
 
 Remaining work:
 
 - Keep Robert's iPhone unlocked, trusted, and on the same Wi-Fi as the Mac for OTA deploys.
-- Re-run on the physical phone after CoreDevice visibility is confirmed.
+- Re-run on the physical phone after any coherent app-code batch.
 - Re-run simulator tests after any simulator launch issue is cleared.
 - Keep `MILESTONE_0_STATUS.md` updated with the latest pass/fail result.
 
 Done when:
 
-- MotoGuide launches on the iPhone.
+- RideHorizon launches on the iPhone.
 - A simulator or device test run has a recorded result.
 - Any remaining setup blocker is documented with exact command and expected result.
 
 Primary command:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
 ```
 
-Expected result: MotoGuide builds for Robert's iPhone.
+Expected result: RideHorizon builds for Robert's iPhone.
 
 ## Milestone 1: Current Prototype Hardening
 
@@ -106,7 +119,7 @@ Existing baseline:
 
 Enhancement work:
 
-- Replace placeholder generated tests in `MotoGuideTests.swift` with useful smoke tests or remove them.
+- Replace placeholder generated tests in `RideHorizonTests.swift` with useful smoke tests or remove them.
 - Add tests for `speakAfterEveryGeocode` semantics.
 - Add tests for first-address behaviour when repeat toggles are disabled.
 - Add tests for audio-interruption resume behaviour if the logic is extracted enough to test.
@@ -142,6 +155,8 @@ Enhancement work:
 - Add one-sentence mode for what is special about the current town or county.
 - Rename UI controls from address-component language to rider-facing language where appropriate.
 - Keep MVP1 as a separate audio companion that runs alongside normal navigation.
+- Add ride-aware announcement timing as a post-MVP1 enhancement: hold speech while the rider is cornering, braking, accelerating, rapidly changing heading, or otherwise in a busy riding state.
+- Coalesce held announcements so RideHorizon speaks only the latest relevant place update, not a backlog.
 
 Done when:
 
@@ -149,10 +164,11 @@ Done when:
 - The UI exposes quiet, names-only, and one-sentence modes.
 - The UI makes speech frequency rules visible.
 - Default settings are conservative enough for a first road test.
+- Ride-aware timing has explicit states and tests: announce normally, delay while busy, announce only when stopped or steady, and quiet.
 
 ## Milestone 3: Deferred UK Place Context Layer
 
-Target outcome: MotoGuide can move beyond raw reverse-geocoded address text while preserving the existing reverse-geocode path as a fallback.
+Target outcome: RideHorizon can move beyond raw reverse-geocoded address text while preserving the existing reverse-geocode path as a fallback.
 
 Status: Deferred until after MVP1 field trial.
 
@@ -213,13 +229,13 @@ Done when:
 
 ## Milestone 5: Facts MVP
 
-Target outcome: MotoGuide can add lightweight local context beyond names while keeping speech bounded and ride-safe.
+Target outcome: RideHorizon can add lightweight local context beyond names while keeping speech bounded and ride-safe.
 
 Existing baseline:
 
 - The app can already speak selected place/address components.
 - The proposed first-region route is known.
-- Short Facts and Long Facts use the OpenAI-backed MotoGuide fact proxy as the primary implementation path.
+- Short Facts and Long Facts use the OpenAI-backed RideHorizon fact proxy as the primary implementation path.
 - The proxy API contract is documented in `FACT_PROXY_OPENAPI.yaml`, with `FACT_PROXY_CONTRACT.md` as the human-readable companion.
 
 Enhancement work:
@@ -228,16 +244,20 @@ Enhancement work:
 - Use the OpenAI-backed fact proxy first. Keep the iOS client and proxy server aligned with `FACT_PROXY_OPENAPI.yaml`.
 - Keep `LOCAL_LLM_FACTS_FALLBACK_PLAN.md` as an alternative if OpenAI cost, latency, connectivity, privacy, or quality becomes a blocker.
 - Add a content-depth parameter, including names only, Short Facts, and Long Facts.
-- Revise fact length targets:
-- Short Facts: up to 5 concise sentences, up to 1100 characters.
-- Long Facts: up to 8 concise sentences, up to 1500 characters, still safe to hear while riding and interruptible.
+- Revise fact length targets from the 2026-07-03 prompt-refinement pass:
+  - Short Facts: 35-45 words, one sentence or two short sentences.
+  - Long Facts: 75-90 words, two to four concise sentences, explicit and interruptible.
 - Revise prompt style: avoid banal encyclopaedia facts, obvious administrative definitions, trivia without relevance, and patronising explanations. Prefer specific local history, landscape, road context, industry, architecture, border changes, notable people, or why the place matters.
 - Add optional rider familiarity context to the contract, such as `homeCountry`, `homeRegion`, or `familiarRegions`, without sending an exact home address. Use it only to tune what not to explain.
+- Add optional ride sequence context to the fact proxy contract: sequence index, current regional context, previous spoken places, previous topics, avoid topics, desired novelty, and familiarity policy.
+- Add a small app-side topic memory for the last 3-5 spoken facts.
+- Add optional `topics` and `novelty` fields to fact responses, or derive coarse tags on-device for MVP if the response contract stays simple.
+- Add a home quiet radius setting after the first field trial: off, 5 miles, 10 miles, or 25 miles. Inside the radius, use silence or names-only unless the rider explicitly asks for facts.
 - Add rules for when facts are spoken.
 - Keep fact announcements shorter than navigation instructions.
 - Keep prompt selection server-side; iOS sends only the requested fact mode and place hierarchy.
 - Add tests for selecting and suppressing facts.
-- Add a fact-review fixture using real route places and expected quality checks: not banal, not obvious to a UK rider, no schoolbook definitions, no safety instruction, no raw coordinates, bounded length.
+- Add fact-review fixtures using real route places and expected quality checks: not banal, not obvious to a UK rider, no schoolbook definitions, no safety instruction, no raw coordinates, bounded length, and low repetition across a ride sequence.
 
 Done when:
 
@@ -247,10 +267,12 @@ Done when:
 - Quiet mode remains silent.
 - The fact instruction is constrained enough that announcements remain ride-safe.
 - Facts use optional home/familiar-region context to avoid telling riders things they are likely to know already.
+- Sequence tests show repeated nearby towns do not all restate the same regional topics, such as Cotswolds, limestone, stone buildings, wool, cloth, old routes, and mills.
+- If no distinct fact is available for a same-region town, RideHorizon uses names-only or stays quiet rather than speaking filler.
 
 ## Milestone 5.5: Speech Voice And Audio Quality
 
-Target outcome: MotoGuide sounds less robotic and more suitable for helmet listening.
+Target outcome: RideHorizon sounds less robotic and more suitable for helmet listening.
 
 Work:
 
@@ -264,7 +286,7 @@ Work:
 
 Done when:
 
-- MotoGuide can use proxy-backed ElevenLabs speech and clearly falls back to Apple speech if it is unavailable.
+- RideHorizon can use proxy-backed ElevenLabs speech and clearly falls back to Apple speech if it is unavailable.
 - The rider can preview and choose the speech provider.
 - The selected provider remains intelligible through the helmet at riding volume.
 
@@ -278,16 +300,15 @@ Existing baseline:
 
 - `LocationManager` provides throttled coordinates and reverse-geocoded `Address`.
 - `BoundaryType` and `AnnouncementPolicy` define the street → town → county → region → country hierarchy.
-- `ContentView` has a primary Location screen with toolbar Settings and Log.
-- The app already shows a current-place summary, hierarchy, last spoken phrase, quiet-mode status, and a basic MapKit map.
+- `ContentView` has a primary map-first Location screen with toolbar Settings and Log.
+- The app already shows a compact overlay with current-place summary, context line, last spoken phrase, quiet-mode status, visible location/geocoder states, manual map controls, moving-state map lock, and a full-screen MapKit map.
 
 Enhancement work:
 
-- Complete the **Location** screen with a single MapKit map and context stack.
-- Move toward a map-first layout: a near full-screen MapKit map with compact translucent/bottom-sheet overlays for current place, hierarchy, last phrase, and mode.
+- Complete the remaining **Location** screen context around the map-first implementation.
 - Keep information compact: avoid a tall stacked dashboard above the map; use one-line current place, compressed hierarchy chips/rows, and collapsible detail.
 - Show summary line, hierarchy panel, previous street when changed, and nearby towns with distances in compact overlay form.
-- Auto-follow user location with context-aware default zoom; show roughly twice the current map area by default.
+- Auto-follow user location with context-aware default zoom.
 - Keep speed-gated zoom presets when stopped.
 - Reuse shared `LocationManager` state; support test mode on the Gloucestershire fixture.
 - Do **not** add deterministic boundary data or administrative polygons in M6.
@@ -307,7 +328,7 @@ Done when:
 
 ## Milestone 6.5: First-Time Rider Polish And Review Readiness
 
-Target outcome: MotoGuide feels like a focused rider app, not a developer test harness, and avoids obvious App Store review problems before broader testing.
+Target outcome: RideHorizon feels like a focused rider app, not a developer test harness, and avoids obvious App Store review problems before broader testing.
 
 Design reference: `MVP_POLISH_PLAN.md`
 
@@ -335,7 +356,7 @@ Done when:
 
 ## Milestone 7: Custom Announcement Instructions
 
-Target outcome: MotoGuide can adapt announcement style without making the ride experience unsafe or noisy.
+Target outcome: RideHorizon can adapt announcement style without making the ride experience unsafe or noisy.
 
 Enhancement work:
 
@@ -349,6 +370,38 @@ Done when:
 - A rider can choose or edit announcement preferences.
 - The app still limits output to the selected content depth.
 - Boundary-specific preferences do not bypass safety limits.
+
+## Milestone 7.5: Ride-Aware Announcement Timing
+
+Target outcome: RideHorizon speaks at calmer moments and avoids blithering away while the rider is dealing with demanding riding conditions.
+
+Vocabulary:
+
+- Use **announcements** for rider-facing copy.
+- Use **ride-aware announcements** for the feature.
+- Use **held announcement** internally for a delayed speech item.
+
+Work:
+
+- Define a `RideState` model from available signals: stopped, slow and steady, moving steadily, cornering, braking, accelerating, and uncertain.
+- Use speed, course/heading stability, acceleration, and turn-rate signals where available. Do not depend on perfect lean-angle detection for MVP.
+- Add Settings options:
+  - Announce normally.
+  - Delay while cornering or braking.
+  - Announce only when stopped or riding steadily.
+  - Quiet mode.
+- Delay place announcements while the ride state is busy or uncertain, then speak the latest held announcement when conditions settle.
+- Coalesce held announcements. Keep only the most relevant latest boundary/fact; do not read a backlog after a bend or junction sequence.
+- Add a maximum hold time, then either speak a shortened names-only update or drop it.
+- Keep navigation-app audio priority in mind. RideHorizon must remain secondary to turn-by-turn directions.
+- Add tests for busy-state suppression, steady-state release, max-hold expiry, quiet-mode override, and coalescing.
+
+Done when:
+
+- RideHorizon can delay speech while cornering, braking, accelerating, rapidly changing heading, or receiving noisy motion/course data.
+- The rider can choose a conservative timing mode without understanding the sensors.
+- Held announcements do not become stale, unsafe, or repetitive.
+- The feature is validated on the physical iPhone and Nex Xcom headset during a real ride.
 
 ## Milestone 8: MVP1 Field Trial
 
@@ -367,7 +420,7 @@ Work:
 - Compare against normal navigation alone.
 - Capture rider notes immediately after each ride.
 - Evaluate distraction, timing, usefulness, novelty, and headset reliability.
-- Move the fact proxy from the default `motoguide-fact-proxy.fly.dev` hostname to an owned MotoGuide/DML domain name before inviting broader external testers.
+- Move the fact proxy from the default `ridehorizon.digitalmercenaries.ai` hostname to an owned RideHorizon/DML domain name before inviting broader external testers.
 - Decide whether to continue, pivot, or stop.
 
 Done when:
@@ -379,38 +432,65 @@ Done when:
 
 ## Milestone 9: MVP2 Listening And POI Handoff
 
-Target outcome: MotoGuide can listen for simple rider replies and hand off a selected point of interest to navigation.
+Target outcome: RideHorizon starts moving from passive place announcements toward the adaptive tour-guide vision. It can listen for simple rider replies, suggest nearby points of interest, give a short or longer description when appropriate, learn from expressed interests, and hand off a selected destination to navigation.
+
+MVP2 product boundary:
+
+- This is still not route planning. RideHorizon may help pick a destination, then hand off to a navigation app.
+- Listening should be explicit and bounded, not always-on open conversation.
+- This does not reject the always-on tour-guide vision. It is the first controlled version of it, so safety, trust, and interaction quality can be tested before broad open conversation.
+- POI suggestions should be sparse and rider-relevant: castles, viewpoints, historic places, cafes, fuel, museums, bridges, passes, border points, or landmarks.
+- Longer descriptions should be available when stopped or explicitly requested, not pushed automatically while riding.
+- The first implementation can use server/API data or pre-generated touring-pack content. Live LLM use is allowed only if cost, latency, and privacy are visible in the product and business model.
 
 Work:
 
-- Add a limited listening mode for short replies.
-- Let MotoGuide suggest a nearby point of interest.
-- Let the rider accept, reject, or ask for the next option.
-- Define the first navigation handoff target.
-- Keep fallback behaviour simple if navigation handoff fails.
+- Add a limited listening mode for short replies such as "yes", "no", "next", "tell me more", and "navigate there".
+- Let RideHorizon suggest a nearby point of interest from the current place context.
+- Support a short list flow: "There are three nearby places: Caernarfon Castle, the waterfront, and Segontium Roman Fort."
+- Support a detail flow: "Tell me more about Caernarfon Castle" gives a longer but bounded description, preferably when stopped.
+- Support a navigation flow: "Navigate to Caernarfon Castle" opens or hands off to the chosen navigation app with the selected POI.
+- Define the first navigation handoff target before implementation, likely Google Maps or Apple Maps, then test Garmin/TomTom/Calimoto feasibility later.
+- Keep fallback behaviour simple if navigation handoff fails: show the destination and copy/open action, do not attempt route calculation.
+- Add user controls for whether POI suggestions are enabled, when listening is allowed, and whether long descriptions can play while moving.
+- Add simple preference signals such as "more like this", "less history", "shorter", "more detail", or topic toggles so the guide can begin adapting without needing broad memory first.
+- Add validation questions before implementation: would riders use ask-back while moving, only when stopped, or not at all?
 
 Done when:
 
-- The app can suggest a POI and process a simple voice reply.
-- The app can pass the selected POI to the chosen navigation flow.
-- Listening does not interfere with core boundary announcements.
+- The app can suggest one or more POIs grounded in current location.
+- The rider can accept, reject, ask for the next option, ask for more detail, or request navigation using simple voice commands.
+- The app can pass the selected POI to the chosen navigation flow without becoming a route planner.
+- Long descriptions are bounded, interruptible, and disabled or deferred while moving unless explicitly allowed.
+- Listening does not interfere with core boundary announcements, normal navigation audio, or instant mute.
 
 ## Milestone 10: Rider Questions
 
-Target outcome: MotoGuide can answer simple place questions during a ride.
+Target outcome: RideHorizon can answer constrained place questions after the POI handoff pattern is validated, then progressively expand toward an always-on adaptive guide.
+
+Boundary:
+
+- This is a later expansion of MVP2, not MVP1.
+- Prefer questions about the current place, nearby POIs, route-adjacent context, or the last announced place.
+- Avoid general chat, route advice, safety advice, speed advice, or broad travel planning while riding.
+- Defer open-ended or long answers until stopped unless the rider explicitly allows a longer response.
+- General questions are part of the long-term product vision, but should be introduced behind controls and tested against distraction, latency, answer quality, and trust.
 
 Work:
 
-- Add a constrained question mode.
-- Ground answers in the current place context and local content dataset.
-- Keep answers short by default.
+- Add a constrained question mode, for example: "What is that castle?", "Anything worth visiting nearby?", "Why is this town notable?", or "Tell me more when I stop."
+- Ground answers in current place context, selected POI, trusted source text, cached touring-pack content, or proxy/API content.
+- Keep answers short by default and make longer answers explicit.
 - Add a way to defer longer answers until the ride stops.
+- Add privacy and cost controls if live LLM calls are used.
+- Test whether riders prefer passive announcements, stopped-only questions, or moving voice questions before building broad Q&A.
 
 Done when:
 
 - The rider can ask basic questions about the current town, county, landmark, or history.
 - Answers stay within ride-safe length limits.
 - The feature can be disabled completely.
+- The implementation shows whether open-ended questions add enough value beyond POI suggestion and navigation handoff.
 
 ## Milestone 11: Post-MVP Direction
 
@@ -422,12 +502,13 @@ Options:
 - UK and Europe motorbike touring app.
 - Car road-trip audio companion after motorbike validation.
 - Integration layer for existing navigation.
-- AI live-guide feature set with listening and questions.
+- AI live-guide feature set with POI discovery, listening, questions, and navigation handoff.
+- Adaptive always-on tour guide with rider memory, configurable detail, topic preferences, voice questions, and trip-aware suggestions.
 - Stop after prototype if the ride value is weak.
 
 Decision criteria:
 
-- Does the rider miss MotoGuide when it is off?
+- Does the rider miss RideHorizon when it is off?
 - Does it add value without distraction?
 - Is the data pipeline manageable?
 - Can it run reliably in the background?
@@ -437,6 +518,6 @@ Decision criteria:
 
 1. Finish Milestone 6 Location screen completion.
 2. Finish Milestone 6.5 first-time rider polish and review-readiness notes.
-3. Build, install, and launch MotoGuide on Robert's iPhone.
+3. Build, install, and launch RideHorizon on Robert's iPhone.
 4. Run the first MVP1 field trial on 2026-07-03.
 5. Record the ride result, then decide whether to continue with more field rides or fix blockers first.
