@@ -421,6 +421,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var interruptedSpeechPlan: AnnouncementPlan?
     private var interruptionResumeWorkItem: DispatchWorkItem?
     private let factGenerator: PlaceFactGenerating
+    private let aiSharingAllowed: () -> Bool
     private var inFlightFactTask: Task<Void, Never>?
     private var activeAnnouncementToken = UUID()
     private var wantsRideTracking = false
@@ -565,10 +566,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     init(
         factGenerator: PlaceFactGenerating? = nil,
-        speechOutput: SpeechOutputEngine? = nil
+        speechOutput: SpeechOutputEngine? = nil,
+        aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
         self.speechOutput = speechOutput ?? DefaultSpeechOutputEngine()
+        self.aiSharingAllowed = aiSharingAllowed
         super.init()
         self.speechOutput.onFinish = { [weak self] in
             self?.activeSpeechPlan = nil
@@ -622,6 +625,49 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         wantsRideTracking = false
         locationManager.stopUpdatingLocation()
         isTracking = false
+    }
+
+    func applyAISharingDecision(isGranted: Bool) {
+        inFlightFactTask?.cancel()
+        inFlightFactTask = nil
+        activeAnnouncementToken = UUID()
+        cancelPendingAnnouncement()
+        stopSpeechOutput()
+
+        if !isGranted {
+            contentMode = .namesOnly
+            speechProvider = .apple
+        }
+    }
+
+    /// Cancels active work and removes privacy-sensitive state held by this manager.
+    /// The caller remains responsible for clearing persisted defaults and Keychain records.
+    func clearLocalPrivacyState() {
+        applyAISharingDecision(isGranted: false)
+        pauseRideTracking()
+        geocoder.cancelGeocode()
+        onAddressChange = nil
+        onRideLog = nil
+
+        lastKnownLocation = nil
+        lastKnownAddress = nil
+        currentSpeedMetersPerSecond = nil
+        lastSpokenPhrase = nil
+        lastSpokenAt = nil
+        lastSpeechDiagnosticNote = nil
+        locationStatus = .checking
+        previousAddress = nil
+        lastUpdateTime = nil
+        lastBoundaryAnnouncementTime = nil
+        interruptedSpeechPlan = nil
+
+        homeCountry = ""
+        homeRegion = ""
+        familiarRegions = ""
+        customFactInstructions = ""
+        factInterestCategories = FactInterestCategory.defaultSelections
+        contentMode = .shortFacts
+        speechProvider = .proxyElevenLabs
     }
 
     private func startRideTrackingIfAuthorized() {
@@ -825,7 +871,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             if testMode {
                 recordTestLog(utteredPhrase: nil)
             }
-            print("No announcement required.")
+            AppDiagnostics.log("No announcement required.")
             return
         }
 
@@ -836,7 +882,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             if testMode {
                 recordTestLog(utteredPhrase: nil)
             }
-            print("Boundary announcement suppressed due cooldown.")
+            AppDiagnostics.log("Boundary announcement suppressed due cooldown.")
             return
         }
 
@@ -845,7 +891,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             onAddressChange?(address)
         }
 
-        if let factMode = contentMode.factMode {
+        if let factMode = contentMode.factMode, aiSharingAllowed(), plan.boundary != .street {
             lastBoundaryAnnouncementTime = Date()
             fetchFactAndEnqueue(plan: plan, address: address, mode: factMode)
         } else if contentMode != .quiet {
@@ -883,11 +929,16 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             riderContext: riderContext
         )
         let generator = factGenerator
+        let aiSharingAllowed = aiSharingAllowed
 
         inFlightFactTask = Task { [weak self] in
             let fact = await PlaceFactFetcher.fact(for: request, using: generator)
             await MainActor.run {
                 guard let self, !Task.isCancelled, self.activeAnnouncementToken == token else { return }
+                guard aiSharingAllowed() else {
+                    self.enqueueAnnouncement(plan)
+                    return
+                }
                 if fact == nil {
                     ProxyDiagnostics.log("Facts", "No proxy fact available. Speaking base phrase for \(request.cacheKey).")
                 }
@@ -921,7 +972,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 newBoundary: plan.boundary,
                 currentlySpeaking: speakingBoundary
             ) {
-                print("Dropped lower-priority announcement: \(plan.text)")
+                AppDiagnostics.log("Dropped lower-priority announcement.")
                 return
             }
 
@@ -944,7 +995,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             deadline: .now() + bluetoothDelaySeconds,
             execute: workItem
         )
-        print("Queued announcement after \(bluetoothDelaySeconds)s: \(plan.text)")
+        AppDiagnostics.log("Queued announcement after configured Bluetooth delay.")
     }
 
     private func cancelPendingAnnouncement() {
@@ -955,7 +1006,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     private func deliverAnnouncement(id: UUID) {
         guard let pending = announcementQueue.pending, pending.id == id else {
-            print("Skipped stale announcement.")
+            AppDiagnostics.log("Skipped stale announcement.")
             return
         }
 
@@ -965,7 +1016,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 currentlySpeaking: speakingBoundary
             ) {
                 announcementQueue.clearPending(id: id)
-                print("Dropped stale lower-priority announcement at delivery.")
+                AppDiagnostics.log("Dropped stale lower-priority announcement at delivery.")
                 return
             }
 
@@ -1016,14 +1067,14 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             }
             lastUpdateTime = currentTime
 
-            print("Location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+            AppDiagnostics.log("Location updated.")
             reverseGeocode(location: location)
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         locationStatus = .locationUnavailable("Location update failed. \(ProductIdentity.displayName) will keep trying.")
-        print("Failed to get user location: \(error.localizedDescription)")
+        AppDiagnostics.log("Location update failed.")
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -1032,11 +1083,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     private func reverseGeocode(location: CLLocation, completion: (@MainActor () -> Void)? = nil) {
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
-            if let error = error {
+            if error != nil {
                 Task { @MainActor [weak self] in
                     self?.locationStatus = .placeUnavailable("Place lookup failed. GPS is still active.")
                 }
-                print("Failed to reverse geocode location: \(error.localizedDescription)")
+                AppDiagnostics.log("Reverse geocoding failed.")
                 return
             }
 
@@ -1044,7 +1095,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 Task { @MainActor [weak self] in
                     self?.locationStatus = .placeUnavailable("Place name is unavailable here.")
                 }
-                print("No placemarks found")
+                AppDiagnostics.log("No placemark was returned.")
                 return
             }
 
@@ -1052,9 +1103,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.lastKnownAddress = address
-                if let addressJSON = address.toJSON() {
-                    print("Resolved Address JSON: \(addressJSON)")
-                }
+                AppDiagnostics.log("Resolved a place name.")
 
                 completion?()
                 self.processResolvedAddress(address)
@@ -1072,9 +1121,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         do {
             try audioSession.setCategory(.playback, mode: .default, options: options)
             try audioSession.setActive(true)
-            print("Audio session activated for background playback.")
+            AppDiagnostics.log("Audio session activated for background playback.")
         } catch {
-            print("Failed to set up audio session: \(error.localizedDescription)")
+            AppDiagnostics.log("Audio session setup failed.")
         }
     }
 
@@ -1127,7 +1176,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
 
         if isSpeechOutputActive {
-            print("\(reason) RideHorizon speech stopped.")
+            AppDiagnostics.log("RideHorizon speech stopped for primary audio.")
             stopSpeechOutput()
         }
     }
@@ -1143,7 +1192,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
         interruptionResumeWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + externalAudioResumeDelaySeconds, execute: workItem)
-        print("\(reason) RideHorizon will resume after \(externalAudioResumeDelaySeconds)s.")
+        AppDiagnostics.log("RideHorizon will resume after the primary-audio delay.")
     }
 
     private func speak(
@@ -1155,12 +1204,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         guard ignoreQuietMode || contentMode != .quiet else { return }
         if shouldYieldToPrimaryAudio {
             interruptedSpeechPlan = AnnouncementPlan(text: text, boundary: boundary ?? .street)
-            print("Primary audio is active. \(ProductIdentity.displayName) speech deferred.")
+            AppDiagnostics.log("Primary audio is active; RideHorizon speech deferred.")
             return
         }
         currentlySpeakingBoundary = boundary
         activeSpeechPlan = AnnouncementPlan(text: text, boundary: boundary ?? .street)
-        print("Speaking: \(text)")
+        AppDiagnostics.log("Speaking an announcement.")
         lastSpokenPhrase = text
         lastSpokenAt = Date()
         lastSpeechDiagnosticNote = nil
@@ -1171,7 +1220,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         speechOutput.speak(
             text: text,
             boundary: boundary,
-            provider: speechProvider,
+            provider: aiSharingAllowed() ? speechProvider : .apple,
             appleVoice: resolveSpeechVoice(),
             allowAppleFallback: premiumVoiceAppleFallbackEnabled
         )
@@ -1186,6 +1235,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 #if DEBUG
     func speakForTesting(text: String, boundary: BoundaryType) {
         speak(text: text, boundary: boundary, shouldRecordTestLog: false, ignoreQuietMode: true)
+    }
+
+    func processResolvedAddressForTesting(_ address: Address) {
+        processResolvedAddress(address)
     }
 #endif
 
@@ -1255,14 +1308,14 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         lastKnownLocation = waypoint.coordinate
         currentSpeedMetersPerSecond = 0
         locationStatus = .active
-        print("Test location logged: \(waypoint.name) - \(waypoint.latitude), \(waypoint.longitude)")
+        AppDiagnostics.log("Test location advanced.")
 
         geocoder.reverseGeocodeLocation(CLLocation(latitude: waypoint.latitude, longitude: waypoint.longitude)) { [weak self] placemarks, error in
-            if let error = error {
+            if error != nil {
                 Task { @MainActor [weak self] in
                     self?.locationStatus = .placeUnavailable("Test place lookup failed.")
                 }
-                print("Failed to reverse geocode test location: \(error.localizedDescription)")
+                AppDiagnostics.log("Test location reverse geocoding failed.")
                 return
             }
 
@@ -1270,7 +1323,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 Task { @MainActor [weak self] in
                     self?.locationStatus = .placeUnavailable("Test place name is unavailable.")
                 }
-                print("No placemarks found")
+                AppDiagnostics.log("No test placemark was returned.")
                 return
             }
 
@@ -1278,9 +1331,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.lastKnownAddress = address
-                if let addressJSON = address.toJSON() {
-                    print("Resolved Test Address JSON: \(addressJSON)")
-                }
+                AppDiagnostics.log("Resolved a test place name.")
 
                 self.processResolvedAddress(address)
             }

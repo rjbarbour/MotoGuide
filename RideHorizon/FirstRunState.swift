@@ -49,3 +49,50 @@ final class FirstRunState: ObservableObject {
         storagePrefix + key.rawValue
     }
 }
+
+/// Stores the rider's explicit choice about sharing data with third-party AI providers.
+final class AISharingConsentStore: ObservableObject {
+    enum Decision: String, Equatable {
+        case notDetermined
+        case granted
+        case declined
+    }
+
+    static let storageKey = "ai.digitalmercenaries.ridehorizon.privacy.aiSharingDecision"
+
+    @Published private(set) var decision: Decision
+
+    var isGranted: Bool {
+        decision == .granted
+    }
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        decision = defaults.string(forKey: Self.storageKey)
+            .flatMap(Decision.init(rawValue:)) ?? .notDetermined
+    }
+
+    func grant() {
+        set(.granted)
+    }
+
+    func decline() {
+        set(.declined)
+    }
+
+    func reset() {
+        defaults.removeObject(forKey: Self.storageKey)
+        decision = .notDetermined
+    }
+
+    static func isGranted(defaults: UserDefaults = .standard) -> Bool {
+        defaults.string(forKey: storageKey) == Decision.granted.rawValue
+    }
+
+    private func set(_ newDecision: Decision) {
+        decision = newDecision
+        defaults.set(newDecision.rawValue, forKey: Self.storageKey)
+    }
+}

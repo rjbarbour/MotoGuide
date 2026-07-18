@@ -67,6 +67,27 @@ final class PlaceFactCacheTests: XCTestCase {
         XCTAssertEqual(cache.fact(forKey: request.cacheKey), "A market town.")
     }
 
+    func testCacheClearRemovesStoredFacts() {
+        let cache = PlaceFactCache(loadPersisted: false)
+        let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: "United Kingdom")
+        cache.store("A market town.", forKey: request.cacheKey)
+
+        cache.clear()
+
+        XCTAssertNil(cache.fact(forKey: request.cacheKey))
+    }
+
+    func testCacheExpiresFactsAfterThirtyDays() {
+        var now = Date(timeIntervalSince1970: 1_000)
+        let cache = PlaceFactCache(loadPersisted: false, now: { now })
+        let request = PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: "United Kingdom")
+        cache.store("A market town.", forKey: request.cacheKey)
+
+        now = now.addingTimeInterval(30 * 24 * 60 * 60 + 1)
+
+        XCTAssertNil(cache.fact(forKey: request.cacheKey))
+    }
+
     func testCacheKeyNormalizesPlaceName() {
         let first = PlaceFactRequest(boundary: .county, placeName: "Gloucestershire", countryContext: nil)
         let second = PlaceFactRequest(boundary: .county, placeName: " gloucestershire ", countryContext: nil)

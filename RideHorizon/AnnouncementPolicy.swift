@@ -211,7 +211,7 @@ enum AnnouncementPolicy {
             placeName: AnnouncementPhraseBuilder.placeName(for: plan.boundary, in: address),
             factMode: mode,
             countryContext: Address.isValidPlaceName(address.country) ? address.country : nil,
-            placeHierarchy: PlaceHierarchy(address: address),
+            placeHierarchy: PlaceHierarchy(minimizing: address, for: plan.boundary),
             riderContext: riderContext
         )
     }

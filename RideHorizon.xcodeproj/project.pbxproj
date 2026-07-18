@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A17D26072026071700000002 /* ProductIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17D26072026071700000001 /* ProductIdentity.swift */; };
+		A18D26072026071800000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A18D26072026071800000001 /* PrivacyInfo.xcprivacy */; };
 		E13E87A32C3EE36100308669 /* RideHorizonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87A22C3EE36100308669 /* RideHorizonApp.swift */; };
 		E13E87A52C3EE36100308669 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13E87A42C3EE36100308669 /* ContentView.swift */; };
 		E13E87A92C3EE36400308669 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E13E87A82C3EE36400308669 /* Assets.xcassets */; };
@@ -57,6 +58,7 @@
 
 /* Begin PBXFileReference section */
 		A17D26072026071700000001 /* ProductIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductIdentity.swift; sourceTree = "<group>"; };
+		A18D26072026071800000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E13E879F2C3EE36100308669 /* RideHorizon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RideHorizon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E13E87A22C3EE36100308669 /* RideHorizonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideHorizonApp.swift; sourceTree = "<group>"; };
 		E13E87A42C3EE36100308669 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -146,6 +148,7 @@
 				E13E87A82C3EE36400308669 /* Assets.xcassets */,
 				E13E87AD2C3EE36400308669 /* RideHorizon.entitlements */,
 				E13E87AE2C3EE36400308669 /* Info.plist */,
+				A18D26072026071800000001 /* PrivacyInfo.xcprivacy */,
 				E13E87AA2C3EE36400308669 /* Preview Content */,
 				E13E87D02C3EEF7100308669 /* LocationManager.swift */,
 				E13E87DA2C3F200000308669 /* Address.swift */,
@@ -301,6 +304,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A18D26072026071800000002 /* PrivacyInfo.xcprivacy in Resources */,
 				E13E87AC2C3EE36400308669 /* Preview Assets.xcassets in Resources */,
 				E13E87A92C3EE36400308669 /* Assets.xcassets in Resources */,
 			);

@@ -179,6 +179,18 @@ final class AnnouncementPolicyTests: XCTestCase {
 
         XCTAssertNil(plan)
     }
+
+    func testFactRequestOmitsStreetAndLowerPriorityPlaceData() {
+        let countyPlan = AnnouncementPlan(text: "Welcome to Gloucestershire", boundary: .county)
+
+        let request = AnnouncementPolicy.factRequest(for: countyPlan, address: gloucester)
+
+        XCTAssertNil(request.placeHierarchy.street)
+        XCTAssertNil(request.placeHierarchy.town)
+        XCTAssertEqual(request.placeHierarchy.county, "Gloucestershire")
+        XCTAssertEqual(request.placeHierarchy.region, "England")
+        XCTAssertEqual(request.placeHierarchy.country, "United Kingdom")
+    }
 }
 
 final class AnnouncementQueueTests: XCTestCase {

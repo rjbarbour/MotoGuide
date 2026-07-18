@@ -128,6 +128,16 @@ struct PlaceHierarchy: Equatable, Codable {
         )
     }
 
+    init(minimizing address: Address, for boundary: BoundaryType) {
+        self.init(
+            street: nil,
+            town: boundary >= .town ? address.town : nil,
+            county: boundary >= .county ? address.county : nil,
+            region: boundary >= .nation ? address.administrativeArea : nil,
+            country: address.country
+        )
+    }
+
     private static func validValue(_ value: String?) -> String? {
         guard let value, Address.isValidPlaceName(value) else { return nil }
         return value

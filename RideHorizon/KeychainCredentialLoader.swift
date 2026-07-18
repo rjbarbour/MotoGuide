@@ -30,6 +30,16 @@ enum KeychainCredentialLoader {
         storeGenericPassword(deviceId, service: service)
     }
 
+    @discardableResult
+    static func deleteRideHorizonDeviceId(service: String = FactProxyContract.deviceIdKeychainService) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+
     static func loadGenericPassword(service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

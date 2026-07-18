@@ -38,11 +38,12 @@ enum ProxyDiagnostics {
         UserDefaults.standard.bool(forKey: enabledKey)
     }
 
-    static func log(_ category: String, _ message: String) {
+    static func log(_ category: String, _ message: @autoclosure () -> String) {
         guard isEnabled else { return }
-        print("[RideHorizonDebug] [\(category)] \(message)")
+        let resolvedMessage = message()
+        print("[RideHorizonDebug] [\(category)] \(resolvedMessage)")
         Task { @MainActor in
-            DebugLogStore.shared.append(category: category, message: message)
+            DebugLogStore.shared.append(category: category, message: resolvedMessage)
         }
     }
 
@@ -100,7 +101,7 @@ enum ProxyDiagnostics {
 }
 #else
 enum ProxyDiagnostics {
-    static func log(_ category: String, _ message: String) {}
+    static func log(_ category: String, _ message: @autoclosure () -> String) {}
     static func logResolution(for endpoint: URL) async {}
 }
 #endif

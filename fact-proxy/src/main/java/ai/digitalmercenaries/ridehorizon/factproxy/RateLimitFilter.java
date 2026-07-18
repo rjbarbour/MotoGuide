@@ -6,10 +6,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -27,10 +29,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final Pattern CLIENT_IP_PATTERN = Pattern.compile("^[0-9a-fA-F:\\.:%]+$");
 
     private final RideHorizonProperties properties;
+    private final Clock clock;
     private final Map<String, Deque<Instant>> requestsByIdentity = new BoundedIdentityCache(MAX_TRACKED_CLIENT_IDENTITIES);
 
-    public RateLimitFilter(RideHorizonProperties properties) {
+    public RateLimitFilter(RideHorizonProperties properties, Clock clock) {
         this.properties = properties;
+        this.clock = clock;
     }
 
     @Override
@@ -47,10 +51,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String clientKey = requestIdentityKey(request);
         int limit = Math.max(properties.rateLimitPerMinute(), 1);
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         Instant cutoff = now.minusSeconds(60);
 
         synchronized (requestsByIdentity) {
+            pruneExpiredIdentities(cutoff);
             Deque<Instant> timestamps = requestsByIdentity.computeIfAbsent(clientKey, ignored -> new ArrayDeque<>());
             while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(cutoff)) {
                 timestamps.removeFirst();
@@ -67,6 +72,33 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    @Scheduled(
+            initialDelayString = "${ridehorizon.rate-limit-privacy-cleanup-delay-ms:60000}",
+            fixedDelayString = "${ridehorizon.rate-limit-privacy-cleanup-delay-ms:60000}"
+    )
+    void purgeExpiredIdentities() {
+        Instant cutoff = clock.instant().minusSeconds(60);
+        synchronized (requestsByIdentity) {
+            pruneExpiredIdentities(cutoff);
+        }
+    }
+
+    int trackedIdentityCount() {
+        synchronized (requestsByIdentity) {
+            return requestsByIdentity.size();
+        }
+    }
+
+    private void pruneExpiredIdentities(Instant cutoff) {
+        requestsByIdentity.entrySet().removeIf(entry -> {
+            Deque<Instant> timestamps = entry.getValue();
+            while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(cutoff)) {
+                timestamps.removeFirst();
+            }
+            return timestamps.isEmpty();
+        });
     }
 
     private String requestIdentityKey(HttpServletRequest request) {

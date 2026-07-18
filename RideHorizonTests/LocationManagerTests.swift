@@ -72,11 +72,13 @@ final class LocationManagerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         clearSpeechProviderDefaults()
+        clearRiderContextDefaults()
     }
 
     override func tearDown() {
         super.tearDown()
         clearSpeechProviderDefaults()
+        clearRiderContextDefaults()
     }
 
     @MainActor
@@ -118,6 +120,32 @@ final class LocationManagerTests: XCTestCase {
         locationManager.locationManager(CLLocationManager(), didUpdateLocations: [location])
 
         XCTAssertNil(locationManager.lastKnownLocation)
+    }
+
+    @MainActor
+    func testClearLocalPrivacyStateRemovesRiderContextAndVisibleRideState() {
+        let locationManager = LocationManager()
+        locationManager.homeCountry = "United Kingdom"
+        locationManager.homeRegion = "Gloucestershire"
+        locationManager.familiarRegions = "Cotswolds"
+        locationManager.customFactInstructions = "Mention industrial history"
+        locationManager.factInterestCategories = [.history]
+        locationManager.contentMode = .longFacts
+        locationManager.speechProvider = .proxyElevenLabs
+
+        locationManager.clearLocalPrivacyState()
+
+        XCTAssertEqual(locationManager.homeCountry, "")
+        XCTAssertEqual(locationManager.homeRegion, "")
+        XCTAssertEqual(locationManager.familiarRegions, "")
+        XCTAssertEqual(locationManager.customFactInstructions, "")
+        XCTAssertEqual(locationManager.factInterestCategories, FactInterestCategory.defaultSelections)
+        XCTAssertNil(locationManager.lastKnownLocation)
+        XCTAssertNil(locationManager.lastKnownAddress)
+        XCTAssertNil(locationManager.lastSpokenPhrase)
+        XCTAssertEqual(locationManager.contentMode, .shortFacts)
+        XCTAssertEqual(locationManager.speechProvider, .proxyElevenLabs)
+        XCTAssertFalse(locationManager.isTracking)
     }
 
     @MainActor
@@ -190,7 +218,7 @@ final class LocationManagerTests: XCTestCase {
     @MainActor
     func testPremiumVoiceRoutesEveryBoundaryThroughSelectedSpeechProvider() {
         let speechOutput = RecordingSpeechOutputEngine()
-        let locationManager = LocationManager(speechOutput: speechOutput)
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
         locationManager.speechProvider = .proxyElevenLabs
 
         for boundary in BoundaryType.allCases {
@@ -207,7 +235,7 @@ final class LocationManagerTests: XCTestCase {
         UserDefaults.standard.set("apple", forKey: "RideHorizonSpeechProvider")
 
         let speechOutput = RecordingSpeechOutputEngine()
-        let locationManager = LocationManager(speechOutput: speechOutput)
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
 
         locationManager.speakForTesting(text: "Boundary test for town", boundary: .town)
 
@@ -224,7 +252,7 @@ final class LocationManagerTests: XCTestCase {
         UserDefaults.standard.set(true, forKey: "RideHorizonSpeechProviderPremiumNoAppleFallbackMigration20260703")
 
         let speechOutput = RecordingSpeechOutputEngine()
-        let locationManager = LocationManager(speechOutput: speechOutput)
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
 
         locationManager.speakForTesting(text: "Boundary test for town", boundary: .town)
 
@@ -235,7 +263,7 @@ final class LocationManagerTests: XCTestCase {
     @MainActor
     func testTestModeDoesNotEnablePremiumVoiceAppleFallbackByDefault() {
         let speechOutput = RecordingSpeechOutputEngine()
-        let locationManager = LocationManager(speechOutput: speechOutput)
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
         locationManager.testMode = true
         locationManager.premiumVoiceAppleFallbackEnabled = false
 
@@ -248,7 +276,7 @@ final class LocationManagerTests: XCTestCase {
     @MainActor
     func testPremiumVoiceAppleFallbackFeatureFlagControlsSpeechFallback() {
         let speechOutput = RecordingSpeechOutputEngine()
-        let locationManager = LocationManager(speechOutput: speechOutput)
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
         locationManager.testMode = true
         locationManager.premiumVoiceAppleFallbackEnabled = true
 
@@ -394,9 +422,55 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(appleSpeechOutput.requests.map(\.boundary), [.town])
     }
 
+    @MainActor
+    func testDeclinedAISharingSkipsFactProviderAndForcesAppleSpeech() async {
+        let factGenerator = MockPlaceFactGenerator()
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(
+            factGenerator: factGenerator,
+            speechOutput: speechOutput,
+            aiSharingAllowed: { false }
+        )
+        locationManager.testMode = false
+        locationManager.contentMode = .shortFacts
+        locationManager.speechProvider = .proxyElevenLabs
+        locationManager.bluetoothDelaySeconds = 0
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(factGenerator.callCount, 0)
+        XCTAssertEqual(speechOutput.requests.last?.provider, .apple)
+        XCTAssertEqual(speechOutput.requests.last?.text, "You are in Stonehouse, Gloucestershire")
+    }
+
     private func clearSpeechProviderDefaults() {
         UserDefaults.standard.removeObject(forKey: "RideHorizonSpeechProvider")
         UserDefaults.standard.removeObject(forKey: "RideHorizonSpeechProviderPremiumNoAppleFallbackMigration20260703")
         UserDefaults.standard.removeObject(forKey: "RideHorizonPremiumVoiceAppleFallbackEnabled")
+    }
+
+    private func clearRiderContextDefaults() {
+        [
+            "RideHorizonHomeCountry",
+            "RideHorizonHomeRegion",
+            "RideHorizonFamiliarRegions",
+            "RideHorizonCustomFactInstructions",
+            "RideHorizonFactInterestCategories"
+        ].forEach(UserDefaults.standard.removeObject(forKey:))
     }
 }

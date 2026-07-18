@@ -93,10 +93,10 @@ public class ElevenLabsSpeechService {
         }
     }
 
-    private URI speechUri() {
+    URI speechUri() {
         String voiceId = URLEncoder.encode(rideHorizonProperties.elevenLabsVoiceId(), StandardCharsets.UTF_8);
         String outputFormat = URLEncoder.encode(configuredOutputFormat(), StandardCharsets.UTF_8);
-        return URI.create(ELEVENLABS_BASE_URL + voiceId + "?output_format=" + outputFormat);
+        return URI.create(ELEVENLABS_BASE_URL + voiceId + "?output_format=" + outputFormat + "&enable_logging=false");
     }
 
     private String configuredModelId() {

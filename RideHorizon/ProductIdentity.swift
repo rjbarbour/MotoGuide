@@ -9,3 +9,11 @@ enum ProductIdentity {
         return displayName ?? bundleName ?? "App"
     }()
 }
+
+enum AppDiagnostics {
+    static func log(_ message: @autoclosure () -> String) {
+#if DEBUG
+        print(message())
+#endif
+    }
+}

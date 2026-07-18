@@ -71,3 +71,49 @@ final class FirstRunStateTests: XCTestCase {
         XCTAssertFalse(reloaded.hasSeenPermissionExplanation)
     }
 }
+
+final class AISharingConsentStoreTests: XCTestCase {
+    private var suiteName: String!
+    private var defaults: UserDefaults!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "AISharingConsentStoreTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    func testFreshInstallHasNoAISharingDecision() {
+        let store = AISharingConsentStore(defaults: defaults)
+
+        XCTAssertEqual(store.decision, .notDetermined)
+        XCTAssertFalse(store.isGranted)
+    }
+
+    func testGrantAndDeclinePersistExplicitDecision() {
+        let store = AISharingConsentStore(defaults: defaults)
+
+        store.grant()
+        XCTAssertEqual(AISharingConsentStore(defaults: defaults).decision, .granted)
+
+        store.decline()
+        XCTAssertEqual(AISharingConsentStore(defaults: defaults).decision, .declined)
+        XCTAssertFalse(store.isGranted)
+    }
+
+    func testResetRemovesAISharingDecision() {
+        let store = AISharingConsentStore(defaults: defaults)
+        store.grant()
+
+        store.reset()
+
+        XCTAssertEqual(store.decision, .notDetermined)
+        XCTAssertNil(defaults.object(forKey: AISharingConsentStore.storageKey))
+    }
+}

@@ -18,6 +18,10 @@ ridehorizon:
   eleven-labs-output-format: ${ELEVENLABS_OUTPUT_FORMAT:mp3_44100_128}
   invite-ttl-hours: ${RIDEHORIZON_INVITE_TTL_HOURS:72}
   credential-ttl-days: ${RIDEHORIZON_CREDENTIAL_TTL_DAYS:90}
+  invite-record-retention-hours: ${RIDEHORIZON_INVITE_RECORD_RETENTION_HOURS:24}
+  credential-record-retention-days: ${RIDEHORIZON_CREDENTIAL_RECORD_RETENTION_DAYS:30}
+  retention-cleanup-initial-delay-ms: ${RIDEHORIZON_RETENTION_CLEANUP_INITIAL_DELAY_MS:60000}
+  retention-cleanup-delay-ms: ${RIDEHORIZON_RETENTION_CLEANUP_DELAY_MS:21600000}
 
 openai:
   api-key: ${OPENAI_API_KEY:}

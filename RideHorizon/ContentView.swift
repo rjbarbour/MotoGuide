@@ -124,12 +124,14 @@ enum LocationSummaryFormatter {
 struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var firstRunState = FirstRunState()
+    @StateObject private var aiSharingConsent = AISharingConsentStore()
     @AppStorage("RideHorizonMapLabelScale") private var mapLabelScale = 1.0
 #if DEBUG
     @StateObject private var debugLog = DebugLogStore.shared
 #endif
     @State private var logs: [RideLogEntry] = []
     @State private var showOnboarding = false
+    @State private var showAISharingChoice = false
     @State private var showResetConfirmation = false
     @State private var showResetCompleteMessage = false
     @State private var showSettings = false
@@ -188,7 +190,9 @@ struct ContentView: View {
         }
         .onAppear {
             showOnboarding = firstRunState.needsOnboarding
-            if !firstRunState.needsOnboarding {
+            if !firstRunState.needsOnboarding, aiSharingConsent.decision == .notDetermined {
+                showAISharingChoice = true
+            } else if !firstRunState.needsOnboarding {
                 startRideIfNeeded()
             }
         }
@@ -197,6 +201,8 @@ struct ContentView: View {
             SettingsView(
                 locationManager: locationManager,
                 showResetConfirmation: $showResetConfirmation,
+                aiSharingConsent: aiSharingConsent,
+                onClearLocalData: clearAllLocalData,
                 debugLog: debugLog
             )
             .presentationDetents([.medium, .large], selection: $settingsDetent)
@@ -205,7 +211,9 @@ struct ContentView: View {
 #else
             SettingsView(
                 locationManager: locationManager,
-                showResetConfirmation: $showResetConfirmation
+                showResetConfirmation: $showResetConfirmation,
+                aiSharingConsent: aiSharingConsent,
+                onClearLocalData: clearAllLocalData
             )
             .presentationDetents([.medium, .large], selection: $settingsDetent)
             .presentationDragIndicator(.visible)
@@ -219,8 +227,16 @@ struct ContentView: View {
                 .presentationContentInteraction(.resizes)
         }
         .fullScreenCover(isPresented: $showOnboarding) {
-            OnboardingView(firstRunState: firstRunState) {
+            OnboardingView(firstRunState: firstRunState, aiSharingConsent: aiSharingConsent) {
                 showOnboarding = false
+                locationManager.applyAISharingDecision(isGranted: aiSharingConsent.isGranted)
+                startRideIfNeeded()
+            }
+        }
+        .fullScreenCover(isPresented: $showAISharingChoice) {
+            AISharingChoiceView(consent: aiSharingConsent) {
+                showAISharingChoice = false
+                locationManager.applyAISharingDecision(isGranted: aiSharingConsent.isGranted)
                 startRideIfNeeded()
             }
         }
@@ -260,6 +276,28 @@ struct ContentView: View {
         showResetCompleteMessage = true
     }
 
+    private func clearAllLocalData() {
+        locationManager.applyAISharingDecision(isGranted: false)
+        locationManager.pauseRideTracking()
+        logs.removeAll()
+        PlaceFactCache.shared.clear()
+        if let bundleIdentifier = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleIdentifier)
+        }
+        locationManager.clearLocalPrivacyState()
+#if DEBUG
+        DebugLogStore.shared.clear()
+#endif
+        firstRunState.reset()
+        aiSharingConsent.reset()
+        KeychainCredentialLoader.deleteRideHorizonDeviceId()
+        ProxyCredentialLifecycle.invalidate()
+        showSettings = false
+        showLog = false
+        showAISharingChoice = false
+        showOnboarding = true
+    }
+
     private func appendLog(
         location: CLLocationCoordinate2D,
         address: Address,
@@ -272,7 +310,7 @@ struct ContentView: View {
             utteredPhrase: utteredPhrase
         )
         logs.insert(entry, at: 0)
-        print("Log added: \(entry.timestamp) - \(location.latitude), \(location.longitude) - \(address.toJSON() ?? "N/A")")
+        AppDiagnostics.log("Ride log entry added.")
     }
 }
 
@@ -882,7 +920,11 @@ private struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var locationManager: LocationManager
     @Binding var showResetConfirmation: Bool
+    @ObservedObject var aiSharingConsent: AISharingConsentStore
+    let onClearLocalData: () -> Void
     @State private var lastNonQuietMode: ContentMode = .shortFacts
+    @State private var showPrivacyNotice = false
+    @State private var showClearLocalDataConfirmation = false
     private static let lastNonQuietModeKey = "RideHorizonLastNonQuietContentMode"
     @AppStorage("RideHorizonMapLabelScale") private var mapLabelScale = 1.0
     @AppStorage("RideHorizonNightMode") private var nightMode = false
@@ -949,7 +991,9 @@ private struct SettingsView: View {
                             .foregroundStyle(palette.primaryText)
                         Picker("Announcement style", selection: $locationManager.contentMode) {
                             ForEach(ContentMode.allCases) { mode in
-                                Text(mode.label).tag(mode)
+                                Text(mode.label)
+                                    .tag(mode)
+                                    .disabled(mode.factMode != nil && !aiSharingConsent.isGranted)
                             }
                         }
                         .pickerStyle(.menu)
@@ -982,7 +1026,9 @@ private struct SettingsView: View {
                             .foregroundStyle(palette.primaryText)
                         Picker("Speech provider", selection: $locationManager.speechProvider) {
                             ForEach(SpeechProvider.allCases) { provider in
-                                Text(provider.label).tag(provider)
+                                Text(provider.label)
+                                    .tag(provider)
+                                    .disabled(provider == .proxyElevenLabs && !aiSharingConsent.isGranted)
                             }
                         }
                         .pickerStyle(.menu)
@@ -1089,6 +1135,48 @@ private struct SettingsView: View {
                         .foregroundStyle(palette.secondaryText)
                         .listRowBackground(palette.rowBackground)
                     FactInterestCategoryPicker(selectedCategories: $locationManager.factInterestCategories, palette: palette)
+                    }
+
+                    SettingsCard(title: "Privacy", palette: palette) {
+                    Text("Choose whether RideHorizon may send place information and optional preferences to OpenAI, and announcement text to ElevenLabs for Premium Voice.")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(palette.secondaryText)
+
+                    SettingsToggleRow(
+                        title: "Third-party AI features",
+                        subtitle: aiSharingConsent.isGranted
+                            ? "Allowed. You can withdraw permission at any time."
+                            : "Off. Facts use place names and speech uses Apple Voice on this device.",
+                        isOn: Binding(
+                            get: { aiSharingConsent.isGranted },
+                            set: { isAllowed in
+                                if isAllowed {
+                                    aiSharingConsent.grant()
+                                } else {
+                                    aiSharingConsent.decline()
+                                }
+                                locationManager.applyAISharingDecision(isGranted: isAllowed)
+                            }
+                        ),
+                        palette: palette
+                    )
+
+                    Button("Read privacy notice") {
+                        showPrivacyNotice = true
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+
+                    Button("Clear local data and access", role: .destructive) {
+                        showClearLocalDataConfirmation = true
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+
+                    Text("Clearing removes settings, cached facts, ride history, consent, the installation identifier and the beta access credential. Setup will be required again.")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(palette.secondaryText)
                     }
 
                     SettingsCard(title: "Advanced", palette: palette) {
@@ -1230,6 +1318,10 @@ private struct SettingsView: View {
                 }
             }
             .onChange(of: locationManager.contentMode) { _, newMode in
+                if newMode.factMode != nil, !aiSharingConsent.isGranted {
+                    locationManager.contentMode = .namesOnly
+                    return
+                }
                 guard newMode != .quiet else { return }
                 lastNonQuietMode = newMode
                 UserDefaults.standard.set(newMode.rawValue, forKey: Self.lastNonQuietModeKey)
@@ -1239,6 +1331,17 @@ private struct SettingsView: View {
                     dismiss()
                 }
             }
+        }
+        .sheet(isPresented: $showPrivacyNotice) {
+            PrivacyNoticeView()
+        }
+        .alert("Clear local RideHorizon data?", isPresented: $showClearLocalDataConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear data", role: .destructive) {
+                onClearLocalData()
+            }
+        } message: {
+            Text("This removes local settings, cached facts, ride history, consent and beta access from this iPhone. It does not yet submit a remote deletion request.")
         }
     }
 
@@ -1517,9 +1620,9 @@ private struct LogHistoryView: View {
                 ),
                 at: 0
             )
-            print("Log added: \(Date()) - \(location.latitude), \(location.longitude) - \(address.toJSON() ?? "N/A")")
+            AppDiagnostics.log("Manual ride log entry added.")
         } else {
-            print("Location or address not available")
+            AppDiagnostics.log("Location or address not available for manual log entry.")
         }
     }
 }
