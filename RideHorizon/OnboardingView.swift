@@ -302,7 +302,7 @@ struct PrivacyNoticeView: View {
                 }
 
                 Section("Optional AI features") {
-                    Text("With your permission, OpenAI receives the announced place hierarchy and optional rider fact preferences to generate a short fact. ElevenLabs receives announcement text only when Premium Voice is selected. OpenAI may retain API inputs and outputs for up to 30 days unless lower-retention controls apply. RideHorizon requests ElevenLabs zero-retention processing.")
+                    Text("With your permission, OpenAI receives the announced place hierarchy and optional rider fact preferences to generate a short fact. ElevenLabs receives announcement text only when Premium Voice is selected. OpenAI may retain API inputs and outputs for up to 30 days unless lower-retention controls apply. RideHorizon asks ElevenLabs not to log the text or generated audio; availability depends on the production account configuration.")
                 }
 
                 Section("Service operation") {
@@ -315,6 +315,13 @@ struct PrivacyNoticeView: View {
 
                 Section("Not tracking") {
                     Text("RideHorizon does not use advertising, data brokers or cross-app tracking.")
+                }
+
+                Section("Full policy") {
+                    Link(
+                        "Read the RideHorizon Privacy Policy",
+                        destination: URL(string: "https://ridehorizon-invite-beta.rjbarbour.chatgpt.site/privacy")!
+                    )
                 }
             }
             .navigationTitle("Privacy notice")
