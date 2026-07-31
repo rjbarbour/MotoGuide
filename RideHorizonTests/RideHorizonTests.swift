@@ -2,6 +2,15 @@ import XCTest
 @testable import RideHorizon
 
 final class RideHorizonTests: XCTestCase {
+    func testOnboardingSafetyCopyRequiresStoppedSetupAndNoInteractionWhileMoving() {
+        let copy = RiderSafetyCopy.onboarding.lowercased()
+
+        XCTAssertTrue(copy.contains("stopped"))
+        XCTAssertTrue(copy.contains("do not interact"))
+        XCTAssertTrue(copy.contains("moving"))
+        XCTAssertTrue(copy.contains("distracting"))
+    }
+
     func testContentModesIncludeShortFactsLongFactsAndQuiet() {
         let modes = Set(ContentMode.allCases.map(\.rawValue))
         XCTAssertTrue(modes.contains("shortFacts"))

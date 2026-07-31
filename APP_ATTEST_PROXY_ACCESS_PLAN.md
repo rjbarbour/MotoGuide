@@ -46,10 +46,11 @@ App Attest does not replace rate limiting. A genuine installation can still be a
 Normal first launch:
 
 1. The app starts normally; there is no access-code screen.
-2. Proxy access is provisioned automatically in the background.
-3. Names-only and Apple speech remain available while provisioning is pending or unavailable.
-4. Proxy-backed facts and ElevenLabs speech become available as soon as a session is established.
-5. Temporary failures produce the existing non-blocking fallback behaviour and a useful diagnostic message in Test Mode.
+2. Before the rider enables optional AI features, the app does not contact the RideHorizon proxy or create a proxy installation identifier.
+3. After the rider enables optional AI features, proxy access is provisioned automatically when the first proxy-backed fact or Premium Voice request needs it.
+4. Names-only and Apple speech remain available while provisioning is pending or unavailable.
+5. Proxy-backed facts and ElevenLabs speech become available as soon as a session is established.
+6. Temporary failures produce the existing non-blocking fallback behaviour and a useful diagnostic message in Test Mode.
 
 The user must never need to understand App Attest, tokens, Fly, or ElevenLabs.
 

@@ -71,25 +71,27 @@ private struct StubProxySpeechGenerator: ProxySpeechGenerating {
 final class LocationManagerTests: XCTestCase {
     override func setUp() {
         super.setUp()
+        clearLocationManagerDefaults()
         clearSpeechProviderDefaults()
         clearRiderContextDefaults()
     }
 
     override func tearDown() {
         super.tearDown()
+        clearLocationManagerDefaults()
         clearSpeechProviderDefaults()
         clearRiderContextDefaults()
     }
 
     @MainActor
-    func testDefaultsUseMVPRealRideModeAndShortFacts() {
+    func testDefaultsUsePrivateBetaTestModeAndShortFacts() {
         let locationManager = LocationManager()
 
-        XCTAssertFalse(locationManager.testMode)
+        XCTAssertTrue(locationManager.testMode)
         XCTAssertEqual(locationManager.contentMode, .shortFacts)
         XCTAssertEqual(locationManager.speechProvider, .proxyElevenLabs)
         XCTAssertTrue(locationManager.interruptsMusic)
-        XCTAssertFalse(locationManager.premiumVoiceAppleFallbackEnabled)
+        XCTAssertTrue(locationManager.premiumVoiceAppleFallbackEnabled)
     }
 
     @MainActor
@@ -119,7 +121,9 @@ final class LocationManagerTests: XCTestCase {
         let location = CLLocation(latitude: 37.7749, longitude: -122.4194)
         locationManager.locationManager(CLLocationManager(), didUpdateLocations: [location])
 
-        XCTAssertNil(locationManager.lastKnownLocation)
+        let firstTestWaypoint = TestRouteFixture.waypoints[0]
+        XCTAssertEqual(locationManager.lastKnownLocation?.latitude, firstTestWaypoint.latitude)
+        XCTAssertEqual(locationManager.lastKnownLocation?.longitude, firstTestWaypoint.longitude)
     }
 
     @MainActor
@@ -345,7 +349,7 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertTrue(appleSpeechOutput.requests.isEmpty)
         XCTAssertEqual(
             diagnosticNote,
-            "Premium voice failed: Premium voice is temporarily unavailable. [RH-TTS-02] Apple fallback disabled."
+            "Premium voice failed: Premium voice is temporarily unavailable. [RH-TTS-02]. Apple fallback disabled."
         )
         XCTAssertFalse(diagnosticNote?.localizedCaseInsensitiveContains("credit") == true)
         XCTAssertFalse(diagnosticNote?.localizedCaseInsensitiveContains("quota") == true)
@@ -462,6 +466,13 @@ final class LocationManagerTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "RideHorizonSpeechProvider")
         UserDefaults.standard.removeObject(forKey: "RideHorizonSpeechProviderPremiumNoAppleFallbackMigration20260703")
         UserDefaults.standard.removeObject(forKey: "RideHorizonPremiumVoiceAppleFallbackEnabled")
+    }
+
+    private func clearLocationManagerDefaults() {
+        [
+            "RideHorizonTestMode",
+            "RideHorizonInterruptsMusic"
+        ].forEach(UserDefaults.standard.removeObject(forKey:))
     }
 
     private func clearRiderContextDefaults() {

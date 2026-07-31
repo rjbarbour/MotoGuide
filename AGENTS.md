@@ -177,6 +177,14 @@ Notion operating references read on 2026-07-02:
 
 ## Development Workflow
 
+## Adaptive agentic delivery
+
+For planning and software delivery, fetch and follow [SOP: Adaptive Agentic Software Delivery v1.2](https://app.notion.com/p/3aea4c502b1781a888b1f8e851697813). Treat it as binding for this personal project unless an explicit project requirement conflicts.
+
+`Backlog.md` is the canonical delivery ledger. Keep the long-range plan shallow and revisable, with only the next one to three work items **Ready**. Give the active item a Goal that references its ID and evidence contract. Use independent evaluation, link evidence before **Done**, update `PROJECT.md` without duplicating ledger status, and stop at every milestone health and replenishment gate.
+
+Use Plan for direction, Goal for the active work item and Loop only for bounded machine-verifiable iteration. Treat coding agents and IDEs as execution surfaces, not project trackers. Use the Delivery Risk Cube to compare the evidence shape with the project's next commitment. Record hard-to-reverse, cross-increment or surprising architectural choices in the project decision log or an ADR; do not embed them silently in code. Do not continue automatically into later milestones.
+
 All agents work in one checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`. There are no separate worktrees unless explicitly created.
 
 - Work on one coherent batch of changes at a time. Do not run parallel agents that edit the same repo.

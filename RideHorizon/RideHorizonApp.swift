@@ -17,14 +17,5 @@ struct RideHorizonApp: App {
 
     private var appContent: some View {
         ContentView()
-            .onAppear {
-                Task {
-                    do {
-                        _ = try await ProxySessionCoordinator.shared.provisionSessionIfNeeded()
-                    } catch {
-                        ProxyDiagnostics.log("Auth", "Auto-provision attempt failed before launch: \(error.localizedDescription)")
-                    }
-                }
-            }
     }
 }

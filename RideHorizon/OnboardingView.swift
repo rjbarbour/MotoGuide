@@ -71,7 +71,7 @@ struct OnboardingView: View {
         onboardingPage(
             symbol: "speaker.wave.2.fill",
             title: "Place awareness for your ride",
-            body: "\(ProductIdentity.displayName) speaks short place updates through your helmet headset. It works alongside your normal navigation app — it does not give turn-by-turn directions.",
+            body: "\(ProductIdentity.displayName) speaks short place updates through your helmet headset. It works alongside your normal navigation app — it does not give turn-by-turn directions. \(RiderSafetyCopy.onboarding)",
             imageName: "OnboardingForest",
             photoCredit: "Photo: Dreamy Pixel · CC BY 4.0"
         )
@@ -306,11 +306,11 @@ struct PrivacyNoticeView: View {
                 }
 
                 Section("Service operation") {
-                    Text("The RideHorizon proxy receives a random installation identifier and limited request information for access control, abuse prevention and reliability. Provider keys are not stored in the app. Technical logs are designed not to contain coordinates, place content, rider text, device identifiers or credentials.")
+                    Text("If you enable optional AI features, the RideHorizon proxy receives a random installation identifier and limited request information for access control, abuse prevention and reliability when an AI feature first needs access. Provider keys are not stored in the app. Technical logs are designed not to contain coordinates, place content, rider text, device identifiers or credentials.")
                 }
 
                 Section("Your controls") {
-                    Text("You can withdraw AI permission, use Apple Voice, clear local data, remove location permission in iOS Settings, or stop ride tracking. Clearing local data also removes this installation's proxy access credential and it will be re-provisioned automatically.")
+                    Text("You can withdraw AI permission, use Apple Voice, clear local data, remove location permission in iOS Settings, or stop ride tracking. Clearing local data also removes this installation's proxy access credential. If you later grant AI permission again, a new credential is provisioned when an AI feature next needs it.")
                 }
 
                 Section("Not tracking") {

@@ -8,9 +8,9 @@ Please complete setup while stationary. Test onboarding and the location and opt
 
 # Beta App Review Notes
 
-No account, invite code, proxy token or API credential is required. Network access is provisioned automatically at first launch.
+No account, invite code, proxy token or API credential is required. If the reviewer enables optional AI features, network access is provisioned automatically when an AI fact or Premium Voice first needs it.
 
-To test without travelling: launch the app, complete onboarding while stationary, allow location, enable optional AI sharing if you wish to test AI facts or Premium Voice, then open Settings > Advanced > Developer and enable Test Mode. Advance through the Gloucestershire sample route to trigger location changes and announcements. Bluetooth hardware is optional; the iPhone speaker is sufficient.
+To test without travelling: launch the app, complete onboarding while stationary, allow location, enable optional AI sharing if you wish to test AI facts or Premium Voice, then open Settings > Advanced > Developer and confirm Test Mode is enabled. Advance through the Gloucestershire sample route to trigger location changes and announcements. Bluetooth hardware is optional; the iPhone speaker is sufficient.
 
 Apple Voice remains available if external AI or speech services are declined or unavailable. RideHorizon is an audio place-awareness companion and does not provide navigation, safety, emergency or vehicle-control functions. The production proxy and provider services will remain online during review.
 

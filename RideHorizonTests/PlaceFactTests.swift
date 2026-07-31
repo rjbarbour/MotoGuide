@@ -46,9 +46,9 @@ final class FactPhraseBuilderTests: XCTestCase {
     }
 
     func testSanitizeTruncatesLongFacts() {
-        let long = String(repeating: "a", count: 1_000)
+        let long = String(repeating: "a", count: 1_200)
         let sanitized = FactPhraseBuilder.sanitize(long)
-        XCTAssertEqual(sanitized?.count, 1100)
+        XCTAssertEqual(sanitized?.count, 1_100)
     }
 
     func testLongFactsUseLongerBoundedSanitizer() {
@@ -207,6 +207,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
 
         let generator = ProxyFactGenerator(
             proxyTokenProvider: { "proxy-token" },
+            deviceIdProvider: { nil },
             session: makeMockSession(),
             endpoint: endpoint
         )
@@ -323,9 +324,9 @@ final class ProxyFactGeneratorTests: XCTestCase {
             let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
 
             let riderContext = try XCTUnwrap(json?["riderContext"] as? [String: Any])
-            XCTAssertEqual(riderContext["homeCountry"] as? String, "United Kingdom")
-            XCTAssertEqual(riderContext["homeRegion"] as? String, "West Midlands")
-            XCTAssertEqual(riderContext["familiarRegions"] as? [String], ["England", "Cotswolds"])
+            XCTAssertEqual(riderContext["homeCountry"] as? String, "united kingdom")
+            XCTAssertEqual(riderContext["homeRegion"] as? String, "west midlands")
+            XCTAssertEqual(riderContext["familiarRegions"] as? [String], ["england", "cotswolds"])
             XCTAssertEqual(riderContext["customFactInstructions"] as? String, "engineering and old roads")
             XCTAssertEqual(riderContext["factInterestCategories"] as? [String], [
                 "geographyBasics",
@@ -339,7 +340,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data(#"{\"fact\":\"Great spot for a ride.\"}"#.utf8))
+            return (response, Data(#"{"fact":"Great spot for a ride."}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
