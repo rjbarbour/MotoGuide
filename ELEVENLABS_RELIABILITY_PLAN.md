@@ -23,6 +23,13 @@ The private-beta client must tolerate both Fly availability transitions and inte
 
 This is a reversible client reliability policy and does not change the proxy HTTP interface or trust boundary, so it does not require an ADR.
 
+Implementation evidence, 2026-07-31:
+
+- Commit `1665bac` implements the policy and passed the complete iOS unit target, generic iPhone build, proxy Gradle suite, OpenAPI parse and two independent reviews.
+- Fly production version 38 retains `https://motoguide-fact-proxy.fly.dev` and sets `min_machines_running = 1`.
+- Live automatic session issuance and fact generation succeeded; ElevenLabs returned HTTP 200 `audio/mpeg` with 34,316 bytes.
+- The physical iPhone was unavailable, so exact-build installation remains part of RH-001 rather than evidence for this increment.
+
 ## Active Fix: Renamed Proxy Credential
 
 Date: 2026-07-17
