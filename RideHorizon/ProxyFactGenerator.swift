@@ -118,10 +118,13 @@ enum FactProxyContract {
     static let localDevelopmentBaseURL = URL(string: "http://127.0.0.1:3000")!
     static let keychainService = "RideHorizonProxy"
     static let deviceIdKeychainService = "RideHorizonDeviceId"
-    static let factTimeoutSeconds: TimeInterval = 15
-    static let speechTimeoutSeconds: TimeInterval = 15
-    static let healthTimeoutSeconds: TimeInterval = 6
-    static let iosTimeoutSeconds = factTimeoutSeconds
+    static let factTimeoutSeconds: TimeInterval = 35
+    static let speechTimeoutSeconds: TimeInterval = 35
+    static let healthTimeoutSeconds: TimeInterval = 10
+    static let sessionTimeoutSeconds: TimeInterval = 12
+    static let sessionOperationTimeoutSeconds: TimeInterval = 30
+    static let iosTimeoutSeconds: TimeInterval = 60
+    static let retryDelaysSeconds: [TimeInterval] = [3, 10]
 
     static func factEndpoint(baseURL: URL = productionBaseURL) -> URL {
         baseURL
@@ -140,6 +143,161 @@ enum FactProxyContract {
     }
 }
 
+struct ProxyRequestExecutor {
+    typealias ResponseRetryDecision = (HTTPURLResponse, Data) -> Bool
+
+    let session: URLSession
+    let retryDelays: [TimeInterval]
+
+    func data(
+        for request: URLRequest,
+        category: String,
+        shouldRetryResponse: ResponseRetryDecision
+    ) async throws -> (Data, URLResponse) {
+        var retryIndex = 0
+
+        while true {
+            try Task.checkCancellation()
+
+            do {
+                let (data, response) = try await session.data(for: request)
+                if let http = response as? HTTPURLResponse,
+                   retryIndex < retryDelays.count,
+                   shouldRetryResponse(http, data) {
+                    try await waitBeforeRetry(category: category, retryIndex: retryIndex, reason: "HTTP \(http.statusCode)")
+                    retryIndex += 1
+                    continue
+                }
+                return (data, response)
+            } catch {
+                guard retryIndex < retryDelays.count, Self.isTransientNetworkError(error) else {
+                    throw error
+                }
+                try await waitBeforeRetry(category: category, retryIndex: retryIndex, reason: "transient network failure")
+                retryIndex += 1
+            }
+        }
+    }
+
+    private func waitBeforeRetry(category: String, retryIndex: Int, reason: String) async throws {
+        let delay = retryDelays[retryIndex]
+        ProxyDiagnostics.log(
+            category,
+            "Retrying after \(reason) in \(Self.formatted(delay))s (retry \(retryIndex + 1)/\(retryDelays.count))."
+        )
+        try Task.checkCancellation()
+        guard delay > 0 else { return }
+        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    }
+
+    static func isTransientHTTPStatus(_ statusCode: Int) -> Bool {
+        statusCode == 408 || statusCode == 502 || statusCode == 503 || statusCode == 504
+    }
+
+    private static func isTransientNetworkError(_ error: Error) -> Bool {
+        guard let urlError = error as? URLError else { return false }
+        switch urlError.code {
+        case .timedOut,
+             .cannotFindHost,
+             .cannotConnectToHost,
+             .dnsLookupFailed,
+             .networkConnectionLost,
+             .notConnectedToInternet,
+             .resourceUnavailable:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func formatted(_ seconds: TimeInterval) -> String {
+        seconds.rounded() == seconds ? String(Int(seconds)) : String(format: "%.1f", seconds)
+    }
+}
+
+enum ProxyOperationDeadline {
+    static func run<Value: Sendable>(
+        seconds: TimeInterval,
+        operation: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        let race = ProxyOperationRace<Value>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                race.install(continuation: continuation)
+
+                let operationTask = Task {
+                    do {
+                        race.resolve(.success(try await operation()))
+                    } catch {
+                        race.resolve(.failure(error))
+                    }
+                }
+                let timeoutTask = Task {
+                    do {
+                        try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                        race.resolve(.failure(URLError(.timedOut)))
+                    } catch {
+                        // The operation won the race or the caller cancelled it.
+                    }
+                }
+                race.install(operationTask: operationTask, timeoutTask: timeoutTask)
+            }
+        } onCancel: {
+            race.resolve(.failure(CancellationError()))
+        }
+    }
+}
+
+private final class ProxyOperationRace<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Error>?
+    private var result: Result<Value, Error>?
+    private var operationTask: Task<Void, Never>?
+    private var timeoutTask: Task<Void, Never>?
+
+    func install(continuation: CheckedContinuation<Value, Error>) {
+        lock.lock()
+        if let result {
+            lock.unlock()
+            continuation.resume(with: result)
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    func install(operationTask: Task<Void, Never>, timeoutTask: Task<Void, Never>) {
+        lock.lock()
+        if result != nil {
+            lock.unlock()
+            operationTask.cancel()
+            timeoutTask.cancel()
+            return
+        }
+        self.operationTask = operationTask
+        self.timeoutTask = timeoutTask
+        lock.unlock()
+    }
+
+    func resolve(_ result: Result<Value, Error>) {
+        lock.lock()
+        guard self.result == nil else {
+            lock.unlock()
+            return
+        }
+        self.result = result
+        let continuation = self.continuation
+        self.continuation = nil
+        let operationTask = self.operationTask
+        let timeoutTask = self.timeoutTask
+        lock.unlock()
+
+        operationTask?.cancel()
+        timeoutTask?.cancel()
+        continuation?.resume(with: result)
+    }
+}
+
 struct ProxyFactGenerator: PlaceFactGenerating {
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
     typealias ProxyTokenProvider = () -> String?
@@ -151,8 +309,9 @@ struct ProxyFactGenerator: PlaceFactGenerating {
     private let deviceIdProvider: DeviceIdProvider
     private let credentialInvalidator: CredentialInvalidator
     private let credentialRefresher: CredentialRefresher
-    private let session: URLSession
+    private let requestExecutor: ProxyRequestExecutor
     private let endpoint: URL
+    private let operationTimeoutSeconds: TimeInterval
 
     init(
         proxyTokenProvider: @escaping ProxyTokenProvider = { KeychainCredentialLoader.loadRideHorizonProxyToken() },
@@ -163,18 +322,23 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         },
         session: URLSession = .shared,
         baseURL: URL = FactProxyContract.productionBaseURL,
-        endpoint: URL? = nil
+        endpoint: URL? = nil,
+        retryDelays: [TimeInterval] = FactProxyContract.retryDelaysSeconds,
+        operationTimeoutSeconds: TimeInterval = FactProxyContract.iosTimeoutSeconds
     ) {
         self.proxyTokenProvider = proxyTokenProvider
         self.deviceIdProvider = deviceIdProvider
         self.credentialInvalidator = credentialInvalidator
         self.credentialRefresher = credentialRefresher
-        self.session = session
+        self.requestExecutor = ProxyRequestExecutor(session: session, retryDelays: retryDelays)
         self.endpoint = endpoint ?? FactProxyContract.factEndpoint(baseURL: baseURL)
+        self.operationTimeoutSeconds = operationTimeoutSeconds
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
-        try await fact(for: request, retryAfterAuthenticationFailure: true)
+        try await ProxyOperationDeadline.run(seconds: operationTimeoutSeconds) {
+            try await fact(for: request, retryAfterAuthenticationFailure: true)
+        }
     }
 
     private func fact(
@@ -214,7 +378,13 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: urlRequest)
+            (data, response) = try await requestExecutor.data(
+                for: urlRequest,
+                category: "Proxy",
+                shouldRetryResponse: { http, _ in
+                    ProxyRequestExecutor.isTransientHTTPStatus(http.statusCode)
+                }
+            )
         } catch {
             ProxyDiagnostics.log("Proxy", "Network error for \(endpoint.absoluteString): \(error.localizedDescription)")
             throw error
@@ -265,7 +435,7 @@ struct ProxySpeechGenerator {
     private let deviceIdProvider: DeviceIdProvider
     private let credentialInvalidator: CredentialInvalidator
     private let credentialRefresher: CredentialRefresher
-    private let session: URLSession
+    private let requestExecutor: ProxyRequestExecutor
     private let endpoint: URL
     private static let maxSpeechTextLength = 1400
 
@@ -278,13 +448,14 @@ struct ProxySpeechGenerator {
         },
         session: URLSession = .shared,
         baseURL: URL = FactProxyContract.productionBaseURL,
-        endpoint: URL? = nil
+        endpoint: URL? = nil,
+        retryDelays: [TimeInterval] = FactProxyContract.retryDelaysSeconds
     ) {
         self.proxyTokenProvider = proxyTokenProvider
         self.deviceIdProvider = deviceIdProvider
         self.credentialInvalidator = credentialInvalidator
         self.credentialRefresher = credentialRefresher
-        self.session = session
+        self.requestExecutor = ProxyRequestExecutor(session: session, retryDelays: retryDelays)
         self.endpoint = endpoint ?? FactProxyContract.speechEndpoint(baseURL: baseURL)
     }
 
@@ -296,20 +467,25 @@ struct ProxySpeechGenerator {
                 "Truncated speech text from \(text.count) to \(boundedText.count) chars to match proxy limit \(Self.maxSpeechTextLength)."
             )
         }
-        return try await speechAudioChunk(for: boundedText)
+        return try await ProxyOperationDeadline.run(seconds: FactProxyContract.iosTimeoutSeconds) {
+            try await speechAudioChunk(for: boundedText)
+        }
     }
 
     func speechAudios(for text: String) async throws -> [Data] {
-        let chunks = Self.chunkSpeechText(Self.normalizedSpeechText(text))
-        if chunks.count > 1 {
-            ProxyDiagnostics.log("Speech", "Splitting speech text into \(chunks.count) chunk(s) for proxy requests.")
-        }
+        try await ProxyOperationDeadline.run(seconds: FactProxyContract.iosTimeoutSeconds) {
+            let chunks = Self.chunkSpeechText(Self.normalizedSpeechText(text))
+            if chunks.count > 1 {
+                ProxyDiagnostics.log("Speech", "Splitting speech text into \(chunks.count) chunk(s) for proxy requests.")
+            }
 
-        var responses: [Data] = []
-        for chunk in chunks {
-            responses.append(try await speechAudioChunk(for: chunk))
+            var responses: [Data] = []
+            for chunk in chunks {
+                try Task.checkCancellation()
+                responses.append(try await speechAudioChunk(for: chunk))
+            }
+            return responses
         }
-        return responses
     }
 
     private func speechAudioChunk(for text: String) async throws -> Data {
@@ -355,7 +531,20 @@ struct ProxySpeechGenerator {
         let response: URLResponse
         let started = Date()
         do {
-            (data, response) = try await session.data(for: urlRequest)
+            (data, response) = try await requestExecutor.data(
+                for: urlRequest,
+                category: "Speech",
+                shouldRetryResponse: { http, data in
+                    guard ProxyRequestExecutor.isTransientHTTPStatus(http.statusCode) else {
+                        return false
+                    }
+                    guard http.statusCode == 502,
+                          let proxyError = try? JSONDecoder().decode(SpeechProxyErrorResponse.self, from: data) else {
+                        return true
+                    }
+                    return proxyError.code == .upstreamFailure
+                }
+            )
         } catch {
             ProxyDiagnostics.log(
                 "Speech",

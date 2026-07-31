@@ -149,9 +149,9 @@ paths:
         `shortFacts` and `longFacts`. Optional rider context text, home region
         preferences, and fact-interest categories are treated as bounded user
         preference data, not as system prompt text. The iOS app must fall back
-        to the base place announcement
-        for any non-200 response, invalid response body, rejected fact, missing
-        token, or request timeout.
+        to the base place announcement after allowed transient retries are
+        exhausted, or immediately for a permanent non-200 response, invalid
+        response body, rejected fact, missing token, or operation timeout.
       operationId: createPlaceFact
       security:
         - RideHorizonProxyToken: []
@@ -175,7 +175,10 @@ paths:
             maxLength: 64
       x-ios-keychain-service: RideHorizonProxy
       x-ios-device-id-keychain-service: RideHorizonDeviceId
-      x-ios-timeout-seconds: 15
+      x-ios-attempt-timeout-seconds: 35
+      x-ios-operation-timeout-seconds: 60
+      x-ios-retry-delays-seconds: [3, 10]
+      x-ios-retry-http-statuses: [408, 502, 503, 504]
       x-ios-fallback: Speak the base place announcement without a fact.
       x-openai-api-key-location: Server-side only. Never store the OpenAI API key in the iOS app or repository.
       x-speech-safety-rules:
@@ -265,7 +268,11 @@ paths:
             maxLength: 64
       x-ios-keychain-service: RideHorizonProxy
       x-ios-device-id-keychain-service: RideHorizonDeviceId
-      x-ios-timeout-seconds: 15
+      x-ios-attempt-timeout-seconds: 35
+      x-ios-operation-timeout-seconds: 60
+      x-ios-retry-delays-seconds: [3, 10]
+      x-ios-retry-http-statuses: [408, 502, 503, 504]
+      x-ios-structured-502-retry-code: RH-TTS-04
       x-ios-fallback: Fall back to local Apple AVSpeechSynthesizer speech.
       x-elevenlabs-api-key-location: Server-side only. Never store the ElevenLabs API key in the iOS app or repository.
       requestBody:

@@ -391,7 +391,7 @@ Fields:
 | `400` | Invalid JSON, missing required field, invalid `boundary`, invalid `factMode`, invalid `placeName`, or invalid `placeHierarchy`. | Fall back to the base place announcement. |
 | `401` | Missing or wrong proxy token. | Fall back to the base place announcement. |
 | `500` | Proxy is misconfigured, including missing server-side proxy token. | Fall back to the base place announcement. |
-| `502` | OpenAI returned an error or unusable response. | Fall back to the base place announcement. |
+| `502` | OpenAI returned an error or unusable response. | Retry while the transient-retry budget remains, then fall back to the base place announcement. |
 
 The iOS app must not speak raw error text.
 
@@ -463,8 +463,13 @@ The proxy calls ElevenLabs server-side using environment configuration:
 
 The iOS app treats `/v1/speech` separately from fact generation:
 
-- Speech timeout: `15 s`.
-- Fact timeout: `15 s`.
+- Speech attempt timeout: `35 s`.
+- Fact attempt timeout: `35 s`.
+- Complete fact or Premium Voice operation timeout: `60 s`, including transient retries.
+- Automatic session attempt timeout: `12 s`; complete session-provisioning timeout: `30 s`.
+- Retry delays: `3 s`, then `10 s`, while the operation budget remains.
+- Retry transient connection errors and HTTP `408`, `502`, `503`, and `504`; do not retry ordinary `4xx` failures.
+- A structured Premium Voice HTTP `502` retries only diagnostic code `RH-TTS-04`, not authentication, account-capacity, or throttling codes.
 - Speech diagnostics should log request elapsed time to completion / last byte.
 - Apple speech fallback is feature-flagged during the private beta and defaults on so ride-facing speech remains available during provider outages; when the rider turns fallback off, errors are visible in Test Mode instead of silently speaking Apple.
 
@@ -484,9 +489,9 @@ The current iOS sanitizer rejects empty facts, questions, and `you should` phras
 
 ## Timeout And Fallback
 
-The iOS app uses a 15-second fact timeout through `PlaceFactFetcher`.
+The iOS app gives each fact attempt up to 35 seconds and bounds the complete fact operation to 60 seconds through `PlaceFactFetcher`. A newer boundary announcement cancels the older request and its retry backoff.
 
-If the proxy token is missing, the request fails, the proxy returns an error, response JSON is invalid, the fact is rejected by the sanitizer, or the timeout expires, RideHorizon must speak the base place announcement without a fact.
+If the proxy token is missing, all allowed attempts fail, the proxy returns a permanent error, response JSON is invalid, the fact is rejected by the sanitizer, or the operation deadline expires, RideHorizon must speak the base place announcement without a fact. A superseded request must not speak a delayed result or trigger Apple fallback.
 
 Example fallback:
 

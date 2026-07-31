@@ -17,6 +17,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
     var onCancel: (() -> Void)?
     var onDiagnosticNote: ((String) -> Void)?
     private(set) var requests: [Request] = []
+    private(set) var cancelPendingPreparationCount = 0
 
     func speak(
         text: String,
@@ -25,6 +26,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
         appleVoice: AVSpeechSynthesisVoice?,
         allowAppleFallback: Bool
     ) {
+        isSpeaking = true
         requests.append(
             Request(
                 text: text,
@@ -37,6 +39,12 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
 
     func stop() {
         isSpeaking = false
+    }
+
+    func cancelPendingPreparation() {
+        cancelPendingPreparationCount += 1
+        isSpeaking = false
+        onCancel?()
     }
 }
 
@@ -65,6 +73,13 @@ private struct StubProxySpeechGenerator: ProxySpeechGenerating {
 
     func speechAudios(for text: String) async throws -> [Data] {
         try result.get()
+    }
+}
+
+private struct DelayedFailingProxySpeechGenerator: ProxySpeechGenerating {
+    func speechAudios(for text: String) async throws -> [Data] {
+        try await Task.sleep(nanoseconds: 100_000_000)
+        throw PlaceFactError.invalidResponse
     }
 }
 
@@ -407,6 +422,52 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSupersededPremiumVoiceRequestDoesNotTriggerDelayedAppleFallback() async {
+        let appleSpeechOutput = RecordingAppleSpeechOutput()
+        let speechOutput = DefaultSpeechOutputEngine(
+            proxySpeechGenerator: DelayedFailingProxySpeechGenerator(),
+            appleSpeechOutput: appleSpeechOutput
+        )
+        var diagnosticNote: String?
+        speechOutput.onDiagnosticNote = { note in
+            diagnosticNote = note
+        }
+
+        speechOutput.speak(
+            text: "This announcement will be superseded.",
+            boundary: .town,
+            provider: .proxyElevenLabs,
+            appleVoice: nil,
+            allowAppleFallback: true
+        )
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        speechOutput.stop()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertTrue(appleSpeechOutput.requests.isEmpty)
+        XCTAssertNil(diagnosticNote)
+    }
+
+    @MainActor
+    func testPremiumVoiceReportsActiveWhileWaitingForNetworkAudio() {
+        let speechOutput = DefaultSpeechOutputEngine(
+            proxySpeechGenerator: DelayedFailingProxySpeechGenerator(),
+            appleSpeechOutput: RecordingAppleSpeechOutput()
+        )
+
+        speechOutput.speak(
+            text: "Waiting for network audio.",
+            boundary: .town,
+            provider: .proxyElevenLabs,
+            appleVoice: nil,
+            allowAppleFallback: false
+        )
+
+        XCTAssertTrue(speechOutput.isSpeaking)
+        speechOutput.stop()
+    }
+
+    @MainActor
     func testAppleProviderUsesAppleSpeechOutputOnlyWhenExplicitlySelected() {
         let appleSpeechOutput = RecordingAppleSpeechOutput()
         let speechOutput = DefaultSpeechOutputEngine(
@@ -460,6 +521,183 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(factGenerator.callCount, 0)
         XCTAssertEqual(speechOutput.requests.last?.provider, .apple)
         XCTAssertEqual(speechOutput.requests.last?.text, "You are in Stonehouse, Gloucestershire")
+    }
+
+    @MainActor
+    func testNewSuppressedBoundaryCancelsOlderFactInsteadOfSpeakingStalePlace() async {
+        let factGenerator = MockPlaceFactGenerator()
+        factGenerator.delayNanoseconds = 150_000_000
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(
+            factGenerator: factGenerator,
+            speechOutput: speechOutput,
+            aiSharingAllowed: { true }
+        )
+        locationManager.testMode = false
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 60
+        locationManager.bluetoothDelaySeconds = 0
+
+        let stroud = Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+        let stonehouse = Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+        let dursley = Address(
+            street: "Long Street",
+            town: "Dursley",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+        let stonehouseRequest = AnnouncementPolicy.factRequest(
+            for: AnnouncementPlan(text: "You are in Stonehouse, Gloucestershire", boundary: .town),
+            address: stonehouse,
+            mode: .shortFacts,
+            riderContext: .empty
+        )
+        factGenerator.factsByCacheKey[stonehouseRequest.cacheKey] = "Known for its canal-side industry."
+
+        locationManager.processResolvedAddressForTesting(stroud)
+        locationManager.processResolvedAddressForTesting(stonehouse)
+        locationManager.processResolvedAddressForTesting(dursley)
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+    }
+
+    @MainActor
+    func testStreetOnlyGeocoderChangeDoesNotCancelTownFact() async {
+        let factGenerator = MockPlaceFactGenerator()
+        factGenerator.delayNanoseconds = 150_000_000
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(
+            factGenerator: factGenerator,
+            speechOutput: speechOutput,
+            aiSharingAllowed: { true }
+        )
+        locationManager.testMode = false
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bath Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        XCTAssertEqual(speechOutput.requests.last?.boundary, .town)
+        XCTAssertEqual(speechOutput.requests.last?.text, "You are in Stonehouse, Gloucestershire")
+    }
+
+    @MainActor
+    func testLowerPriorityTownDoesNotCancelHigherPriorityCountryFact() async {
+        let factGenerator = MockPlaceFactGenerator()
+        factGenerator.delayNanoseconds = 150_000_000
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(
+            factGenerator: factGenerator,
+            speechOutput: speechOutput,
+            aiSharingAllowed: { true }
+        )
+        locationManager.testMode = false
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Dover",
+            county: "Kent",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Rue de Paris",
+            town: "Calais",
+            county: "Pas-de-Calais",
+            administrativeArea: "Hauts-de-France",
+            country: "France"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Rue Royale",
+            town: "Lille",
+            county: "Nord",
+            administrativeArea: "Hauts-de-France",
+            country: "France"
+        ))
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        XCTAssertEqual(speechOutput.requests.count, 1)
+        XCTAssertEqual(speechOutput.requests.first?.boundary, .country)
+        XCTAssertTrue(speechOutput.requests.first?.text.hasPrefix("Welcome to France.") == true)
+    }
+
+    @MainActor
+    func testNewBoundaryCancelsOlderSpeechPreparationBeforeQueuingReplacement() async {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
+        locationManager.testMode = false
+        locationManager.contentMode = .namesOnly
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        let cancellationsBeforeNewBoundary = speechOutput.cancelPendingPreparationCount
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Long Street",
+            town: "Dursley",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+
+        XCTAssertEqual(
+            speechOutput.cancelPendingPreparationCount,
+            cancellationsBeforeNewBoundary + 1
+        )
     }
 
     private func clearSpeechProviderDefaults() {

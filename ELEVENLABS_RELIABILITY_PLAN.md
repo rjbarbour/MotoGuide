@@ -6,6 +6,23 @@ Date: 2026-07-17
 
 Make Premium Voice (ElevenLabs) reliable for RideHorizon private-beta testing. This document is the operational handoff for the voice/proxy track; keep layout work separate.
 
+## Rider-network timeout policy
+
+Date: 2026-07-31
+
+The private-beta client must tolerate both Fly availability transitions and intermittent mobile data without speaking stale announcements:
+
+- Keep one Fly proxy machine running during the TestFlight window.
+- Give each fact or speech HTTP attempt up to 35 seconds because the proxy may wait up to 30 seconds for OpenAI or ElevenLabs.
+- Bound the complete fact or Premium Voice operation to 60 seconds.
+- Retry transient connection failures and HTTP 408/502/503/504 after 3 seconds and 10 seconds, subject to the remaining operation budget.
+- Do not retry ordinary 4xx responses. Preserve the existing one-time 401 session refresh.
+- For structured Premium Voice failures, retry only `RH-TTS-04`; do not retry authentication, account-capacity or throttling categories.
+- Bound automatic session provisioning to 30 seconds using the same transient-failure rules.
+- Honour task cancellation during requests and backoff. When a newer boundary supersedes an older request, the older request must not speak Premium Voice or trigger Apple fallback.
+
+This is a reversible client reliability policy and does not change the proxy HTTP interface or trust boundary, so it does not require an ADR.
+
 ## Active Fix: Renamed Proxy Credential
 
 Date: 2026-07-17
@@ -62,7 +79,7 @@ Acceptance criteria:
 Implementation status on 2026-07-17:
 
 - Proxy classification and neutral-response tests pass.
-- The OpenAPI speech error contract parses and records the actual `15 s` iOS timeout.
+- At that checkpoint, the OpenAPI speech error contract parsed and recorded the then-current `15 s` iOS timeout. The 2026-07-31 rider-network policy above supersedes it.
 - The rider-safe proxy change was deployed from an isolated build so concurrent database-provisioning work in the shared checkout was not modified or included prematurely.
 - Live acceptance passed with HTTP `200`, `audio/mpeg`, 50,199 bytes, and a 2.47-second warm response.
 - The iOS client compiles and recognizes only the four allowed opaque codes. Focused simulator tests could not launch because the Mac volume ran out of space; no test assertion failed.

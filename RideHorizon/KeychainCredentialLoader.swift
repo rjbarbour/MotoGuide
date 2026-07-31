@@ -151,14 +151,15 @@ final actor ProxySessionCoordinator {
     }
 
     private var inFlightTask: Task<Void, Error>?
-    private let session: URLSession
+    private let requestExecutor: ProxyRequestExecutor
     private let deviceIdentifierStore: DeviceIdentifierStore
 
     fileprivate init(
         session: URLSession = .shared,
-        deviceIdentifierStore: DeviceIdentifierStore = DeviceIdentifierStore()
+        deviceIdentifierStore: DeviceIdentifierStore = DeviceIdentifierStore(),
+        retryDelays: [TimeInterval] = FactProxyContract.retryDelaysSeconds
     ) {
-        self.session = session
+        self.requestExecutor = ProxyRequestExecutor(session: session, retryDelays: retryDelays)
         self.deviceIdentifierStore = deviceIdentifierStore
     }
 
@@ -194,7 +195,7 @@ final actor ProxySessionCoordinator {
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = FactProxyContract.factTimeoutSeconds
+        request.timeoutInterval = FactProxyContract.sessionTimeoutSeconds
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(FallbackSessionRequest(reason: "app_auto_provision"))
         let deviceId = try deviceIdentifierStore.loadOrCreate()
@@ -202,8 +203,20 @@ final actor ProxySessionCoordinator {
 
         let data: Data
         let response: URLResponse
+        let sessionRequest = request
+        let executor = requestExecutor
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await ProxyOperationDeadline.run(
+                seconds: FactProxyContract.sessionOperationTimeoutSeconds
+            ) {
+                try await executor.data(
+                    for: sessionRequest,
+                    category: "Auth",
+                    shouldRetryResponse: { http, _ in
+                        ProxyRequestExecutor.isTransientHTTPStatus(http.statusCode)
+                    }
+                )
+            }
         } catch {
             ProxyDiagnostics.log("Auth", "Session fallback request network error: \(error.localizedDescription)")
             throw error

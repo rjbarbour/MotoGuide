@@ -167,6 +167,89 @@ final class ProxyFactGeneratorTests: XCTestCase {
         super.tearDown()
     }
 
+    func testRiderNetworkBudgetOutlastsProxyUpstreamDeadline() {
+        let proxyUpstreamDeadline: TimeInterval = 30
+
+        XCTAssertGreaterThan(FactProxyContract.factTimeoutSeconds, proxyUpstreamDeadline)
+        XCTAssertGreaterThan(FactProxyContract.speechTimeoutSeconds, proxyUpstreamDeadline)
+        XCTAssertEqual(FactProxyContract.iosTimeoutSeconds, 60)
+        XCTAssertLessThan(FactProxyContract.factTimeoutSeconds, FactProxyContract.iosTimeoutSeconds)
+        XCTAssertLessThan(FactProxyContract.speechTimeoutSeconds, FactProxyContract.iosTimeoutSeconds)
+        XCTAssertEqual(FactProxyContract.retryDelaysSeconds, [3, 10])
+        XCTAssertEqual(FactProxyContract.sessionTimeoutSeconds, 12)
+        XCTAssertEqual(FactProxyContract.sessionOperationTimeoutSeconds, 30)
+    }
+
+    func testOperationDeadlineCancelsSlowWorkAtItsWallClockLimit() async {
+        let started = Date()
+
+        do {
+            _ = try await ProxyOperationDeadline.run(seconds: 0.05) {
+                try await Task.sleep(nanoseconds: 5_000_000_000)
+                return "too late"
+            }
+            XCTFail("Expected the operation deadline to expire.")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .timedOut)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        XCTAssertLessThan(Date().timeIntervalSince(started), 0.5)
+    }
+
+    func testOperationDeadlineReturnsPromptlyWhenWorkIgnoresCancellation() async {
+        let started = Date()
+
+        do {
+            _ = try await ProxyOperationDeadline.run(seconds: 0.05) {
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                        continuation.resume(returning: "too late")
+                    }
+                }
+            }
+            XCTFail("Expected the operation deadline to expire.")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .timedOut)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        XCTAssertLessThan(Date().timeIntervalSince(started), 0.2)
+    }
+
+    func testFactDeadlineReturnsPromptlyWhenSessionProvisioningIgnoresCancellation() async {
+        let started = Date()
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { nil },
+            credentialRefresher: {
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                        continuation.resume()
+                    }
+                }
+            },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: [],
+            operationTimeoutSeconds: 0.05
+        )
+
+        do {
+            _ = try await generator.fact(
+                for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+            )
+            XCTFail("Expected the overall fact deadline to expire.")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .timedOut)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        XCTAssertLessThan(Date().timeIntervalSince(started), 0.2)
+    }
+
     func testPostsFactRequestToProxyWithBearerToken() async throws {
         let endpoint = self.endpoint
         let request = PlaceFactRequest(
@@ -405,6 +488,115 @@ final class ProxyFactGeneratorTests: XCTestCase {
         XCTAssertEqual(fact, "Known for its wool trade.")
     }
 
+    func testFactRequestRetriesTransientNetworkAndGatewayFailures() async throws {
+        let endpoint = self.endpoint
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { _ in
+            requestCount += 1
+            switch requestCount {
+            case 1:
+                throw URLError(.notConnectedToInternet)
+            case 2:
+                let response = HTTPURLResponse(
+                    url: endpoint,
+                    statusCode: 503,
+                    httpVersion: nil,
+                    headerFields: nil
+                )!
+                return (response, Data())
+            default:
+                let response = HTTPURLResponse(
+                    url: endpoint,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: nil
+                )!
+                return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+            }
+        }
+
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: [0, 0]
+        )
+
+        let fact = try await generator.fact(
+            for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+        )
+
+        XCTAssertEqual(requestCount, 3)
+        XCTAssertEqual(fact, "Known for its wool trade.")
+    }
+
+    func testFactRetryBackoffStopsPromptlyWhenAnnouncementIsCancelled() async {
+        let endpoint = self.endpoint
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { _ in
+            requestCount += 1
+            throw URLError(.notConnectedToInternet)
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: [30, 30]
+        )
+        let task = Task {
+            try await generator.fact(
+                for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+            )
+        }
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected cancellation during retry backoff.")
+        } catch is CancellationError {
+            // Expected: a superseded announcement must not wait for another network attempt.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    func testFactRequestDoesNotRetryPermanentClientFailure() async {
+        let endpoint = self.endpoint
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { _ in
+            requestCount += 1
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 400,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data())
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: [0, 0]
+        )
+
+        do {
+            _ = try await generator.fact(
+                for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+            )
+            XCTFail("Expected a permanent client failure.")
+        } catch let error as PlaceFactError {
+            XCTAssertEqual(error, .httpError(400))
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        XCTAssertEqual(requestCount, 1)
+    }
+
     func testProxySpeechGeneratorPostsTextAndReturnsAudio() async throws {
         let endpoint = URL(string: "https://example.test/v1/speech")!
 
@@ -625,8 +817,10 @@ final class ProxyFactGeneratorTests: XCTestCase {
 
     func testProxySpeechGeneratorPreservesRiderSafeDiagnosticCode() async {
         let endpoint = URL(string: "https://example.test/v1/speech")!
+        var requestCount = 0
 
         MockURLProtocol.requestHandler = { _ in
+            requestCount += 1
             let response = HTTPURLResponse(
                 url: endpoint,
                 statusCode: 502,
@@ -657,6 +851,46 @@ final class ProxyFactGeneratorTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    func testProxySpeechRetriesGenericTransientFailureThenReturnsAudio() async throws {
+        let endpoint = URL(string: "https://example.test/v1/speech")!
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { _ in
+            requestCount += 1
+            if requestCount == 1 {
+                let response = HTTPURLResponse(
+                    url: endpoint,
+                    statusCode: 502,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (
+                    response,
+                    Data(#"{"error":"Premium voice is temporarily unavailable.","code":"RH-TTS-04"}"#.utf8)
+                )
+            }
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "audio/mpeg"]
+            )!
+            return (response, Data([7, 8, 9]))
+        }
+
+        let generator = ProxySpeechGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: [0, 0]
+        )
+
+        let audio = try await generator.speechAudio(for: "Known for its wool trade.")
+
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertEqual(audio, Data([7, 8, 9]))
     }
 
     func testMissingProxyTokenAttemptsAutomaticProvisioningBeforeFailing() async {

@@ -127,6 +127,7 @@ protocol SpeechOutputEngine: AnyObject {
         appleVoice: AVSpeechSynthesisVoice?,
         allowAppleFallback: Bool
     )
+    func cancelPendingPreparation()
     func stop()
 }
 
@@ -196,6 +197,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
     private let appleSpeechOutput: AppleSpeechOutputting
     private var proxyAudioPlayer: AVAudioPlayer?
     private var proxyAudioChunks: [Data] = []
+    private var proxyRequestTask: Task<Void, Never>?
     private var playbackToken = UUID()
     private var currentProxyFallbackText = ""
     private var currentProxyFallbackBoundary: BoundaryType?
@@ -207,7 +209,10 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
     var onDiagnosticNote: ((String) -> Void)?
 
     var isSpeaking: Bool {
-        appleSpeechOutput.isSpeaking || (proxyAudioPlayer?.isPlaying == true) || !proxyAudioChunks.isEmpty
+        proxyRequestTask != nil
+            || appleSpeechOutput.isSpeaking
+            || (proxyAudioPlayer?.isPlaying == true)
+            || !proxyAudioChunks.isEmpty
     }
 
     init(
@@ -242,6 +247,8 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
 
     func stop() {
         playbackToken = UUID()
+        proxyRequestTask?.cancel()
+        proxyRequestTask = nil
         appleSpeechOutput.stop()
         proxyAudioChunks.removeAll()
         clearProxyFallbackContext()
@@ -252,12 +259,23 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
         proxyAudioPlayer = nil
     }
 
+    func cancelPendingPreparation() {
+        guard proxyRequestTask != nil else { return }
+        playbackToken = UUID()
+        proxyRequestTask?.cancel()
+        proxyRequestTask = nil
+        proxyAudioChunks.removeAll()
+        clearProxyFallbackContext()
+        onCancel?()
+    }
+
     private func speakWithProxy(
         text: String,
         boundary: BoundaryType?,
         appleVoice: AVSpeechSynthesisVoice?,
         allowAppleFallback: Bool
     ) {
+        proxyRequestTask?.cancel()
         proxyAudioPlayer?.stop()
         proxyAudioChunks.removeAll()
         let token = UUID()
@@ -270,12 +288,13 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
             "Speech",
             "Routing \(boundary?.factLabel ?? "unknown") speech through Premium Voice, textLength=\(text.count), appleFallbackEnabled=\(allowAppleFallback)."
         )
-        Task { [weak self] in
-            guard let self else { return }
+        let proxySpeechGenerator = proxySpeechGenerator
+        proxyRequestTask = Task { [weak self] in
             do {
                 let audioDataSegments = try await proxySpeechGenerator.speechAudios(for: text)
                 await MainActor.run {
-                    guard self.playbackToken == token else { return }
+                    guard let self, !Task.isCancelled, self.playbackToken == token else { return }
+                    self.proxyRequestTask = nil
                     if audioDataSegments.isEmpty {
                         self.handlePremiumVoiceFailure(
                             message: "Premium voice failed: proxy returned no audio. Apple fallback used.",
@@ -297,6 +316,8 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
                 }
             } catch {
                 await MainActor.run {
+                    guard let self, !Task.isCancelled, self.playbackToken == token else { return }
+                    self.proxyRequestTask = nil
                     self.handlePremiumVoiceFailure(
                         message: "Premium voice failed: \(Self.diagnosticDescription(for: error)). Apple fallback used.",
                         text: text,
@@ -423,6 +444,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private let factGenerator: PlaceFactGenerating
     private let aiSharingAllowed: () -> Bool
     private var inFlightFactTask: Task<Void, Never>?
+    private var inFlightFactBoundary: BoundaryType?
     private var activeAnnouncementToken = UUID()
     private var wantsRideTracking = false
     private var hasSeededTestRoute = false
@@ -630,6 +652,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     func applyAISharingDecision(isGranted: Bool) {
         inFlightFactTask?.cancel()
         inFlightFactTask = nil
+        inFlightFactBoundary = nil
         activeAnnouncementToken = UUID()
         cancelPendingAnnouncement()
         stopSpeechOutput()
@@ -876,6 +899,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
 
         if shouldSuppressBoundarySpeech() {
+            _ = supersedeUndeliveredAnnouncementWork(with: plan.boundary)
             if previousAddress != address {
                 previousAddress = address
             }
@@ -886,6 +910,14 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             return
         }
 
+        guard supersedeUndeliveredAnnouncementWork(with: plan.boundary) else {
+            previousAddress = address
+            if testMode {
+                recordTestLog(utteredPhrase: nil)
+            }
+            AppDiagnostics.log("Dropped lower-priority announcement while higher-priority work remains active.")
+            return
+        }
         previousAddress = address
         if !testMode {
             onAddressChange?(address)
@@ -916,10 +948,34 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         onRideLog?(location, address, utteredPhrase)
     }
 
+    @discardableResult
+    private func supersedeUndeliveredAnnouncementWork(with newBoundary: BoundaryType) -> Bool {
+        let activeBoundaries = [
+            inFlightFactBoundary,
+            announcementQueue.pending?.boundary,
+            isSpeechOutputActive ? activeSpeechPlan?.boundary : nil
+        ].compactMap { $0 }
+
+        if let highestPriorityBoundary = activeBoundaries.min(),
+           newBoundary > highestPriorityBoundary {
+            return false
+        }
+
+        guard !activeBoundaries.isEmpty else { return true }
+        activeAnnouncementToken = UUID()
+        inFlightFactTask?.cancel()
+        inFlightFactTask = nil
+        inFlightFactBoundary = nil
+        cancelPendingAnnouncement()
+        speechOutput.cancelPendingPreparation()
+        return true
+    }
+
     private func fetchFactAndEnqueue(plan: AnnouncementPlan, address: Address, mode: FactMode) {
         let token = UUID()
         activeAnnouncementToken = token
         inFlightFactTask?.cancel()
+        inFlightFactBoundary = plan.boundary
         cancelPendingAnnouncement()
 
         let request = AnnouncementPolicy.factRequest(
@@ -935,6 +991,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             let fact = await PlaceFactFetcher.fact(for: request, using: generator)
             await MainActor.run {
                 guard let self, !Task.isCancelled, self.activeAnnouncementToken == token else { return }
+                self.inFlightFactTask = nil
+                self.inFlightFactBoundary = nil
                 guard aiSharingAllowed() else {
                     self.enqueueAnnouncement(plan)
                     return
@@ -960,6 +1018,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             return
         }
 
+        guard supersedeUndeliveredAnnouncementWork(with: .town) else { return }
         previousAddress = address
         lastBoundaryAnnouncementTime = Date()
         let plan = AnnouncementPlan(text: speechText, boundary: .town)
