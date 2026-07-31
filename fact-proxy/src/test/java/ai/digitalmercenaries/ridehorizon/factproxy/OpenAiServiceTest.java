@@ -223,78 +223,18 @@ class OpenAiServiceTest {
             String trustedDeviceIds,
             String promptOverridesHostAllowlist
     ) {
-        for (var constructor : RideHorizonProperties.class.getDeclaredConstructors()) {
-            if (constructor.getParameterCount() == 17) {
-                try {
-                    return (RideHorizonProperties) constructor.newInstance(
-                            proxyToken,
-                            adminToken,
-                            rateLimitPerMinute,
-                            diagnosticsEnabled,
-                            shortFactPrompt,
-                            longFactPrompt,
-                            promptOverridesEnabled,
-                            promptOverridesObjectUrl,
-                            promptOverridesRefreshSeconds,
-                            promptOverridesAuthToken,
-                            deviceBindingRequired,
-                            trustedDeviceIds,
-                            promptOverridesHostAllowlist,
-                            null,
-                            null,
-                            null,
-                            null
-                    );
-                } catch (ReflectiveOperationException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-
-            if (constructor.getParameterCount() == 13) {
-                try {
-                    return (RideHorizonProperties) constructor.newInstance(
-                            proxyToken,
-                            adminToken,
-                            rateLimitPerMinute,
-                            diagnosticsEnabled,
-                            shortFactPrompt,
-                            longFactPrompt,
-                            promptOverridesEnabled,
-                            promptOverridesObjectUrl,
-                            promptOverridesRefreshSeconds,
-                            promptOverridesAuthToken,
-                            deviceBindingRequired,
-                            trustedDeviceIds,
-                            promptOverridesHostAllowlist
-                    );
-                } catch (ReflectiveOperationException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-
-            if (constructor.getParameterCount() == 12) {
-                try {
-                    return (RideHorizonProperties) constructor.newInstance(
-                            proxyToken,
-                            adminToken,
-                            rateLimitPerMinute,
-                            diagnosticsEnabled,
-                            shortFactPrompt,
-                            longFactPrompt,
-                            promptOverridesEnabled,
-                            promptOverridesObjectUrl,
-                            promptOverridesRefreshSeconds,
-                            promptOverridesAuthToken,
-                            deviceBindingRequired,
-                            trustedDeviceIds
-                    );
-                } catch (ReflectiveOperationException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-        }
-
-        throw new IllegalStateException("Unexpected RideHorizonProperties constructor signature");
+        return new RideHorizonProperties(
+                proxyToken, adminToken, rateLimitPerMinute, diagnosticsEnabled,
+                shortFactPrompt, longFactPrompt,
+                promptOverridesEnabled, promptOverridesObjectUrl,
+                promptOverridesRefreshSeconds, promptOverridesAuthToken,
+                promptOverridesHostAllowlist,
+                "", "", "", "",
+                300, 3600, 900,
+                180, 120_000, 20, 12_000, 2_000, 250_000,
+                30, 24, 3,
+                60_000, 21_600_000
+        );
     }
 
     private static void handleOpenAiRequest(HttpExchange exchange, AtomicReference<String> requestBody) throws IOException {

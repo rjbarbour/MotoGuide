@@ -1,6 +1,6 @@
 # RideHorizon Fact Proxy Contract
 
-Date: 2026-07-02
+Date: 2026-07-31
 
 Status: Human-readable companion to `FACT_PROXY_OPENAPI.yaml`.
 
@@ -99,8 +99,6 @@ Runtime configuration:
 | `RIDEHORIZON_PROMPT_OVERRIDES_OBJECT_URL` | (not set) | Optional URL for prompt override JSON. |
 | `RIDEHORIZON_PROMPT_OVERRIDES_REFRESH_SECONDS` | `60` | Poll interval for override updates from object storage. |
 | `RIDEHORIZON_PROMPT_OVERRIDES_AUTH_TOKEN` | (not set) | Optional bearer token for override object download. |
-| `RIDEHORIZON_DEVICE_BINDING_REQUIRED` | `false` | Require approved devices via `X-RideHorizon-Device-Id` when true. |
-| `RIDEHORIZON_TRUSTED_DEVICE_IDS` | (not set) | Comma-separated allowed `X-RideHorizon-Device-Id` values when device binding is required. |
 | `RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST` | (not set) | Comma-separated host allowlist. Required when `RIDEHORIZON_PROMPT_OVERRIDES_ENABLED=true`. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Per identity (trusted user/device if provided, else IP) request limit for authenticated proxy calls. |
 
@@ -130,10 +128,12 @@ ok
 
 ## Authentication
 
-Every `POST /v1/fact` request must include:
+The iOS app automatically requests a restricted session from `POST /v1/session/fallback`. It sends a random per-install identifier in `X-RideHorizon-Device-Id`, stores both that identifier and the short-lived returned session token in Keychain, and renews the session after expiry or a `401`. Testers never enter or see a token.
+
+Every `POST /v1/fact` and `POST /v1/speech` request must include:
 
 ```http
-Authorization: Bearer <RIDEHORIZON_PROXY_TOKEN>
+Authorization: Bearer <SHORT_LIVED_SESSION_TOKEN>
 Content-Type: application/json
 ```
 
@@ -143,47 +143,45 @@ Optional request header for prompt overrides:
 X-RideHorizon-User-Id: rider-42
 ```
 
-Optional approved-device header:
+Per-install request header:
 
 ```http
-X-RideHorizon-Device-Id: helmet-001
+X-RideHorizon-Device-Id: <RANDOM_PER_INSTALL_IDENTIFIER>
 ```
 
-When `RIDEHORIZON_DEVICE_BINDING_REQUIRED=true`, `X-RideHorizon-Device-Id` must be present and in `RIDEHORIZON_TRUSTED_DEVICE_IDS`.
-
-The iOS app reads this token from the iOS Keychain generic-password item with service:
+The iOS app reads the session token from the iOS Keychain generic-password item with service:
 
 ```text
 RideHorizonProxy
 ```
 
-When device binding is enabled, the iOS app reads the optional approved-device identifier from a separate iOS Keychain generic-password item with service:
+The iOS app reads the per-install identifier from a separate iOS Keychain generic-password item with service:
 
 ```text
 RideHorizonDeviceId
 ```
 
-If that item exists, iOS sends it as `X-RideHorizon-Device-Id`. If it is absent, iOS omits the header; keep `RIDEHORIZON_DEVICE_BINDING_REQUIRED=false` until approved device IDs have been provisioned on app installs.
+If that item is absent, iOS securely generates and stores one before requesting a session.
 
 The OpenAI API key must stay server-side. It must be configured only on the proxy host, for example as the Fly.io secret `OPENAI_API_KEY`.
 
 Current MVP security model:
 
 - Transport is HTTPS through Fly.io public ingress.
-- App authentication is a shared bearer token: `RIDEHORIZON_PROXY_TOKEN`.
-- The app stores only the proxy token, not the OpenAI key.
+- App authentication uses automatic short-lived restricted bearer sessions.
+- The app stores only the short-lived session token and a random per-install identifier, not provider API keys.
 - The OpenAI key is stored only as the Fly secret `OPENAI_API_KEY`.
+- The ElevenLabs key is stored only as the Fly secret `ELEVENLABS_API_KEY`.
 - The proxy only exposes a narrow place-fact endpoint; clients cannot send arbitrary OpenAI prompts, model names, endpoints, or message arrays.
 - The proxy validates `boundary`, `factMode`, `placeName`, `countryContext`, `placeHierarchy`, and optional `riderContext`.
-- The proxy rate-limits by user ID or device ID if provided, with IP fallback.
+- The proxy applies per-install daily limits, global daily limits, and per-IP session-issuance limits.
 
 Current limitation:
 
-- If `RIDEHORIZON_PROXY_TOKEN` is extracted from the app or device, the holder can call `/v1/fact` until the token is rotated, rate limits apply, or server-side controls block it.
+- Automatic restricted sessions are not yet backed by Apple App Attest, so a modified client could request sessions until server limits apply.
 
 Planned hardening:
 
-- Per-device registration.
 - Apple App Attest assertion verification.
 - Server-side approved-device state with revoke/block support.
 - Per-device and per-user quotas.
@@ -466,9 +464,9 @@ The proxy calls ElevenLabs server-side using environment configuration:
 The iOS app treats `/v1/speech` separately from fact generation:
 
 - Speech timeout: `15 s`.
-- Fact timeout: `3 s`.
+- Fact timeout: `15 s`.
 - Speech diagnostics should log request elapsed time to completion / last byte.
-- Apple speech fallback is feature-flagged during MVP and defaults off; when fallback is off, errors should be visible in Test Mode instead of silently speaking Apple.
+- Apple speech fallback is feature-flagged during the private beta and defaults on so ride-facing speech remains available during provider outages; when the rider turns fallback off, errors are visible in Test Mode instead of silently speaking Apple.
 
 ## Speech Safety Rules
 
@@ -486,7 +484,7 @@ The current iOS sanitizer rejects empty facts, questions, and `you should` phras
 
 ## Timeout And Fallback
 
-The iOS app uses a 3-second fact timeout through `PlaceFactFetcher`.
+The iOS app uses a 15-second fact timeout through `PlaceFactFetcher`.
 
 If the proxy token is missing, the request fails, the proxy returns an error, response JSON is invalid, the fact is rejected by the sanitizer, or the timeout expires, RideHorizon must speak the base place announcement without a fact.
 

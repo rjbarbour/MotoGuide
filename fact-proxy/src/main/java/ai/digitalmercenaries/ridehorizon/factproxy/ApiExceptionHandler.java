@@ -55,6 +55,37 @@ public class ApiExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(SessionAuthority.UnauthorizedAccess.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorizedAccess(SessionAuthority.UnauthorizedAccess ex) {
+        log.warn("event=proxy_access_denied status=401");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    @ExceptionHandler(SessionAuthority.ChallengeInvalid.class)
+    public ResponseEntity<Map<String, String>> handleSessionChallengeInvalid(SessionAuthority.ChallengeInvalid ex) {
+        log.warn("event=proxy_auth_failed status=400 reason=challenge_invalid");
+        return badRequest("invalid request");
+    }
+
+    @ExceptionHandler(SessionAuthority.ProofMalformed.class)
+    public ResponseEntity<Map<String, String>> handleSessionProofMalformed(SessionAuthority.ProofMalformed ex) {
+        log.warn("event=proxy_auth_failed status=400 reason=proof_malformed");
+        return badRequest("invalid request");
+    }
+
+    @ExceptionHandler(SessionAuthority.ProofRejected.class)
+    public ResponseEntity<Map<String, String>> handleSessionProofRejected(SessionAuthority.ProofRejected ex) {
+        log.warn("event=proxy_auth_failed status=401 reason=proof_rejected");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    @ExceptionHandler(SessionAuthority.QuotaExceeded.class)
+    public ResponseEntity<Map<String, String>> handleSessionQuotaExceeded(SessionAuthority.QuotaExceeded ex) {
+        log.warn("event=proxy_usage_exceeded status=429 reason={}", ex.category());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Map.of("error", "usage limit exceeded"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleUnexpected(Exception ex) {
         log.error("event=fact_request_unexpected status=500 reason={}", ex.getMessage(), ex);

@@ -310,7 +310,7 @@ struct PrivacyNoticeView: View {
                 }
 
                 Section("Your controls") {
-                    Text("You can withdraw AI permission, use Apple Voice, clear local data, remove location permission in iOS Settings, or stop ride tracking. Clearing local data also removes this installation's beta access credential and requires setup again.")
+                    Text("You can withdraw AI permission, use Apple Voice, clear local data, remove location permission in iOS Settings, or stop ride tracking. Clearing local data also removes this installation's proxy access credential and it will be re-provisioned automatically.")
                 }
 
                 Section("Not tracking") {

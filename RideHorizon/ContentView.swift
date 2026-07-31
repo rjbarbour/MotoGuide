@@ -1174,7 +1174,7 @@ private struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity, minHeight: 50)
 
-                    Text("Clearing removes settings, cached facts, ride history, consent, the installation identifier and the beta access credential. Setup will be required again.")
+                    Text("Clearing removes settings, cached facts, ride history, consent, the installation identifier and the proxy access credential. Access will be provisioned automatically when needed.")
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(palette.secondaryText)
                     }
@@ -1341,7 +1341,7 @@ private struct SettingsView: View {
                 onClearLocalData()
             }
         } message: {
-            Text("This removes local settings, cached facts, ride history, consent and beta access from this iPhone. It does not yet submit a remote deletion request.")
+            Text("This removes local settings, cached facts, ride history, consent and proxy access from this iPhone. It does not yet submit a remote deletion request.")
         }
     }
 

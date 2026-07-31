@@ -26,9 +26,6 @@ final class AdminAuthorizer {
         if (properties.adminToken() != null && !properties.adminToken().isBlank()) {
             return properties.adminToken();
         }
-        if (properties.proxyToken() != null && !properties.proxyToken().isBlank()) {
-            return properties.proxyToken();
-        }
         return null;
     }
 }

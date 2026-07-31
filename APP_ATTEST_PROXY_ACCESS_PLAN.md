@@ -4,6 +4,19 @@ Date: 2026-07-18
 
 Status: Approved for implementation
 
+## Private TestFlight Release Decision — 2026-07-31
+
+For the first named private beta, full App Attest verification is deferred until after the initial TestFlight build. This is not an Apple TestFlight requirement. The release candidate will use automatic restricted fallback sessions with no login, invite code, shared app credential, or manual token entry.
+
+The fallback release gate is:
+
+- sessions renew automatically after expiry and retry one failed proxy request once;
+- fallback usage is persistently limited per anonymous installation plus globally;
+- the public fallback endpoint is IP rate-limited;
+- facts and Premium Voice work through the deployed proxy on a clean installation;
+- upstream credentials remain only in Fly Secrets;
+- App Attest can replace the fallback path later without changing the rider-facing flow.
+
 ## Outcome
 
 RideHorizon users, TestFlight testers, and Apple App Review must be able to open the app and use proxy-backed facts and speech without an account, invite code, or manual credential setup.
@@ -227,6 +240,11 @@ Follow `SOP: Secret Management in Agentic AI Development v3.0` throughout implem
 - Confirm on a clean TestFlight installation that Apple reviewers cannot encounter a developer-only credential dependency.
 
 ## Implementation Sequence
+
+### Execution tracker (2026-07-18)
+
+- Status: In progress.
+- Scope: remove invite-based access, add App Attest-like session endpoints with registration/renew/fallback, remove iOS gate, add token persistence + provisioning state, and enforce persistent usage limits in the proxy.
 
 ### Phase 1: Contract and test scaffolding
 

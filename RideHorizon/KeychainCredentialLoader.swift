@@ -91,130 +91,148 @@ enum KeychainCredentialLoader {
     }
 }
 
-extension Notification.Name {
-    static let rideHorizonCredentialInvalidated = Notification.Name("RideHorizonCredentialInvalidated")
-}
-
 enum ProxyCredentialLifecycle {
     static func invalidate() {
         KeychainCredentialLoader.deleteRideHorizonProxyToken()
-        NotificationCenter.default.post(name: .rideHorizonCredentialInvalidated, object: nil)
     }
 }
 
-enum CredentialProvisioningError: LocalizedError, Equatable {
-    case invalidInvite
+enum ProxySessionProvisionError: LocalizedError, Equatable {
     case invalidResponse
+    case missingToken
     case keychainFailure
+    case httpError(Int)
 
     var errorDescription: String? {
         switch self {
-        case .invalidInvite:
-            return "That invite code is invalid or has expired."
         case .invalidResponse:
-            return "RideHorizon could not complete setup. Please try again."
+            return "RideHorizon could not obtain proxy session access."
+        case .missingToken:
+            return "Proxy session response did not include a token."
         case .keychainFailure:
-            return "RideHorizon could not securely store access on this device."
+            return "RideHorizon could not securely store automatic proxy access on this device."
+        case .httpError(let statusCode):
+            return "Proxy session provisioning returned HTTP \(statusCode)."
         }
     }
 }
 
-struct ProxyCredentialProvisioner {
-    typealias CredentialStore = (String) -> Bool
-    typealias DeviceIdProvider = () -> String?
-    typealias DeviceIdStore = (String) -> Bool
-    typealias DeviceIdGenerator = () -> String
+private struct FallbackSessionRequest: Encodable {
+    let reason: String
+}
 
-    private let session: URLSession
-    private let endpoint: URL
-    private let credentialStore: CredentialStore
-    private let deviceIdProvider: DeviceIdProvider
-    private let deviceIdStore: DeviceIdStore
-    private let deviceIdGenerator: DeviceIdGenerator
+private struct FallbackSessionResponse: Decodable {
+    let sessionToken: String
+}
 
-    init(
-        session: URLSession = .shared,
-        endpoint: URL = FactProxyContract.provisioningEndpoint(),
-        credentialStore: @escaping CredentialStore = { KeychainCredentialLoader.storeRideHorizonProxyToken($0) },
-        deviceIdProvider: @escaping DeviceIdProvider = { KeychainCredentialLoader.loadRideHorizonDeviceId() },
-        deviceIdStore: @escaping DeviceIdStore = { KeychainCredentialLoader.storeRideHorizonDeviceId($0) },
-        deviceIdGenerator: @escaping DeviceIdGenerator = { "rh-ios-\(UUID().uuidString.lowercased())" }
-    ) {
-        self.session = session
-        self.endpoint = endpoint
-        self.credentialStore = credentialStore
-        self.deviceIdProvider = deviceIdProvider
-        self.deviceIdStore = deviceIdStore
-        self.deviceIdGenerator = deviceIdGenerator
-    }
+private struct DeviceIdentifierStore {
+    private let service = FactProxyContract.deviceIdKeychainService
 
-    func redeem(inviteCode: String) async throws {
-        let normalizedInvite = inviteCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard normalizedInvite.hasPrefix("rhi_"), normalizedInvite.count <= 128 else {
-            throw CredentialProvisioningError.invalidInvite
+    func loadOrCreate() throws -> String {
+        if let existing = KeychainCredentialLoader.loadRideHorizonDeviceId(service: service),
+           !existing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return existing
         }
 
-        let deviceId: String
-        if let existing = deviceIdProvider()?.trimmingCharacters(in: .whitespacesAndNewlines), !existing.isEmpty {
-            deviceId = existing
-        } else {
-            deviceId = deviceIdGenerator()
-            guard deviceIdStore(deviceId) else {
-                throw CredentialProvisioningError.keychainFailure
-            }
+        let deviceId = "rh-ios-\(UUID().uuidString.lowercased())"
+        let normalized = deviceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard KeychainCredentialLoader.storeRideHorizonDeviceId(normalized, service: service) else {
+            throw ProxySessionProvisionError.keychainFailure
+        }
+        return normalized
+    }
+}
+
+final actor ProxySessionCoordinator {
+    static let shared = ProxySessionCoordinator()
+
+    enum ProvisionTarget {
+        case production
+    }
+
+    private var inFlightTask: Task<Void, Error>?
+    private let session: URLSession
+    private let deviceIdentifierStore: DeviceIdentifierStore
+
+    fileprivate init(
+        session: URLSession = .shared,
+        deviceIdentifierStore: DeviceIdentifierStore = DeviceIdentifierStore()
+    ) {
+        self.session = session
+        self.deviceIdentifierStore = deviceIdentifierStore
+    }
+
+    func provisionSessionIfNeeded(_ target: ProvisionTarget = .production) async throws {
+        if KeychainCredentialLoader.loadRideHorizonProxyToken() != nil {
+            return
+        }
+
+        if let existing = inFlightTask {
+            return try await existing.value
+        }
+
+        let task = Task {
+            try await self.provisionSession(target: target)
+        }
+        inFlightTask = task
+        defer { inFlightTask = nil }
+        try await task.value
+    }
+
+    func forceProvisionSession(_ target: ProvisionTarget = .production) async throws {
+        inFlightTask?.cancel()
+        inFlightTask = nil
+        ProxyCredentialLifecycle.invalidate()
+        try await provisionSessionIfNeeded(target)
+    }
+
+    private func provisionSession(target: ProvisionTarget) async throws {
+        let endpoint: URL = switch target {
+        case .production:
+            FactProxyContract.sessionFallbackEndpoint()
         }
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = 15
+        request.timeoutInterval = FactProxyContract.factTimeoutSeconds
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(ProvisionRequest(
-            inviteCode: normalizedInvite,
-            deviceId: deviceId
-        ))
+        request.httpBody = try JSONEncoder().encode(FallbackSessionRequest(reason: "app_auto_provision"))
+        let deviceId = try deviceIdentifierStore.loadOrCreate()
+        request.setValue(deviceId, forHTTPHeaderField: "X-RideHorizon-Device-Id")
 
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            ProxyDiagnostics.log("Auth", "Session fallback request network error: \(error.localizedDescription)")
+            throw error
+        }
+
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw CredentialProvisioningError.invalidResponse
+            throw ProxySessionProvisionError.invalidResponse
         }
-        guard httpResponse.statusCode == 201 else {
-            if httpResponse.statusCode == 401 {
-                throw CredentialProvisioningError.invalidInvite
-            }
-            throw CredentialProvisioningError.invalidResponse
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw ProxySessionProvisionError.httpError(httpResponse.statusCode)
         }
 
-        let provisioned = try JSONDecoder().decode(ProvisionResponse.self, from: data)
-        guard provisioned.credential.hasPrefix("rh_"), provisioned.credential.count <= 128 else {
-            throw CredentialProvisioningError.invalidResponse
+        let sessionResponse = try JSONDecoder().decode(FallbackSessionResponse.self, from: data)
+        let token = sessionResponse.sessionToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard token.hasPrefix("rh_") && token.count > 10 else {
+            throw ProxySessionProvisionError.missingToken
         }
-        guard credentialStore(provisioned.credential) else {
-            throw CredentialProvisioningError.keychainFailure
+        guard KeychainCredentialLoader.storeRideHorizonProxyToken(token) else {
+            throw ProxySessionProvisionError.keychainFailure
         }
-    }
-
-    private struct ProvisionRequest: Encodable {
-        let inviteCode: String
-        let deviceId: String
-    }
-
-    private struct ProvisionResponse: Decodable {
-        let credentialId: UUID
-        let credential: String
-        let expiresAt: String
+        ProxyDiagnostics.log("Auth", "Provisioned fallback proxy session.")
     }
 }
 
-#if DEBUG
-enum DebugProxyTokenImporter {
-    private static let environmentKey = "RIDEHORIZON_PROXY_TOKEN"
-
-    static func importFromEnvironment() {
-        guard let token = ProcessInfo.processInfo.environment[environmentKey],
-              KeychainCredentialLoader.storeRideHorizonProxyToken(token) else {
-            return
-        }
-        print("Stored RideHorizon proxy token in iOS Keychain service \(FactProxyContract.keychainService).")
+extension FactProxyContract {
+    static func sessionFallbackEndpoint() -> URL {
+        productionBaseURL
+            .appendingPathComponent("v1")
+            .appendingPathComponent("session")
+            .appendingPathComponent("fallback")
     }
 }
-#endif

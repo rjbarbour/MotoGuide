@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: RideHorizon Fact Proxy API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     MVP contract for the RideHorizon iOS app to request a short or long
     ride-safe place fact without storing or sending an OpenAI API key from
@@ -16,8 +16,8 @@ tags:
     description: Proxy health checks.
   - name: Facts
     description: Ride-safe place facts.
-  - name: Provisioning
-    description: One-time private-alpha device credential provisioning.
+  - name: Sessions
+    description: Automatic restricted sessions for the private TestFlight beta.
   - name: Admin
     description: Operational controls. Not used by the iOS app.
 x-deployment:
@@ -42,6 +42,8 @@ x-deployment:
     dedicatedIpv6: "2a09:8280:1::13b:6469:0"
   deployedSecrets:
     - OPENAI_API_KEY
+    - ELEVENLABS_API_KEY
+    - ELEVENLABS_VOICE_ID
     - RIDEHORIZON_PROXY_TOKEN
   optionalSecrets:
     - RIDEHORIZON_ADMIN_TOKEN
@@ -63,11 +65,6 @@ x-deployment:
     RIDEHORIZON_LONG_FACT_PROMPT:
       default: built-in long fact prompt
       description: Optional server-side prompt override for longFacts requests. Never sent by iOS.
-    RIDEHORIZON_DEVICE_BINDING_REQUIRED:
-      default: false
-      description: When true, requires X-RideHorizon-Device-Id to be in RIDEHORIZON_TRUSTED_DEVICE_IDS.
-    RIDEHORIZON_TRUSTED_DEVICE_IDS:
-      description: Comma-separated list of allowed X-RideHorizon-Device-Id values when device binding is required.
     RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST:
       description: Comma-separated host allowlist for prompt override JSON fetches. Required when RIDEHORIZON_PROMPT_OVERRIDES_ENABLED=true.
     OPENAI_MODEL:
@@ -78,15 +75,14 @@ x-deployment:
       description: Request limit for authenticated proxy calls, with user/device identity preference then IP fallback.
 x-current-security-model:
   transport: HTTPS through Fly.io public ingress.
-  appAuthentication: Revocable per-device bearer credentials, with the shared Fly secret retained temporarily for operator/developer access.
-  deviceSecretStorage: iOS Keychain generic-password service RideHorizonProxy.
+  appAuthentication: Automatic short-lived restricted sessions, with the shared Fly secret retained only for operator/developer access.
+  deviceSecretStorage: A per-install identifier and short-lived session token are stored in iOS Keychain.
   serverSecretStorage: Fly.io secrets.
   openAiKeyExposure: Server-side only. Never store the OpenAI API key in the iOS app or repository.
   currentLimitations:
-    - The shared RIDEHORIZON_PROXY_TOKEN fallback can call the proxy until rotated or rate-limited.
-    - Private-alpha provisioning uses one-time invite codes rather than Apple App Attest or user identity.
+    - Automatic sessions are restricted by per-install, global daily, and per-IP request limits but are not yet protected by Apple App Attest.
+    - The server-side RIDEHORIZON_PROXY_TOKEN remains an operator-only compatibility path until the private beta migration is complete.
   plannedHardening:
-    - Per-device registration.
     - Apple App Attest assertion verification.
     - Server-side device approval, revocation, and quota state.
     - Per-user auth before wider non-TestFlight distribution.
@@ -171,8 +167,7 @@ paths:
         - in: header
           name: X-RideHorizon-Device-Id
           description: |
-            Optional approved-device identifier. Required when
-            RIDEHORIZON_DEVICE_BINDING_REQUIRED=true.
+            Optional per-install identifier used for request-level rate limiting.
           required: false
           schema:
             type: string
@@ -262,8 +257,7 @@ paths:
         - in: header
           name: X-RideHorizon-Device-Id
           description: |
-            Optional approved-device identifier. Required when
-            RIDEHORIZON_DEVICE_BINDING_REQUIRED=true.
+            Optional per-install identifier used for request-level rate limiting.
           required: false
           schema:
             type: string
@@ -306,98 +300,83 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SpeechErrorResponse"
-  /v1/provision:
+  /v1/session/fallback:
     post:
       tags:
-        - Provisioning
-      summary: Redeem a one-time invite for a device credential
-      operationId: provisionDeviceCredential
+        - Sessions
+      summary: Issue an automatic restricted session
+      description: |
+        Used by the iOS app without any tester-entered code or token. The app
+        creates a random per-install identifier, stores it in Keychain, and sends
+        it in `X-RideHorizon-Device-Id`. The returned bearer token is short-lived.
+      operationId: issueFallbackSession
       security: []
+      parameters:
+        - in: header
+          name: X-RideHorizon-Device-Id
+          required: true
+          schema:
+            type: string
+            minLength: 4
+            maxLength: 64
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ProvisionRequest"
+              $ref: "#/components/schemas/FallbackSessionRequest"
       responses:
-        "201":
-          description: Credential issued once. The plaintext credential is never returned again.
+        "200":
+          description: Restricted session issued.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProvisionResponse"
+                $ref: "#/components/schemas/SessionResponse"
         "400":
-          description: Invalid JSON.
-        "401":
-          description: Invite is invalid, expired, or already consumed.
+          description: Missing or invalid per-install identifier, or invalid JSON.
         "429":
-          description: Provisioning rate limit exceeded.
-  /admin/v1/invites:
-    post:
-      tags:
-        - Admin
-      summary: Create a one-time private-alpha invite
-      operationId: createPrivateAlphaInvite
-      security:
-        - RideHorizonAdminToken: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateInviteRequest"
-      responses:
-        "201":
-          description: Invite created. The plaintext invite code is returned once.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/InviteResponse"
-        "401":
-          description: Missing or wrong administrative bearer credential.
-        "404":
-          description: Administrative authentication is not configured.
-  /admin/v1/credentials:
+          description: Automatic-session per-IP rate limit exceeded.
+  /admin/v1/sessions:
     get:
       tags:
         - Admin
-      summary: List issued credential metadata
-      operationId: listDeviceCredentials
+      summary: List registered installation metadata
+      operationId: listInstallations
       security:
         - RideHorizonAdminToken: []
       responses:
         "200":
-          description: Credential metadata without plaintext credentials or hashes.
+          description: Installation metadata without plaintext credentials or hashes.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/CredentialSummary"
+                  $ref: "#/components/schemas/InstallationSummary"
         "401":
           description: Missing or wrong administrative bearer credential.
-  /admin/v1/credentials/{credentialId}:
+  /admin/v1/sessions/{installationId}:
     delete:
       tags:
         - Admin
-      summary: Revoke a device credential
-      operationId: revokeDeviceCredential
+      summary: Revoke an installation and its active sessions
+      operationId: revokeInstallation
       security:
         - RideHorizonAdminToken: []
       parameters:
         - in: path
-          name: credentialId
+          name: installationId
           required: true
           schema:
             type: string
             format: uuid
       responses:
         "204":
-          description: Credential revoked.
+          description: Installation revoked.
         "401":
           description: Missing or wrong administrative bearer credential.
         "404":
-          description: Credential was not found.
+          description: Installation was not found.
   /admin/diagnostics:
     get:
       tags:
@@ -454,102 +433,68 @@ components:
     RideHorizonProxyToken:
       type: http
       scheme: bearer
-      bearerFormat: RIDEHORIZON_PROXY_TOKEN
+      bearerFormat: RideHorizonSessionToken
       description: |
-        Per-device credential issued by `/v1/provision`. The iOS app reads it
-        from the Keychain generic-password item with service `RideHorizonProxy`.
-        The shared Fly secret remains a temporary operator/developer fallback.
+        Short-lived token issued automatically by `/v1/session/fallback`. The
+        iOS app stores it in Keychain and renews it automatically after expiry or
+        a 401 response. Testers never enter or see this token.
     RideHorizonAdminToken:
       type: http
       scheme: bearer
       bearerFormat: RIDEHORIZON_ADMIN_TOKEN
       description: |
-        Separate operational token when configured. During private alpha only,
-        the server-side shared proxy token is the administrative fallback. Neither
-        credential is shipped in the iOS app.
+        Separate operational token when configured. It is never shipped in the
+        iOS app.
   schemas:
-    CreateInviteRequest:
+    FallbackSessionRequest:
       type: object
       additionalProperties: false
       properties:
-        label:
+        reason:
           type: string
-          maxLength: 80
-          description: Human-readable tester label. Must not contain secret material.
-    InviteResponse:
+          maxLength: 48
+          description: Non-sensitive diagnostic category; defaults to restricted.
+    SessionResponse:
       type: object
       additionalProperties: false
       required:
-        - inviteId
-        - inviteCode
+        - sessionToken
         - expiresAt
+        - fallback
       properties:
-        inviteId:
+        sessionToken:
           type: string
-          format: uuid
-        inviteCode:
-          type: string
-          description: One-time secret returned only in this response.
+          description: Short-lived bearer token. Never logged or displayed to the tester.
         expiresAt:
           type: string
           format: date-time
-    ProvisionRequest:
+        fallback:
+          type: boolean
+          enum:
+            - true
+    InstallationSummary:
       type: object
       additionalProperties: false
       required:
-        - inviteCode
-        - deviceId
-      properties:
-        inviteCode:
-          type: string
-          minLength: 4
-          maxLength: 128
-        deviceId:
-          type: string
-          minLength: 4
-          maxLength: 64
-          pattern: "^[a-z0-9._:-]+$"
-    ProvisionResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - credentialId
-        - credential
-        - expiresAt
-      properties:
-        credentialId:
-          type: string
-          format: uuid
-        credential:
-          type: string
-          description: Device-bound secret returned only in this response and stored in iOS Keychain.
-        expiresAt:
-          type: string
-          format: date-time
-    CredentialSummary:
-      type: object
-      additionalProperties: false
-      required:
-        - credentialId
-        - deviceId
+        - installationId
+        - keyId
+        - environment
+        - status
         - createdAt
-        - expiresAt
       properties:
-        credentialId:
+        installationId:
           type: string
           format: uuid
-        deviceId:
+        keyId:
           type: string
-        label:
+        environment:
           type: string
-          nullable: true
+        status:
+          type: string
         createdAt:
           type: string
           format: date-time
-        expiresAt:
-          type: string
-          format: date-time
-        lastUsedAt:
+        lastSeenAt:
           type: string
           format: date-time
           nullable: true

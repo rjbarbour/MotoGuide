@@ -24,16 +24,16 @@ class ProvisioningRateLimitTest {
     @Autowired private MockMvc mockMvc;
 
     @Test
-    void changingDeviceHeaderCannotBypassProvisioningIpLimit() throws Exception {
-        attempt("device-one").andExpect(status().isUnauthorized());
-        attempt("device-two").andExpect(status().isUnauthorized());
+    void changingDeviceHeaderCannotBypassAutomaticSessionIpLimit() throws Exception {
+        attempt("device-one").andExpect(status().isOk());
+        attempt("device-two").andExpect(status().isOk());
         attempt("device-three").andExpect(status().isTooManyRequests());
     }
 
     private org.springframework.test.web.servlet.ResultActions attempt(String headerDeviceId) throws Exception {
-        return mockMvc.perform(post("/v1/provision")
+        return mockMvc.perform(post("/v1/session/fallback")
                 .header("X-RideHorizon-Device-Id", headerDeviceId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"inviteCode\":\"rhi_invalid\",\"deviceId\":\"body-device\"}"));
+                .content("{\"reason\":\"test\"}"));
     }
 }

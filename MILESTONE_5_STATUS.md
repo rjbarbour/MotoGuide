@@ -20,6 +20,8 @@ Status update on 2026-07-08: Speech/TTS uses a separate iOS timeout from facts. 
 
 Status update on 2026-07-08: the expanded Location bottom sheet must fit both the visible Premium Voice error and the current spoken/fact text. If content exceeds the expanded height, the panel must scroll instead of clipping.
 
+Status update on 2026-07-27: removed the debug splash-time proxy token prompt from the iOS app, keeping automatic server-assisted session provisioning as the default path. The app now launches directly and can obtain proxy access via `/v1/session/fallback` without user token entry or invite UX.
+
 ## Approach
 
 Facts are generated on demand through the RideHorizon fact proxy when the rider selects **Short Facts** or **Long Facts** announcement style and a speakable boundary change occurs.

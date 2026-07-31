@@ -34,8 +34,15 @@ class RateLimitFilterPrivacyTest {
 
     private static RideHorizonProperties properties() {
         return new RideHorizonProperties(
-                "", "", 30, false, "", "", false, "", 60, "", false, "", "",
-                "", "", "", ""
+                "", "", 30, false,
+                "", "",
+                false, "", 60,
+                "", "",
+                "", "", "", "",
+                300, 3600, 900,
+                180, 120_000, 20, 12_000, 2_000, 250_000,
+                30, 24, 3,
+                60000, 21600000
         );
     }
 

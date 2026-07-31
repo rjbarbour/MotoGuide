@@ -81,13 +81,17 @@ RideHorizon iOS app → authenticated Fly proxy → ElevenLabs text-to-speech AP
 - Attempts to read Fly logs from this environment returned HTTP 401. No credentials were requested, printed, copied, or changed.
 - On-device Preview Voice diagnostics on 2026-07-17 reported **Missing proxy token**. The proxy and ElevenLabs were not contacted.
 
-## Why the Development Token Was Missing
+## Superseded Access-Flow History
+
+The material in this section through **Active Slice: Private-Alpha Token Provisioning** records the pre-2026-07-31 diagnostic and invite-based design. It is not an active operator procedure. The invite UI, invite endpoints, shared-token importer, credential authority, and invite tables were removed for the first TestFlight beta. Current builds obtain restricted short-lived sessions automatically through `/v1/session/fallback` and renew after a `401` without tester input.
+
+### Why the Development Token Was Missing
 
 The former development path is `DebugProxyTokenImporter` in `RideHorizon/KeychainCredentialLoader.swift`, invoked only by the `#if DEBUG` block in `RideHorizon/RideHorizonApp.swift`. It reads `RIDEHORIZON_PROXY_TOKEN` from an Xcode launch-scheme environment and writes it to `RideHorizonProxy` in the app Keychain.
 
 `xcrun devicectl` launch does not receive the Xcode scheme environment, so that importer was not given a value. TestFlight release builds also exclude it. This path is development-only and must not be used for TestFlight provisioning.
 
-## What Is Proven vs. Unknown
+### What Was Proven vs. Unknown
 
 | Layer | Status | Evidence |
 |---|---|---|
@@ -98,7 +102,7 @@ The former development path is `DebugProxyTokenImporter` in `RideHorizon/Keychai
 | Fly → ElevenLabs | Not yet tested | Requires a successful authenticated speech request. |
 | ElevenLabs audio → iOS playback | Not yet tested | Requires returned audio from the proxy. |
 
-## Security Constraints
+### Security Constraints
 
 Follow `AGENTS.md` and AXON **SOP: Secret Management in Agentic AI Development v3.0** before any secret-related action.
 
@@ -107,7 +111,7 @@ Follow `AGENTS.md` and AXON **SOP: Secret Management in Agentic AI Development v
 - Fly Secrets is an approved platform-native secret store for this Fly.io-hosted private-alpha workload under the 2026-07-17 AXON SOP exception. Secret values must still never enter source, repository files, logs, documentation, databases as plaintext application credentials, or chat.
 - The temporary old Fly endpoint is for this private-beta diagnostic phase only. Remove it after the RideHorizon hostname and compliant service are live.
 
-## Next Diagnostic Sequence
+### Former Diagnostic Sequence
 
 1. For local debug only, provision a valid proxy token directly into the RideHorizon Keychain service `RideHorizonProxy` using an approved local-only mechanism. Do not use Xcode environment injection, paste a value into chat, or rely on the old app Keychain item.
 2. In the app, enable Proxy Diagnostics and select **Premium voice (ElevenLabs)**.
@@ -124,7 +128,7 @@ Follow `AGENTS.md` and AXON **SOP: Secret Management in Agentic AI Development v
 
 5. After a reproducible failure, change the smallest responsible layer, run the relevant tests, build for the physical iPhone, and test again through the helmet headset.
 
-## TestFlight Provisioning Design
+### Former TestFlight Provisioning Design
 
 Do not embed or manually distribute one shared proxy bearer token in a TestFlight build. Implement an authenticated bootstrap flow instead:
 
@@ -136,7 +140,7 @@ Do not embed or manually distribute one shared proxy bearer token in a TestFligh
 
 This is the route for private beta. A manual secure entry UI may be acceptable for one developer device, but is not a tester-provisioning system.
 
-## Active Slice: Private-Alpha Token Provisioning
+### Former Slice: Private-Alpha Token Provisioning
 
 Date: 2026-07-17
 

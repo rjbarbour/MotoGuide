@@ -10,16 +10,25 @@ ridehorizon:
   prompt-overrides-object-url: ${RIDEHORIZON_PROMPT_OVERRIDES_OBJECT_URL:}
   prompt-overrides-refresh-seconds: ${RIDEHORIZON_PROMPT_OVERRIDES_REFRESH_SECONDS:60}
   prompt-overrides-auth-token: ${RIDEHORIZON_PROMPT_OVERRIDES_AUTH_TOKEN:}
+  prompt-overrides-host-allowlist: ${RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST:}
   short-fact-prompt: ${RIDEHORIZON_SHORT_FACT_PROMPT:}
   long-fact-prompt: ${RIDEHORIZON_LONG_FACT_PROMPT:}
   eleven-labs-api-key: ${ELEVENLABS_API_KEY:}
   eleven-labs-voice-id: ${ELEVENLABS_VOICE_ID:JBFqnCBsd6RMkjVDRZzb}
   eleven-labs-model-id: ${ELEVENLABS_MODEL_ID:eleven_multilingual_v2}
   eleven-labs-output-format: ${ELEVENLABS_OUTPUT_FORMAT:mp3_44100_128}
-  invite-ttl-hours: ${RIDEHORIZON_INVITE_TTL_HOURS:72}
-  credential-ttl-days: ${RIDEHORIZON_CREDENTIAL_TTL_DAYS:90}
-  invite-record-retention-hours: ${RIDEHORIZON_INVITE_RECORD_RETENTION_HOURS:24}
-  credential-record-retention-days: ${RIDEHORIZON_CREDENTIAL_RECORD_RETENTION_DAYS:30}
+  attestation-challenge-ttl-seconds: ${RIDEHORIZON_ATTESTATION_CHALLENGE_TTL_SECONDS:300}
+  session-ttl-seconds: ${RIDEHORIZON_SESSION_TTL_SECONDS:3600}
+  fallback-session-ttl-seconds: ${RIDEHORIZON_FALLBACK_SESSION_TTL_SECONDS:900}
+  verified-fact-daily-limit: ${RIDEHORIZON_VERIFIED_FACT_DAILY_LIMIT:180}
+  verified-speech-char-daily-limit: ${RIDEHORIZON_VERIFIED_SPEECH_CHAR_DAILY_LIMIT:120000}
+  fallback-fact-daily-limit: ${RIDEHORIZON_FALLBACK_FACT_DAILY_LIMIT:20}
+  fallback-speech-char-daily-limit: ${RIDEHORIZON_FALLBACK_SPEECH_CHAR_DAILY_LIMIT:12000}
+  global-fact-daily-limit: ${RIDEHORIZON_GLOBAL_FACT_DAILY_LIMIT:2000}
+  global-speech-char-daily-limit: ${RIDEHORIZON_GLOBAL_SPEECH_CHAR_DAILY_LIMIT:250000}
+  session-record-retention-days: ${RIDEHORIZON_SESSION_RECORD_RETENTION_DAYS:30}
+  challenge-record-retention-hours: ${RIDEHORIZON_CHALLENGE_RECORD_RETENTION_HOURS:24}
+  fallback-usage-retention-days: ${RIDEHORIZON_FALLBACK_USAGE_RETENTION_DAYS:3}
   retention-cleanup-initial-delay-ms: ${RIDEHORIZON_RETENTION_CLEANUP_INITIAL_DELAY_MS:60000}
   retention-cleanup-delay-ms: ${RIDEHORIZON_RETENTION_CLEANUP_DELAY_MS:21600000}
 

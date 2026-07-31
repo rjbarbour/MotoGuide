@@ -118,9 +118,9 @@ enum FactProxyContract {
     static let localDevelopmentBaseURL = URL(string: "http://127.0.0.1:3000")!
     static let keychainService = "RideHorizonProxy"
     static let deviceIdKeychainService = "RideHorizonDeviceId"
-    static let factTimeoutSeconds: TimeInterval = 3
+    static let factTimeoutSeconds: TimeInterval = 15
     static let speechTimeoutSeconds: TimeInterval = 15
-    static let healthTimeoutSeconds: TimeInterval = 3
+    static let healthTimeoutSeconds: TimeInterval = 6
     static let iosTimeoutSeconds = factTimeoutSeconds
 
     static func factEndpoint(baseURL: URL = productionBaseURL) -> URL {
@@ -135,12 +135,6 @@ enum FactProxyContract {
             .appendingPathComponent("speech")
     }
 
-    static func provisioningEndpoint(baseURL: URL = productionBaseURL) -> URL {
-        baseURL
-            .appendingPathComponent("v1")
-            .appendingPathComponent("provision")
-    }
-
     static func healthEndpoint(baseURL: URL = productionBaseURL) -> URL {
         baseURL.appendingPathComponent("health")
     }
@@ -151,10 +145,12 @@ struct ProxyFactGenerator: PlaceFactGenerating {
     typealias ProxyTokenProvider = () -> String?
     typealias DeviceIdProvider = () -> String?
     typealias CredentialInvalidator = () -> Void
+    typealias CredentialRefresher = () async throws -> Void
 
     private let proxyTokenProvider: ProxyTokenProvider
     private let deviceIdProvider: DeviceIdProvider
     private let credentialInvalidator: CredentialInvalidator
+    private let credentialRefresher: CredentialRefresher
     private let session: URLSession
     private let endpoint: URL
 
@@ -162,6 +158,9 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         proxyTokenProvider: @escaping ProxyTokenProvider = { KeychainCredentialLoader.loadRideHorizonProxyToken() },
         deviceIdProvider: @escaping DeviceIdProvider = { KeychainCredentialLoader.loadRideHorizonDeviceId() },
         credentialInvalidator: @escaping CredentialInvalidator = { ProxyCredentialLifecycle.invalidate() },
+        credentialRefresher: @escaping CredentialRefresher = {
+            try await ProxySessionCoordinator.shared.provisionSessionIfNeeded()
+        },
         session: URLSession = .shared,
         baseURL: URL = FactProxyContract.productionBaseURL,
         endpoint: URL? = nil
@@ -169,13 +168,26 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         self.proxyTokenProvider = proxyTokenProvider
         self.deviceIdProvider = deviceIdProvider
         self.credentialInvalidator = credentialInvalidator
+        self.credentialRefresher = credentialRefresher
         self.session = session
         self.endpoint = endpoint ?? FactProxyContract.factEndpoint(baseURL: baseURL)
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
-        guard let proxyToken = proxyTokenProvider(), !proxyToken.isEmpty else {
-            ProxyDiagnostics.log("Proxy", "Missing proxy token. No network request sent.")
+        try await fact(for: request, retryAfterAuthenticationFailure: true)
+    }
+
+    private func fact(
+        for request: PlaceFactRequest,
+        retryAfterAuthenticationFailure: Bool
+    ) async throws -> String {
+        var proxyToken = proxyTokenProvider()
+        if proxyToken?.isEmpty != false {
+            ProxyDiagnostics.log("Proxy", "Proxy session missing; provisioning automatically.")
+            try await credentialRefresher()
+            proxyToken = proxyTokenProvider()
+        }
+        guard let proxyToken, !proxyToken.isEmpty else {
             throw PlaceFactError.missingProxyToken
         }
 
@@ -217,6 +229,11 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         guard (200...299).contains(http.statusCode) else {
             if http.statusCode == 401 {
                 credentialInvalidator()
+                if retryAfterAuthenticationFailure {
+                    ProxyDiagnostics.log("Auth", "Proxy session rejected; reprovisioning and retrying once.")
+                    try await credentialRefresher()
+                    return try await fact(for: request, retryAfterAuthenticationFailure: false)
+                }
             }
             throw PlaceFactError.httpError(http.statusCode)
         }
@@ -242,10 +259,12 @@ struct ProxySpeechGenerator {
     typealias ProxyTokenProvider = () -> String?
     typealias DeviceIdProvider = () -> String?
     typealias CredentialInvalidator = () -> Void
+    typealias CredentialRefresher = () async throws -> Void
 
     private let proxyTokenProvider: ProxyTokenProvider
     private let deviceIdProvider: DeviceIdProvider
     private let credentialInvalidator: CredentialInvalidator
+    private let credentialRefresher: CredentialRefresher
     private let session: URLSession
     private let endpoint: URL
     private static let maxSpeechTextLength = 1400
@@ -254,6 +273,9 @@ struct ProxySpeechGenerator {
         proxyTokenProvider: @escaping ProxyTokenProvider = { KeychainCredentialLoader.loadRideHorizonProxyToken() },
         deviceIdProvider: @escaping DeviceIdProvider = { KeychainCredentialLoader.loadRideHorizonDeviceId() },
         credentialInvalidator: @escaping CredentialInvalidator = { ProxyCredentialLifecycle.invalidate() },
+        credentialRefresher: @escaping CredentialRefresher = {
+            try await ProxySessionCoordinator.shared.provisionSessionIfNeeded()
+        },
         session: URLSession = .shared,
         baseURL: URL = FactProxyContract.productionBaseURL,
         endpoint: URL? = nil
@@ -261,6 +283,7 @@ struct ProxySpeechGenerator {
         self.proxyTokenProvider = proxyTokenProvider
         self.deviceIdProvider = deviceIdProvider
         self.credentialInvalidator = credentialInvalidator
+        self.credentialRefresher = credentialRefresher
         self.session = session
         self.endpoint = endpoint ?? FactProxyContract.speechEndpoint(baseURL: baseURL)
     }
@@ -290,8 +313,20 @@ struct ProxySpeechGenerator {
     }
 
     private func speechAudioChunk(for text: String) async throws -> Data {
-        guard let proxyToken = proxyTokenProvider(), !proxyToken.isEmpty else {
-            ProxyDiagnostics.log("Speech", "Missing proxy token. No speech request sent.")
+        try await speechAudioChunk(for: text, retryAfterAuthenticationFailure: true)
+    }
+
+    private func speechAudioChunk(
+        for text: String,
+        retryAfterAuthenticationFailure: Bool
+    ) async throws -> Data {
+        var proxyToken = proxyTokenProvider()
+        if proxyToken?.isEmpty != false {
+            ProxyDiagnostics.log("Speech", "Proxy session missing; provisioning automatically.")
+            try await credentialRefresher()
+            proxyToken = proxyTokenProvider()
+        }
+        guard let proxyToken, !proxyToken.isEmpty else {
             throw PlaceFactError.missingProxyToken
         }
 
@@ -337,6 +372,11 @@ struct ProxySpeechGenerator {
         guard (200...299).contains(http.statusCode) else {
             if http.statusCode == 401 {
                 credentialInvalidator()
+                if retryAfterAuthenticationFailure {
+                    ProxyDiagnostics.log("Auth", "Speech session rejected; reprovisioning and retrying once.")
+                    try await credentialRefresher()
+                    return try await speechAudioChunk(for: text, retryAfterAuthenticationFailure: false)
+                }
             }
             if let proxyError = try? JSONDecoder().decode(SpeechProxyErrorResponse.self, from: data) {
                 ProxyDiagnostics.log("Speech", "Proxy diagnostic code \(proxyError.code.rawValue).")

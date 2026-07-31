@@ -18,6 +18,7 @@ import java.util.Map;
 public class ElevenLabsSpeechService {
     private static final Logger log = LoggerFactory.getLogger(ElevenLabsSpeechService.class);
     private static final String ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1/text-to-speech/";
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -52,7 +53,7 @@ public class ElevenLabsSpeechService {
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(speechUri())
-                    .timeout(Duration.ofSeconds(15))
+                    .timeout(REQUEST_TIMEOUT)
                     .header("xi-api-key", rideHorizonProperties.elevenLabsApiKey())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))

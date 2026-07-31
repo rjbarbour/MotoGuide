@@ -231,76 +231,16 @@ class PromptOverridesServiceTest {
             int refreshSeconds,
             String hostAllowlist
     ) {
-        for (var constructor : RideHorizonProperties.class.getDeclaredConstructors()) {
-            if (constructor.getParameterCount() == 17) {
-                try {
-                    return (RideHorizonProperties) constructor.newInstance(
-                            "proxy-token",
-                            null,
-                            30,
-                            false,
-                            null,
-                            null,
-                            enabled,
-                            objectUrl,
-                            refreshSeconds,
-                            null,
-                            false,
-                            null,
-                            hostAllowlist,
-                            null,
-                            null,
-                            null,
-                            null
-                    );
-                } catch (ReflectiveOperationException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-
-            if (constructor.getParameterCount() == 13) {
-                try {
-                    return (RideHorizonProperties) constructor.newInstance(
-                            "proxy-token",
-                            null,
-                            30,
-                            false,
-                            null,
-                            null,
-                            enabled,
-                            objectUrl,
-                            refreshSeconds,
-                            null,
-                            false,
-                            null,
-                            hostAllowlist
-                    );
-                } catch (ReflectiveOperationException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-            if (constructor.getParameterCount() == 12) {
-                try {
-                    return (RideHorizonProperties) constructor.newInstance(
-                            "proxy-token",
-                            null,
-                            30,
-                            false,
-                            null,
-                            null,
-                            enabled,
-                            objectUrl,
-                            refreshSeconds,
-                            null,
-                            false,
-                            null
-                    );
-                } catch (ReflectiveOperationException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-        }
-        throw new IllegalStateException("Unexpected RideHorizonProperties constructor signature");
+        return new RideHorizonProperties(
+                "proxy-token", "", 30, false,
+                "", "",
+                enabled, objectUrl, refreshSeconds, "", hostAllowlist,
+                "", "", "", "",
+                300, 3600, 900,
+                180, 120_000, 20, 12_000, 2_000, 250_000,
+                30, 24, 3,
+                60_000, 21_600_000
+        );
     }
 
     @Test

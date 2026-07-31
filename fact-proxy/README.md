@@ -74,11 +74,19 @@ Expected result: `OpenAPI YAML parsed: RideHorizon Fact Proxy API 0.1.0`.
 
 Returns `200` with body `ok`.
 
+### `POST /v1/session/fallback`
+
+The app creates a random per-install identifier in Keychain and exchanges it automatically for a short-lived restricted session. Testers do not enter a code or token.
+
+Required header: `X-RideHorizon-Device-Id: <RANDOM_PER_INSTALL_IDENTIFIER>`.
+
+Response: JSON containing `sessionToken`, `expiresAt`, and `fallback: true`.
+
 ### `POST /v1/fact`
 
 **Headers**
 
-- `Authorization: Bearer <RIDEHORIZON_PROXY_TOKEN>` (required)
+- `Authorization: Bearer <SHORT_LIVED_SESSION_TOKEN>` (required)
 - `Content-Type: application/json`
 
 **Body**
@@ -132,7 +140,7 @@ The iOS app sends place hierarchy only. It does not send prompt text, model mess
 
 **Headers**
 
-- `Authorization: Bearer <RIDEHORIZON_PROXY_TOKEN>` (required)
+- `Authorization: Bearer <SHORT_LIVED_SESSION_TOKEN>` (required)
 - `Content-Type: application/json`
 
 **Body**
@@ -209,7 +217,7 @@ fly status
 curl -sS https://ridehorizon.digitalmercenaries.ai/health
 ```
 
-Store `RIDEHORIZON_PROXY_TOKEN` in the iOS app Keychain (service `RideHorizonProxy`) — **not** the OpenAI key.
+The iOS app automatically stores only its short-lived session token in Keychain. Provider keys remain in Fly Secrets.
 
 ## Environment variables
 
@@ -217,7 +225,7 @@ Store `RIDEHORIZON_PROXY_TOKEN` in the iOS app Keychain (service `RideHorizonPro
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Yes | OpenAI key (Fly secret only) |
 | `ELEVENLABS_API_KEY` | Yes for speech | ElevenLabs key (Fly secret only) |
-| `RIDEHORIZON_PROXY_TOKEN` | Yes | Shared secret the app sends as Bearer token |
+| `RIDEHORIZON_PROXY_TOKEN` | Operator compatibility only | Server-side operator credential; never ship it in the app |
 | `OPENAI_MODEL` | No | Fly runtime variable. Default `gpt-4o-mini` in `fly.toml` |
 | `ELEVENLABS_VOICE_ID` | No | Voice id for `/v1/speech`; default is the service default in `application.yml` |
 | `ELEVENLABS_MODEL_ID` | No | ElevenLabs model id. Default `eleven_multilingual_v2` |
@@ -235,11 +243,11 @@ Store `RIDEHORIZON_PROXY_TOKEN` in the iOS app Keychain (service `RideHorizonPro
 
 The iOS app uses `ProxyFactGenerator` to call `https://ridehorizon.digitalmercenaries.ai/v1/fact`.
 
-Store `RIDEHORIZON_PROXY_TOKEN` in the iOS Keychain service `RideHorizonProxy`. Do not store the OpenAI key on the device.
+The app automatically stores the returned short-lived session token in Keychain service `RideHorizonProxy` and renews it when required. Do not store OpenAI or ElevenLabs keys on the device.
 
 ## Security notes
 
 - Minimal MVP proxy, not a full product backend.
-- Use a long random `RIDEHORIZON_PROXY_TOKEN` and rotate if leaked.
+- Keep `RIDEHORIZON_PROXY_TOKEN` server-side and rotate it if exposed.
 - Set OpenAI usage limits in the OpenAI dashboard.
 - Add per-rider auth before wider distribution.

@@ -11,8 +11,12 @@ class ElevenLabsSpeechServiceTest {
     @Test
     void requestsZeroRetentionProcessing() {
         RideHorizonProperties properties = new RideHorizonProperties(
-                "", "", 30, false, "", "", false, "", 60, "", false, "", "",
-                "test-provider-key", "test-voice", "eleven_multilingual_v2", "mp3_44100_128"
+                "", "", 30, false, "", "", false, "", 60, "", "",
+                "test-provider-key", "test-voice", "eleven_multilingual_v2", "mp3_44100_128",
+                300, 3600, 900,
+                180, 120_000, 20, 12_000, 2_000, 250_000,
+                30, 24, 3,
+                60000, 21600000
         );
         ElevenLabsSpeechService service = new ElevenLabsSpeechService(
                 HttpClient.newHttpClient(),

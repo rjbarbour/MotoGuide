@@ -1,8 +1,8 @@
 package ai.digitalmercenaries.ridehorizon.factproxy;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,55 +11,49 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
-final class CredentialProvisioningController {
-    private final CredentialAuthority credentials;
+final class SessionAccessController {
+    private static final String DEVICE_ID_HEADER = "X-RideHorizon-Device-Id";
+    private final SessionAuthority sessions;
     private final AdminAuthorizer adminAuthorizer;
 
-    CredentialProvisioningController(CredentialAuthority credentials, AdminAuthorizer adminAuthorizer) {
-        this.credentials = credentials;
+    SessionAccessController(SessionAuthority sessions, AdminAuthorizer adminAuthorizer) {
+        this.sessions = sessions;
         this.adminAuthorizer = adminAuthorizer;
     }
 
-    @PostMapping("/admin/v1/invites")
-    ResponseEntity<?> createInvite(HttpServletRequest request, @RequestBody CreateInviteRequest body) {
+    @PostMapping("/v1/session/fallback")
+    ResponseEntity<SessionResponse> fallback(
+            @RequestBody(required = false) FallbackRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String deviceId = DeviceIdSanitizer.normalize(httpRequest.getHeader(DEVICE_ID_HEADER));
+        if (deviceId == null) {
+            throw new BadRequestException("automatic access requires an installation identifier");
+        }
+        String reason = request == null ? null : request.reason();
+        SessionAuthority.SessionToken token = sessions.issueFallbackSession(reason, deviceId);
+        return ResponseEntity.ok(new SessionResponse(token.token(), token.expiresAt(), token.fallback()));
+    }
+
+    @GetMapping("/admin/v1/sessions")
+    ResponseEntity<?> listInstallations(HttpServletRequest request) {
         ResponseEntity<?> rejection = rejectUnauthorizedAdmin(request);
         if (rejection != null) {
             return rejection;
         }
-        CredentialAuthority.InviteIssue issue = credentials.issueInvite(body.label());
-        return ResponseEntity.status(HttpStatus.CREATED).body(new InviteResponse(
-                issue.inviteId(), issue.inviteCode(), issue.expiresAt()));
+        return ResponseEntity.ok(sessions.listInstallations());
     }
 
-    @PostMapping("/v1/provision")
-    ResponseEntity<?> provision(@RequestBody ProvisionRequest body) {
-        try {
-            CredentialAuthority.IssuedCredential issued = credentials.redeem(body.inviteCode(), body.deviceId());
-            return ResponseEntity.status(HttpStatus.CREATED).body(new ProvisionResponse(
-                    issued.credentialId(), issued.credential(), issued.expiresAt()));
-        } catch (CredentialAuthority.InvalidInviteException rejected) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ProvisionError("invalid_invite", "Invite is invalid or expired."));
-        }
-    }
-
-    @GetMapping("/admin/v1/credentials")
-    ResponseEntity<?> listCredentials(HttpServletRequest request) {
-        ResponseEntity<?> rejection = rejectUnauthorizedAdmin(request);
-        return rejection != null ? rejection : ResponseEntity.ok(credentials.listCredentials());
-    }
-
-    @DeleteMapping("/admin/v1/credentials/{credentialId}")
-    ResponseEntity<?> revoke(HttpServletRequest request, @PathVariable UUID credentialId) {
+    @DeleteMapping("/admin/v1/sessions/{installationId}")
+    ResponseEntity<?> revoke(HttpServletRequest request, @PathVariable UUID installationId) {
         ResponseEntity<?> rejection = rejectUnauthorizedAdmin(request);
         if (rejection != null) {
             return rejection;
         }
-        return credentials.revoke(credentialId)
+        return sessions.revoke(installationId)
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.notFound().build();
     }
@@ -74,18 +68,9 @@ final class CredentialProvisioningController {
         return null;
     }
 
-    record CreateInviteRequest(String label) {
+    record SessionResponse(String sessionToken, Instant expiresAt, boolean fallback) {
     }
 
-    record InviteResponse(UUID inviteId, String inviteCode, Instant expiresAt) {
-    }
-
-    record ProvisionRequest(String inviteCode, String deviceId) {
-    }
-
-    record ProvisionResponse(UUID credentialId, String credential, Instant expiresAt) {
-    }
-
-    record ProvisionError(String code, String message) {
+    record FallbackRequest(String reason) {
     }
 }

@@ -103,7 +103,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private String requestIdentityKey(HttpServletRequest request) {
         String path = request.getRequestURI();
-        if ("/v1/provision".equals(path) || path.startsWith("/admin/")) {
+        if (path.startsWith("/v1/attestation/")
+                || path.startsWith("/v1/session/")
+                || path.startsWith("/admin/")) {
             return "ip:" + clientIp(request);
         }
         String userId = UserIdSanitizer.normalizeAndValidate(request.getHeader(USER_ID_HEADER));

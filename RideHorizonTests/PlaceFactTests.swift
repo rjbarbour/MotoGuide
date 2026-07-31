@@ -586,23 +586,40 @@ final class ProxyFactGeneratorTests: XCTestCase {
         }
     }
 
-    func testProxySpeechGeneratorInvalidatesStoredCredentialOnUnauthorized() async {
+    func testProxySpeechGeneratorReprovisionsAndRetriesOnceOnUnauthorized() async throws {
         let endpoint = URL(string: "https://example.test/v1/speech")!
         var invalidated = false
-        MockURLProtocol.requestHandler = { _ in
-            let response = HTTPURLResponse(url: endpoint, statusCode: 401, httpVersion: nil, headerFields: nil)!
-            return (response, Data())
+        var token = "expired-token"
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            if requestCount == 1 {
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer expired-token")
+                let response = HTTPURLResponse(url: endpoint, statusCode: 401, httpVersion: nil, headerFields: nil)!
+                return (response, Data())
+            }
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer refreshed-token")
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "audio/mpeg"]
+            )!
+            return (response, Data([7, 8, 9]))
         }
         let generator = ProxySpeechGenerator(
-            proxyTokenProvider: { "expired-token" },
+            proxyTokenProvider: { token },
             credentialInvalidator: { invalidated = true },
+            credentialRefresher: { token = "refreshed-token" },
             session: makeMockSession(),
             endpoint: endpoint
         )
 
-        _ = try? await generator.speechAudio(for: "Test")
+        let audio = try await generator.speechAudio(for: "Test")
 
         XCTAssertTrue(invalidated)
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertEqual(audio, Data([7, 8, 9]))
     }
 
     func testProxySpeechGeneratorPreservesRiderSafeDiagnosticCode() async {
@@ -641,8 +658,9 @@ final class ProxyFactGeneratorTests: XCTestCase {
         }
     }
 
-    func testMissingProxyTokenThrowsBeforeNetworkRequest() async {
+    func testMissingProxyTokenAttemptsAutomaticProvisioningBeforeFailing() async {
         let endpoint = self.endpoint
+        var refreshCount = 0
         MockURLProtocol.requestHandler = { _ in
             XCTFail("No network request should be made without a proxy token.")
             let response = HTTPURLResponse(
@@ -656,6 +674,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
 
         let generator = ProxyFactGenerator(
             proxyTokenProvider: { nil },
+            credentialRefresher: { refreshCount += 1 },
             session: makeMockSession(),
             endpoint: endpoint
         )
@@ -668,37 +687,51 @@ final class ProxyFactGeneratorTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
+        XCTAssertEqual(refreshCount, 1)
     }
 
-    func testProxyHttpErrorIsSurfaced() async {
+    func testProxyUnauthorizedReprovisionsAndRetriesOnce() async throws {
         let endpoint = self.endpoint
         var invalidated = false
-        MockURLProtocol.requestHandler = { _ in
+        var token = "expired-token"
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            if requestCount == 1 {
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer expired-token")
+                let response = HTTPURLResponse(
+                    url: endpoint,
+                    statusCode: 401,
+                    httpVersion: nil,
+                    headerFields: nil
+                )!
+                return (response, Data())
+            }
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer refreshed-token")
             let response = HTTPURLResponse(
                 url: endpoint,
-                statusCode: 401,
+                statusCode: 200,
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data())
+            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
-            proxyTokenProvider: { "wrong-token" },
+            proxyTokenProvider: { token },
             credentialInvalidator: { invalidated = true },
+            credentialRefresher: { token = "refreshed-token" },
             session: makeMockSession(),
             endpoint: endpoint
         )
 
-        do {
-            _ = try await generator.fact(for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil))
-            XCTFail("Expected HTTP error.")
-        } catch let error as PlaceFactError {
-            XCTAssertEqual(error, .httpError(401))
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
+        let fact = try await generator.fact(
+            for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+        )
+
         XCTAssertTrue(invalidated)
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertEqual(fact, "Known for its wool trade.")
     }
 
     private func makeMockSession() -> URLSession {
@@ -791,56 +824,6 @@ final class ProxyHealthCheckerTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
-    }
-}
-
-final class ProxyCredentialProvisionerTests: XCTestCase {
-    override func tearDown() {
-        MockURLProtocol.requestHandler = nil
-        super.tearDown()
-    }
-
-    func testRedeemsInviteAndStoresCredentialForStableDevice() async throws {
-        let endpoint = URL(string: "https://proxy.test/v1/provision")!
-        var storedCredential: String?
-        var storedDeviceId: String?
-
-        MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url, endpoint)
-            XCTAssertEqual(request.httpMethod, "POST")
-            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
-            let body = try XCTUnwrap(request.httpBody)
-            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: String])
-            XCTAssertEqual(json["inviteCode"], "rhi_test-invite")
-            XCTAssertEqual(json["deviceId"], storedDeviceId)
-
-            let response = HTTPURLResponse(
-                url: endpoint,
-                statusCode: 201,
-                httpVersion: nil,
-                headerFields: ["Content-Type": "application/json"]
-            )!
-            return (
-                response,
-                Data(#"{"credentialId":"02f96eb5-f52c-45f8-a52d-8734089fc018","credential":"rh_device-credential","expiresAt":"2026-10-15T12:00:00Z"}"#.utf8)
-            )
-        }
-
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [MockURLProtocol.self]
-        let provisioner = ProxyCredentialProvisioner(
-            session: URLSession(configuration: configuration),
-            endpoint: endpoint,
-            credentialStore: { storedCredential = $0; return true },
-            deviceIdProvider: { nil },
-            deviceIdStore: { storedDeviceId = $0; return true },
-            deviceIdGenerator: { "rh-ios-test-device" }
-        )
-
-        try await provisioner.redeem(inviteCode: "rhi_test-invite")
-
-        XCTAssertEqual(storedDeviceId, "rh-ios-test-device")
-        XCTAssertEqual(storedCredential, "rh_device-credential")
     }
 }
 

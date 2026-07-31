@@ -18,6 +18,7 @@ import java.util.Map;
 @Service
 public class OpenAiService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiService.class);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     private static final String BASE_SYSTEM_PROMPT = """
             You are a place-fact generator for a motorcycling ride companion.
@@ -89,7 +90,7 @@ public class OpenAiService {
             String body = objectMapper.writeValueAsString(buildPayload(request, factMode));
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(openAiProperties.endpoint()))
-                    .timeout(Duration.ofSeconds(15))
+                    .timeout(REQUEST_TIMEOUT)
                     .header("Authorization", "Bearer " + openAiProperties.apiKey())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))

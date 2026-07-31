@@ -479,7 +479,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
     @Published var premiumVoiceAppleFallbackEnabled: Bool = {
         guard UserDefaults.standard.object(forKey: LocationManagerDefaults.premiumVoiceAppleFallbackEnabledKey) != nil else {
-            return false
+            return true
         }
         return UserDefaults.standard.bool(forKey: LocationManagerDefaults.premiumVoiceAppleFallbackEnabledKey)
     }() {
@@ -1222,7 +1222,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             boundary: boundary,
             provider: aiSharingAllowed() ? speechProvider : .apple,
             appleVoice: resolveSpeechVoice(),
-            allowAppleFallback: premiumVoiceAppleFallbackEnabled
+            allowAppleFallback: aiSharingAllowed() ? premiumVoiceAppleFallbackEnabled : false
         )
     }
 

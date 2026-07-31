@@ -11,11 +11,10 @@ import java.time.Duration;
 @Configuration
 @EnableConfigurationProperties({RideHorizonProperties.class, OpenAiProperties.class})
 public class AppConfig {
-
     @Bean
     HttpClient httpClient() {
         return HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
+                .connectTimeout(Duration.ofSeconds(20))
                 .build();
     }
 
