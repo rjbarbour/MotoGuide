@@ -320,7 +320,7 @@ struct PrivacyNoticeView: View {
                 Section("Full policy") {
                     Link(
                         "Read the RideHorizon Privacy Policy",
-                        destination: URL(string: "https://ridehorizon-invite-beta.rjbarbour.chatgpt.site/privacy")!
+                        destination: ProductLinks.privacyPolicy
                     )
                 }
             }

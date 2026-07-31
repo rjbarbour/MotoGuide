@@ -2,7 +2,7 @@
 
 Date: 2026-07-31
 
-Status: Reviewed build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31; App Store Connect processing and beta configuration remain. Build `20260731.1519` is superseded and must not be assigned to testers.
+Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Local candidate `0.12.3 (20260731.1645)` adds the final public privacy-policy link and must be uploaded after the custom domain is live. The Cloudflare Pages deployment and its Fly proxy path passed production checks on 2026-07-31; custom-domain association and Namecheap DNS remain. Build `20260731.1519` is superseded and must not be assigned to testers.
 
 ## Release Decisions — 2026-07-31
 
@@ -11,6 +11,18 @@ Status: Reviewed build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07
 - Automatic restricted proxy sessions are permitted for this first private beta while full App Attest verification remains under development.
 - Standard HTTPS/platform cryptography is expected to qualify for the export-compliance exemption; the account holder confirms the App Store Connect answer.
 - The release candidate must use a working public privacy-policy URL and a working monitored feedback address.
+
+## External TestFlight Submission Acceptance Criteria — 2026-07-31
+
+- App Store Connect uses `https://ridehorizon.digitalmercenaries.ai/app-privacy-policy` as the privacy-policy URL.
+- The same URL is reachable from the privacy notice inside the shipped iOS build.
+- The privacy-policy page is public over HTTPS, requires no sign-in, contains no placeholder text, and identifies Digital Mercenaries Limited and a monitored privacy contact.
+- The App Store Connect Beta App Description, What to Test text, and Beta App Review notes match the actual build and are copied from `APP_STORE_CONNECT_TEST_INFORMATION.md`.
+- Reviewers can exercise the core experience without an account, invite code, proxy token, API key, motorcycle ride, or Bluetooth hardware.
+- Test Mode can trigger representative location changes, AI facts, Premium Voice, and Apple Voice fallback while stationary.
+- The production proxy remains available throughout review and automatically provisions restricted app sessions.
+- Optional AI and Premium Voice disclosures are presented before provider sharing; names-only announcements and Apple Voice remain available when sharing is declined.
+- The current build launches on a physical iPhone and the production `/v1/speech` route returns valid MP3 audio.
 
 ## Purpose
 

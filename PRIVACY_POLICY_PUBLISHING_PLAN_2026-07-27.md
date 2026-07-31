@@ -6,7 +6,7 @@ Status: Automatic work completed as far as current access safely allows
 
 ## Outcome on 2026-07-27
 
-- Drafted and deployed the conventional legal policy at `https://ridehorizon-invite-beta.rjbarbour.chatgpt.site/privacy`. The hosting service reports a successful production deployment, but the public edge currently returns HTTP 522, so public availability is not yet verified.
+- Replaced the failed legacy host with a Cloudflare Pages deployment at `https://ridehorizon-edge.pages.dev/app-privacy-policy`. The page, security headers, Fly proxy health route, automatic session flow, and ElevenLabs speech route were verified on 2026-07-31. The final URL remains `https://ridehorizon.digitalmercenaries.ai/app-privacy-policy`; Cloudflare custom-domain association and the Namecheap `ridehorizon` CNAME are still required before TestFlight submission.
 - Kept the product proposition separate: RideHorizon provides short audio place context for motorcyclists alongside their normal navigation.
 - Added the public policy link to the in-app privacy notice and completed a generic iOS device build successfully.
 - Confirmed the physical iPhone was not connected, so installation and launch remain manual.

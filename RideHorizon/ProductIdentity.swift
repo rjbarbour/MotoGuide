@@ -10,6 +10,10 @@ enum ProductIdentity {
     }()
 }
 
+enum ProductLinks {
+    static let privacyPolicy = URL(string: "https://ridehorizon.digitalmercenaries.ai/app-privacy-policy")!
+}
+
 enum AppDiagnostics {
     static func log(_ message: @autoclosure () -> String) {
 #if DEBUG
