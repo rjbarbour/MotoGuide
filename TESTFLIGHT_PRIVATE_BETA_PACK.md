@@ -2,7 +2,7 @@
 
 Date: 2026-07-31
 
-Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Local candidate `0.12.3 (20260731.1645)` adds the final public privacy-policy link and must be uploaded after the custom domain is live. The Cloudflare Pages deployment and its Fly proxy path passed production checks on 2026-07-31; custom-domain association and Namecheap DNS remain. Build `20260731.1519` is superseded and must not be assigned to testers.
+Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Local candidate `0.12.3 (20260731.1645)` adds the final public privacy-policy link and is ready to archive and upload. The Cloudflare Pages deployment, custom domain, privacy-policy route and Fly proxy path passed production checks on 2026-07-31. Build `20260731.1519` is superseded and must not be assigned to testers.
 
 ## Release Decisions — 2026-07-31
 

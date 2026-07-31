@@ -6,7 +6,7 @@ Status: Automatic work completed as far as current access safely allows
 
 ## Outcome on 2026-07-27
 
-- Replaced the failed legacy host with a Cloudflare Pages deployment at `https://ridehorizon-edge.pages.dev/app-privacy-policy`. The page, security headers, Fly proxy health route, automatic session flow, and ElevenLabs speech route were verified on 2026-07-31. The final URL remains `https://ridehorizon.digitalmercenaries.ai/app-privacy-policy`; Cloudflare custom-domain association and the Namecheap `ridehorizon` CNAME are still required before TestFlight submission.
+- Replaced the failed legacy host with a Cloudflare Pages deployment at `https://ridehorizon-edge.pages.dev/app-privacy-policy`. The page, security headers, Fly proxy health route, automatic session flow, and ElevenLabs speech route were verified on 2026-07-31. The final custom URL `https://ridehorizon.digitalmercenaries.ai/app-privacy-policy` and its Namecheap CNAME were verified live on 2026-07-31.
 - Kept the product proposition separate: RideHorizon provides short audio place context for motorcyclists alongside their normal navigation.
 - Added the public policy link to the in-app privacy notice and completed a generic iOS device build successfully.
 - Confirmed the physical iPhone was not connected, so installation and launch remain manual.
