@@ -99,10 +99,7 @@ struct OnboardingView: View {
 
     private var aiSharingPage: some View {
         ZStack {
-            Image("OnboardingAlps")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
+            onboardingBackground(imageName: "OnboardingAlps")
             LinearGradient(
                 colors: [.black.opacity(0.74), .black.opacity(0.48), .black.opacity(0.82)],
                 startPoint: .top,
@@ -110,39 +107,40 @@ struct OnboardingView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                brandMark
-                Spacer()
-                Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 52))
-                    .foregroundStyle(.white)
-                    .accessibilityHidden(true)
-                Text("Choose how facts are made")
-                    .font(.title2.bold())
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                Text("If you allow AI features, RideHorizon sends the current town, county, region or country and your optional fact preferences to OpenAI. If you choose Premium Voice, announcement text is sent to ElevenLabs. Precise GPS coordinates are not sent to either provider.")
-                    .font(.body)
-                    .foregroundStyle(.white.opacity(0.96))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                Text("You can decline and keep place-name announcements with Apple Voice. You can change this choice in Settings.")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                Button("Read privacy details") {
-                    showPrivacyNotice = true
+            scrollablePageContent {
+                VStack(spacing: 20) {
+                    brandMark
+                    Spacer()
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 52))
+                        .foregroundStyle(.white)
+                        .accessibilityHidden(true)
+                    Text("Choose how facts are made")
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Text("If you allow AI features, RideHorizon sends the current town, county, region or country and your optional fact preferences to OpenAI. If you choose Premium Voice, announcement text is sent to ElevenLabs. Precise GPS coordinates are not sent to either provider.")
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.96))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Text("You can decline and keep place-name announcements with Apple Voice. You can change this choice in Settings.")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Button("Read privacy details") {
+                        showPrivacyNotice = true
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.white)
+                    Spacer()
+                    Text("Photo: Royonx · CC0")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.78))
+                        .padding(.bottom, 34)
                 }
-                .buttonStyle(.bordered)
-                .tint(.white)
-                Spacer()
-                Text("Photo: Royonx · CC0")
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.78))
-                    .padding(.bottom, 34)
             }
-            .padding()
         }
     }
 
@@ -154,41 +152,63 @@ struct OnboardingView: View {
         photoCredit: String
     ) -> some View {
         ZStack {
+            onboardingBackground(imageName: imageName)
+            LinearGradient(colors: [.black.opacity(0.66), .black.opacity(0.22), .black.opacity(0.76)], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            scrollablePageContent {
+                VStack(spacing: 24) {
+                    brandMark
+                    Spacer()
+                    Image(systemName: symbol)
+                        .font(.system(size: 56))
+                        .foregroundStyle(.white)
+                        .shadow(radius: 4)
+                        .accessibilityHidden(true)
+                    Text(title)
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .shadow(radius: 3)
+                    Text(body)
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.94))
+                        .multilineTextAlignment(.center)
+                        .shadow(radius: 3)
+                        .padding(.horizontal)
+                    Spacer()
+                    Text(photoCredit)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.78))
+                        .shadow(radius: 2)
+                        .accessibilityLabel(photoCredit.replacingOccurrences(of: "·", with: ","))
+                        .padding(.bottom, 34)
+                }
+            }
+        }
+    }
+
+    private func scrollablePageContent<Content: View>(
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        GeometryReader { geometry in
+            ScrollView {
+                content()
+                    .padding()
+                    .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func onboardingBackground(imageName: String) -> some View {
+        GeometryReader { geometry in
             Image(imageName)
                 .resizable()
                 .scaledToFill()
-                .ignoresSafeArea()
-            LinearGradient(colors: [.black.opacity(0.66), .black.opacity(0.22), .black.opacity(0.76)], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-            VStack(spacing: 24) {
-                brandMark
-                Spacer()
-                Image(systemName: symbol)
-                    .font(.system(size: 56))
-                    .foregroundStyle(.white)
-                    .shadow(radius: 4)
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(.title2.bold())
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .shadow(radius: 3)
-                Text(body)
-                    .font(.body)
-                    .foregroundStyle(.white.opacity(0.94))
-                    .multilineTextAlignment(.center)
-                    .shadow(radius: 3)
-                    .padding(.horizontal)
-                Spacer()
-                Text(photoCredit)
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.78))
-                    .shadow(radius: 2)
-                    .accessibilityLabel(photoCredit.replacingOccurrences(of: "·", with: ","))
-                    .padding(.bottom, 34)
-            }
-            .padding()
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
         }
+        .ignoresSafeArea()
     }
 
     private var brandMark: some View {

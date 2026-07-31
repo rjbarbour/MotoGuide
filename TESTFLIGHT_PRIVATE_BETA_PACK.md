@@ -2,7 +2,7 @@
 
 Date: 2026-07-31
 
-Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Candidate `0.12.3 (20260731.1857)` adds the final public privacy-policy link and private-beta hardening; its tests, independent review, production proxy checks, Release archive and local store validation pass. Upload is waiting for the local Xcode Apple ID session to be refreshed, and the exact build still needs installation on the currently unavailable target iPhone. The Cloudflare Pages deployment, custom domain, privacy-policy route and Fly proxy path passed production checks on 2026-07-31. Builds `20260731.1519` and `20260731.1645` are superseded and must not be assigned to testers.
+Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Candidate `0.12.3 (20260731.1942)` adds the final public privacy-policy link, private-beta hardening, clean-install UI coverage and simulator-discovered onboarding fixes for width, compact iPhones and landscape. Its unit, proxy, Cloudflare and UI suites pass, and its Release archive passes local store and packaging validation. The final upload attempt stopped before transfer with `exportArchive Failed to Use Accounts`, so the local Xcode Apple ID session must be refreshed. The exact build also still needs installation on the currently unavailable target iPhone. The Cloudflare Pages deployment, custom domain, privacy-policy route and Fly proxy path passed production checks on 2026-07-31. Builds `20260731.1519`, `20260731.1645`, `20260731.1857` and `20260731.1930` are superseded and must not be assigned to testers.
 
 ## Release Decisions — 2026-07-31
 
@@ -24,7 +24,7 @@ Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and r
 - Optional AI and Premium Voice disclosures are presented before provider sharing; names-only announcements and Apple Voice remain available when sharing is declined.
 - A clean launch does not contact the RideHorizon proxy until the rider enables optional AI features and a proxy-backed feature first needs access.
 - Onboarding tells the rider to complete setup while stopped, avoid interacting with the phone while moving, and stop using RideHorizon if it becomes distracting.
-- The current build launches on a physical iPhone and the production `/v1/speech` route returns valid MP3 audio.
+- An earlier build launched on the target physical iPhone, and the production `/v1/speech` route returns valid MP3 audio. The exact candidate still needs its physical-device smoke test.
 
 ## Purpose
 

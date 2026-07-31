@@ -139,8 +139,8 @@ If any condition fails, mark Coarse Location and Other User Content as linked.
 ### P0 — Blockers
 
 1. **Completed in code:** explicit, optional, revocable AI-sharing consent gates OpenAI and ElevenLabs. Decline and withdrawal fall back to Names Only and Apple Voice.
-2. **External action open:** publish a privacy policy at a stable HTTPS URL and add that public link in App Store Connect and the app. The in-app privacy notice is implemented.
-3. **Completed in code:** `PrivacyInfo.xcprivacy` declares no tracking and the approved same-app `UserDefaults` reason. Validate it again in the final signed archive.
+2. **Completed 2026-07-31:** the privacy policy is public at `https://ridehorizon.digitalmercenaries.ai/app-privacy-policy`, App Store Connect uses that URL, and the same URL is linked from the app's privacy notice.
+3. **Completed 2026-07-31:** `PrivacyInfo.xcprivacy` declares no tracking and the approved same-app `UserDefaults` reason; the manifest is present and valid in Release archive `0.12.3 (20260731.1942)`.
 4. **Completed in code:** sensitive iOS diagnostics are compile-gated or replaced with value-free Release messages. Recheck the final archive and production logs.
 5. **Code complete; account verification open:** ElevenLabs requests `enable_logging=false`. Confirm Zero Retention Mode is authorised for the production account before making that claim publicly.
 6. **Code complete; deployment verification open:** scheduled cleanup and retention indexes cover invite and legacy credential records. Deploy the migration and verify production execution; extend cleanup to the separate App Attest/session work before that flow ships.
@@ -162,6 +162,15 @@ If any condition fails, mark Coarse Location and Other User Content as linked.
 - The full fact-proxy Gradle test suite passed in a clean temporary checkout containing the privacy changes.
 - The shared fact-proxy checkout cannot currently compile because separate unfinished App Attest source files contain syntax errors; those files were not changed by this privacy batch.
 - Physical iPhone installation and Bluetooth/audio/background ride validation remain open because the configured device was not connected.
+
+### Release-candidate update — 2026-07-31
+
+- All 100 iOS unit tests pass on iPhone 16e / iOS 26.3.1.
+- Three clean-install UI tests pass and cover the safety copy, onboarding, privacy notice and link, on-device-only consent, the real location permission prompt, absence of credential fields, arrival at the main screen and compact-landscape scrolling with fixed controls.
+- Simulator screenshot inspection found horizontally clipped onboarding text and non-scrollable compact-landscape content. The background is now bounded to the device container, and page content is adaptive and scrollable while navigation controls remain fixed.
+- Release archive `0.12.3 (20260731.1942)` passes Xcode's local store validation, contains a valid root privacy manifest, targets iPhone only, declares no non-exempt encryption and exposes no credential-entry UI.
+- The public privacy and health routes, automatic restricted session, fact and speech routes pass production checks; ElevenLabs returns valid MPEG audio.
+- Xcode's generated privacy report, exact physical-iPhone installation, background/Bluetooth ride smoke and App Store Connect upload/processing remain open.
 
 ### P2 — Submission preparation
 
