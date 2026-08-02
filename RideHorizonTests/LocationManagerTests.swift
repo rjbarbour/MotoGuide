@@ -99,14 +99,24 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testDefaultsUsePrivateBetaTestModeAndShortFacts() {
+    func testFreshInstallDefaultsToLiveLocationAndShortFacts() {
         let locationManager = LocationManager()
 
-        XCTAssertTrue(locationManager.testMode)
+        XCTAssertFalse(locationManager.testMode)
         XCTAssertEqual(locationManager.contentMode, .shortFacts)
         XCTAssertEqual(locationManager.speechProvider, .proxyElevenLabs)
         XCTAssertTrue(locationManager.interruptsMusic)
         XCTAssertTrue(locationManager.premiumVoiceAppleFallbackEnabled)
+    }
+
+    @MainActor
+    func testExplicitTestModeChoicePersists() {
+        let locationManager = LocationManager()
+        locationManager.testMode = true
+
+        let restoredLocationManager = LocationManager()
+
+        XCTAssertTrue(restoredLocationManager.testMode)
     }
 
     @MainActor

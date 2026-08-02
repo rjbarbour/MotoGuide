@@ -2,7 +2,7 @@
 
 Date: 2026-07-31
 
-Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Candidate `0.12.3 (20260731.2020)` adds the final public privacy-policy link, private-beta hardening, clean-install UI coverage, simulator-discovered onboarding fixes and the reviewed rider-network retry/timeout strategy. Its iOS unit, proxy and Cloudflare suites pass, the earlier UI suite remains green, and a generic iPhone build passes. Fly production version 38 keeps one machine warm and passed fresh live health, automatic-session, fact and ElevenLabs audio checks. The validated `20260731.1942` archive is superseded by the reliability changes. The local Xcode Apple ID session must be refreshed before `20260731.2020` is archived and uploaded, and the exact build still needs installation on the currently unavailable target iPhone. Builds `20260731.1519`, `20260731.1645`, `20260731.1857`, `20260731.1930` and `20260731.1942` must not be assigned to testers.
+Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Candidate `0.12.3 (20260802.2254)` includes the prior privacy, onboarding and rider-network hardening and now defaults a fresh install to live location with Test Mode off. Its complete app and test targets compile; the physical-iPhone unit target passes 115/115; the unsigned generic-iPhone Release build passes; and the normal signed app installs and launches on the target iPhone. The signed Release archive and App Store Connect upload remain outstanding. Earlier candidates, including `20260731.2020`, must not be assigned to testers.
 
 ## Release Decisions — 2026-07-31
 
@@ -19,12 +19,13 @@ Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and r
 - The privacy-policy page is public over HTTPS, requires no sign-in, contains no placeholder text, and identifies Digital Mercenaries Limited and a monitored privacy contact.
 - The App Store Connect Beta App Description, What to Test text, and Beta App Review notes match the actual build and are copied from `APP_STORE_CONNECT_TEST_INFORMATION.md`.
 - Reviewers can exercise the core experience without an account, invite code, proxy token, API key, motorcycle ride, or Bluetooth hardware.
+- A fresh install starts with Test Mode off and processes live location; reviewers can enable Test Mode explicitly while stationary.
 - Test Mode can trigger representative location changes, AI facts, Premium Voice, and Apple Voice fallback while stationary.
 - The production proxy remains available throughout review and automatically provisions restricted app sessions.
 - Optional AI and Premium Voice disclosures are presented before provider sharing; names-only announcements and Apple Voice remain available when sharing is declined.
 - A clean launch does not contact the RideHorizon proxy until the rider enables optional AI features and a proxy-backed feature first needs access.
 - Onboarding tells the rider to complete setup while stopped, avoid interacting with the phone while moving, and stop using RideHorizon if it becomes distracting.
-- An earlier build launched on the target physical iPhone, and the production `/v1/speech` route returns valid MP3 audio. The exact candidate still needs its physical-device smoke test.
+- Candidate `20260802.2254` installed and launched on the target physical iPhone, and the production `/v1/speech` route returns valid MP3 audio. The exact candidate still needs its manual location, background and Bluetooth smoke test.
 
 ## Purpose
 

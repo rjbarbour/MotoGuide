@@ -1,6 +1,6 @@
 # RideHorizon Project State
 
-Last verified: 2026-07-31
+Last verified: 2026-08-02
 
 ## Current commitment
 
@@ -8,17 +8,17 @@ Prepare a private external TestFlight beta for 3–5 named iPhone testers. This 
 
 ## Last verified result
 
-RideHorizon `0.12.3 (20260731.2020)` is the current source and device-build candidate. It adds the reviewed rider-network policy: 35-second attempts, a 60-second fact/Premium Voice ceiling, transient retries after 3 and 10 seconds, prompt cancellation, boundary-priority preservation and stale-audio suppression. The complete iOS unit target, the earlier three-test clean-install UI suite, the fact-proxy Gradle suite and the Cloudflare edge suite pass; a generic iPhone build also passes. Fly production version 38 keeps one machine warm at the existing hostname. On 2026-07-31 its health endpoint returned `ok`, automatic session issuance succeeded, OpenAI facts returned HTTP 200 JSON, and ElevenLabs returned HTTP 200 `audio/mpeg` with 34,316 bytes. The validated `20260731.1942` Release archive is now superseded by these source changes, so `20260731.2020` still requires a signed archive, physical-iPhone install and App Store Connect upload.
+RideHorizon `0.12.3 (20260802.2254)` is the current source and device-build candidate. A fresh install now starts with Test Mode off so live location updates are processed; an explicit saved Test Mode choice still persists. Both focused regression tests and the complete `RideHorizonTests` target passed on the physical iPhone: 115 tests, zero failures. The complete app and test targets compile, the unsigned generic-iPhone Release build passes, and the normal signed candidate installed and launched on `Robert’s iPhone 17`. The previously verified rider-network, proxy, Cloudflare and live-service evidence remains unchanged. This exact build still requires a signed Release archive and App Store Connect upload.
 
 ## Delivery Risk Cube
 
 - **Functional breadth:** Sufficient for the private beta: onboarding, location awareness, Test Mode, names, facts, Apple Voice, Premium Voice and Quiet Mode.
-- **Implementation fidelity:** Live services, clean-install compact-iPhone portrait and landscape evidence, and a validated layout-corrected Release archive exist; physical-device installation, App Store Connect processing and TestFlight installation remain unproved.
+- **Implementation fidelity:** Live services, clean-install compact-iPhone portrait and landscape evidence, a validated earlier Release archive, and installation/launch of the current signed development candidate exist; the current Release archive, App Store Connect processing, TestFlight installation and manual ride smoke test remain unproved.
 - **Production-quality depth:** Privacy policy, consent, no pre-consent proxy access, explicit in-app rider-safety wording, minimal background modes, iPhone-only packaging, provider fallback and green automated checks are in place. Real-world background location, battery and Bluetooth evidence remains the largest gap.
 
 ## Current gate
 
-Complete RH-001 in `Backlog.md`. When available, reconnect and unlock the target iPhone. Refresh the Apple ID session in Xcode, create and validate the signed `20260731.2020` archive, install that exact build, then retry the App Store Connect upload. Do not start RH-002 until Apple finishes processing this build.
+Complete RH-001 in `Backlog.md`. Create and validate the signed `20260802.2254` Release archive, upload it to App Store Connect, and wait for processing. Do not start RH-002 until Apple finishes processing this build.
 
 ## Residual risks
 

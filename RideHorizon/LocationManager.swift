@@ -474,7 +474,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var testMode: Bool = {
         let key = LocationManagerDefaults.testModeKey
         if UserDefaults.standard.object(forKey: key) == nil {
-            return true
+            return false
         }
         return UserDefaults.standard.bool(forKey: key)
     }() {
