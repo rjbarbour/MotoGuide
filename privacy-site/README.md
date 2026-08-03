@@ -1,7 +1,9 @@
 # RideHorizon Cloudflare Edge Site
 
-This Cloudflare Pages project serves the RideHorizon privacy policy and preserves the canonical proxy hostname.
+This Cloudflare Pages project serves the RideHorizon public product, support and privacy pages while preserving the canonical proxy hostname.
 
+- `GET` or `HEAD /` serves the product page.
+- `GET` or `HEAD /support` and `/support/` serve the support page.
 - `GET` or `HEAD /app-privacy-policy` serves the static policy.
 - `GET` or `HEAD /app-privacy-policy/` serves the same policy.
 - Every other path is transparently forwarded to `https://motoguide-fact-proxy.fly.dev`, including `/health`, `/v1/session/*`, `/v1/fact`, and `/v1/speech`.
@@ -17,7 +19,7 @@ Run from `/Users/rob_dev/DocsLocal/motoguide/repo/privacy-site`.
 
 2. Run the edge-router tests: `npm test`
 
-   Expected result: all privacy-path, method, proxy-body, and upstream-failure tests pass.
+   Expected result: all public-page, method, proxy-body, and upstream-failure tests pass.
 
 3. Start a local preview if needed: `npm run dev`
 
@@ -50,9 +52,9 @@ Run from `/Users/rob_dev/DocsLocal/motoguide/repo/privacy-site`.
 
    There is currently no `ridehorizon` record to remove. Do not change the domain's nameservers, MX records, or other DNS records.
 
-6. Wait for Cloudflare to show the custom domain as active, then verify: `curl -I https://ridehorizon.digitalmercenaries.ai/app-privacy-policy`
+6. Wait for Cloudflare to show the custom domain as active, then verify `curl -I https://ridehorizon.digitalmercenaries.ai/`, `curl -I https://ridehorizon.digitalmercenaries.ai/support`, and `curl -I https://ridehorizon.digitalmercenaries.ai/app-privacy-policy`.
 
-   Expected result: HTTP 200 with `content-type: text/html; charset=utf-8`.
+   Expected result: each returns HTTP 200 with `content-type: text/html; charset=utf-8`.
 
 7. Verify that the canonical proxy hostname still reaches Fly: `curl -fsS https://ridehorizon.digitalmercenaries.ai/health`
 

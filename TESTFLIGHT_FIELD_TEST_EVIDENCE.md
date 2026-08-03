@@ -1,0 +1,148 @@
+# RideHorizon TestFlight Field-Test Evidence
+
+Date: 2026-08-03
+
+Status: **Development candidate ready for stationary verification. Do not upload or invite external testers until the mandatory safety gates pass.**
+
+This is the operational evidence record for stationary, road and background testing. `Backlog.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
+
+## Safety rules
+
+- Configure the app, start music and navigation, and record results only while stopped.
+- Do not capture screenshots, read diagnostics or change settings while moving.
+- Stop the test if speech, volume changes, distraction, heat or any other behaviour feels unsafe.
+- Use an ordinary familiar route and keep the normal navigation app in charge.
+- A test is not passed by recollection alone. Record the build, device, conditions, observed result and supporting evidence.
+
+## Original findings and implemented correction
+
+Source review on 2026-08-02 confirmed two credible causes for the reported behaviour:
+
+1. Ride tracking starts automatically after onboarding. With Always location permission, the app enables background location, disables automatic pausing and has no inactivity end condition.
+2. The playback audio session is activated when the location manager is created and is not deactivated after speech. When music interruption is enabled, that long-lived session includes audio ducking.
+
+These findings explained the symptoms. Development candidate `0.12.3 (20260803.0032)` replaces automatic tracking with an explicit bounded ride session and replaces app-lifetime audio ownership with playback-scoped ownership. These changes passed 144 physical-iPhone unit tests, signed build, install and launch. They still require the stationary and exact-TestFlight physical evidence below.
+
+## Accepted ride-session decision
+
+Use **Start ride** and **End ride** as the product verbs. Do not call the action “guiding”: RideHorizon is a companion, not a navigation system.
+
+Accepted by Rob on 2026-08-02:
+
+- Opening RideHorizon leaves it idle. It may obtain a foreground location fix for the map, but it does not begin continuous background tracking or activate the playback audio session.
+- Tapping **Start ride** begins continuous tracking and announcements. Reopening the app during an active ride resumes the active-ride UI.
+- Tapping **End ride** stops location updates, cancels pending work and speech, deactivates the audio session with notification to other audio apps, and returns the app to idle.
+- If the accepted locations show less than 50 metres of displacement across a rolling 10-minute window, RideHorizon suspends announcements and asks **Still riding?** using an in-app alert when visible and a local notification when backgrounded.
+- **Continue ride** resumes the active session. **End ride**, or no response within a proposed two-minute grace period, ends it. Movement exceeding 50 metres during the grace period cancels the timeout and resumes the ride.
+- At Start ride and after each confirmed movement, retain an inactivity anchor. Accept only samples no more than 15 seconds old with a non-negative horizontal accuracy no worse than 30 metres. Confirm movement and reset the anchor/timer only when the straight-line anchor-to-sample distance minus both samples' horizontal-accuracy values is at least 50 metres. Do not use accumulated path length. If no sample proves movement for 10 elapsed minutes, including when accuracy remains poor, enter Awaiting Confirmation rather than tracking indefinitely.
+- Request local-notification permission contextually on the first Start ride. If notification permission is denied, show the prompt while foregrounded but still end the ride after the two-minute grace period when backgrounded; a notification is helpful, not a prerequisite for bounded cleanup.
+
+The app must not try to terminate its own process. “Shut down” means ending the ride session and releasing background location, network, timers and audio resources.
+
+## What iOS can observe for audio diagnosis
+
+RideHorizon can record its own audio-session lifecycle, output-volume snapshots, current audio route, interruptions, route changes, whether other audio is playing, and the system hint that secondary audio should be silenced. It cannot reliably identify Google Maps, Apple Maps, Calimoto or a music app by name, inspect their audio content, predict every external prompt, or set the iPhone’s system volume.
+
+The diagnostic log should therefore record:
+
+- ISO-8601 timestamp and elapsed time from ride start;
+- ride state, app foreground/background state and location-tracking state;
+- announcement queued, deferred, started, finished, cancelled or failed;
+- speech provider and playback path, without recording spoken content;
+- audio-session category, mode, options, activation and deactivation result;
+- output-volume snapshot, current route and whether other audio is playing;
+- interruption begin/end, silence-secondary-audio hint, route change and media-services reset;
+- manual end, inactivity prompt, continuation and automatic end.
+
+Shareable diagnostics must not contain precise location, API credentials, generated fact text or other apps’ content.
+
+Candidate `0.12.3 (20260803.0032)` provides this Release-build ring buffer, capped at 2,000 events, seven days or 1 MiB, whichever limit is reached first. It uses `FileProtectionType.completeUntilFirstUserAuthentication`, is excluded from device backups, coalesces persistence away from the main actor, and provides view, export and clear actions under Advanced with stationary-use copy. The schema is typed and cannot accept coordinates, spoken text, credentials or external audio content.
+
+## Automated and service evidence
+
+- Physical device: `Robert’s iPhone 17`, iPhone 17 Pro Max, iOS 26.5.2.
+- `RideHorizonTests`: 144 passed, zero failed, zero skipped on 2026-08-03.
+- Signed development build `0.12.3 (20260803.0032)`: built, installed and launched on the physical iPhone.
+- Proxy Gradle suite: `BUILD SUCCESSFUL`.
+- Live health, automatic restricted session, fact and Premium Voice requests: HTTP 200 on 2026-08-03; the fact contained 263 characters and speech returned `audio/mpeg`, 38,078 bytes.
+- Product, support and privacy-policy URLs: HTTP 200 through the fixed-origin Cloudflare worker.
+- XCUITest did not execute: XCTest timed out while enabling automation mode on the physical device, and CoreSimulator services were unavailable. This is a test-harness blocker, not positive app evidence; use the human stationary rows below.
+
+## Test run record
+
+Create one record per candidate or materially different environment.
+
+| Field | Value |
+|---|---|
+| Test run ID | `YYYY-MM-DD-initials-sequence` |
+| App version and build | `0.12.3 (20260803.0032)` |
+| Install source | Xcode |
+| iPhone and iOS version | iPhone 17 Pro Max / iOS 26.5.2 |
+| Headset and connection | |
+| Music app/source | |
+| Navigation app | |
+| Route and approximate duration | |
+| Weather/signal conditions | |
+| Tester | |
+
+Use `Not run`, `Pass`, `Fail` or `Blocked`. A pass needs the evidence named in the row.
+
+## Mandatory pre-road tests
+
+| ID | Test | Expected result | Evidence | Status |
+|---|---|---|---|---|
+| TF-INSTALL-01 | Clean install and onboarding | No invite code, token or credential prompt. Test Mode is off. Privacy link opens. | Screen recording or screenshots while stationary; build number | Not run |
+| TF-SESSION-01 | Open the app after onboarding without starting a ride | App remains idle; no continuous/background location session and no active playback audio session | Diagnostic log plus iOS location indicator observation | Ready on `20260803.0032` |
+| TF-SESSION-02 | Tap Start ride while stationary | Ride state becomes active; the location permission request is contextual; location begins | Diagnostic log and screenshot | Ready on `20260803.0032` |
+| TF-SESSION-03 | Tap End ride | Location, pending requests, speech and timers stop; audio session deactivates; other audio remains at its prior level | Diagnostic log and short observation note | Ready on `20260803.0032` |
+| TF-AUDIO-01 | Preview Apple Voice and Premium Voice with no other audio | Both play once and finish cleanly; no session remains active afterwards | Diagnostic log and subjective loudness score | Ready on `20260803.0032` |
+| TF-AUDIO-02 | Play music, then trigger one announcement | Music is lowered only for the announcement and returns smoothly within one second, with no sudden loud jump | Diagnostic log and observation note | Ready on `20260803.0032` |
+| TF-PROXY-01 | Exercise Premium Voice after an idle proxy period | Either Premium Voice succeeds within the retry ceiling or Apple Voice fallback occurs once; no late duplicate speech | Diagnostic log | Not run |
+
+Do not begin the moving tests unless the session and audio pre-road tests pass.
+
+## Mandatory field tests
+
+| ID | Test | Expected result | Evidence | Status |
+|---|---|---|---|---|
+| TF-LOC-01 | Ride with RideHorizon foregrounded | Location and place changes remain plausible; announcements follow configured boundaries | Post-ride log and route notes | Not run |
+| TF-LOC-02 | Lock the screen for at least 15 minutes during an active ride | The active ride continues without requiring interaction | Diagnostic log with screen-state markers | Not run |
+| TF-LOC-03 | Put the navigation app in the foreground for at least 15 minutes | RideHorizon continues only while the ride is active and does not disrupt navigation | Diagnostic log and observation note | Not run |
+| TF-AUDIO-03 | Ride with music playing and at least three RideHorizon announcements | Each announcement is intelligible; music ducks and restores smoothly every time | Event log and per-event notes | Ready for exact-build field test |
+| TF-AUDIO-04 | Exercise navigation prompts before, during and after pending RideHorizon announcements | RideHorizon yields whenever iOS emits an interruption or primary-audio hint, then waits for the configured settling delay. Record any overlap with no corresponding OS event as residual platform evidence. | Timestamped event log and observation note | Ready for exact-build field test |
+| TF-AUDIO-05 | Compare Apple Voice and Premium Voice with normal music and navigation volume | Both are intelligible without increasing system volume to a level that makes music/navigation unsafe | 1–5 intelligibility score for each provider and notes | Ready for exact-build field test |
+| TF-AUDIO-06 | Disconnect and reconnect the Bluetooth headset during an active ride while safely stopped | Route change is handled; no blast, stuck ducking, duplicate speech or lost long-term audio | Diagnostic log and observation note | Ready for exact-build field test |
+| TF-NET-01 | Pass through weak or absent mobile data | Requests remain bounded; transient failures retry rationally; stale speech never arrives after the context has changed | Diagnostic log and signal notes | Not run |
+| TF-POWER-01 | Complete a 60-minute ride with screen mostly off | No abnormal heat, obvious runaway background activity or unacceptable battery drain | Start/end battery percentage, screen state and temperature note | Not run |
+
+## Mandatory inactivity and end-of-ride tests
+
+| ID | Test | Expected result | Evidence | Status |
+|---|---|---|---|---|
+| TF-IDLE-01 | Remain within 50 metres for 10 minutes during an active ride | Announcements suspend and **Still riding?** appears as an alert or local notification | Diagnostic log and notification screenshot after stopping | Ready for exact-build field test |
+| TF-IDLE-02 | Tap Continue ride during the grace period | The same ride resumes without duplicate requests or announcements | Diagnostic log | Ready for exact-build field test |
+| TF-IDLE-03 | Do not respond during the grace period | The ride ends after the configured grace period; background location and audio activity stop | Diagnostic log and iOS location-indicator observation | Ready for exact-build field test |
+| TF-IDLE-04 | Move more than 50 metres during the grace period | Timeout is cancelled and the ride resumes without interaction | Diagnostic log and route note | Ready for exact-build field test |
+| TF-IDLE-05 | Stop in traffic, at fuel, or at a café; include poor GPS accuracy | GPS drift does not keep the ride alive indefinitely; a genuine resumed ride can be continued safely | Diagnostic log with accuracy values but no coordinates | Ready for exact-build field test |
+| TF-END-01 | End the ride, lock the phone and leave it for at least 15 minutes | No further location, network, speech or audio-session events occur | Diagnostic log and iOS location-indicator observation | Ready for exact-build field test |
+| TF-END-02 | Reopen RideHorizon after a manual or automatic end | The app is idle and requires Start ride; it does not silently restart tracking | Diagnostic log and screenshot | Ready for exact-build field test |
+
+## Defect and evidence submission
+
+For every failure, add one entry below and retain the original evidence.
+
+| Test ID | Run ID | Result | Expected | Observed | Evidence path/link | Backlog or issue reference | Retest build/result |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |
+
+## Release evidence gate
+
+External TestFlight invitations remain blocked until:
+
+- all mandatory pre-road tests pass on the exact uploaded build;
+- all mandatory field, inactivity and end-of-ride tests pass on the same build or an approved replacement;
+- no unresolved failure can cause distracting audio, a sudden volume increase, failure to honour an observable iOS audio interruption, unbounded background location, a crash or a credential prompt;
+- `TESTFLIGHT_PRIVATE_BETA_PACK.md` administrative gates are complete;
+- Rob records the explicit milestone decision: **continue**, **revise**, **refactor**, **research**, **prototype**, **reduce scope**, **pause** or **stop**.
+
+This evidence format follows [SOP: Adaptive Agentic Software Delivery v1.2](https://app.notion.com/p/3aea4c502b1781a888b1f8e851697813), reviewed on 2026-08-02. Recheck that source if its version or current date changes materially.

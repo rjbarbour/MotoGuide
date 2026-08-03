@@ -11,7 +11,13 @@ function assetsEnvironment() {
       ASSETS: {
         async fetch(request) {
           calls.push(request);
-          return new Response("<!doctype html><title>RideHorizon Privacy Policy</title>", {
+          const pathname = new URL(request.url).pathname;
+          const title = pathname === "/support.html"
+            ? "RideHorizon Support"
+            : pathname === "/landing.html"
+              ? "RideHorizon"
+              : "RideHorizon Privacy Policy";
+          return new Response(`<!doctype html><title>${title}</title>`, {
             headers: { "Content-Type": "text/html" }
           });
         }
@@ -47,6 +53,28 @@ test("accepts the trailing-slash privacy path and supports HEAD", async () => {
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "");
   assert.equal(calls[0].method, "HEAD");
+});
+
+test("serves public support and product pages instead of proxying them to Fly", async () => {
+  const support = assetsEnvironment();
+  const supportResponse = await handleRequest(
+    new Request("https://ridehorizon.digitalmercenaries.ai/support"),
+    support.env,
+    async () => assert.fail("support requests must not reach Fly")
+  );
+  assert.equal(supportResponse.status, 200);
+  assert.match(await supportResponse.text(), /RideHorizon Support/);
+  assert.equal(new URL(support.calls[0].url).pathname, "/support.html");
+
+  const product = assetsEnvironment();
+  const productResponse = await handleRequest(
+    new Request("https://ridehorizon.digitalmercenaries.ai/"),
+    product.env,
+    async () => assert.fail("product-page requests must not reach Fly")
+  );
+  assert.equal(productResponse.status, 200);
+  assert.match(await productResponse.text(), /<title>RideHorizon<\/title>/);
+  assert.equal(new URL(product.calls[0].url).pathname, "/landing.html");
 });
 
 test("rejects writes to the privacy path", async () => {
@@ -103,4 +131,21 @@ test("proxies non-policy paths and returns a controlled upstream failure", async
   assert.equal(response.status, 502);
   assert.equal(response.headers.get("Cache-Control"), "no-store");
   assert.equal(await response.text(), "Bad Gateway");
+});
+
+test("keeps double-slash paths on the fixed Fly origin", async () => {
+  const { env } = assetsEnvironment();
+  let upstreamRequest;
+  const response = await handleRequest(
+    new Request("https://ridehorizon.digitalmercenaries.ai//example.com/collect?source=test"),
+    env,
+    async request => {
+      upstreamRequest = request;
+      return new Response("not found", { status: 404 });
+    }
+  );
+
+  assert.equal(response.status, 404);
+  assert.equal(upstreamRequest.url, "https://motoguide-fact-proxy.fly.dev//example.com/collect?source=test");
+  assert.equal(new URL(upstreamRequest.url).origin, "https://motoguide-fact-proxy.fly.dev");
 });

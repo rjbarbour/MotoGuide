@@ -10,7 +10,7 @@ final class RideHorizonUITests: XCTestCase {
             "-ai.digitalmercenaries.ridehorizon.firstRun.hasCompletedOnboarding", "NO",
             "-ai.digitalmercenaries.ridehorizon.firstRun.hasSeenPermissionExplanation", "NO",
             "-ai.digitalmercenaries.ridehorizon.privacy.aiSharingDecision", "notDetermined",
-            "-RideHorizonTestMode", "YES"
+            "-RideHorizonTestMode", "NO"
         ]
     }
 
@@ -18,6 +18,13 @@ final class RideHorizonUITests: XCTestCase {
         addUIInterruptionMonitor(withDescription: "Location permission") { alert in
             for label in ["Allow While Using App", "Allow Once"] where alert.buttons[label].exists {
                 alert.buttons[label].tap()
+                return true
+            }
+            return false
+        }
+        addUIInterruptionMonitor(withDescription: "Notification permission") { alert in
+            if alert.buttons["Allow"].exists {
+                alert.buttons["Allow"].tap()
                 return true
             }
             return false
@@ -73,11 +80,20 @@ final class RideHorizonUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["Onboarding page 4 of 4"].exists)
 
         app.buttons["Get Started"].tap()
-        app.tap()
 
         XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["Log"].exists)
+        XCTAssertTrue(app.buttons["Start ride"].exists)
+        XCTAssertFalse(app.buttons["End ride"].exists)
         XCTAssertFalse(app.buttons["Allow AI features"].exists)
+
+        app.buttons["Start ride"].tap()
+        app.tap()
+        app.tap()
+        XCTAssertTrue(app.buttons["End ride"].waitForExistence(timeout: 5))
+
+        app.buttons["End ride"].tap()
+        XCTAssertTrue(app.buttons["Start ride"].waitForExistence(timeout: 2))
     }
 
     func testLandscapeOnboardingKeepsControlsFixedAndSafetyContentScrollable() throws {

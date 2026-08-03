@@ -1,8 +1,8 @@
 # RideHorizon Private TestFlight Beta Pack
 
-Date: 2026-07-31
+Date: 2026-08-03
 
-Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Candidate `0.12.3 (20260802.2254)` includes the prior privacy, onboarding and rider-network hardening and now defaults a fresh install to live location with Test Mode off. Its complete app and test targets compile; the physical-iPhone unit target passes 115/115; the unsigned generic-iPhone Release build passes; and the normal signed app installs and launches on the target iPhone. The signed Release archive and App Store Connect upload remain outstanding. Earlier candidates, including `20260731.2020`, must not be assigned to testers.
+Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Development candidate `0.12.3 (20260803.0032)` adds explicit bounded ride sessions, playback-scoped audio ownership and privacy-safe Release diagnostics. Its physical-iPhone unit target passes 144/144; the signed app builds, installs and launches; the proxy suite passes; and live automatic session, fact and Premium Voice requests return HTTP 200. Archive/upload remains paused only for the five stationary checks in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and final review closure. Earlier candidates must not be assigned to testers.
 
 ## Release Decisions — 2026-07-31
 
@@ -25,7 +25,7 @@ Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and r
 - Optional AI and Premium Voice disclosures are presented before provider sharing; names-only announcements and Apple Voice remain available when sharing is declined.
 - A clean launch does not contact the RideHorizon proxy until the rider enables optional AI features and a proxy-backed feature first needs access.
 - Onboarding tells the rider to complete setup while stopped, avoid interacting with the phone while moving, and stop using RideHorizon if it becomes distracting.
-- Candidate `20260802.2254` installed and launched on the target physical iPhone, and the production `/v1/speech` route returns valid MP3 audio. The exact candidate still needs its manual location, background and Bluetooth smoke test.
+- Candidate `20260803.0032` installs and launches on the target physical iPhone, passes 144 physical-device unit tests, and uses the production proxy whose live `/v1/speech` route returned valid MP3 audio. Complete the five stationary checks before archive/upload, then run the full location, background and Bluetooth evidence on the exact replacement Internal TestFlight binary.
 
 ## Purpose
 
@@ -62,10 +62,11 @@ Send these with the TestFlight invitation:
 2. Before riding, open RideHorizon and complete onboarding while stationary.
 3. Grant location permission when asked. Enable the option that allows location use while the app is not on screen if iOS offers it.
 4. Connect your usual Bluetooth helmet headset. Check the device volume and listen to one test announcement while stopped.
-5. Start normal navigation in your preferred navigation app. RideHorizon is a companion and does not provide directions.
+5. Tap **Start ride** while stopped, then start normal navigation in your preferred navigation app. RideHorizon is a companion and does not provide directions.
 6. Use the default announcement settings for the first ride. Do not change settings while moving.
 7. If speech is distracting, incorrect, too frequent, or the app behaves unexpectedly, switch to Quiet mode or stop using the app until safely parked.
-8. After the ride, send the feedback below. Include the approximate ride duration and whether the app was in the foreground, background, or both.
+8. When safely stopped at the end, return to RideHorizon and tap **End ride**.
+9. Send the feedback below. Include the approximate ride duration and whether the app was in the foreground, background, or both.
 
 ## Feedback Form
 
@@ -89,7 +90,9 @@ Use these questions in a short form or email reply:
 Do not invite external testers until all items are true:
 
 - A signed, non-internal-only build has uploaded and processed in App Store Connect.
-- The current build has passed a physical iPhone smoke test using location, background behaviour, and Bluetooth audio.
+- The exact build has passed every mandatory stationary, field, inactivity and end-of-ride test in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`, with retained evidence.
+- Ride tracking begins only after an explicit Start ride action and ends after an explicit End ride action or the accepted inactivity policy.
+- The audio session is active only around announcements and releases other audio smoothly after finish, cancellation, interruption and ride end.
 - Automatic restricted proxy sessions work in the TestFlight environment; the app also retains names-only and Apple-voice behaviour when proxy access is unavailable.
 - No upstream API key, shared bearer credential, or manual tester credential entry is present in the build or tester instructions.
 - Privacy and support contact details are ready to send to testers.

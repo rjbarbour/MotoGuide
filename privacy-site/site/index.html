@@ -176,7 +176,7 @@
   </header>
 
   <main>
-    <p class="effective"><strong>Effective date:</strong> 2026-07-31</p>
+    <p class="effective"><strong>Effective date:</strong> 2026-08-03</p>
 
     <div class="plain-summary">
       <strong>The short version</strong>
@@ -223,6 +223,9 @@
       <p>The app creates a random per-installation identifier that is unrelated to Apple's advertising identifier. Our proxy uses it to issue short-lived access credentials, enforce service quotas, and prevent abuse. We store credential hashes rather than reusable provider API keys. Provider API keys are not included in the app.</p>
       <p>Our service may process limited request information such as route, time, response status, duration, response size, and provider status. Hosting and network providers may process IP addresses and similar connection data needed to deliver and protect the service. Application diagnostics are designed not to include coordinates, place content, rider text, installation identifiers, or credentials.</p>
 
+      <h3>Local release diagnostics</h3>
+      <p>RideHorizon keeps a bounded diagnostic log on your iPhone to investigate ride-session and audio problems during the beta. It may contain timestamps, ride and app state, whether location tracking is active, location-sample age and accuracy without coordinates, speech playback path, audio-session state, output-volume snapshots, audio route type, and iOS interruption events. It does not contain coordinates, place names, announcement text, credentials, recordings, or content from other apps. You can view, export, or clear it in Settings &gt; Advanced; it leaves the iPhone only if you choose to share the exported file.</p>
+
       <h3>This webpage</h3>
       <p>This privacy-policy page uses no cookies, analytics, advertising, forms, JavaScript, or third-party fonts. Cloudflare and related network providers process ordinary connection data, including IP address and browser request information, to deliver and secure the page.</p>
     </section>
@@ -262,13 +265,14 @@
       <ul>
         <li>Exact location and the active ride history remain in app memory for the current session and are not stored by the RideHorizon proxy.</li>
         <li>Generated facts and context-derived cache keys are stored locally for up to 30 days, unless you clear local data or uninstall sooner.</li>
+        <li>Local release diagnostics retain at most 2,000 events, seven days, or 1 MiB, whichever limit is reached first. You can clear them at any time.</li>
         <li>Proxy sessions expire after 15 minutes for the current automatic beta-access flow. Expired or revoked session and inactive installation records are deleted after 30 days.</li>
         <li>Per-installation and global service-usage buckets are deleted after 3 days.</li>
         <li>OpenAI's default abuse-monitoring logs may contain API inputs and outputs for up to 30 days, subject to its stated legal and security exceptions and any lower-retention controls applied to our account.</li>
         <li>ElevenLabs retention depends on the production account's eligibility for its Zero Retention Mode and ElevenLabs' applicable terms. You can use Apple Voice instead.</li>
         <li>We retain limited legal or security records longer only when reasonably necessary to meet a legal obligation or establish, exercise, or defend a claim.</li>
       </ul>
-      <p>Clearing local data in RideHorizon removes local settings, cached facts, ride history, consent, the installation identifier, and the proxy access credential from that iPhone. It does not by itself send a remote deletion request to us or a provider. Contact us if you want to request deletion of information held by us.</p>
+      <p>Clearing local data in RideHorizon removes local settings, cached facts, ride history, release diagnostics, consent, the installation identifier, and the proxy access credential from that iPhone. It does not by itself send a remote deletion request to us or a provider. Contact us if you want to request deletion of information held by us.</p>
     </section>
 
     <section id="choices">

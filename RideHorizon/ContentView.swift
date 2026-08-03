@@ -122,7 +122,9 @@ enum LocationSummaryFormatter {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var locationManager = LocationManager()
+    @StateObject private var rideDiagnostics = RideDiagnosticsStore.shared
     @StateObject private var firstRunState = FirstRunState()
     @StateObject private var aiSharingConsent = AISharingConsentStore()
     @AppStorage("RideHorizonMapLabelScale") private var mapLabelScale = 1.0
@@ -151,6 +153,25 @@ struct ContentView: View {
             .navigationTitle(ProductIdentity.displayName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        if locationManager.rideSessionState.isActive {
+                            locationManager.endRide()
+                        } else {
+                            locationManager.startRide()
+                        }
+                    } label: {
+                        Text(locationManager.rideSessionState.isActive ? "End ride" : "Start ride")
+                            .fontWeight(.bold)
+                    }
+                    .accessibilityIdentifier("rideSessionControl")
+                    .accessibilityHint(
+                        locationManager.rideSessionState.isActive
+                            ? "Stops location, announcements and background activity."
+                            : "Starts location and announcements. Set up while stopped."
+                    )
+                }
+
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
                         Text(AppBuildMetadata.shouldShow(testMode: locationManager.testMode) ? AppBuildMetadata.titlePrimaryLabel : ProductIdentity.displayName)
@@ -189,11 +210,10 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            configureRideCallbacks()
             showOnboarding = firstRunState.needsOnboarding
             if !firstRunState.needsOnboarding, aiSharingConsent.decision == .notDetermined {
                 showAISharingChoice = true
-            } else if !firstRunState.needsOnboarding {
-                startRideIfNeeded()
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -203,6 +223,7 @@ struct ContentView: View {
                 showResetConfirmation: $showResetConfirmation,
                 aiSharingConsent: aiSharingConsent,
                 onClearLocalData: clearAllLocalData,
+                rideDiagnostics: rideDiagnostics,
                 debugLog: debugLog
             )
             .presentationDetents([.medium, .large], selection: $settingsDetent)
@@ -213,7 +234,8 @@ struct ContentView: View {
                 locationManager: locationManager,
                 showResetConfirmation: $showResetConfirmation,
                 aiSharingConsent: aiSharingConsent,
-                onClearLocalData: clearAllLocalData
+                onClearLocalData: clearAllLocalData,
+                rideDiagnostics: rideDiagnostics
             )
             .presentationDetents([.medium, .large], selection: $settingsDetent)
             .presentationDragIndicator(.visible)
@@ -230,14 +252,25 @@ struct ContentView: View {
             OnboardingView(firstRunState: firstRunState, aiSharingConsent: aiSharingConsent) {
                 showOnboarding = false
                 locationManager.applyAISharingDecision(isGranted: aiSharingConsent.isGranted)
-                startRideIfNeeded()
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                locationManager.evaluateRideSession()
+                locationManager.recordAppLifecycle(isForeground: true)
+            case .background:
+                locationManager.recordAppLifecycle(isForeground: false)
+            case .inactive:
+                break
+            @unknown default:
+                break
             }
         }
         .fullScreenCover(isPresented: $showAISharingChoice) {
             AISharingChoiceView(consent: aiSharingConsent) {
                 showAISharingChoice = false
                 locationManager.applyAISharingDecision(isGranted: aiSharingConsent.isGranted)
-                startRideIfNeeded()
             }
         }
         .alert("Reset First-Time Experience?", isPresented: $showResetConfirmation) {
@@ -253,11 +286,30 @@ struct ContentView: View {
         } message: {
             Text("Onboarding is showing again. No app restart needed.")
         }
+        .alert(
+            "Still riding?",
+            isPresented: Binding(
+                get: {
+                    if case .awaitingConfirmation = locationManager.rideSessionState {
+                        return true
+                    }
+                    return false
+                },
+                set: { _ in }
+            )
+        ) {
+            Button("Continue ride") {
+                locationManager.continueRide()
+            }
+            Button("End ride", role: .destructive) {
+                locationManager.endRide()
+            }
+        } message: {
+            Text("RideHorizon has not confirmed 50 metres of movement in 10 minutes. Continue only while stopped; otherwise this ride will end automatically.")
+        }
     }
 
-    private func startRideIfNeeded() {
-        locationManager.beginRideTracking()
-        locationManager.requestLocation()
+    private func configureRideCallbacks() {
         locationManager.onAddressChange = { address in
             guard !locationManager.testMode else { return }
             if let location = locationManager.lastKnownLocation {
@@ -277,14 +329,13 @@ struct ContentView: View {
     }
 
     private func clearAllLocalData() {
-        locationManager.applyAISharingDecision(isGranted: false)
-        locationManager.pauseRideTracking()
+        locationManager.clearLocalPrivacyState()
         logs.removeAll()
         PlaceFactCache.shared.clear()
         if let bundleIdentifier = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleIdentifier)
         }
-        locationManager.clearLocalPrivacyState()
+        rideDiagnostics.clear()
 #if DEBUG
         DebugLogStore.shared.clear()
 #endif
@@ -477,7 +528,7 @@ private struct LocationScreenView: View {
                 speechDiagnosticWarning
             }
 
-            if locationManager.testMode {
+            if locationManager.testMode && locationManager.rideSessionState.isActive {
                 Button {
                     locationManager.logTestLocation()
                 } label: {
@@ -518,7 +569,10 @@ private struct LocationScreenView: View {
                         .font(.system(size: scaledFont(14)))
                         .foregroundStyle(panelStyle.warningText)
                 } else {
-                    Label("Always running", systemImage: "location.fill")
+                    Label(
+                        locationManager.rideSessionState.riderLabel,
+                        systemImage: locationManager.rideSessionState.isActive ? "location.fill" : "location.slash"
+                    )
                         .font(.system(size: scaledFont(14)))
                         .foregroundStyle(panelStyle.primaryText)
                 }
@@ -742,6 +796,8 @@ private struct LocationMapView: View {
 
     private var unavailableTitle: String {
         switch locationStatus {
+        case .idle:
+            return "Start a Ride"
         case .denied, .restricted:
             return "Location Access Needed"
         case .placeUnavailable:
@@ -755,6 +811,8 @@ private struct LocationMapView: View {
 
     private var unavailableDescription: String {
         switch locationStatus {
+        case .idle:
+            return "Tap Start ride when you are ready to begin."
         case .denied:
             return "Enable location access in Settings so \(ProductIdentity.displayName) can show where you are."
         case .restricted:
@@ -922,6 +980,7 @@ private struct SettingsView: View {
     @Binding var showResetConfirmation: Bool
     @ObservedObject var aiSharingConsent: AISharingConsentStore
     let onClearLocalData: () -> Void
+    @ObservedObject var rideDiagnostics: RideDiagnosticsStore
     @State private var lastNonQuietMode: ContentMode = .shortFacts
     @State private var showPrivacyNotice = false
     @State private var showClearLocalDataConfirmation = false
@@ -1174,7 +1233,7 @@ private struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity, minHeight: 50)
 
-                    Text("Clearing removes settings, cached facts, ride history, consent, the installation identifier and the proxy access credential. Access will be provisioned automatically when needed.")
+                    Text("Clearing removes settings, cached facts, ride history, release diagnostics, consent, the installation identifier and the proxy access credential. Access will be provisioned automatically when needed.")
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(palette.secondaryText)
                     }
@@ -1250,6 +1309,43 @@ private struct SettingsView: View {
                             .listRowBackground(palette.rowBackground)
                     }
                     .listRowBackground(palette.rowBackground)
+
+                    DisclosureGroup("Release diagnostics") {
+                        Text("Local audio, ride-session and app-lifecycle events. Retained for at most 7 days, 2,000 events or 1 MiB. Coordinates, spoken text and credentials are never recorded.")
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(palette.secondaryText)
+
+                        Text("View, export or clear diagnostics only while safely stopped.")
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(palette.secondaryText)
+
+                        Text("\(rideDiagnostics.entries.count) retained events")
+                            .font(.headline)
+                            .foregroundStyle(palette.primaryText)
+
+                        ForEach(Array(rideDiagnostics.entries.suffix(20).reversed())) { entry in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(entry.event.rawValue)
+                                    .font(.callout.monospaced())
+                                Text(entry.timestamp.formatted(date: .abbreviated, time: .standard))
+                                    .font(.caption)
+                                    .foregroundStyle(palette.secondaryText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        ShareLink(item: rideDiagnostics.exportURL) {
+                            Label("Export diagnostics", systemImage: "square.and.arrow.up")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button("Clear diagnostics", role: .destructive) {
+                            rideDiagnostics.clear()
+                        }
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
 
                     DisclosureGroup("Developer") {
                         SettingsToggleRow(
@@ -1341,7 +1437,7 @@ private struct SettingsView: View {
                 onClearLocalData()
             }
         } message: {
-            Text("This removes local settings, cached facts, ride history, consent and proxy access from this iPhone. It does not yet submit a remote deletion request.")
+            Text("This removes local settings, cached facts, ride history, release diagnostics, consent and proxy access from this iPhone. It does not yet submit a remote deletion request.")
         }
     }
 

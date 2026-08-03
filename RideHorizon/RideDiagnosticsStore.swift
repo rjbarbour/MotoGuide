@@ -1,0 +1,293 @@
+import Foundation
+
+enum RideDiagnosticEvent: String, Codable, Equatable {
+    case appEnteredForeground
+    case appEnteredBackground
+    case rideStarted
+    case rideInactivityPrompted
+    case rideContinued
+    case rideMovementResumed
+    case rideEnded
+    case locationSampleObserved
+    case announcementQueued
+    case announcementDeferred
+    case announcementCancelled
+    case announcementFailed
+    case audioPlaybackStarted
+    case audioPlaybackFinished
+    case audioPlaybackCancelled
+    case audioSessionActivated
+    case audioSessionActivationFailed
+    case audioSessionReleased
+    case audioSessionReleaseFailed
+    case audioInterruptionBegan
+    case audioInterruptionEnded
+    case primaryAudioBegan
+    case primaryAudioEnded
+    case audioRouteChanged
+    case audioMediaServicesReset
+}
+
+enum DiagnosticRideState: String, Codable, Equatable {
+    case idle
+    case riding
+    case awaitingConfirmation
+}
+
+enum DiagnosticPlaybackPath: String, Codable, Equatable {
+    case apple
+    case premiumVoice
+}
+
+struct AudioSessionSnapshot: Codable, Equatable {
+    let outputVolume: Float
+    let outputRouteTypes: [String]
+    let isOtherAudioPlaying: Bool
+    let shouldYieldToPrimaryAudio: Bool
+    let category: String?
+    let mode: String?
+    let options: [String]?
+
+    init(
+        outputVolume: Float,
+        outputRouteTypes: [String],
+        isOtherAudioPlaying: Bool,
+        shouldYieldToPrimaryAudio: Bool,
+        category: String? = nil,
+        mode: String? = nil,
+        options: [String]? = nil
+    ) {
+        self.outputVolume = outputVolume
+        self.outputRouteTypes = outputRouteTypes
+        self.isOtherAudioPlaying = isOtherAudioPlaying
+        self.shouldYieldToPrimaryAudio = shouldYieldToPrimaryAudio
+        self.category = category
+        self.mode = mode
+        self.options = options
+    }
+}
+
+struct RideDiagnosticEntry: Identifiable, Codable, Equatable {
+    let id: UUID
+    let timestamp: Date
+    let event: RideDiagnosticEvent
+    let audio: AudioSessionSnapshot?
+    let duckOthers: Bool?
+    let elapsedRideSeconds: TimeInterval?
+    let rideState: DiagnosticRideState?
+    let isLocationTracking: Bool?
+    let playbackPath: DiagnosticPlaybackPath?
+    let horizontalAccuracyMetres: Double?
+    let locationSampleAgeSeconds: TimeInterval?
+}
+
+/// A privacy-safe, local-only release log. Its typed schema cannot accept coordinates,
+/// announcement text, credentials or third-party audio content.
+@MainActor
+final class RideDiagnosticsStore: ObservableObject {
+    private final class PersistenceTicket {
+        private let lock = NSLock()
+        private var cancelled = false
+
+        func cancel() {
+            lock.lock()
+            cancelled = true
+            lock.unlock()
+        }
+
+        var shouldProceed: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return !cancelled
+        }
+    }
+
+    static let shared = RideDiagnosticsStore()
+
+    @Published private(set) var entries: [RideDiagnosticEntry] = []
+
+    let exportURL: URL
+    private let now: () -> Date
+    private let maxEntries: Int
+    private let maxAge: TimeInterval
+    private let maxBytes: Int
+    private let persistenceDelay: TimeInterval
+    private let persistenceWillWrite: (([RideDiagnosticEntry]) -> Void)?
+    private let persistenceQueue = DispatchQueue(
+        label: "ai.digitalmercenaries.ridehorizon.diagnostics",
+        qos: .utility
+    )
+    private var pendingPersistence: (workItem: DispatchWorkItem, ticket: PersistenceTicket)?
+    private var encodedSizes: [UUID: Int] = [:]
+
+    init(
+        directoryURL: URL? = nil,
+        now: @escaping () -> Date = Date.init,
+        maxEntries: Int = 2_000,
+        maxAge: TimeInterval = 7 * 24 * 60 * 60,
+        maxBytes: Int = 1_048_576,
+        persistenceDelay: TimeInterval = 1,
+        persistenceWillWrite: (([RideDiagnosticEntry]) -> Void)? = nil
+    ) {
+        let directory = directoryURL ?? FileManager.default.urls(
+            for: .cachesDirectory,
+            in: .userDomainMask
+        )[0].appendingPathComponent("RideHorizon", isDirectory: true)
+        self.exportURL = directory.appendingPathComponent("ride-diagnostics.json")
+        self.now = now
+        self.maxEntries = maxEntries
+        self.maxAge = maxAge
+        self.maxBytes = maxBytes
+        self.persistenceDelay = persistenceDelay
+        self.persistenceWillWrite = persistenceWillWrite
+
+        try? FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        Self.excludeFromBackup(directory)
+        loadAndPrune()
+    }
+
+    func record(
+        _ event: RideDiagnosticEvent,
+        audio: AudioSessionSnapshot? = nil,
+        duckOthers: Bool? = nil,
+        elapsedRideSeconds: TimeInterval? = nil,
+        rideState: DiagnosticRideState? = nil,
+        isLocationTracking: Bool? = nil,
+        playbackPath: DiagnosticPlaybackPath? = nil,
+        horizontalAccuracyMetres: Double? = nil,
+        locationSampleAgeSeconds: TimeInterval? = nil,
+        at timestamp: Date? = nil
+    ) {
+        let entry = RideDiagnosticEntry(
+            id: UUID(),
+            timestamp: timestamp ?? now(),
+            event: event,
+            audio: audio,
+            duckOthers: duckOthers,
+            elapsedRideSeconds: elapsedRideSeconds,
+            rideState: rideState,
+            isLocationTracking: isLocationTracking,
+            playbackPath: playbackPath,
+            horizontalAccuracyMetres: horizontalAccuracyMetres,
+            locationSampleAgeSeconds: locationSampleAgeSeconds
+        )
+        entries.append(entry)
+        encodedSizes[entry.id] = Self.encodedSize(of: entry)
+        prune(referenceDate: now())
+        schedulePersistence(immediately: event == .appEnteredBackground || event == .rideEnded)
+    }
+
+    func clear() {
+        entries.removeAll()
+        encodedSizes.removeAll()
+        pendingPersistence?.ticket.cancel()
+        pendingPersistence?.workItem.cancel()
+        pendingPersistence = nil
+        let url = exportURL
+        persistenceQueue.sync {
+            Self.persist([], to: url)
+        }
+    }
+
+#if DEBUG
+    func flushForTesting() {
+        pendingPersistence?.ticket.cancel()
+        pendingPersistence?.workItem.cancel()
+        pendingPersistence = nil
+        let snapshot = entries
+        let url = exportURL
+        persistenceQueue.sync {
+            Self.persist(snapshot, to: url)
+        }
+    }
+#endif
+
+    private func loadAndPrune() {
+        if let data = try? Data(contentsOf: exportURL),
+           let decoded = try? Self.makeDecoder().decode([RideDiagnosticEntry].self, from: data) {
+            entries = decoded
+            encodedSizes = Dictionary(uniqueKeysWithValues: decoded.map { ($0.id, Self.encodedSize(of: $0)) })
+        }
+        prune(referenceDate: now())
+        Self.persist(entries, to: exportURL)
+    }
+
+    private func prune(referenceDate: Date) {
+        let cutoff = referenceDate.addingTimeInterval(-maxAge)
+        entries.removeAll { entry in
+            guard entry.timestamp < cutoff else { return false }
+            encodedSizes[entry.id] = nil
+            return true
+        }
+        while entries.count > maxEntries {
+            encodedSizes[entries.removeFirst().id] = nil
+        }
+        while !entries.isEmpty, encodedByteCount > maxBytes {
+            encodedSizes[entries.removeFirst().id] = nil
+        }
+    }
+
+    private var encodedByteCount: Int {
+        guard !entries.isEmpty else { return 2 }
+        return 2 + entries.reduce(0) { $0 + (encodedSizes[$1.id] ?? 0) } + entries.count - 1
+    }
+
+    private func schedulePersistence(immediately: Bool) {
+        pendingPersistence?.ticket.cancel()
+        pendingPersistence?.workItem.cancel()
+        let ticket = PersistenceTicket()
+        let snapshot = entries
+        let url = exportURL
+        let persistenceWillWrite = persistenceWillWrite
+        let workItem = DispatchWorkItem {
+            guard ticket.shouldProceed else { return }
+            persistenceWillWrite?(snapshot)
+            Self.persist(snapshot, to: url)
+        }
+        pendingPersistence = (workItem, ticket)
+        persistenceQueue.asyncAfter(
+            deadline: .now() + (immediately ? 0 : persistenceDelay),
+            execute: workItem
+        )
+    }
+
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
+    private static func encodedSize(of entry: RideDiagnosticEntry) -> Int {
+        (try? makeEncoder().encode(entry).count) ?? 0
+    }
+
+    private static func persist(_ entries: [RideDiagnosticEntry], to url: URL) {
+        guard let data = try? makeEncoder().encode(entries) else { return }
+        do {
+            try data.write(to: url, options: .atomic)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: url.path
+            )
+            excludeFromBackup(url)
+        } catch {
+            AppDiagnostics.log("Release diagnostics persistence failed.")
+        }
+    }
+
+    private static func excludeFromBackup(_ url: URL) {
+        var resourceURL = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? resourceURL.setResourceValues(values)
+    }
+}

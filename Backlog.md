@@ -2,7 +2,7 @@
 
 This file is the canonical delivery ledger. Trello remains intake, Notion holds reusable SOPs, and `PROJECT.md` records only the last verified project state and current gate.
 
-## In progress
+## Paused at milestone health gate
 
 ### RH-001 — Harden the private TestFlight release candidate
 
@@ -33,27 +33,67 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Reliability acceptance evidence — 2026-07-31:** Focused tests prove recovery after transient network and gateway failures, no retry for permanent/capacity failures, cancellation during backoff, prompt wall-clock expiry even when session provisioning ignores cancellation, preservation across street-only geocoder churn, boundary-priority preservation and suppression of superseded Premium Voice fallback. The complete iOS unit target, generic iPhone build, proxy Gradle suite and OpenAPI parse pass. Two independent reviews found no remaining blocker in commit `1665bac`. Fly production version 38 preserves `https://motoguide-fact-proxy.fly.dev`, sets `min_machines_running = 1`, and reached `started`; live health returned `ok`, automatic restricted session issuance succeeded, facts returned HTTP 200 `application/json` with 259 bytes, and ElevenLabs returned HTTP 200 `audio/mpeg` with 34,316 bytes. The unavailable physical iPhone remains the only unrun device-install check for this increment.
 - **Live-location default correction authorised — 2026-08-02:** A fresh install must start with Test Mode off so the release candidate processes real location updates. An explicit saved Test Mode choice must continue to persist. Acceptance requires focused tests for both behaviours, the complete iOS unit target, and a current physical-iPhone build/install when the device is available.
 - **Live-location default evidence — 2026-08-02:** Candidate `0.12.3 (20260802.2254)` defaults Test Mode off only when no saved choice exists and retains an explicit saved choice. Both focused regression tests and the complete `RideHorizonTests` target passed on the unlocked physical iPhone: 115 tests, zero failures. The complete app and test targets compile, the unsigned generic-iPhone Release build passes, and the normal signed candidate was installed and launched successfully on `Robert’s iPhone 17`.
+- **Milestone health gate — 2026-08-02: REVISE.** Source review confirms that tracking starts automatically after onboarding, enables background location under Always permission, disables automatic location pausing and has no inactivity end condition. It also confirms that the playback audio session is activated during `LocationManager` initialisation and is not deactivated after announcements; the music-interruption option therefore can remain in effect beyond speech. These are safety and privacy blockers for external testers. Do not archive or upload this candidate. Complete RH-003 and RH-004, pass their deterministic and pre-road physical checks, then upload the replacement for exact-binary field testing through Internal TestFlight.
 
-## Ready
+## Verification
+
+### RH-003 — Bound background work to an explicit ride session
+
+- **Type:** Safety, privacy and lifecycle increment.
+- **Outcome:** RideHorizon performs continuous/background location and announcement work only within a rider-started session, and reliably releases it after manual or confirmed inactivity end.
+- **User/operator:** A rider can understand when RideHorizon is active, start it before setting off, and end it without relying on force-quit or iOS intervention.
+- **Boundaries:** Add Idle, Riding and Awaiting Confirmation states; use Start ride and End ride actions; keep app launch idle; detect inactivity using the accepted-sample algorithm in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`; alert or locally notify the rider; allow a two-minute confirmation grace; automatically end when unanswered; stop location, network, timers and speech on end. Request notification permission contextually at the first Start ride; if permission is denied, show the alert only while foregrounded and still auto-end after the grace period in the background. Do not programmatically terminate the app.
+- **Non-goals:** Route navigation, automatic trip recognition, motion-activity classification, CarPlay or public-beta polish.
+- **Dependencies:** The accepted lifecycle in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`; existing location permission wording; physical iPhone access for background evidence.
+- **Risk:** High. False negatives can leave privacy-sensitive background work active; false positives can stop useful announcements. The prompt must not require interaction while moving.
+- **Decision impact:** Accepted by Rob on 2026-08-02: adopt **Start ride** and **End ride** rather than automatic start or “guiding”, with a 10-minute inactivity window, 50-metre confidence-adjusted displacement threshold and two-minute confirmation grace.
+- **Delivery Risk Cube movement:** Hold breadth fixed; increase implementation fidelity through a bounded state machine and production-quality depth through privacy, battery and lifecycle controls.
+- **Behavioural evidence:** Automated scenarios prove the session state machine and cleanup paths; `TF-SESSION-01` to `TF-SESSION-03` pass on the physical development candidate before upload. Retain `TF-IDLE-01` to `TF-IDLE-05` and `TF-END-01` to `TF-END-02` as release evidence for the exact Internal TestFlight binary under RH-002.
+- **Quality evidence:** Unit tests cover state transitions, filtered displacement, notification-independent grace expiry, expired-prompt rejection, movement recovery, stale-geocode rejection, Test Mode restart and idempotent cleanup. A physical iPhone proves location stops after both end paths.
+- **Deterministic verification:** Complete `RideHorizonTests` target and signed physical-iPhone build pass. Exact commands must be recorded with the implementation evidence.
+- **Independent evaluation:** Fresh review checks state-machine correctness, permissions, concurrency, cleanup and rider-safe copy. Rob performs the stationary and road evidence.
+- **Stop condition:** Stop before release if background work survives End ride or timeout, or if the prompt encourages interaction while moving.
+- **Gate:** Continue to RH-004 only after the session lifecycle is deterministic and the pre-road physical checks pass. Prove the full background behaviour later on the exact Internal TestFlight binary.
+- **Implementation evidence — 2026-08-03:** Candidate `0.12.3 (20260803.0032)` adds a deterministic Idle/Riding/Awaiting Confirmation state machine, confidence-adjusted movement filtering, contextual local-notification request, two-minute grace and idempotent manual/automatic cleanup. Review hardening rejects expired continuation, invalidates place-lookup generations at End ride and at the inactivity prompt, ignores queued location callbacks after End ride and resets Test Mode per session. The physical iPhone unit target passed 144 tests with zero failures. The signed app built, installed and launched. `TF-SESSION-01` to `TF-SESSION-03` remain a human stationary gate before upload.
+
+### RH-004 — Make audio coexistence observable and bounded
+
+- **Type:** Safety, diagnosis and audio-lifecycle increment.
+- **Outcome:** RideHorizon activates audio only around its own announcements, yields whenever iOS reports an interruption or primary-audio hint, restores other audio smoothly, and produces privacy-safe evidence for failures.
+- **User/operator:** A rider hears intelligible announcements without stuck music suppression or a sudden post-session volume jump, and RideHorizon yields to navigation whenever iOS exposes the competing audio event.
+- **Boundaries:** Add a privacy-safe diagnostic ring buffer to Release builds for ride/app/audio state, output-volume snapshots, route changes, interruption and silence hints, and playback lifecycle. Retain at most 2,000 events, seven days or 1 MiB, whichever limit is reached first; persist it with `FileProtectionType.completeUntilFirstUserAuthentication` so locked-device background writes remain possible after first unlock; expose view, export and clear controls under Advanced with stationary-use copy. Activate the playback session immediately before speech; deactivate it after finish, cancellation and failure using notification to other audio apps; bind cleanup to End ride; calibrate Apple and Premium Voice playback against normal music/navigation conditions. Do not log coordinates, fact text, credentials or external audio content.
+- **Non-goals:** Identifying external apps by name, controlling system volume, recording external audio, or guaranteeing arbitration that iOS does not expose.
+- **Dependencies:** RH-003 cleanup boundary, AVAudioSession behaviour on the target iPhone and at least one Bluetooth helmet headset.
+- **Risk:** High because an audio regression can distract a rider or create an unsafe volume transition.
+- **Decision impact:** Preserve the existing user choice to lower music, but change its scope from app lifetime to announcement lifetime. Settings information architecture is deferred to RH-005.
+- **Delivery Risk Cube movement:** Hold breadth fixed; increase implementation fidelity through OS-event diagnostics and production-quality depth through bounded audio ownership.
+- **Behavioural evidence:** `TF-AUDIO-01` and `TF-AUDIO-02` pass on the physical development candidate before upload. Retain `TF-AUDIO-03` to `TF-AUDIO-06` and the end-of-ride tests as release evidence for the exact Internal TestFlight binary under RH-002.
+- **Quality evidence:** Tests cover finish, cancellation, stale Apple callbacks, interruption, provider failure, activation/deactivation failure, route change and media reset. Tests also prove the diagnostic age, count and byte bounds, file protection, backup exclusion and persistence; physical evidence records output-volume snapshots and subjective intelligibility without claiming control of system volume.
+- **Deterministic verification:** Complete `RideHorizonTests` target and signed physical-iPhone build pass. Exact commands must be recorded with the implementation evidence.
+- **Independent evaluation:** Fresh review checks every audio-session activation has bounded deactivation and no error path leaks active state. Rob performs Bluetooth and navigation coexistence tests.
+- **Stop condition:** Stop before release on any stuck ducking, sudden volume increase, failure to yield to an iOS interruption or primary-audio hint, or missing cleanup path. Treat overlap for which iOS emitted no observable event as a residual platform risk and physical-test finding, not a deterministic failure of an impossible guarantee.
+- **Gate:** Pass the pre-road physical checks, return to RH-001 for replacement archive/upload, then run the complete field evidence set on that exact Internal TestFlight binary before RH-002 external submission.
+- **Implementation evidence — 2026-08-03:** Audio ownership now begins at actual Apple or Premium Voice playback rather than request preparation and deactivates with `notifyOthersOnDeactivation` on every finish/cancellation/end path. Review hardening makes Apple terminal callbacks request-scoped, handles Premium Voice start/decode failures, retries failed deactivation twice, cancels a pending deactivation retry when new playback starts and discards non-resumable interruptions. Release diagnostics record typed ride, app, announcement, location-quality and audio lifecycle data without coordinates, text or credentials; they retain at most 2,000 events, seven days or 1 MiB with protected, backup-excluded, serialised coalesced persistence and stationary-only view/export/clear controls. The physical iPhone unit target passed 144 tests with zero failures and the signed development candidate was installed. `TF-AUDIO-01` and `TF-AUDIO-02` remain a human stationary gate because loudness and music restoration are perceptual.
+
+## Shaping
 
 ### RH-002 — Internal TestFlight smoke and external beta submission
 
 - **Type:** Release and operations increment.
 - **Outcome:** The exact processed build passes a clean internal TestFlight smoke test and is submitted for external TestFlight review with accurate metadata.
 - **User/operator:** Rob and the first 3–5 named private testers.
-- **Boundaries:** Internal group, clean TestFlight install, onboarding, consent decline/grant, Test Mode, facts, Premium Voice, Apple fallback, privacy link, App Privacy publication check, external group and review submission. No public TestFlight link and no public App Store submission.
+- **Boundaries:** Internal group, clean TestFlight install, onboarding, consent decline/grant, Test Mode, facts, Premium Voice, Apple fallback, privacy link, App Privacy publication check, completion of `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`, external group and review submission. No public TestFlight link and no public App Store submission.
 - **Dependencies:** RH-001 Done and the uploaded build in `Ready to Submit` or equivalent processed state.
 - **Risk:** Medium because the final approval and App Store Connect declarations require Rob's legal and account-holder judgement.
 - **Decision impact:** No ADR. App Store Connect declarations remain Rob's responsibility where legal confirmation is required.
 - **Delivery Risk Cube movement:** Raise implementation fidelity to the actual TestFlight distribution path and production-quality depth through independent clean-install evidence.
-- **Behavioural evidence:** A tester with no prior Keychain state can use the core experience without credentials or motorcycle hardware.
+- **Behavioural evidence:** A tester with no prior Keychain state can use the core experience without credentials. The exact Internal TestFlight binary passes all mandatory stationary, background, audio, network, inactivity and end-of-ride evidence before external submission.
 - **Quality evidence:** The exact TestFlight binary, public privacy page and live backend agree with the saved App Store Connect declarations.
 - **Deterministic verification:** App Store Connect displays the processed build without `Invalid Binary` or `Missing Compliance`; TestFlight installs and launches it on the target iPhone.
 - **Independent evaluation:** Rob completes the human smoke test; Apple performs TestFlight App Review.
 - **Stop condition:** Stop submission on any crash, credential prompt, broken policy link, unavailable AI path, inaccurate declaration or unresolved safety issue.
 - **Gate:** Submit for external review, revise if rejected, or pause if real-device evidence is unsafe.
 
-## Shaping
-
+- **RH-005 — Rationalise Settings information architecture.** First stabilise the ride-session and audio concepts. Then keep frequent rider choices prominent, group voice/audio and privacy coherently, move tuning and developer controls behind Advanced, and usability-test the result while stationary. Do not mix this visual refactor into RH-003 or RH-004.
 - Full App Attest enforcement after the first private beta.
 - Public App Store metadata, screenshots, support page, regional declarations and launch hardening.

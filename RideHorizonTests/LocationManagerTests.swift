@@ -13,11 +13,13 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
     }
 
     var isSpeaking = false
+    var onStart: ((SpeechProvider) -> Void)?
     var onFinish: (() -> Void)?
     var onCancel: (() -> Void)?
     var onDiagnosticNote: ((String) -> Void)?
     private(set) var requests: [Request] = []
     private(set) var cancelPendingPreparationCount = 0
+    private(set) var stopCount = 0
 
     func speak(
         text: String,
@@ -38,7 +40,12 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
     }
 
     func stop() {
+        let wasActive = isSpeaking
+        stopCount += 1
         isSpeaking = false
+        if wasActive {
+            onCancel?()
+        }
     }
 
     func cancelPendingPreparation() {
@@ -46,25 +53,102 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
         isSpeaking = false
         onCancel?()
     }
+
+    func beginPlayback(provider: SpeechProvider = .proxyElevenLabs) {
+        onStart?(provider)
+    }
+
+    func finishPlayback() {
+        isSpeaking = false
+        onFinish?()
+    }
+}
+
+@MainActor
+private final class RecordingAudioSessionManager: AudioSessionManaging {
+    var shouldYieldToPrimaryAudio = false
+    var snapshot: AudioSessionSnapshot {
+        AudioSessionSnapshot(
+            outputVolume: 0.5,
+            outputRouteTypes: ["test"],
+            isOtherAudioPlaying: false,
+            shouldYieldToPrimaryAudio: shouldYieldToPrimaryAudio
+        )
+    }
+    private(set) var activationRequests: [Bool] = []
+    private(set) var deactivationCount = 0
+    var activationFailuresRemaining = 0
+    var deactivationFailuresRemaining = 0
+
+    func activate(duckOthers: Bool) throws {
+        activationRequests.append(duckOthers)
+        if activationFailuresRemaining > 0 {
+            activationFailuresRemaining -= 1
+            throw TestAudioSessionError.expectedFailure
+        }
+    }
+
+    func deactivate() throws {
+        deactivationCount += 1
+        if deactivationFailuresRemaining > 0 {
+            deactivationFailuresRemaining -= 1
+            throw TestAudioSessionError.expectedFailure
+        }
+    }
+}
+
+private enum TestAudioSessionError: Error {
+    case expectedFailure
+}
+
+@MainActor
+private final class RecordingRideInactivityNotifier: RideInactivityNotifying {
+    private(set) var authorizationRequestCount = 0
+    private(set) var deadlines: [Date] = []
+    private(set) var cancelCount = 0
+
+    func requestAuthorizationIfNeeded() {
+        authorizationRequestCount += 1
+    }
+
+    func showInactivityPrompt(deadline: Date) {
+        deadlines.append(deadline)
+    }
+
+    func cancelInactivityPrompt() {
+        cancelCount += 1
+    }
 }
 
 private final class RecordingAppleSpeechOutput: AppleSpeechOutputting {
     struct Request: Equatable {
         let text: String
         let boundary: BoundaryType?
+        let requestID: UUID
     }
 
     var isSpeaking = false
-    var onFinish: (() -> Void)?
-    var onCancel: (() -> Void)?
+    var onStart: ((UUID) -> Void)?
+    var onFinish: ((UUID) -> Void)?
+    var onCancel: ((UUID) -> Void)?
     private(set) var requests: [Request] = []
 
-    func speak(text: String, boundary: BoundaryType?, voice: AVSpeechSynthesisVoice?) {
-        requests.append(Request(text: text, boundary: boundary))
+    func speak(text: String, boundary: BoundaryType?, voice: AVSpeechSynthesisVoice?, requestID: UUID) {
+        requests.append(Request(text: text, boundary: boundary, requestID: requestID))
     }
 
     func stop() {
         isSpeaking = false
+    }
+
+    func emitStart(requestID: UUID) {
+        isSpeaking = true
+        onStart?(requestID)
+    }
+
+    func emitCancel(requestID: UUID) {
+        isSpeaking = false
+        onCancel?(requestID)
     }
 }
 
@@ -103,10 +187,454 @@ final class LocationManagerTests: XCTestCase {
         let locationManager = LocationManager()
 
         XCTAssertFalse(locationManager.testMode)
+        XCTAssertEqual(locationManager.rideSessionState, .idle)
+        XCTAssertEqual(locationManager.locationStatus, .idle)
         XCTAssertEqual(locationManager.contentMode, .shortFacts)
         XCTAssertEqual(locationManager.speechProvider, .proxyElevenLabs)
         XCTAssertTrue(locationManager.interruptsMusic)
         XCTAssertTrue(locationManager.premiumVoiceAppleFallbackEnabled)
+    }
+
+    @MainActor
+    func testAudioSessionIsOwnedOnlyWhileSpeechIsActuallyPlaying() {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            aiSharingAllowed: { true }
+        )
+
+        XCTAssertTrue(audioSession.activationRequests.isEmpty)
+        XCTAssertEqual(audioSession.deactivationCount, 0)
+
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+
+        XCTAssertTrue(audioSession.activationRequests.isEmpty)
+
+        speechOutput.beginPlayback()
+
+        XCTAssertEqual(audioSession.activationRequests, [true])
+
+        speechOutput.finishPlayback()
+
+        XCTAssertEqual(audioSession.deactivationCount, 1)
+    }
+
+    @MainActor
+    func testStoppingSpeechReleasesOwnedAudioSession() {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            aiSharingAllowed: { true }
+        )
+
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+        locationManager.endRide()
+
+        XCTAssertEqual(audioSession.activationRequests, [true])
+        XCTAssertEqual(audioSession.deactivationCount, 1)
+    }
+
+    @MainActor
+    func testAudioActivationFailureDoesNotCreateFalseOwnership() {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        audioSession.activationFailuresRemaining = 1
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            aiSharingAllowed: { true }
+        )
+
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+        speechOutput.finishPlayback()
+
+        XCTAssertEqual(audioSession.activationRequests, [true])
+        XCTAssertEqual(audioSession.deactivationCount, 0)
+    }
+
+    @MainActor
+    func testAudioDeactivationFailureIsRetriedUntilReleased() async {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        audioSession.deactivationFailuresRemaining = 1
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            aiSharingAllowed: { true }
+        )
+
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+        speechOutput.finishPlayback()
+        try? await Task.sleep(nanoseconds: 700_000_000)
+
+        XCTAssertEqual(audioSession.activationRequests, [true])
+        XCTAssertEqual(audioSession.deactivationCount, 2)
+    }
+
+    @MainActor
+    func testNewPlaybackCancelsPendingAudioDeactivationRetry() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        audioSession.deactivationFailuresRemaining = 1
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            aiSharingAllowed: { true }
+        )
+
+        locationManager.speakForTesting(text: "First announcement", boundary: .town)
+        speechOutput.beginPlayback()
+        speechOutput.finishPlayback()
+        locationManager.speakForTesting(text: "Second announcement", boundary: .county)
+        speechOutput.beginPlayback()
+        try? await Task.sleep(nanoseconds: 700_000_000)
+
+        XCTAssertEqual(audioSession.deactivationCount, 1)
+        XCTAssertEqual(
+            diagnostics.entries.filter { $0.event == .audioPlaybackStarted }.count,
+            2
+        )
+
+        speechOutput.finishPlayback()
+        XCTAssertEqual(audioSession.deactivationCount, 2)
+    }
+
+    @MainActor
+    func testEndRideCleanupIsIdempotent() {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            aiSharingAllowed: { true }
+        )
+        locationManager.startRide()
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+
+        locationManager.endRide()
+        locationManager.endRide()
+
+        XCTAssertEqual(locationManager.rideSessionState, .idle)
+        XCTAssertEqual(audioSession.deactivationCount, 1)
+    }
+
+    @MainActor
+    func testNonResumableAudioInterruptionReleasesSessionAndDiscardsSpeech() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            aiSharingAllowed: { true }
+        )
+        locationManager.startRide()
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+
+        NotificationCenter.default.post(
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
+        )
+        XCTAssertEqual(audioSession.deactivationCount, 1)
+        XCTAssertTrue(locationManager.hasInterruptedSpeechPlanForTesting)
+
+        NotificationCenter.default.post(
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: [
+                AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.ended.rawValue,
+                AVAudioSessionInterruptionOptionKey: UInt(0)
+            ]
+        )
+
+        XCTAssertFalse(locationManager.hasInterruptedSpeechPlanForTesting)
+        XCTAssertTrue(diagnostics.entries.map(\.event).contains(.audioInterruptionBegan))
+        XCTAssertTrue(diagnostics.entries.map(\.event).contains(.audioInterruptionEnded))
+        locationManager.endRide()
+    }
+
+    @MainActor
+    func testRouteChangeAndMediaResetAreCapturedWithoutRetainingAudioOwnership() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let locationManager = LocationManager(diagnostics: diagnostics)
+
+        NotificationCenter.default.post(
+            name: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+        NotificationCenter.default.post(
+            name: AVAudioSession.mediaServicesWereResetNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+
+        XCTAssertTrue(diagnostics.entries.map(\.event).contains(.audioRouteChanged))
+        XCTAssertTrue(diagnostics.entries.map(\.event).contains(.audioMediaServicesReset))
+    }
+
+    @MainActor
+    func testReleaseDiagnosticsArePersistedAndBoundedByAgeAndCount() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let store = RideDiagnosticsStore(
+            directoryURL: directory,
+            now: { now },
+            maxEntries: 2,
+            maxAge: 7 * 24 * 60 * 60,
+            maxBytes: 1_048_576
+        )
+
+        store.record(.rideStarted, at: now.addingTimeInterval(-8 * 24 * 60 * 60))
+        store.record(.audioPlaybackStarted, at: now.addingTimeInterval(-2))
+        store.record(.audioSessionActivated, at: now.addingTimeInterval(-1))
+        store.record(.audioSessionReleased, at: now)
+        store.flushForTesting()
+
+        XCTAssertEqual(store.entries.map(\.event), [.audioSessionActivated, .audioSessionReleased])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.exportURL.path))
+
+        let restored = RideDiagnosticsStore(
+            directoryURL: directory,
+            now: { now },
+            maxEntries: 2,
+            maxAge: 7 * 24 * 60 * 60,
+            maxBytes: 1_048_576
+        )
+        XCTAssertEqual(restored.entries.map(\.event), [.audioSessionActivated, .audioSessionReleased])
+
+        restored.clear()
+        XCTAssertTrue(restored.entries.isEmpty)
+    }
+
+    @MainActor
+    func testClearWaitsForInFlightPersistenceBeforeWritingEmptySnapshot() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let writerStarted = DispatchSemaphore(value: 0)
+        let releaseWriter = DispatchSemaphore(value: 0)
+        let store = RideDiagnosticsStore(
+            directoryURL: directory,
+            persistenceDelay: 0,
+            persistenceWillWrite: { snapshot in
+                guard !snapshot.isEmpty else { return }
+                writerStarted.signal()
+                _ = releaseWriter.wait(timeout: .now() + 2)
+            }
+        )
+
+        store.record(.appEnteredBackground)
+        XCTAssertEqual(writerStarted.wait(timeout: .now() + 1), .success)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+            releaseWriter.signal()
+        }
+
+        store.clear()
+
+        let persisted = try JSONDecoder().decode(
+            [RideDiagnosticEntry].self,
+            from: Data(contentsOf: store.exportURL)
+        )
+        XCTAssertTrue(persisted.isEmpty)
+    }
+
+    @MainActor
+    func testReleaseDiagnosticsStayWithinByteLimitAndAreExcludedFromBackup() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = RideDiagnosticsStore(
+            directoryURL: directory,
+            maxEntries: 2_000,
+            maxBytes: 1_024
+        )
+
+        for _ in 0..<100 {
+            store.record(
+                .audioPlaybackStarted,
+                audio: AudioSessionSnapshot(
+                    outputVolume: 0.5,
+                    outputRouteTypes: ["BluetoothA2DPOutput"],
+                    isOtherAudioPlaying: true,
+                    shouldYieldToPrimaryAudio: false,
+                    category: "playback",
+                    mode: "spokenAudio",
+                    options: ["duckOthers"]
+                )
+            )
+        }
+        store.flushForTesting()
+
+        let data = try Data(contentsOf: store.exportURL)
+        XCTAssertLessThanOrEqual(data.count, 1_024)
+        XCTAssertEqual(
+            try store.exportURL.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup,
+            true
+        )
+        let attributes = try FileManager.default.attributesOfItem(atPath: store.exportURL.path)
+        XCTAssertEqual(
+            attributes[.protectionKey] as? FileProtectionType,
+            .completeUntilFirstUserAuthentication
+        )
+    }
+
+    @MainActor
+    func testRideStartsOnlyAfterExplicitActionAndManualEndCleansUp() {
+        let notifier = RecordingRideInactivityNotifier()
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            inactivityNotifier: notifier
+        )
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+
+        XCTAssertEqual(locationManager.rideSessionState, .idle)
+        XCTAssertEqual(notifier.authorizationRequestCount, 0)
+
+        locationManager.startRide(at: startedAt)
+
+        XCTAssertEqual(locationManager.rideSessionState, .riding)
+        XCTAssertEqual(notifier.authorizationRequestCount, 1)
+
+        locationManager.endRide()
+
+        XCTAssertEqual(locationManager.rideSessionState, .idle)
+        XCTAssertEqual(locationManager.locationStatus, .idle)
+        XCTAssertFalse(locationManager.isTracking)
+        XCTAssertEqual(notifier.cancelCount, 1)
+        XCTAssertEqual(speechOutput.stopCount, 1)
+    }
+
+    @MainActor
+    func testEndRideInvalidatesPendingGeocodeResults() {
+        let locationManager = LocationManager(inactivityNotifier: RecordingRideInactivityNotifier())
+        locationManager.startRide()
+        let rideGeneration = locationManager.rideSessionGenerationForTesting
+        let requestGeneration = locationManager.geocodeRequestGenerationForTesting
+        XCTAssertTrue(
+            locationManager.canAcceptGeocodeResultForTesting(
+                rideGeneration: rideGeneration,
+                requestGeneration: requestGeneration
+            )
+        )
+
+        locationManager.endRide()
+
+        XCTAssertFalse(
+            locationManager.canAcceptGeocodeResultForTesting(
+                rideGeneration: rideGeneration,
+                requestGeneration: requestGeneration
+            )
+        )
+        XCTAssertEqual(locationManager.locationStatus, .idle)
+    }
+
+    @MainActor
+    func testInactivityPromptInvalidatesPendingGeocodeAcrossContinue() {
+        let locationManager = LocationManager(inactivityNotifier: RecordingRideInactivityNotifier())
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+        locationManager.startRide(at: startedAt)
+        let rideGeneration = locationManager.rideSessionGenerationForTesting
+        let requestGeneration = locationManager.geocodeRequestGenerationForTesting
+
+        locationManager.evaluateRideSession(at: startedAt.addingTimeInterval(600))
+        locationManager.continueRide(at: startedAt.addingTimeInterval(660))
+
+        XCTAssertFalse(
+            locationManager.canAcceptGeocodeResultForTesting(
+                rideGeneration: rideGeneration,
+                requestGeneration: requestGeneration
+            )
+        )
+        XCTAssertEqual(locationManager.rideSessionState, .riding)
+    }
+
+    @MainActor
+    func testInactivityPromptCanContinueOrAutomaticallyEndTheRide() {
+        let notifier = RecordingRideInactivityNotifier()
+        let locationManager = LocationManager(inactivityNotifier: notifier)
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+        locationManager.startRide(at: startedAt)
+
+        locationManager.evaluateRideSession(at: startedAt.addingTimeInterval(600))
+
+        XCTAssertEqual(
+            locationManager.rideSessionState,
+            .awaitingConfirmation(deadline: startedAt.addingTimeInterval(720))
+        )
+        XCTAssertEqual(notifier.deadlines, [startedAt.addingTimeInterval(720)])
+
+        locationManager.continueRide(at: startedAt.addingTimeInterval(660))
+        XCTAssertEqual(locationManager.rideSessionState, .riding)
+
+        locationManager.evaluateRideSession(at: startedAt.addingTimeInterval(1_260))
+        locationManager.evaluateRideSession(at: startedAt.addingTimeInterval(1_380))
+
+        XCTAssertEqual(locationManager.rideSessionState, .idle)
+        XCTAssertEqual(locationManager.locationStatus, .idle)
+    }
+
+    @MainActor
+    func testExpiredInactivityPromptCannotContinueTheRide() {
+        let locationManager = LocationManager(inactivityNotifier: RecordingRideInactivityNotifier())
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+        locationManager.startRide(at: startedAt)
+        locationManager.evaluateRideSession(at: startedAt.addingTimeInterval(600))
+
+        locationManager.continueRide(at: startedAt.addingTimeInterval(721))
+
+        XCTAssertEqual(locationManager.rideSessionState, .idle)
+        XCTAssertEqual(locationManager.locationStatus, .idle)
+        XCTAssertFalse(locationManager.isTracking)
+    }
+
+    @MainActor
+    func testTestModeDoesNotSeedUntilRideStarts() {
+        let locationManager = LocationManager(inactivityNotifier: RecordingRideInactivityNotifier())
+        locationManager.testMode = true
+
+        XCTAssertNil(locationManager.lastKnownLocation)
+
+        locationManager.startRide()
+
+        XCTAssertEqual(locationManager.rideSessionState, .riding)
+        XCTAssertEqual(
+            locationManager.lastKnownLocation?.latitude,
+            TestRouteFixture.waypoints[0].latitude
+        )
+        locationManager.endRide()
+    }
+
+    @MainActor
+    func testSecondTestModeRideRestartsAtFirstPoint() {
+        let locationManager = LocationManager(inactivityNotifier: RecordingRideInactivityNotifier())
+        locationManager.testMode = true
+        locationManager.startRide()
+        locationManager.logTestLocation()
+        XCTAssertEqual(locationManager.lastKnownLocation?.latitude, TestRouteFixture.waypoints[1].latitude)
+
+        locationManager.endRide()
+        locationManager.startRide()
+
+        XCTAssertEqual(locationManager.lastKnownLocation?.latitude, TestRouteFixture.waypoints[0].latitude)
+        locationManager.endRide()
     }
 
     @MainActor
@@ -124,6 +652,7 @@ final class LocationManagerTests: XCTestCase {
         let locationManager = LocationManager()
         locationManager.testMode = false
         locationManager.locationCheckInterval = 60
+        locationManager.startRide()
 
         let firstLocation = CLLocation(latitude: 51.6971, longitude: -2.5830)
         locationManager.locationManager(CLLocationManager(), didUpdateLocations: [firstLocation])
@@ -142,6 +671,7 @@ final class LocationManagerTests: XCTestCase {
     func testTestModeIgnoresLiveLocationUpdates() {
         let locationManager = LocationManager()
         locationManager.testMode = true
+        locationManager.startRide()
 
         let location = CLLocation(latitude: 37.7749, longitude: -122.4194)
         locationManager.locationManager(CLLocationManager(), didUpdateLocations: [location])
@@ -181,6 +711,7 @@ final class LocationManagerTests: XCTestCase {
     func testMovingLocationStillAllowsMapInteraction() {
         let locationManager = LocationManager()
         locationManager.testMode = false
+        locationManager.startRide()
 
         let movingLocation = CLLocation(
             coordinate: CLLocationCoordinate2D(latitude: 51.6971, longitude: -2.5830),
@@ -200,6 +731,7 @@ final class LocationManagerTests: XCTestCase {
     func testStationaryLocationAllowsMapInteraction() {
         let locationManager = LocationManager()
         locationManager.testMode = false
+        locationManager.startRide()
 
         let stoppedLocation = CLLocation(
             coordinate: CLLocationCoordinate2D(latitude: 51.6971, longitude: -2.5830),
@@ -218,10 +750,44 @@ final class LocationManagerTests: XCTestCase {
     @MainActor
     func testLocationFailurePublishesRiderStatus() {
         let locationManager = LocationManager()
+        locationManager.startRide()
 
         locationManager.locationManager(CLLocationManager(), didFailWithError: CLError(.locationUnknown))
 
         XCTAssertEqual(locationManager.locationStatus, .locationUnavailable("Location update failed. RideHorizon will keep trying."))
+    }
+
+    @MainActor
+    func testLateLocationCallbacksAreIgnoredAfterEndRide() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let locationManager = LocationManager(diagnostics: diagnostics)
+        locationManager.startRide()
+        locationManager.endRide()
+        let eventsBeforeCallbacks = diagnostics.entries
+        let lateLocation = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 51.745, longitude: -2.218),
+            altitude: 0,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 5,
+            course: 0,
+            speed: 0,
+            timestamp: Date()
+        )
+
+        locationManager.locationManager(
+            CLLocationManager(),
+            didUpdateLocations: [lateLocation]
+        )
+        locationManager.locationManager(
+            CLLocationManager(),
+            didFailWithError: CLError(.locationUnknown)
+        )
+
+        XCTAssertEqual(locationManager.rideSessionState, .idle)
+        XCTAssertEqual(locationManager.locationStatus, .idle)
+        XCTAssertEqual(diagnostics.entries, eventsBeforeCallbacks)
     }
 
     func testLocationSummaryAndHierarchyUseMapDesignLabels() {
@@ -478,6 +1044,22 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testStoppingIdleSpeechEngineDoesNotReportCancellation() {
+        let speechOutput = DefaultSpeechOutputEngine(
+            proxySpeechGenerator: DelayedFailingProxySpeechGenerator(),
+            appleSpeechOutput: RecordingAppleSpeechOutput()
+        )
+        var cancellationCount = 0
+        speechOutput.onCancel = {
+            cancellationCount += 1
+        }
+
+        speechOutput.stop()
+
+        XCTAssertEqual(cancellationCount, 0)
+    }
+
+    @MainActor
     func testAppleProviderUsesAppleSpeechOutputOnlyWhenExplicitlySelected() {
         let appleSpeechOutput = RecordingAppleSpeechOutput()
         let speechOutput = DefaultSpeechOutputEngine(
@@ -495,6 +1077,43 @@ final class LocationManagerTests: XCTestCase {
 
         XCTAssertEqual(appleSpeechOutput.requests.map(\.text), ["Known for its market square."])
         XCTAssertEqual(appleSpeechOutput.requests.map(\.boundary), [.town])
+    }
+
+    @MainActor
+    func testStaleAppleCancellationCannotCancelReplacementSpeech() {
+        let appleSpeechOutput = RecordingAppleSpeechOutput()
+        let speechOutput = DefaultSpeechOutputEngine(
+            proxySpeechGenerator: DelayedFailingProxySpeechGenerator(),
+            appleSpeechOutput: appleSpeechOutput
+        )
+        var cancellationCount = 0
+        speechOutput.onCancel = {
+            cancellationCount += 1
+        }
+
+        speechOutput.speak(
+            text: "First announcement",
+            boundary: .town,
+            provider: .apple,
+            appleVoice: nil,
+            allowAppleFallback: false
+        )
+        let firstRequestID = appleSpeechOutput.requests[0].requestID
+        appleSpeechOutput.emitStart(requestID: firstRequestID)
+        speechOutput.stop()
+
+        speechOutput.speak(
+            text: "Replacement announcement",
+            boundary: .county,
+            provider: .apple,
+            appleVoice: nil,
+            allowAppleFallback: false
+        )
+        let secondRequestID = appleSpeechOutput.requests[1].requestID
+        appleSpeechOutput.emitStart(requestID: secondRequestID)
+        appleSpeechOutput.emitCancel(requestID: firstRequestID)
+
+        XCTAssertEqual(cancellationCount, 1)
     }
 
     @MainActor

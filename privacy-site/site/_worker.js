@@ -1,5 +1,11 @@
 const FLY_ORIGIN = "https://motoguide-fact-proxy.fly.dev";
-const POLICY_PATHS = new Set(["/app-privacy-policy", "/app-privacy-policy/"]);
+const STATIC_ASSETS = new Map([
+  ["/", "/landing.html"],
+  ["/app-privacy-policy", "/index.html"],
+  ["/app-privacy-policy/", "/index.html"],
+  ["/support", "/support.html"],
+  ["/support/", "/support.html"]
+]);
 
 const POLICY_HEADERS = {
   "Cache-Control": "public, max-age=300",
@@ -11,7 +17,7 @@ const POLICY_HEADERS = {
   "X-Frame-Options": "DENY"
 };
 
-async function servePrivacyPolicy(request, env) {
+async function serveStaticPage(request, env, assetPath) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", {
       status: 405,
@@ -19,7 +25,7 @@ async function servePrivacyPolicy(request, env) {
     });
   }
 
-  const assetURL = new URL("/index.html", request.url);
+  const assetURL = new URL(assetPath, request.url);
   const assetRequest = new Request(assetURL, {
     method: request.method,
     headers: request.headers
@@ -41,7 +47,16 @@ async function servePrivacyPolicy(request, env) {
 
 async function proxyToFly(request, originFetch) {
   const incomingURL = new URL(request.url);
-  const upstreamURL = new URL(incomingURL.pathname + incomingURL.search, FLY_ORIGIN);
+  const upstreamURL = new URL(FLY_ORIGIN);
+  upstreamURL.pathname = incomingURL.pathname;
+  upstreamURL.search = incomingURL.search;
+
+  if (upstreamURL.origin !== FLY_ORIGIN) {
+    return new Response("Bad Request", {
+      status: 400,
+      headers: { "Cache-Control": "no-store" }
+    });
+  }
 
   try {
     return await originFetch(new Request(upstreamURL, request));
@@ -59,8 +74,9 @@ async function proxyToFly(request, originFetch) {
 export async function handleRequest(request, env, originFetch = fetch) {
   const { pathname } = new URL(request.url);
 
-  if (POLICY_PATHS.has(pathname)) {
-    return servePrivacyPolicy(request, env);
+  const assetPath = STATIC_ASSETS.get(pathname);
+  if (assetPath) {
+    return serveStaticPage(request, env, assetPath);
   }
 
   return proxyToFly(request, originFetch);

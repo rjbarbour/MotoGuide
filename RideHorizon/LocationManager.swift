@@ -3,6 +3,7 @@ import CoreLocation
 import AVFoundation
 
 enum LocationServiceStatus: Equatable {
+    case idle
     case checking
     case waitingForPermission
     case denied
@@ -13,6 +14,8 @@ enum LocationServiceStatus: Equatable {
 
     var riderMessage: String {
         switch self {
+        case .idle:
+            return "Ready to start a ride."
         case .checking:
             return "Checking location..."
         case .waitingForPermission:
@@ -32,7 +35,7 @@ enum LocationServiceStatus: Equatable {
         switch self {
         case .denied, .restricted:
             return true
-        case .checking, .waitingForPermission, .active, .locationUnavailable, .placeUnavailable:
+        case .idle, .checking, .waitingForPermission, .active, .locationUnavailable, .placeUnavailable:
             return false
         }
     }
@@ -114,8 +117,61 @@ enum SpeechProvider: String, CaseIterable, Identifiable {
 }
 
 @MainActor
+protocol AudioSessionManaging: AnyObject {
+    var shouldYieldToPrimaryAudio: Bool { get }
+    var snapshot: AudioSessionSnapshot { get }
+    func activate(duckOthers: Bool) throws
+    func deactivate() throws
+}
+
+@MainActor
+final class SystemAudioSessionManager: AudioSessionManaging {
+    private let session: AVAudioSession
+
+    init(session: AVAudioSession = .sharedInstance()) {
+        self.session = session
+    }
+
+    var shouldYieldToPrimaryAudio: Bool {
+        session.secondaryAudioShouldBeSilencedHint
+    }
+
+    var snapshot: AudioSessionSnapshot {
+        let categoryOptions = session.categoryOptions
+        var optionNames: [String] = []
+        if categoryOptions.contains(.mixWithOthers) { optionNames.append("mixWithOthers") }
+        if categoryOptions.contains(.duckOthers) { optionNames.append("duckOthers") }
+        if categoryOptions.contains(.interruptSpokenAudioAndMixWithOthers) {
+            optionNames.append("interruptSpokenAudioAndMixWithOthers")
+        }
+        if categoryOptions.contains(.allowBluetoothA2DP) { optionNames.append("allowBluetoothA2DP") }
+        if categoryOptions.contains(.allowAirPlay) { optionNames.append("allowAirPlay") }
+        return AudioSessionSnapshot(
+            outputVolume: session.outputVolume,
+            outputRouteTypes: session.currentRoute.outputs.map { $0.portType.rawValue },
+            isOtherAudioPlaying: session.isOtherAudioPlaying,
+            shouldYieldToPrimaryAudio: session.secondaryAudioShouldBeSilencedHint,
+            category: session.category.rawValue,
+            mode: session.mode.rawValue,
+            options: optionNames
+        )
+    }
+
+    func activate(duckOthers: Bool) throws {
+        let options: AVAudioSession.CategoryOptions = duckOthers ? [.duckOthers] : [.mixWithOthers]
+        try session.setCategory(.playback, mode: .spokenAudio, options: options)
+        try session.setActive(true)
+    }
+
+    func deactivate() throws {
+        try session.setActive(false, options: [.notifyOthersOnDeactivation])
+    }
+}
+
+@MainActor
 protocol SpeechOutputEngine: AnyObject {
     var isSpeaking: Bool { get }
+    var onStart: ((SpeechProvider) -> Void)? { get set }
     var onFinish: (() -> Void)? { get set }
     var onCancel: (() -> Void)? { get set }
     var onDiagnosticNote: ((String) -> Void)? { get set }
@@ -134,19 +190,22 @@ protocol SpeechOutputEngine: AnyObject {
 @MainActor
 protocol AppleSpeechOutputting: AnyObject {
     var isSpeaking: Bool { get }
-    var onFinish: (() -> Void)? { get set }
-    var onCancel: (() -> Void)? { get set }
+    var onStart: ((UUID) -> Void)? { get set }
+    var onFinish: ((UUID) -> Void)? { get set }
+    var onCancel: ((UUID) -> Void)? { get set }
 
-    func speak(text: String, boundary: BoundaryType?, voice: AVSpeechSynthesisVoice?)
+    func speak(text: String, boundary: BoundaryType?, voice: AVSpeechSynthesisVoice?, requestID: UUID)
     func stop()
 }
 
 @MainActor
 final class AppleSpeechOutput: NSObject, AppleSpeechOutputting, AVSpeechSynthesizerDelegate {
     private let speechSynthesizer = AVSpeechSynthesizer()
+    private var activeUtterance: (id: ObjectIdentifier, requestID: UUID)?
 
-    var onFinish: (() -> Void)?
-    var onCancel: (() -> Void)?
+    var onStart: ((UUID) -> Void)?
+    var onFinish: ((UUID) -> Void)?
+    var onCancel: ((UUID) -> Void)?
     var onDiagnosticNote: ((String) -> Void)?
 
     var isSpeaking: Bool {
@@ -158,35 +217,44 @@ final class AppleSpeechOutput: NSObject, AppleSpeechOutputting, AVSpeechSynthesi
         speechSynthesizer.delegate = self
     }
 
-    func speak(text: String, boundary: BoundaryType?, voice: AVSpeechSynthesisVoice?) {
+    func speak(text: String, boundary: BoundaryType?, voice: AVSpeechSynthesisVoice?, requestID: UUID) {
         guard let voice else {
             ProxyDiagnostics.log("Speech", "No usable Apple voice.")
-            onFinish?()
+            onFinish?(requestID)
             return
         }
 
         ProxyDiagnostics.log("Speech", "Routing \(boundary?.factLabel ?? "unknown") speech through Apple voice \(voice.identifier).")
         let utterance = AVSpeechUtterance(string: text)
+        activeUtterance = (ObjectIdentifier(utterance), requestID)
         utterance.voice = voice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        onStart?(requestID)
         speechSynthesizer.speak(utterance)
     }
 
     func stop() {
+        activeUtterance = nil
         if speechSynthesizer.isSpeaking {
             speechSynthesizer.stopSpeaking(at: .immediate)
         }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in
-            onFinish?()
+        Task { @MainActor [weak self] in
+            guard let self, let active = self.activeUtterance,
+                  active.id == ObjectIdentifier(utterance) else { return }
+            self.activeUtterance = nil
+            self.onFinish?(active.requestID)
         }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in
-            onCancel?()
+        Task { @MainActor [weak self] in
+            guard let self, let active = self.activeUtterance,
+                  active.id == ObjectIdentifier(utterance) else { return }
+            self.activeUtterance = nil
+            self.onCancel?(active.requestID)
         }
     }
 }
@@ -204,6 +272,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
     private var currentProxyFallbackAppleVoice: AVSpeechSynthesisVoice?
     private var currentProxyAllowsAppleFallback = false
 
+    var onStart: ((SpeechProvider) -> Void)?
     var onFinish: (() -> Void)?
     var onCancel: (() -> Void)?
     var onDiagnosticNote: ((String) -> Void)?
@@ -222,11 +291,17 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
         self.proxySpeechGenerator = proxySpeechGenerator
         self.appleSpeechOutput = appleSpeechOutput ?? AppleSpeechOutput()
         super.init()
-        self.appleSpeechOutput.onFinish = { [weak self] in
-            self?.onFinish?()
+        self.appleSpeechOutput.onStart = { [weak self] requestID in
+            guard let self, self.playbackToken == requestID else { return }
+            self.onStart?(.apple)
         }
-        self.appleSpeechOutput.onCancel = { [weak self] in
-            self?.onCancel?()
+        self.appleSpeechOutput.onFinish = { [weak self] requestID in
+            guard let self, self.playbackToken == requestID else { return }
+            self.onFinish?()
+        }
+        self.appleSpeechOutput.onCancel = { [weak self] requestID in
+            guard let self, self.playbackToken == requestID else { return }
+            self.onCancel?()
         }
     }
 
@@ -246,17 +321,20 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
     }
 
     func stop() {
+        let wasActive = isSpeaking
         playbackToken = UUID()
         proxyRequestTask?.cancel()
         proxyRequestTask = nil
         appleSpeechOutput.stop()
-        proxyAudioChunks.removeAll()
-        clearProxyFallbackContext()
-        onCancel?()
         if proxyAudioPlayer?.isPlaying == true {
             proxyAudioPlayer?.stop()
         }
         proxyAudioPlayer = nil
+        proxyAudioChunks.removeAll()
+        clearProxyFallbackContext()
+        if wasActive {
+            onCancel?()
+        }
     }
 
     func cancelPendingPreparation() {
@@ -360,7 +438,9 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
     }
 
     private func speakWithApple(text: String, boundary: BoundaryType?, appleVoice: AVSpeechSynthesisVoice?) {
-        appleSpeechOutput.speak(text: text, boundary: boundary, voice: appleVoice)
+        let requestID = UUID()
+        playbackToken = requestID
+        appleSpeechOutput.speak(text: text, boundary: boundary, voice: appleVoice, requestID: requestID)
     }
 
     private static func diagnosticDescription(for error: Error) -> String {
@@ -393,8 +473,15 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
             let player = try AVAudioPlayer(data: audioData)
             proxyAudioPlayer = player
             player.delegate = self
-            player.prepareToPlay()
-            player.play()
+            guard player.prepareToPlay() else {
+                handleActiveProxyPlaybackFailure(message: "Premium voice failed: audio preparation error. Apple fallback used.")
+                return
+            }
+            onStart?(.proxyElevenLabs)
+            guard player.play() else {
+                handleActiveProxyPlaybackFailure(message: "Premium voice failed: audio playback start error. Apple fallback used.")
+                return
+            }
         } catch {
             handlePremiumVoiceFailure(
                 message: "Premium voice failed: audio playback error. Apple fallback used.",
@@ -410,7 +497,12 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self, self.proxyAudioPlayer === player else { return }
+            self.proxyAudioPlayer = nil
+            guard flag else {
+                self.handleActiveProxyPlaybackFailure(message: "Premium voice failed: audio playback error. Apple fallback used.")
+                return
+            }
             let token = self.playbackToken
             self.playNextProxyChunk(
                 token: token,
@@ -422,6 +514,35 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
         }
     }
 
+    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        Task { @MainActor [weak self] in
+            guard let self, self.proxyAudioPlayer === player else { return }
+            self.handleActiveProxyPlaybackFailure(message: "Premium voice failed: audio decode error. Apple fallback used.")
+        }
+    }
+
+    private func handleActiveProxyPlaybackFailure(message: String) {
+        proxyAudioPlayer?.stop()
+        proxyAudioPlayer = nil
+        proxyAudioChunks.removeAll()
+        let text = currentProxyFallbackText
+        let boundary = currentProxyFallbackBoundary
+        let appleVoice = currentProxyFallbackAppleVoice
+        let allowAppleFallback = currentProxyAllowsAppleFallback
+        guard !text.isEmpty else {
+            clearProxyFallbackContext()
+            onFinish?()
+            return
+        }
+        handlePremiumVoiceFailure(
+            message: message,
+            text: text,
+            boundary: boundary,
+            appleVoice: appleVoice,
+            allowAppleFallback: allowAppleFallback
+        )
+    }
+
 }
 
 @MainActor
@@ -431,8 +552,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
     private let speechOutput: SpeechOutputEngine
+    private let audioSession: AudioSessionManaging
+    private let diagnostics: RideDiagnosticsStore
+    private var ownsAudioSession = false
     private var previousAddress: Address?
     private var lastUpdateTime: Date?
+    private var lastLocationDiagnosticTime: Date?
     private var lastBoundaryAnnouncementTime: Date?
     private var testIndex = 0
     private var announcementQueue = AnnouncementQueue()
@@ -443,12 +568,20 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var interruptionResumeWorkItem: DispatchWorkItem?
     private let factGenerator: PlaceFactGenerating
     private let aiSharingAllowed: () -> Bool
+    private let inactivityNotifier: RideInactivityNotifying
     private var inFlightFactTask: Task<Void, Never>?
     private var inFlightFactBoundary: BoundaryType?
     private var activeAnnouncementToken = UUID()
     private var wantsRideTracking = false
     private var hasSeededTestRoute = false
     private let externalAudioResumeDelaySeconds: TimeInterval = 3
+    private var rideSessionLifecycle = RideSessionLifecycle()
+    private var inactivityTimer: DispatchSourceTimer?
+    private var rideStartedAt: Date?
+    private var rideSessionGeneration = UUID()
+    private var geocodeRequestGeneration = UUID()
+    private var audioSessionReleaseRetryWorkItem: DispatchWorkItem?
+    private var audioSessionReleaseRetryAttempts = 0
 
     @Published var lastKnownLocation: CLLocationCoordinate2D?
     @Published var lastKnownAddress: Address?
@@ -481,10 +614,18 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         didSet {
             UserDefaults.standard.set(testMode, forKey: LocationManagerDefaults.testModeKey)
             if testMode {
-                startTestRouteIfNeeded()
+                locationManager.stopUpdatingLocation()
+                locationManager.allowsBackgroundLocationUpdates = false
+                isTracking = false
+                if rideSessionState.isActive {
+                    startTestRouteIfNeeded()
+                }
             } else {
                 hasSeededTestRoute = false
                 testIndex = 0
+                if rideSessionState.isActive {
+                    startRideTrackingIfAuthorized()
+                }
             }
         }
     }
@@ -496,7 +637,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }() {
         didSet {
             UserDefaults.standard.set(interruptsMusic, forKey: LocationManagerDefaults.interruptsMusicKey)
-            setupAudioSession()
         }
     }
     @Published var premiumVoiceAppleFallbackEnabled: Bool = {
@@ -565,10 +705,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
     }
     @Published private(set) var isTracking = false
+    @Published private(set) var rideSessionState: RideSessionState = .idle
     @Published private(set) var lastSpokenPhrase: String?
     @Published private(set) var lastSpokenAt: Date?
     @Published private(set) var lastSpeechDiagnosticNote: String?
-    @Published private(set) var locationStatus: LocationServiceStatus = .checking
+    @Published private(set) var locationStatus: LocationServiceStatus = .idle
     @Published private(set) var currentSpeedMetersPerSecond: CLLocationSpeed?
 
     var allowsMapInteraction: Bool {
@@ -580,7 +721,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private var shouldYieldToPrimaryAudio: Bool {
-        AVAudioSession.sharedInstance().secondaryAudioShouldBeSilencedHint
+        audioSession.shouldYieldToPrimaryAudio
     }
 
     var onAddressChange: ((Address) -> Void)?
@@ -589,28 +730,40 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     init(
         factGenerator: PlaceFactGenerating? = nil,
         speechOutput: SpeechOutputEngine? = nil,
+        inactivityNotifier: RideInactivityNotifying? = nil,
+        audioSession: AudioSessionManaging? = nil,
+        diagnostics: RideDiagnosticsStore? = nil,
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
         self.speechOutput = speechOutput ?? DefaultSpeechOutputEngine()
+        self.inactivityNotifier = inactivityNotifier ?? UserNotificationRideInactivityNotifier()
+        self.audioSession = audioSession ?? SystemAudioSessionManager()
+        self.diagnostics = diagnostics ?? .shared
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
+        self.speechOutput.onStart = { [weak self] provider in
+            self?.acquireAudioSessionForSpeech(provider: provider)
+        }
         self.speechOutput.onFinish = { [weak self] in
             self?.activeSpeechPlan = nil
             self?.currentlySpeakingBoundary = nil
+            self?.recordDiagnostic(.audioPlaybackFinished)
+            self?.releaseAudioSessionAfterSpeech()
         }
         self.speechOutput.onCancel = { [weak self] in
             self?.activeSpeechPlan = nil
             self?.currentlySpeakingBoundary = nil
+            self?.recordDiagnostic(.audioPlaybackCancelled)
+            self?.releaseAudioSessionAfterSpeech()
         }
         self.speechOutput.onDiagnosticNote = { [weak self] note in
             self?.lastSpeechDiagnosticNote = note
+            self?.recordDiagnostic(.announcementFailed)
         }
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.pausesLocationUpdatesAutomatically = false
-
-        setupAudioSession()
 
         NotificationCenter.default.addObserver(
             self,
@@ -622,6 +775,18 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             self,
             selector: #selector(handleSecondaryAudioHint(_:)),
             name: AVAudioSession.silenceSecondaryAudioHintNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioMediaServicesReset(_:)),
+            name: AVAudioSession.mediaServicesWereResetNotification,
             object: AVAudioSession.sharedInstance()
         )
 
@@ -636,17 +801,80 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         locationManager.requestLocation()
     }
 
-    /// Requests location permission and starts ride tracking. Call after onboarding completes.
-    func beginRideTracking() {
+    /// Starts a rider-controlled session. Continuous and background work must remain inside this boundary.
+    func startRide(at date: Date = Date()) {
+        guard rideSessionState == .idle else { return }
+        rideSessionGeneration = UUID()
+        rideSessionLifecycle.start(at: date)
+        rideStartedAt = date
+        rideSessionState = rideSessionLifecycle.state
         wantsRideTracking = true
+        locationStatus = .checking
+        inactivityNotifier.requestAuthorizationIfNeeded()
+        startInactivityTimer()
         startTestRouteIfNeeded()
         startRideTrackingIfAuthorized()
+        recordDiagnostic(.rideStarted, at: date)
+    }
+
+    func endRide() {
+        finishRideSession()
+    }
+
+    func recordAppLifecycle(isForeground: Bool) {
+        recordDiagnostic(isForeground ? .appEnteredForeground : .appEnteredBackground)
+    }
+
+    func continueRide(at date: Date = Date()) {
+        guard case .awaitingConfirmation = rideSessionState else { return }
+        guard rideSessionLifecycle.continueRide(at: date) else {
+            finishRideSession()
+            return
+        }
+        rideSessionState = rideSessionLifecycle.state
+        inactivityNotifier.cancelInactivityPrompt()
+        recordDiagnostic(.rideContinued, at: date)
+        AppDiagnostics.log("Ride continued after inactivity prompt.")
     }
 
     func pauseRideTracking() {
+        finishRideSession()
+    }
+
+    private func finishRideSession() {
+        let wasActive = wantsRideTracking || rideSessionState.isActive
+        rideSessionGeneration = UUID()
+        rideSessionLifecycle.end()
+        rideSessionState = rideSessionLifecycle.state
         wantsRideTracking = false
         locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
         isTracking = false
+        locationStatus = .idle
+        currentSpeedMetersPerSecond = nil
+        lastUpdateTime = nil
+        lastLocationDiagnosticTime = nil
+        inactivityTimer?.cancel()
+        inactivityTimer = nil
+        inactivityNotifier.cancelInactivityPrompt()
+
+        inFlightFactTask?.cancel()
+        inFlightFactTask = nil
+        inFlightFactBoundary = nil
+        activeAnnouncementToken = UUID()
+        interruptionResumeWorkItem?.cancel()
+        interruptionResumeWorkItem = nil
+        interruptedSpeechPlan = nil
+        cancelPendingAnnouncement()
+        stopSpeechOutput()
+        geocoder.cancelGeocode()
+        hasSeededTestRoute = false
+        testIndex = 0
+        AppDiagnostics.log("Ride session ended and background work stopped.")
+        if wasActive {
+            recordDiagnostic(.rideEnded)
+        }
+        rideStartedAt = nil
     }
 
     func applyAISharingDecision(isGranted: Bool) {
@@ -678,7 +906,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         lastSpokenPhrase = nil
         lastSpokenAt = nil
         lastSpeechDiagnosticNote = nil
-        locationStatus = .checking
+        locationStatus = .idle
         previousAddress = nil
         lastUpdateTime = nil
         lastBoundaryAnnouncementTime = nil
@@ -695,6 +923,14 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     private func startRideTrackingIfAuthorized() {
         guard wantsRideTracking else { return }
+
+        if testMode {
+            locationManager.stopUpdatingLocation()
+            locationManager.allowsBackgroundLocationUpdates = false
+            locationStatus = .active
+            isTracking = false
+            return
+        }
 
         switch locationManager.authorizationStatus {
         case .notDetermined:
@@ -720,6 +956,48 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             locationManager.stopUpdatingLocation()
             locationStatus = .locationUnavailable("Location is unavailable on this device.")
             isTracking = false
+        }
+    }
+
+    func evaluateRideSession(at date: Date = Date()) {
+        handleRideSessionTransition(rideSessionLifecycle.advanceTime(to: date))
+    }
+
+    private func startInactivityTimer() {
+        inactivityTimer?.cancel()
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + 15, repeating: 15)
+        timer.setEventHandler { [weak self] in
+            self?.evaluateRideSession()
+        }
+        inactivityTimer = timer
+        timer.resume()
+    }
+
+    private func handleRideSessionTransition(_ transition: RideSessionTransition) {
+        rideSessionState = rideSessionLifecycle.state
+        switch transition {
+        case .none:
+            return
+        case .inactivityPrompt(let deadline):
+            geocodeRequestGeneration = UUID()
+            geocoder.cancelGeocode()
+            inFlightFactTask?.cancel()
+            inFlightFactTask = nil
+            inFlightFactBoundary = nil
+            activeAnnouncementToken = UUID()
+            cancelPendingAnnouncement()
+            stopSpeechOutput()
+            inactivityNotifier.showInactivityPrompt(deadline: deadline)
+            recordDiagnostic(.rideInactivityPrompted)
+            AppDiagnostics.log("Ride paused after 10 minutes without confirmed movement.")
+        case .movementResumed:
+            inactivityNotifier.cancelInactivityPrompt()
+            recordDiagnostic(.rideMovementResumed)
+            AppDiagnostics.log("Ride resumed after confirmed movement.")
+        case .automaticEnd:
+            finishRideSession()
+            AppDiagnostics.log("Ride ended after inactivity confirmation expired.")
         }
     }
 
@@ -998,6 +1276,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                     return
                 }
                 if fact == nil {
+                    self.recordDiagnostic(.announcementFailed)
                     ProxyDiagnostics.log("Facts", "No proxy fact available. Speaking base phrase for \(request.cacheKey).")
                 }
                 let text = FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact, mode: mode)
@@ -1044,6 +1323,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
 
         let request = announcementQueue.replacePending(text: plan.text, boundary: plan.boundary)
+        recordDiagnostic(.announcementQueued)
         delayWorkItem?.cancel()
 
         let workItem = DispatchWorkItem { [weak self] in
@@ -1058,9 +1338,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func cancelPendingAnnouncement() {
+        let hadPendingAnnouncement = delayWorkItem != nil || announcementQueue.pending != nil
         delayWorkItem?.cancel()
         delayWorkItem = nil
         announcementQueue.clearPending()
+        if hadPendingAnnouncement {
+            recordDiagnostic(.announcementCancelled)
+        }
     }
 
     private func deliverAnnouncement(id: UUID) {
@@ -1112,14 +1396,31 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard rideSessionState.isActive else { return }
         if testMode { return }
 
         if let location = locations.last {
+            let currentTime = Date()
+            let transition = rideSessionLifecycle.observe(location, at: currentTime)
+            let shouldRecordLocationSample = lastLocationDiagnosticTime.map {
+                currentTime.timeIntervalSince($0) >= 10
+            } ?? true
+            if transition != .none || shouldRecordLocationSample {
+                recordDiagnostic(
+                    .locationSampleObserved,
+                    at: currentTime,
+                    horizontalAccuracyMetres: location.horizontalAccuracy,
+                    locationSampleAgeSeconds: currentTime.timeIntervalSince(location.timestamp)
+                )
+                lastLocationDiagnosticTime = currentTime
+            }
+            handleRideSessionTransition(transition)
+            guard rideSessionState == .riding else { return }
+
             lastKnownLocation = location.coordinate
             currentSpeedMetersPerSecond = location.speed
             locationStatus = .active
 
-            let currentTime = Date()
             if let lastTime = lastUpdateTime,
                currentTime.timeIntervalSince(lastTime) < TimeInterval(locationCheckInterval) {
                 return
@@ -1132,6 +1433,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        guard rideSessionState.isActive else { return }
         locationStatus = .locationUnavailable("Location update failed. \(ProductIdentity.displayName) will keep trying.")
         AppDiagnostics.log("Location update failed.")
     }
@@ -1141,10 +1443,18 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func reverseGeocode(location: CLLocation, completion: (@MainActor () -> Void)? = nil) {
+        let rideGeneration = rideSessionGeneration
+        let requestGeneration = UUID()
+        geocodeRequestGeneration = requestGeneration
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             if error != nil {
                 Task { @MainActor [weak self] in
-                    self?.locationStatus = .placeUnavailable("Place lookup failed. GPS is still active.")
+                    guard let self,
+                          self.canAcceptGeocodeResult(
+                            rideGeneration: rideGeneration,
+                            requestGeneration: requestGeneration
+                          ) else { return }
+                    self.locationStatus = .placeUnavailable("Place lookup failed. GPS is still active.")
                 }
                 AppDiagnostics.log("Reverse geocoding failed.")
                 return
@@ -1152,7 +1462,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
             guard let placemark = placemarks?.first else {
                 Task { @MainActor [weak self] in
-                    self?.locationStatus = .placeUnavailable("Place name is unavailable here.")
+                    guard let self,
+                          self.canAcceptGeocodeResult(
+                            rideGeneration: rideGeneration,
+                            requestGeneration: requestGeneration
+                          ) else { return }
+                    self.locationStatus = .placeUnavailable("Place name is unavailable here.")
                 }
                 AppDiagnostics.log("No placemark was returned.")
                 return
@@ -1160,7 +1475,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
             let address = Address(placemark: placemark)
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard let self,
+                      self.canAcceptGeocodeResult(
+                        rideGeneration: rideGeneration,
+                        requestGeneration: requestGeneration
+                      ) else { return }
                 self.lastKnownAddress = address
                 AppDiagnostics.log("Resolved a place name.")
 
@@ -1170,19 +1489,92 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
     }
 
-    private func setupAudioSession() {
-        let audioSession = AVAudioSession.sharedInstance()
-        var options: AVAudioSession.CategoryOptions = [.mixWithOthers]
-        if interruptsMusic {
-            options.insert(.duckOthers)
-        }
+    private func canAcceptGeocodeResult(
+        rideGeneration: UUID,
+        requestGeneration: UUID
+    ) -> Bool {
+        rideSessionState == .riding
+            && rideSessionGeneration == rideGeneration
+            && geocodeRequestGeneration == requestGeneration
+    }
 
+    private func recordDiagnostic(
+        _ event: RideDiagnosticEvent,
+        at timestamp: Date = Date(),
+        duckOthers: Bool? = nil,
+        playbackPath: DiagnosticPlaybackPath? = nil,
+        horizontalAccuracyMetres: Double? = nil,
+        locationSampleAgeSeconds: TimeInterval? = nil
+    ) {
+        let diagnosticState: DiagnosticRideState
+        switch rideSessionState {
+        case .idle:
+            diagnosticState = .idle
+        case .riding:
+            diagnosticState = .riding
+        case .awaitingConfirmation:
+            diagnosticState = .awaitingConfirmation
+        }
+        diagnostics.record(
+            event,
+            audio: audioSession.snapshot,
+            duckOthers: duckOthers,
+            elapsedRideSeconds: rideStartedAt.map { max(0, timestamp.timeIntervalSince($0)) },
+            rideState: diagnosticState,
+            isLocationTracking: isTracking,
+            playbackPath: playbackPath,
+            horizontalAccuracyMetres: horizontalAccuracyMetres,
+            locationSampleAgeSeconds: locationSampleAgeSeconds,
+            at: timestamp
+        )
+    }
+
+    private func acquireAudioSessionForSpeech(provider: SpeechProvider) {
+        recordDiagnostic(
+            .audioPlaybackStarted,
+            duckOthers: interruptsMusic,
+            playbackPath: provider == .apple ? .apple : .premiumVoice
+        )
+        audioSessionReleaseRetryWorkItem?.cancel()
+        audioSessionReleaseRetryWorkItem = nil
+        guard !ownsAudioSession else { return }
         do {
-            try audioSession.setCategory(.playback, mode: .default, options: options)
-            try audioSession.setActive(true)
-            AppDiagnostics.log("Audio session activated for background playback.")
+            try audioSession.activate(duckOthers: interruptsMusic)
+            ownsAudioSession = true
+            recordDiagnostic(
+                .audioSessionActivated,
+                duckOthers: interruptsMusic
+            )
+            AppDiagnostics.log("Audio session activated for speech playback.")
         } catch {
-            AppDiagnostics.log("Audio session setup failed.")
+            recordDiagnostic(
+                .audioSessionActivationFailed,
+                duckOthers: interruptsMusic
+            )
+            AppDiagnostics.log("Audio session activation failed.")
+        }
+    }
+
+    private func releaseAudioSessionAfterSpeech() {
+        guard ownsAudioSession else { return }
+        audioSessionReleaseRetryWorkItem?.cancel()
+        audioSessionReleaseRetryWorkItem = nil
+        do {
+            try audioSession.deactivate()
+            ownsAudioSession = false
+            audioSessionReleaseRetryAttempts = 0
+            recordDiagnostic(.audioSessionReleased)
+            AppDiagnostics.log("Audio session released after speech playback.")
+        } catch {
+            recordDiagnostic(.audioSessionReleaseFailed)
+            AppDiagnostics.log("Audio session release failed.")
+            guard audioSessionReleaseRetryAttempts < 2 else { return }
+            audioSessionReleaseRetryAttempts += 1
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.releaseAudioSessionAfterSpeech()
+            }
+            audioSessionReleaseRetryWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
         }
     }
 
@@ -1194,12 +1586,19 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
 
         if interruptionType == .began {
+            recordDiagnostic(.audioInterruptionBegan)
             pauseForPrimaryAudio(reason: "Audio session interruption began.")
         } else if interruptionType == .ended {
-            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
+            recordDiagnostic(.audioInterruptionEnded)
+            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else {
+                interruptedSpeechPlan = nil
+                return
+            }
             let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
             if options.contains(.shouldResume) {
                 scheduleInterruptedSpeechResume(reason: "Audio session interruption ended.")
+            } else {
+                interruptedSpeechPlan = nil
             }
         }
     }
@@ -1213,12 +1612,26 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
         switch hintType {
         case .begin:
+            recordDiagnostic(.primaryAudioBegan)
             pauseForPrimaryAudio(reason: "Primary audio started.")
         case .end:
+            recordDiagnostic(.primaryAudioEnded)
             scheduleInterruptedSpeechResume(reason: "Primary audio ended.")
         @unknown default:
             return
         }
+    }
+
+    @objc private func handleAudioRouteChange(_ notification: Notification) {
+        recordDiagnostic(.audioRouteChanged)
+    }
+
+    @objc private func handleAudioMediaServicesReset(_ notification: Notification) {
+        audioSessionReleaseRetryWorkItem?.cancel()
+        audioSessionReleaseRetryWorkItem = nil
+        audioSessionReleaseRetryAttempts = 0
+        ownsAudioSession = false
+        recordDiagnostic(.audioMediaServicesReset)
     }
 
     private func pauseForPrimaryAudio(reason: String) {
@@ -1241,11 +1654,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func scheduleInterruptedSpeechResume(reason: String) {
-        guard let plan = interruptedSpeechPlan else { return }
+        guard rideSessionState == .riding, let plan = interruptedSpeechPlan else { return }
 
         interruptionResumeWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
-            guard let self, self.interruptedSpeechPlan == plan else { return }
+            guard let self,
+                  self.rideSessionState == .riding,
+                  self.interruptedSpeechPlan == plan else { return }
             self.interruptedSpeechPlan = nil
             self.speak(text: plan.text, boundary: plan.boundary, shouldRecordTestLog: false)
         }
@@ -1263,6 +1678,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         guard ignoreQuietMode || contentMode != .quiet else { return }
         if shouldYieldToPrimaryAudio {
             interruptedSpeechPlan = AnnouncementPlan(text: text, boundary: boundary ?? .street)
+            recordDiagnostic(.announcementDeferred)
             AppDiagnostics.log("Primary audio is active; RideHorizon speech deferred.")
             return
         }
@@ -1287,6 +1703,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     private func stopSpeechOutput() {
         speechOutput.stop()
+        releaseAudioSessionAfterSpeech()
         activeSpeechPlan = nil
         currentlySpeakingBoundary = nil
     }
@@ -1298,6 +1715,28 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     func processResolvedAddressForTesting(_ address: Address) {
         processResolvedAddress(address)
+    }
+
+    var hasInterruptedSpeechPlanForTesting: Bool {
+        interruptedSpeechPlan != nil
+    }
+
+    var rideSessionGenerationForTesting: UUID {
+        rideSessionGeneration
+    }
+
+    var geocodeRequestGenerationForTesting: UUID {
+        geocodeRequestGeneration
+    }
+
+    func canAcceptGeocodeResultForTesting(
+        rideGeneration: UUID,
+        requestGeneration: UUID
+    ) -> Bool {
+        canAcceptGeocodeResult(
+            rideGeneration: rideGeneration,
+            requestGeneration: requestGeneration
+        )
     }
 #endif
 
@@ -1361,44 +1800,33 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     func logTestLocation() {
+        guard testMode, rideSessionState.isActive else { return }
         let waypoint = TestRouteFixture.waypoint(at: testIndex)
         testIndex = (testIndex + 1) % TestRouteFixture.waypoints.count
+
+        let sampleDate = Date()
+        let sampleLocation = CLLocation(
+            coordinate: waypoint.coordinate,
+            altitude: 0,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 5,
+            course: 0,
+            speed: 0,
+            timestamp: sampleDate
+        )
+        handleRideSessionTransition(rideSessionLifecycle.observe(sampleLocation, at: sampleDate))
+        guard rideSessionState == .riding else { return }
 
         lastKnownLocation = waypoint.coordinate
         currentSpeedMetersPerSecond = 0
         locationStatus = .active
         AppDiagnostics.log("Test location advanced.")
 
-        geocoder.reverseGeocodeLocation(CLLocation(latitude: waypoint.latitude, longitude: waypoint.longitude)) { [weak self] placemarks, error in
-            if error != nil {
-                Task { @MainActor [weak self] in
-                    self?.locationStatus = .placeUnavailable("Test place lookup failed.")
-                }
-                AppDiagnostics.log("Test location reverse geocoding failed.")
-                return
-            }
-
-            guard let placemark = placemarks?.first else {
-                Task { @MainActor [weak self] in
-                    self?.locationStatus = .placeUnavailable("Test place name is unavailable.")
-                }
-                AppDiagnostics.log("No test placemark was returned.")
-                return
-            }
-
-            let address = Address(placemark: placemark)
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.lastKnownAddress = address
-                AppDiagnostics.log("Resolved a test place name.")
-
-                self.processResolvedAddress(address)
-            }
-        }
+        reverseGeocode(location: sampleLocation)
     }
 
     private func startTestRouteIfNeeded() {
-        guard testMode, !hasSeededTestRoute else { return }
+        guard testMode, rideSessionState.isActive, !hasSeededTestRoute else { return }
         hasSeededTestRoute = true
         testIndex = 0
         logTestLocation()
