@@ -9,10 +9,19 @@ enum RideDiagnosticEvent: String, Codable, Equatable {
     case rideMovementResumed
     case rideEnded
     case locationSampleObserved
+    case factGenerationStarted
+    case factGenerationFinished
+    case announcementTextReady
     case announcementQueued
     case announcementDeferred
+    case announcementRestartScheduled
+    case boundedAudioWaitExpired
+    case announcementRestarted
+    case announcementSuperseded
     case announcementCancelled
     case announcementFailed
+    case ttsRequested
+    case speechAudioReady
     case audioPlaybackStarted
     case audioPlaybackFinished
     case audioPlaybackCancelled
@@ -20,12 +29,35 @@ enum RideDiagnosticEvent: String, Codable, Equatable {
     case audioSessionActivationFailed
     case audioSessionReleased
     case audioSessionReleaseFailed
+    case audioSessionNeutralized
+    case audioSessionNeutralizationFailed
     case audioInterruptionBegan
     case audioInterruptionEnded
     case primaryAudioBegan
     case primaryAudioEnded
     case audioRouteChanged
     case audioMediaServicesReset
+}
+
+enum RideDiagnosticReason: String, Codable, Equatable {
+    case factAvailable
+    case factUnavailable
+    case primaryAudioActive
+    case primaryAudioEnded
+    case boundedWaitExpired
+    case interruptionBegan
+    case interruptionShouldResume
+    case interruptionMustNotResume
+    case supersededByHigherPriority
+    case supersededByNewerContext
+    case rideEnded
+    case settingsChanged
+    case inactivityPrompted
+    case playbackCompleted
+    case playbackCancelled
+    case playbackFailed
+    case deactivationRetry
+    case deactivationRecovery
 }
 
 enum DiagnosticRideState: String, Codable, Equatable {
@@ -37,6 +69,11 @@ enum DiagnosticRideState: String, Codable, Equatable {
 enum DiagnosticPlaybackPath: String, Codable, Equatable {
     case apple
     case premiumVoice
+}
+
+enum DiagnosticAppState: String, Codable, Equatable {
+    case foreground
+    case background
 }
 
 struct AudioSessionSnapshot: Codable, Equatable {
@@ -70,13 +107,22 @@ struct AudioSessionSnapshot: Codable, Equatable {
 struct RideDiagnosticEntry: Identifiable, Codable, Equatable {
     let id: UUID
     let timestamp: Date
+    let sequenceNumber: UInt64?
+    let diagnosticSessionID: UUID?
+    let rideSessionID: UUID?
+    let announcementID: UUID?
     let event: RideDiagnosticEvent
+    let reason: RideDiagnosticReason?
+    let appState: DiagnosticAppState?
     let audio: AudioSessionSnapshot?
-    let duckOthers: Bool?
+    let audioPolicy: AudioCoexistencePolicy?
     let elapsedRideSeconds: TimeInterval?
     let rideState: DiagnosticRideState?
     let isLocationTracking: Bool?
     let playbackPath: DiagnosticPlaybackPath?
+    let interruptionReason: UInt?
+    let shouldResume: Bool?
+    let routeChangeReason: UInt?
     let horizontalAccuracyMetres: Double?
     let locationSampleAgeSeconds: TimeInterval?
 }
@@ -119,6 +165,8 @@ final class RideDiagnosticsStore: ObservableObject {
     )
     private var pendingPersistence: (workItem: DispatchWorkItem, ticket: PersistenceTicket)?
     private var encodedSizes: [UUID: Int] = [:]
+    private let diagnosticSessionID = UUID()
+    private var nextSequenceNumber: UInt64 = 1
 
     init(
         directoryURL: URL? = nil,
@@ -151,12 +199,19 @@ final class RideDiagnosticsStore: ObservableObject {
 
     func record(
         _ event: RideDiagnosticEvent,
+        rideSessionID: UUID? = nil,
+        announcementID: UUID? = nil,
+        reason: RideDiagnosticReason? = nil,
+        appState: DiagnosticAppState? = nil,
         audio: AudioSessionSnapshot? = nil,
-        duckOthers: Bool? = nil,
+        audioPolicy: AudioCoexistencePolicy? = nil,
         elapsedRideSeconds: TimeInterval? = nil,
         rideState: DiagnosticRideState? = nil,
         isLocationTracking: Bool? = nil,
         playbackPath: DiagnosticPlaybackPath? = nil,
+        interruptionReason: UInt? = nil,
+        shouldResume: Bool? = nil,
+        routeChangeReason: UInt? = nil,
         horizontalAccuracyMetres: Double? = nil,
         locationSampleAgeSeconds: TimeInterval? = nil,
         at timestamp: Date? = nil
@@ -164,20 +219,46 @@ final class RideDiagnosticsStore: ObservableObject {
         let entry = RideDiagnosticEntry(
             id: UUID(),
             timestamp: timestamp ?? now(),
+            sequenceNumber: nextSequenceNumber,
+            diagnosticSessionID: diagnosticSessionID,
+            rideSessionID: rideSessionID,
+            announcementID: announcementID,
             event: event,
+            reason: reason,
+            appState: appState,
             audio: audio,
-            duckOthers: duckOthers,
+            audioPolicy: audioPolicy,
             elapsedRideSeconds: elapsedRideSeconds,
             rideState: rideState,
             isLocationTracking: isLocationTracking,
             playbackPath: playbackPath,
+            interruptionReason: interruptionReason,
+            shouldResume: shouldResume,
+            routeChangeReason: routeChangeReason,
             horizontalAccuracyMetres: horizontalAccuracyMetres,
             locationSampleAgeSeconds: locationSampleAgeSeconds
         )
+        nextSequenceNumber += 1
         entries.append(entry)
         encodedSizes[entry.id] = Self.encodedSize(of: entry)
         prune(referenceDate: now())
-        schedulePersistence(immediately: event == .appEnteredBackground || event == .rideEnded)
+        let terminalEvent: Bool = switch event {
+        case .appEnteredBackground,
+             .rideEnded,
+             .announcementCancelled,
+             .announcementFailed,
+             .audioPlaybackFinished,
+             .audioPlaybackCancelled,
+             .audioSessionActivationFailed,
+             .audioSessionReleased,
+             .audioSessionReleaseFailed,
+             .audioSessionNeutralized,
+             .audioSessionNeutralizationFailed:
+            true
+        default:
+            false
+        }
+        schedulePersistence(immediately: terminalEvent)
     }
 
     func clear() {
@@ -210,6 +291,7 @@ final class RideDiagnosticsStore: ObservableObject {
            let decoded = try? Self.makeDecoder().decode([RideDiagnosticEntry].self, from: data) {
             entries = decoded
             encodedSizes = Dictionary(uniqueKeysWithValues: decoded.map { ($0.id, Self.encodedSize(of: $0)) })
+            nextSequenceNumber = (decoded.compactMap(\.sequenceNumber).max() ?? 0) + 1
         }
         prune(referenceDate: now())
         Self.persist(entries, to: exportURL)

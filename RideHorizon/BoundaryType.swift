@@ -60,8 +60,15 @@ struct BoundaryAnnouncementSettings: Equatable {
 }
 
 struct AnnouncementPlan: Equatable {
+    let id: UUID
     let text: String
     let boundary: BoundaryType
+
+    init(id: UUID = UUID(), text: String, boundary: BoundaryType) {
+        self.id = id
+        self.text = text
+        self.boundary = boundary
+    }
 }
 
 extension BoundaryType {

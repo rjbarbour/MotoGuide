@@ -1,0 +1,240 @@
+# RideHorizon Audio Interoperability Validation Plan
+
+Date: 2026-08-03
+
+Status: **Increment 1 implementation is installed in `0.12.3 (20260803.2100)` and is waiting at the physical YouTube Music validation gate. Do not tune Google Maps behaviour until Rob accepts the YouTube Music result.**
+
+## Authority and scope
+
+This document is the requirements and validation plan for RideHorizon coexistence with audio from other iOS apps.
+
+- `Backlog.md` remains the authority for delivery status and gates.
+- `TESTFLIGHT_FIELD_TEST_EVIDENCE.md` remains the authority for test runs and results.
+- This document owns the audio-interoperability requirements, platform assumptions, diagnostic contract and staged test design.
+
+The current commitment is a private TestFlight beta. This is a production-quality and implementation-fidelity increment, not new product breadth.
+
+## Outcome
+
+RideHorizon should speak intelligibly alongside music and navigation without leaving other audio suppressed, causing a sudden restoration in perceived volume, talking over an observable navigation prompt, or losing a pending RideHorizon announcement.
+
+The work proceeds one interaction at a time:
+
+1. Make the observable event chain and diagnostic export sufficient.
+2. Verify and correct YouTube Music coexistence.
+3. Hold a review gate.
+4. Verify and correct Google Maps coexistence.
+5. Consider other music and navigation apps only after the first two behaviours are understood.
+
+## Product requirements
+
+### Common requirements
+
+- RideHorizon owns an active playback audio session only while it is playing its own synthesised speech audio.
+- It deactivates that session promptly after completion, cancellation, failure or ride end, using `notifyOthersOnDeactivation`.
+- A pending announcement is not silently lost because another app is producing audio.
+- If RideHorizon stops an announcement because iOS reports competing primary audio or an interruption, it retains one restartable pending announcement and prevents duplicate or stale playback.
+- Restarted speech begins from the start of the announcement. Resume within the encoded audio is not required.
+- A superseded announcement must not restart after the rider has moved to a newer context or ended the ride.
+- RideHorizon must never change the iPhone system volume.
+- The behaviour must work for both Apple Voice and Premium Voice unless a provider-specific limitation is recorded.
+- Audio policy and diagnostics must continue when RideHorizon is backgrounded during an explicitly active ride, subject to the events iOS exposes.
+
+### Music behaviour
+
+When YouTube Music is already playing:
+
+- RideHorizon must not wait indefinitely because `secondaryAudioShouldBeSilencedHint` is true.
+- Fact generation, announcement-text preparation and speech-audio generation must either progress or expose a bounded, visible waiting state.
+- When RideHorizon plays, it should temporarily interrupt music so the announcement remains intelligible. RideHorizon must promptly deactivate its session with `notifyOthersOnDeactivation` so iOS can resume the interrupted app.
+- Music should return smoothly to its previous perceived level within one second after RideHorizon releases its session.
+- There must be no persistent suppression, abrupt volume blast, duplicate announcement or late stale announcement.
+
+When YouTube Music starts during RideHorizon speech, record the actual iOS event sequence before selecting any further policy. The provisional preference is that music remains interrupted until the short announcement ends. If iOS instead interrupts RideHorizon, RideHorizon should recover once without duplication when the OS permits.
+
+### Navigation behaviour
+
+When Google Maps is already speaking and iOS exposes an interruption or primary-audio signal:
+
+- RideHorizon waits until the corresponding end or resumable state, applies a short settling delay, then starts the pending announcement.
+
+When Google Maps begins speaking during a RideHorizon announcement and iOS exposes the event:
+
+- RideHorizon stops promptly.
+- It retains the current announcement as pending.
+- After iOS reports that playback may resume, or reports the end of the primary-audio interval, RideHorizon restarts the announcement once from the beginning.
+
+If Google Maps overlaps without an event available to RideHorizon, record that as a platform-observability finding. Do not claim that app identity or spoken-content classification can be inferred when iOS did not expose it.
+
+## iOS platform model and assumptions
+
+### Known platform facts
+
+- Each app declares its own `AVAudioSession` category, mode and options.
+- iOS arbitrates the combination when an app activates or changes its audio session.
+- RideHorizon can inspect its own session configuration and observe coarse state such as `isOtherAudioPlaying`, `secondaryAudioShouldBeSilencedHint`, interruption notifications, secondary-audio hint notifications, route changes and media-services resets.
+- RideHorizon cannot inspect another app's bundle identifier, category, mode, options, content type or spoken text through the public `AVAudioSession` API.
+- `secondaryAudioShouldBeSilencedHint` means another non-mixable primary audio session is active and that optional secondary audio in the receiving app may yield. It does not mean “navigation audio”.
+- Secondary-audio hint notifications are not a reliable background app-identification mechanism. Their delivery constraints and the absence of an app identity must be treated as part of the test evidence.
+
+### Increment 1 RideHorizon configuration
+
+At the start of this plan, RideHorizon configures its playback session as:
+
+- category: `.playback`;
+- mode: `.spokenAudio`;
+- options when music interruption is enabled: no mixing or ducking category option, so activating the session interrupts other audio;
+- options when music interruption is disabled: `.mixWithOthers`;
+- activation immediately before speech playback;
+- deactivation with `.notifyOthersOnDeactivation` after playback.
+
+The implementation does not request `.interruptSpokenAudioAndMixWithOthers`. Do not add it during Increment 1: it mixes ordinary music while specially interrupting spoken-audio sessions, which does not implement the accepted YouTube Music pause/resume policy and would prematurely tune navigation behaviour.
+
+Apple controls the attenuation applied by `.duckOthers`; RideHorizon cannot select a ducking amount. The accepted 2026-08-03 decision is therefore to use temporary interruption for the YouTube Music increment. See `docs/adr/0001-interrupt-media-during-announcements.md`.
+
+### Test hypotheses, not facts
+
+- YouTube Music is likely to behave as persistent media playback. The physical validation must establish whether it pauses when RideHorizon activates its non-mixing session and resumes smoothly after RideHorizon deactivates with notification.
+- The target phone has already shown `secondaryAudioShouldBeSilencedHint == true` while YouTube Music was playing. This explains the earlier indefinite deferral but does not identify YouTube Music or classify it as spoken audio.
+- Google Maps is likely to use intermittent audio-session activation for navigation prompts, but its exact category, mode, options and timing are private implementation details and may change by app or iOS version.
+- Google Maps may interrupt RideHorizon, generate a primary-audio hint, mix, duck or overlap. Only physical evidence on the target configuration decides which path we support.
+
+## Diagnostic requirements
+
+The existing persistent Release diagnostic ring buffer is the baseline. Keep its current bounds of 2,000 events, seven days or 1 MiB, its file protection, backup exclusion, local export and clear controls.
+
+Before behavioural tuning, confirm that one exported log can reconstruct the following sequence without console access:
+
+`fact generation → announcement text ready → waiting/queued → speech-audio request → speech audio ready → audio-session activation → playback → interruption or completion → audio-session release → requeue/restart decision`
+
+Each relevant entry should contain, where applicable:
+
+- ISO-8601 timestamp;
+- a stable diagnostic or ride-session identifier;
+- monotonic sequence number or elapsed time so clock changes cannot reorder events;
+- announcement correlation identifier, without announcement text;
+- event type and decision reason;
+- ride state and foreground/background state;
+- selected speech provider and playback path;
+- RideHorizon audio category, mode and options;
+- audio-session activation/deactivation result;
+- `isOtherAudioPlaying`;
+- `secondaryAudioShouldBeSilencedHint`;
+- interruption begin/end, documented reason and `shouldResume` when supplied;
+- secondary-audio hint begin/end;
+- output route and route-change reason;
+- output-volume snapshot, clearly treated as system output volume rather than measured loudness;
+- cancellation, supersession, retry, bounded-wait expiry and restart outcome.
+
+Do not log:
+
+- generated facts or announcement text;
+- speech audio or external audio;
+- precise coordinates or route history;
+- API keys, tokens or credentials;
+- an inferred external-app identity.
+
+The test operator records the known external app and scenario in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`. The app log records only what iOS and RideHorizon actually observed.
+
+## Increment 1 — Diagnostic sufficiency and YouTube Music
+
+### Outcome
+
+An exported diagnostic log explains every state transition in a YouTube Music test, and YouTube Music pauses and resumes safely around one RideHorizon announcement.
+
+### Included
+
+- Audit the current diagnostic schema against this plan.
+- Add only the missing correlation, pipeline, decision and interruption fields needed to reconstruct the event chain.
+- Add or update unit tests for ordering, correlation, cancellation, bounded deferral, session activation and release.
+- Route every manual Test Mode advance through one announcement/audio interface so the main sheet and log view cannot select different audio behaviour.
+- For this development campaign, default Test Mode on in Debug builds through one explicit configuration/migration point. Keep Release/TestFlight default off and preserve subsequent explicit choices.
+- Run stationary physical tests with YouTube Music, first through the phone output and then through the helmet Bluetooth headset.
+- Correct the smallest confirmed policy or lifecycle defect.
+
+### Non-goals
+
+- Google Maps tuning.
+- Identifying YouTube Music programmatically.
+- Recording or analysing external audio.
+- General settings redesign.
+- Changing the proxy, ElevenLabs service or fact-generation policy unless evidence isolates a related defect.
+
+### Stationary scenarios
+
+Use one announcement per scenario and export diagnostics after each run:
+
+1. No external audio: establish baseline activation, playback and release.
+2. YouTube Music already playing: trigger Apple Voice and verify pause/resume.
+3. YouTube Music already playing: trigger Premium Voice and verify pause/resume.
+4. Start YouTube Music while RideHorizon is speaking.
+5. Stop or pause YouTube Music while a RideHorizon announcement is waiting.
+6. End ride during waiting, speech-audio generation and active playback; verify no later speech occurs.
+7. Repeat the passing coexistence case through the helmet Bluetooth headset.
+
+For each scenario record app/build version, iOS version, output route, RideHorizon music-interruption setting, speech provider, UTC start/end, subjective speech intelligibility, perceived music restoration and the exported diagnostic path.
+
+### Acceptance evidence
+
+- Automated tests prove bounded wait, single restart, no stale restart, correlated diagnostic ordering and session release on every terminal path.
+- The complete iOS unit target passes.
+- The signed app builds, installs and launches on the physical iPhone.
+- YouTube Music remains usable, pauses during RideHorizon speech and returns smoothly within one second after release.
+- Premium Voice generation proceeds while music is present or exposes a bounded, diagnosable state; it does not silently stall.
+- Exported diagnostics explain the observed outcome without relying on Xcode's live console.
+- No external app identity, content, coordinates or credentials appear in the export.
+
+### Stop condition and gate
+
+Stop before Google Maps work if music remains suppressed, returns with an unsafe perceived jump, blocks announcements indefinitely, causes duplicate/stale playback, or cannot be diagnosed from the export.
+
+At the gate choose **continue**, **revise**, **refactor**, **research**, **prototype**, **reduce scope**, **pause** or **stop**. Continue to Increment 2 only after Rob confirms the stationary YouTube Music behaviour is acceptable.
+
+## Increment 2 — Google Maps
+
+### Outcome
+
+RideHorizon and Google Maps avoid overlapping speech whenever iOS exposes an actionable event, and interrupted RideHorizon speech is recovered safely and at most once.
+
+### Initial scenarios
+
+1. Google Maps prompt starts and ends before RideHorizon requests speech.
+2. RideHorizon becomes ready while a Google Maps prompt is active.
+3. Google Maps begins while RideHorizon is speaking.
+4. Google Maps issues consecutive prompts during one pending RideHorizon announcement.
+5. Repeat through the helmet Bluetooth headset with YouTube Music also playing.
+
+Detailed implementation choices remain deliberately unshaped until Increment 1 evidence and the first Google Maps baseline log are available.
+
+### Acceptance boundary
+
+- Observable Google Maps audio causes the required wait, stop or single restart behaviour.
+- No pending announcement is duplicated or replayed after it becomes stale.
+- Music restoration remains correct when music is also present.
+- Overlap without a corresponding iOS event is recorded as residual platform evidence, not disguised as a solved condition.
+
+## Later applications
+
+After the Google Maps gate, select other apps by actual tester use. Likely candidates are Apple Maps, Calimoto and one additional music or podcast app. Do not assume that evidence from Google Maps generalises to every navigation app.
+
+## Verification commands
+
+Run the complete unit target at each increment checkpoint:
+
+```bash
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData-AudioInterop -only-testing:RideHorizonTests
+```
+
+Expected result: `** TEST SUCCEEDED **` with zero failures.
+
+Build the signed physical-device candidate:
+
+```bash
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData-AudioInterop -allowProvisioningUpdates
+```
+
+Expected result: `** BUILD SUCCEEDED **`.
+
+## Independent evaluation
+
+A fresh review context should check that every audio-session acquisition has a bounded release, every restart is correlated with a still-current announcement, and diagnostic fields cannot carry prohibited content. Rob provides the perceptual judgement for interruption, restoration, intelligibility and distraction on the physical phone and headset.

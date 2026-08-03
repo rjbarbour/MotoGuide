@@ -226,8 +226,12 @@ struct AnnouncementRequest: Equatable {
 struct AnnouncementQueue {
     private(set) var pending: AnnouncementRequest?
 
-    mutating func replacePending(text: String, boundary: BoundaryType) -> AnnouncementRequest {
-        let request = AnnouncementRequest(id: UUID(), text: text, boundary: boundary)
+    mutating func replacePending(
+        id: UUID = UUID(),
+        text: String,
+        boundary: BoundaryType
+    ) -> AnnouncementRequest {
+        let request = AnnouncementRequest(id: id, text: text, boundary: boundary)
         pending = request
         return request
     }

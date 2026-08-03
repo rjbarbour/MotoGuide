@@ -531,7 +531,7 @@ private struct LocationScreenView: View {
 
             if locationManager.testMode && locationManager.rideSessionState.isActive {
                 Button {
-                    locationManager.logTestLocation()
+                    locationManager.advanceTestLocation()
                 } label: {
                     Label("Next test location", systemImage: "arrow.forward.circle")
                         .frame(maxWidth: .infinity)
@@ -1033,12 +1033,12 @@ private struct SettingsView: View {
 
                     SettingsToggleRow(
                         title: "Interrupt music while speaking",
-                        subtitle: "Lower music so announcements are clearer.",
+                        subtitle: "Pause other audio during an announcement, then let iOS resume it.",
                         isOn: $locationManager.interruptsMusic,
                         palette: palette
                     )
 
-                    Text("Defaults: rider-safe interruption priority. Music is lowered so announcements are clearer.")
+                    Text("Defaults: other audio is interrupted only while RideHorizon is speaking.")
                         .font(.title3)
                         .fontWeight(.semibold)
                         .foregroundStyle(palette.secondaryText)
@@ -1700,7 +1700,7 @@ private struct LogHistoryView: View {
 
     private func logCurrentLocation() {
         if locationManager.testMode {
-            locationManager.logTestLocation()
+            locationManager.advanceTestLocation()
             return
         }
 

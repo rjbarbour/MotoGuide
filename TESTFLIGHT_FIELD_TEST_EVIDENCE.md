@@ -2,9 +2,11 @@
 
 Date: 2026-08-03
 
-Status: **Corrected build `20260803.2016` is installed for repeated stationary verification. Do not upload or invite external testers until the five safety checks pass on this build.**
+Status: **Audio Increment 1 build `20260803.2100` is installed and waiting at the YouTube Music validation gate. Do not tune Google Maps, upload or invite external testers until the stationary safety checks pass.**
 
 This is the operational evidence record for stationary, road and background testing. `Backlog.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
+
+`AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md` is the requirements and staged test-design authority for coexistence with YouTube Music, Google Maps and later audio apps. Record run results here; do not duplicate delivery status in that plan.
 
 ## Safety rules
 
@@ -71,6 +73,7 @@ Candidate `0.12.3 (20260803.0032)` provides this Release-build ring buffer, capp
 - Retained IPA: strict code signature passed; `beta-reports-active=true`; `get-task-allow=false`; iPhone-only; `PrivacyInfo.xcprivacy` present; SHA-256 `d435b14b2c6a7080fe82ad4f109e3da4e076072d3152000f50632eeb27157620`.
 - App Store Connect upload: deliberately not started; the five stationary checks below remain the pre-upload safety gate.
 - XCUITest did not execute: XCTest timed out while enabling automation mode on the physical device, and CoreSimulator services were unavailable. This is a test-harness blocker, not positive app evidence; use the human stationary rows below.
+- Audio Increment 1 candidate `0.12.3 (20260803.2100)`: the complete `RideHorizonTests` target passed with zero failures on the physical iPhone; the signed build completed, installed and launched on 2026-08-03. Automated coverage includes a correlated fact-to-release export, activation failure, bounded release recovery, single restart, stale-restart prevention, non-resumable cancellation and active-speech supersession. Perceptual YouTube Music evidence remains outstanding.
 
 ## Test run record
 
@@ -79,7 +82,7 @@ Create one record per candidate or materially different environment.
 | Field | Value |
 |---|---|
 | Test run ID | `YYYY-MM-DD-initials-sequence` |
-| App version and build | `0.12.3 (20260803.0032)` |
+| App version and build | `0.12.3 (20260803.2100)` |
 | Install source | Xcode |
 | iPhone and iOS version | iPhone 17 Pro Max / iOS 26.5.2 |
 | Headset and connection | |
@@ -100,7 +103,7 @@ Use `Not run`, `Pass`, `Fail` or `Blocked`. A pass needs the evidence named in t
 | TF-SESSION-02 | Tap Start ride while stationary | Ride state becomes active; the location permission request is contextual; location begins | Diagnostic log and screenshot | Ready to repeat on `20260803.2016`; passed on superseded `20260803.0032` |
 | TF-SESSION-03 | Tap End ride | Location, pending requests, speech and timers stop; audio session deactivates; other audio remains at its prior level | Diagnostic log and short observation note | Ready to repeat on `20260803.2016`; passed on superseded `20260803.0032` |
 | TF-AUDIO-01 | Preview Apple Voice and Premium Voice with no other audio | Both play once and finish cleanly; no session remains active afterwards | Diagnostic log and subjective loudness score | Ready to repeat on `20260803.2016`; passed on superseded `20260803.0032` |
-| TF-AUDIO-02 | Play music, then trigger one announcement | Music is lowered only for the announcement and returns smoothly within one second, with no sudden loud jump | Diagnostic log and observation note | Ready to repeat on `20260803.2016`; failed on superseded `20260803.0032`; bounded-deferral regression tests and live Premium Voice proxy smoke now pass |
+| TF-AUDIO-02 | Play music, then trigger one Apple Voice announcement and one Premium Voice announcement | Music pauses only for each announcement and resumes smoothly within one second, with no sudden loud jump | Diagnostic export and observation note | Ready on installed `20260803.2100`; failed on superseded `20260803.0032` |
 | TF-PROXY-01 | Exercise Premium Voice after an idle proxy period | Either Premium Voice succeeds within the retry ceiling or Apple Voice fallback occurs once; no late duplicate speech | Diagnostic log | Not run |
 
 Do not begin the moving tests unless the session and audio pre-road tests pass.
@@ -112,10 +115,10 @@ Do not begin the moving tests unless the session and audio pre-road tests pass.
 | TF-LOC-01 | Ride with RideHorizon foregrounded | Location and place changes remain plausible; announcements follow configured boundaries | Post-ride log and route notes | Not run |
 | TF-LOC-02 | Lock the screen for at least 15 minutes during an active ride | The active ride continues without requiring interaction | Diagnostic log with screen-state markers | Not run |
 | TF-LOC-03 | Put the navigation app in the foreground for at least 15 minutes | RideHorizon continues only while the ride is active and does not disrupt navigation | Diagnostic log and observation note | Not run |
-| TF-AUDIO-03 | Ride with music playing and at least three RideHorizon announcements | Each announcement is intelligible; music ducks and restores smoothly every time | Event log and per-event notes | Ready for exact-build field test |
+| TF-AUDIO-03 | Ride with music playing and at least three RideHorizon announcements | Each announcement is intelligible; music pauses and resumes smoothly every time | Event log and per-event notes | Ready for exact-build field test |
 | TF-AUDIO-04 | Exercise navigation prompts before, during and after pending RideHorizon announcements | RideHorizon yields whenever iOS emits an interruption or primary-audio hint, then waits for the configured settling delay. Record any overlap with no corresponding OS event as residual platform evidence. | Timestamped event log and observation note | Ready for exact-build field test |
 | TF-AUDIO-05 | Compare Apple Voice and Premium Voice with normal music and navigation volume | Both are intelligible without increasing system volume to a level that makes music/navigation unsafe | 1–5 intelligibility score for each provider and notes | Ready for exact-build field test |
-| TF-AUDIO-06 | Disconnect and reconnect the Bluetooth headset during an active ride while safely stopped | Route change is handled; no blast, stuck ducking, duplicate speech or lost long-term audio | Diagnostic log and observation note | Ready for exact-build field test |
+| TF-AUDIO-06 | Disconnect and reconnect the Bluetooth headset during an active ride while safely stopped | Route change is handled; no blast, stuck interruption, duplicate speech or lost long-term audio | Diagnostic log and observation note | Ready for exact-build field test |
 | TF-NET-01 | Pass through weak or absent mobile data | Requests remain bounded; transient failures retry rationally; stale speech never arrives after the context has changed | Diagnostic log and signal notes | Not run |
 | TF-POWER-01 | Complete a 60-minute ride with screen mostly off | No abnormal heat, obvious runaway background activity or unacceptable battery drain | Start/end battery percentage, screen state and temperature note | Not run |
 

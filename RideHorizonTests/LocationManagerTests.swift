@@ -6,6 +6,7 @@ import AVFoundation
 @MainActor
 private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
     struct Request: Equatable {
+        let announcementID: UUID
         let text: String
         let provider: SpeechProvider
         let boundary: BoundaryType?
@@ -13,10 +14,12 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
     }
 
     var isSpeaking = false
-    var onStart: ((SpeechProvider) -> Void)?
+    var isPlayingAudio = false
+    var onPlaybackWillStart: ((SpeechProvider) -> Bool)?
     var onFinish: (() -> Void)?
     var onCancel: (() -> Void)?
     var onDiagnosticNote: ((String) -> Void)?
+    var onPipelineEvent: ((SpeechOutputPipelineEvent) -> Void)?
     private(set) var requests: [Request] = []
     private(set) var cancelPendingPreparationCount = 0
     private(set) var stopCount = 0
@@ -26,11 +29,18 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
         boundary: BoundaryType?,
         provider: SpeechProvider,
         appleVoice: AVSpeechSynthesisVoice?,
-        allowAppleFallback: Bool
+        allowAppleFallback: Bool,
+        announcementID: UUID
     ) {
+        onPipelineEvent?(SpeechOutputPipelineEvent(
+            announcementID: announcementID,
+            provider: provider,
+            stage: .ttsRequested
+        ))
         isSpeaking = true
         requests.append(
             Request(
+                announcementID: announcementID,
                 text: text,
                 provider: provider,
                 boundary: boundary,
@@ -43,6 +53,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
         let wasActive = isSpeaking
         stopCount += 1
         isSpeaking = false
+        isPlayingAudio = false
         if wasActive {
             onCancel?()
         }
@@ -51,15 +62,30 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
     func cancelPendingPreparation() {
         cancelPendingPreparationCount += 1
         isSpeaking = false
+        isPlayingAudio = false
         onCancel?()
     }
 
     func beginPlayback(provider: SpeechProvider = .proxyElevenLabs) {
-        onStart?(provider)
+        if let announcementID = requests.last?.announcementID {
+            onPipelineEvent?(SpeechOutputPipelineEvent(
+                announcementID: announcementID,
+                provider: provider,
+                stage: .speechAudioReady
+            ))
+        }
+        guard onPlaybackWillStart?(provider) != false else {
+            isSpeaking = false
+            isPlayingAudio = false
+            onCancel?()
+            return
+        }
+        isPlayingAudio = true
     }
 
     func finishPlayback() {
         isSpeaking = false
+        isPlayingAudio = false
         onFinish?()
     }
 }
@@ -75,13 +101,15 @@ private final class RecordingAudioSessionManager: AudioSessionManaging {
             shouldYieldToPrimaryAudio: shouldYieldToPrimaryAudio
         )
     }
-    private(set) var activationRequests: [Bool] = []
+    private(set) var activationRequests: [AudioCoexistencePolicy] = []
     private(set) var deactivationCount = 0
+    private(set) var neutralizationCount = 0
     var activationFailuresRemaining = 0
     var deactivationFailuresRemaining = 0
+    var neutralizationSucceeds = true
 
-    func activate(duckOthers: Bool) throws {
-        activationRequests.append(duckOthers)
+    func activate(policy: AudioCoexistencePolicy) throws {
+        activationRequests.append(policy)
         if activationFailuresRemaining > 0 {
             activationFailuresRemaining -= 1
             throw TestAudioSessionError.expectedFailure
@@ -94,6 +122,11 @@ private final class RecordingAudioSessionManager: AudioSessionManaging {
             deactivationFailuresRemaining -= 1
             throw TestAudioSessionError.expectedFailure
         }
+    }
+
+    func neutralizeAfterDeactivationFailure() -> Bool {
+        neutralizationCount += 1
+        return neutralizationSucceeds
     }
 }
 
@@ -128,7 +161,7 @@ private final class RecordingAppleSpeechOutput: AppleSpeechOutputting {
     }
 
     var isSpeaking = false
-    var onStart: ((UUID) -> Void)?
+    var onPlaybackWillStart: ((UUID) -> Bool)?
     var onFinish: ((UUID) -> Void)?
     var onCancel: ((UUID) -> Void)?
     private(set) var requests: [Request] = []
@@ -142,8 +175,7 @@ private final class RecordingAppleSpeechOutput: AppleSpeechOutputting {
     }
 
     func emitStart(requestID: UUID) {
-        isSpeaking = true
-        onStart?(requestID)
+        isSpeaking = onPlaybackWillStart?(requestID) != false
     }
 
     func emitCancel(requestID: UUID) {
@@ -167,10 +199,19 @@ private struct DelayedFailingProxySpeechGenerator: ProxySpeechGenerating {
     }
 }
 
+private struct ConstantPlaceFactGenerator: PlaceFactGenerating {
+    let fact: String
+
+    func fact(for request: PlaceFactRequest) async throws -> String {
+        fact
+    }
+}
+
 final class LocationManagerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         clearLocationManagerDefaults()
+        useLiveLocationByDefaultForTests()
         clearSpeechProviderDefaults()
         clearRiderContextDefaults()
     }
@@ -183,10 +224,12 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testFreshInstallDefaultsToLiveLocationAndShortFacts() {
+    func testDebugAudioInteropCampaignDefaultsToTestModeAndShortFacts() {
+        UserDefaults.standard.removeObject(forKey: "RideHorizonTestMode")
+        UserDefaults.standard.removeObject(forKey: "RideHorizonAudioInteropDebugTestModeChoice")
         let locationManager = LocationManager()
 
-        XCTAssertFalse(locationManager.testMode)
+        XCTAssertTrue(locationManager.testMode)
         XCTAssertEqual(locationManager.rideSessionState, .idle)
         XCTAssertEqual(locationManager.locationStatus, .idle)
         XCTAssertEqual(locationManager.contentMode, .shortFacts)
@@ -214,7 +257,7 @@ final class LocationManagerTests: XCTestCase {
 
         speechOutput.beginPlayback()
 
-        XCTAssertEqual(audioSession.activationRequests, [true])
+        XCTAssertEqual(audioSession.activationRequests, [.interrupt])
 
         speechOutput.finishPlayback()
 
@@ -222,7 +265,44 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testInterruptMusicSettingUsesNonMixingAudioPolicy() {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            aiSharingAllowed: { true }
+        )
+        locationManager.interruptsMusic = true
+
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+
+        XCTAssertEqual(audioSession.activationRequests, [.interrupt])
+    }
+
+    @MainActor
+    func testDisabledMusicInterruptionUsesMixingAudioPolicy() {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            aiSharingAllowed: { true }
+        )
+        locationManager.interruptsMusic = false
+
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+
+        XCTAssertEqual(audioSession.activationRequests, [.mix])
+    }
+
+    @MainActor
     func testSustainedOtherAudioDefersBrieflyThenProceedsWithAnnouncement() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
         let speechOutput = RecordingSpeechOutputEngine()
         let audioSession = RecordingAudioSessionManager()
         audioSession.shouldYieldToPrimaryAudio = true
@@ -230,6 +310,7 @@ final class LocationManagerTests: XCTestCase {
             speechOutput: speechOutput,
             inactivityNotifier: RecordingRideInactivityNotifier(),
             audioSession: audioSession,
+            diagnostics: diagnostics,
             externalAudioResumeDelaySeconds: 0.01,
             aiSharingAllowed: { true }
         )
@@ -242,6 +323,152 @@ final class LocationManagerTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(speechOutput.requests.map(\.text), ["Welcome to England."])
         XCTAssertEqual(locationManager.announcementStatus, .preparingVoice)
+        let events = diagnostics.entries.filter { $0.announcementID != nil }
+        XCTAssertEqual(Set(events.compactMap(\.announcementID)).count, 1)
+        XCTAssertEqual(
+            events.map(\.event),
+            [
+                .announcementDeferred,
+                .announcementRestartScheduled,
+                .boundedAudioWaitExpired,
+                .announcementRestarted,
+                .ttsRequested
+            ]
+        )
+    }
+
+    @MainActor
+    func testEndRideCancelsBoundedAudioWaitWithoutLateSpeech() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        audioSession.shouldYieldToPrimaryAudio = true
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            inactivityNotifier: RecordingRideInactivityNotifier(),
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            externalAudioResumeDelaySeconds: 0.01,
+            aiSharingAllowed: { true }
+        )
+        locationManager.startRideWithoutLocationInputForTesting()
+        locationManager.speakForTesting(text: "Welcome to England.", boundary: .nation)
+
+        locationManager.endRide()
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+        XCTAssertEqual(locationManager.announcementStatus, .idle)
+        XCTAssertTrue(
+            diagnostics.entries.contains {
+                $0.event == .announcementCancelled && $0.reason == .rideEnded
+            }
+        )
+    }
+
+    @MainActor
+    func testNewBoundarySupersedesAnnouncementWaitingForOtherAudio() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        audioSession.shouldYieldToPrimaryAudio = true
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            inactivityNotifier: RecordingRideInactivityNotifier(),
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            externalAudioResumeDelaySeconds: 0.05,
+            aiSharingAllowed: { true }
+        )
+        locationManager.contentMode = .namesOnly
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.startRideWithoutLocationInputForTesting()
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Long Street",
+            town: "Dursley",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 120_000_000)
+
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Dursley, Gloucestershire"])
+        XCTAssertTrue(
+            diagnostics.entries.contains {
+                $0.event == .announcementSuperseded && $0.reason == .supersededByNewerContext
+            }
+        )
+    }
+
+    @MainActor
+    func testNewSamePriorityBoundaryStopsActiveSpeechBeforeReplacement() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            inactivityNotifier: RecordingRideInactivityNotifier(),
+            diagnostics: diagnostics,
+            aiSharingAllowed: { true }
+        )
+        locationManager.contentMode = .namesOnly
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Stonehouse, Gloucestershire"])
+        speechOutput.beginPlayback()
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Long Street",
+            town: "Dursley",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(speechOutput.stopCount, 1)
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Stonehouse, Gloucestershire", "Dursley, Gloucestershire"])
+        XCTAssertTrue(
+            diagnostics.entries.contains {
+                $0.event == .announcementSuperseded && $0.reason == .supersededByNewerContext
+            }
+        )
     }
 
     @MainActor
@@ -255,7 +482,7 @@ final class LocationManagerTests: XCTestCase {
             externalAudioResumeDelaySeconds: 0.01,
             aiSharingAllowed: { true }
         )
-        locationManager.startRide()
+        locationManager.startRideWithoutLocationInputForTesting()
         locationManager.speakForTesting(text: "Welcome to England.", boundary: .nation)
         speechOutput.beginPlayback()
 
@@ -272,12 +499,69 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testResumableInterruptionRestartsSameAnnouncementOnlyOnce() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            inactivityNotifier: RecordingRideInactivityNotifier(),
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            externalAudioResumeDelaySeconds: 0.01,
+            aiSharingAllowed: { true }
+        )
+        locationManager.startRideWithoutLocationInputForTesting()
+        locationManager.speakForTesting(text: "Welcome to England.", boundary: .nation)
+        speechOutput.beginPlayback()
+
+        NotificationCenter.default.post(
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
+        )
+        let resumableEnd: [AnyHashable: Any] = [
+            AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.ended.rawValue,
+            AVAudioSessionInterruptionOptionKey: AVAudioSession.InterruptionOptions.shouldResume.rawValue
+        ]
+        NotificationCenter.default.post(
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: resumableEnd
+        )
+        NotificationCenter.default.post(
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: resumableEnd
+        )
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Welcome to England.", "Welcome to England."])
+        XCTAssertEqual(Set(speechOutput.requests.map(\.announcementID)).count, 1)
+        XCTAssertEqual(
+            diagnostics.entries.filter { $0.event == .announcementRestarted }.count,
+            1
+        )
+        XCTAssertTrue(
+            diagnostics.entries.contains {
+                $0.event == .audioInterruptionEnded && $0.shouldResume == true
+            }
+        )
+    }
+
+    @MainActor
     func testFactPipelineReportsContentAndPhrasePreparationStates() async {
         let factGenerator = MockPlaceFactGenerator()
         factGenerator.delayNanoseconds = 50_000_000
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
         let locationManager = LocationManager(
             factGenerator: factGenerator,
             speechOutput: RecordingSpeechOutputEngine(),
+            diagnostics: diagnostics,
             aiSharingAllowed: { true }
         )
         locationManager.contentMode = .shortFacts
@@ -302,6 +586,118 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(locationManager.announcementStatus, .retrievingContent)
         try? await Task.sleep(nanoseconds: 150_000_000)
         XCTAssertEqual(locationManager.announcementStatus, .phraseReady)
+        let pipeline = diagnostics.entries.filter {
+            [
+                RideDiagnosticEvent.factGenerationStarted,
+                .factGenerationFinished,
+                .announcementTextReady,
+                .announcementQueued
+            ].contains($0.event)
+        }
+        XCTAssertEqual(
+            pipeline.map(\.event),
+            [.factGenerationStarted, .factGenerationFinished, .announcementTextReady, .announcementQueued]
+        )
+        XCTAssertEqual(Set(pipeline.compactMap(\.announcementID)).count, 1)
+    }
+
+    @MainActor
+    func testFactAnnouncementExportCarriesOneIDFromGenerationThroughAudioRelease() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            factGenerator: ConstantPlaceFactGenerator(fact: "Known for its wool trade."),
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            aiSharingAllowed: { true }
+        )
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(speechOutput.requests.count, 1)
+
+        speechOutput.beginPlayback()
+        speechOutput.finishPlayback()
+
+        let expected: [RideDiagnosticEvent] = [
+            .factGenerationStarted,
+            .factGenerationFinished,
+            .announcementTextReady,
+            .announcementQueued,
+            .ttsRequested,
+            .speechAudioReady,
+            .audioSessionActivated,
+            .audioPlaybackStarted,
+            .audioPlaybackFinished,
+            .audioSessionReleased
+        ]
+        let correlated = diagnostics.entries.filter { expected.contains($0.event) }
+        XCTAssertEqual(correlated.map(\.event), expected)
+        XCTAssertEqual(Set(correlated.compactMap(\.announcementID)).count, 1)
+
+        diagnostics.flushForTesting()
+        let export = String(data: try Data(contentsOf: diagnostics.exportURL), encoding: .utf8) ?? ""
+        XCTAssertFalse(export.contains("Known for its wool trade."))
+        XCTAssertFalse(export.contains("Stonehouse"))
+        XCTAssertFalse(export.contains("51."))
+    }
+
+    @MainActor
+    func testPlaybackDiagnosticChainIsOrderedAndCorrelatedThroughRelease() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            aiSharingAllowed: { true }
+        )
+        locationManager.startRide()
+
+        locationManager.speakForTesting(text: "Private test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+        speechOutput.finishPlayback()
+
+        let pipeline = diagnostics.entries.filter { $0.announcementID != nil }
+        XCTAssertEqual(
+            pipeline.map(\.event),
+            [
+                .ttsRequested,
+                .speechAudioReady,
+                .audioSessionActivated,
+                .audioPlaybackStarted,
+                .audioPlaybackFinished,
+                .audioSessionReleased
+            ]
+        )
+        XCTAssertEqual(Set(pipeline.compactMap(\.announcementID)).count, 1)
+        XCTAssertEqual(pipeline.map(\.sequenceNumber), pipeline.map(\.sequenceNumber).sorted { ($0 ?? 0) < ($1 ?? 0) })
+        XCTAssertTrue(pipeline.allSatisfy { $0.audioPolicy == .interrupt || $0.audioPolicy == nil })
+        diagnostics.flushForTesting()
+        let export = String(data: try! Data(contentsOf: diagnostics.exportURL), encoding: .utf8) ?? ""
+        XCTAssertFalse(export.contains("Private test announcement"))
     }
 
     @MainActor
@@ -318,7 +714,7 @@ final class LocationManagerTests: XCTestCase {
         speechOutput.beginPlayback()
         locationManager.endRide()
 
-        XCTAssertEqual(audioSession.activationRequests, [true])
+        XCTAssertEqual(audioSession.activationRequests, [.interrupt])
         XCTAssertEqual(audioSession.deactivationCount, 1)
     }
 
@@ -337,8 +733,9 @@ final class LocationManagerTests: XCTestCase {
         speechOutput.beginPlayback()
         speechOutput.finishPlayback()
 
-        XCTAssertEqual(audioSession.activationRequests, [true])
+        XCTAssertEqual(audioSession.activationRequests, [.interrupt])
         XCTAssertEqual(audioSession.deactivationCount, 0)
+        XCTAssertFalse(speechOutput.isSpeaking)
     }
 
     @MainActor
@@ -357,8 +754,37 @@ final class LocationManagerTests: XCTestCase {
         speechOutput.finishPlayback()
         try? await Task.sleep(nanoseconds: 700_000_000)
 
-        XCTAssertEqual(audioSession.activationRequests, [true])
+        XCTAssertEqual(audioSession.activationRequests, [.interrupt])
         XCTAssertEqual(audioSession.deactivationCount, 2)
+    }
+
+    @MainActor
+    func testRepeatedAudioDeactivationFailureFallsBackToMixingNeutralization() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory)
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        audioSession.deactivationFailuresRemaining = 3
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            aiSharingAllowed: { true }
+        )
+
+        locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        speechOutput.beginPlayback()
+        speechOutput.finishPlayback()
+        try? await Task.sleep(nanoseconds: 1_200_000_000)
+
+        XCTAssertEqual(audioSession.deactivationCount, 3)
+        XCTAssertEqual(audioSession.neutralizationCount, 1)
+        XCTAssertTrue(
+            diagnostics.entries.contains {
+                $0.event == .audioSessionNeutralized && $0.audioPolicy == .mix
+            }
+        )
     }
 
     @MainActor
@@ -426,7 +852,7 @@ final class LocationManagerTests: XCTestCase {
             diagnostics: diagnostics,
             aiSharingAllowed: { true }
         )
-        locationManager.startRide()
+        locationManager.startRideWithoutLocationInputForTesting()
         locationManager.speakForTesting(text: "Test announcement", boundary: .town)
         speechOutput.beginPlayback()
 
@@ -448,8 +874,14 @@ final class LocationManagerTests: XCTestCase {
         )
 
         XCTAssertFalse(locationManager.hasInterruptedSpeechPlanForTesting)
+        XCTAssertEqual(locationManager.announcementStatus, .idle)
         XCTAssertTrue(diagnostics.entries.map(\.event).contains(.audioInterruptionBegan))
         XCTAssertTrue(diagnostics.entries.map(\.event).contains(.audioInterruptionEnded))
+        XCTAssertTrue(
+            diagnostics.entries.contains {
+                $0.event == .announcementCancelled && $0.reason == .interruptionMustNotResume
+            }
+        )
         locationManager.endRide()
     }
 
@@ -459,6 +891,7 @@ final class LocationManagerTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let diagnostics = RideDiagnosticsStore(directoryURL: directory)
         let locationManager = LocationManager(diagnostics: diagnostics)
+        XCTAssertEqual(locationManager.rideSessionState, .idle)
 
         NotificationCenter.default.post(
             name: AVAudioSession.routeChangeNotification,
@@ -506,6 +939,20 @@ final class LocationManagerTests: XCTestCase {
 
         restored.clear()
         XCTAssertTrue(restored.entries.isEmpty)
+    }
+
+    @MainActor
+    func testDiagnosticEntriesHaveStableSessionAndMonotonicSequence() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = RideDiagnosticsStore(directoryURL: directory)
+
+        store.record(.rideStarted)
+        store.record(.announcementTextReady)
+        store.record(.ttsRequested)
+
+        XCTAssertEqual(store.entries.compactMap(\.sequenceNumber), [1, 2, 3])
+        XCTAssertEqual(Set(store.entries.compactMap(\.diagnosticSessionID)).count, 1)
     }
 
     @MainActor
@@ -560,7 +1007,8 @@ final class LocationManagerTests: XCTestCase {
                     category: "playback",
                     mode: "spokenAudio",
                     options: ["duckOthers"]
-                )
+                ),
+                audioPolicy: .duck
             )
         }
         store.flushForTesting()
@@ -710,7 +1158,7 @@ final class LocationManagerTests: XCTestCase {
         let locationManager = LocationManager(inactivityNotifier: RecordingRideInactivityNotifier())
         locationManager.testMode = true
         locationManager.startRide()
-        locationManager.logTestLocation()
+        locationManager.advanceTestLocation()
         XCTAssertEqual(locationManager.lastKnownLocation?.latitude, TestRouteFixture.waypoints[1].latitude)
 
         locationManager.endRide()
@@ -728,6 +1176,16 @@ final class LocationManagerTests: XCTestCase {
         let restoredLocationManager = LocationManager()
 
         XCTAssertTrue(restoredLocationManager.testMode)
+    }
+
+    @MainActor
+    func testExplicitTestModeOffChoicePersistsDuringDebugCampaign() {
+        let locationManager = LocationManager()
+        locationManager.testMode = false
+
+        let restoredLocationManager = LocationManager()
+
+        XCTAssertFalse(restoredLocationManager.testMode)
     }
 
     @MainActor
@@ -1421,8 +1879,14 @@ final class LocationManagerTests: XCTestCase {
     private func clearLocationManagerDefaults() {
         [
             "RideHorizonTestMode",
+            "RideHorizonAudioInteropDebugTestModeChoice",
             "RideHorizonInterruptsMusic"
         ].forEach(UserDefaults.standard.removeObject(forKey:))
+    }
+
+    private func useLiveLocationByDefaultForTests() {
+        UserDefaults.standard.set(false, forKey: "RideHorizonTestMode")
+        UserDefaults.standard.set(true, forKey: "RideHorizonAudioInteropDebugTestModeChoice")
     }
 
     private func clearRiderContextDefaults() {
