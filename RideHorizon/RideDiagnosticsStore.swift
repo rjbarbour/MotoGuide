@@ -43,6 +43,12 @@ enum RideDiagnosticEvent: String, Codable, Equatable {
     case primaryAudioEnded
     case audioRouteChanged
     case audioMediaServicesReset
+#if INTERNAL_AUDIO_CALIBRATION
+    case speechCalibrationStarted
+    case speechCalibrationFinished
+    case speechCalibrationFailed
+    case speechCalibrationCancelled
+#endif
 }
 
 enum RideDiagnosticReason: String, Codable, Equatable {
@@ -111,6 +117,28 @@ struct AudioSessionSnapshot: Codable, Equatable {
         self.options = options
     }
 }
+
+#if INTERNAL_AUDIO_CALIBRATION
+enum SpeechCalibrationDiagnosticOutcome: String, Codable, Equatable {
+    case completed
+    case cancelled
+    case preparationFailed
+    case sessionFailed
+    case playbackFailed
+}
+
+struct SpeechCalibrationDiagnosticSnapshot: Codable, Equatable {
+    let fixtureID: String
+    let provider: DiagnosticPlaybackPath
+    let profileID: String
+    let appliedGainDB: Float?
+    let compressionPreset: String?
+    let presenceGainDB: Float?
+    let resultingSamplePeak: Float?
+    let processingDurationSeconds: TimeInterval?
+    let terminalOutcome: SpeechCalibrationDiagnosticOutcome?
+}
+#endif
 
 enum DiagnosticNetworkStatus: String, Codable, Equatable, Sendable {
     case satisfied
@@ -247,6 +275,9 @@ struct RideDiagnosticEntry: Identifiable, Codable, Equatable {
     let shouldResume: Bool?
     let routeChangeReason: UInt?
     let horizontalAccuracyMetres: Double?
+#if INTERNAL_AUDIO_CALIBRATION
+    var speechCalibration: SpeechCalibrationDiagnosticSnapshot? = nil
+#endif
     let locationSampleAgeSeconds: TimeInterval?
 }
 
@@ -377,11 +408,49 @@ final class RideDiagnosticsStore: ObservableObject {
             horizontalAccuracyMetres: horizontalAccuracyMetres,
             locationSampleAgeSeconds: locationSampleAgeSeconds
         )
+        append(entry, event: event)
+    }
+
+#if INTERNAL_AUDIO_CALIBRATION
+    func recordCalibration(
+        _ event: RideDiagnosticEvent,
+        snapshot: SpeechCalibrationDiagnosticSnapshot
+    ) {
+        var entry = RideDiagnosticEntry(
+            id: UUID(),
+            timestamp: now(),
+            sequenceNumber: nextSequenceNumber,
+            diagnosticSessionID: diagnosticSessionID,
+            rideSessionID: nil,
+            placeLookupID: nil,
+            announcementID: nil,
+            event: event,
+            reason: nil,
+            appState: nil,
+            audio: nil,
+            network: nil,
+            audioPolicy: nil,
+            elapsedRideSeconds: nil,
+            rideState: nil,
+            isLocationTracking: nil,
+            playbackPath: snapshot.provider,
+            interruptionReason: nil,
+            shouldResume: nil,
+            routeChangeReason: nil,
+            horizontalAccuracyMetres: nil,
+            locationSampleAgeSeconds: nil
+        )
+        entry.speechCalibration = snapshot
+        append(entry, event: event)
+    }
+#endif
+
+    private func append(_ entry: RideDiagnosticEntry, event: RideDiagnosticEvent) {
         nextSequenceNumber += 1
         entries.append(entry)
         encodedSizes[entry.id] = Self.encodedSize(of: entry)
         prune(referenceDate: now())
-        let terminalEvent: Bool = switch event {
+        var terminalEvent: Bool = switch event {
         case .appEnteredBackground,
              .rideEnded,
              .placeLookupFailed,
@@ -399,6 +468,13 @@ final class RideDiagnosticsStore: ObservableObject {
         default:
             false
         }
+#if INTERNAL_AUDIO_CALIBRATION
+        if event == .speechCalibrationFinished
+            || event == .speechCalibrationFailed
+            || event == .speechCalibrationCancelled {
+            terminalEvent = true
+        }
+#endif
         schedulePersistence(immediately: terminalEvent)
     }
 

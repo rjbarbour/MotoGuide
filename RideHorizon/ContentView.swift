@@ -1368,6 +1368,15 @@ private struct SettingsView: View {
                             palette: palette
                         )
 
+#if INTERNAL_AUDIO_CALIBRATION
+                        NavigationLink {
+                            SpeechCalibrationLabView(locationManager: locationManager)
+                        } label: {
+                            Label("Speech Calibration", systemImage: "waveform.badge.magnifyingglass")
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }
+#endif
+
 #if DEBUG
                         DisclosureGroup("Proxy Diagnostics") {
                             SettingsToggleRow(

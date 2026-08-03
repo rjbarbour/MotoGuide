@@ -347,122 +347,6 @@ final class AppleSpeechOutput: NSObject, AppleSpeechOutputting, AVSpeechSynthesi
     }
 }
 
-enum SpeechAudioPeakNormaliser {
-    static let maximumGain: Float = 2
-    static let targetPeak: Float = 0.794_328_2 // -2 dBFS
-
-    static func gain(forPeak peak: Float) -> Float {
-        guard peak > 0 else { return 1 }
-        return max(1, min(maximumGain, targetPeak / peak))
-    }
-
-    static func peak(in buffer: AVAudioPCMBuffer) throws -> Float {
-        guard let channelData = buffer.floatChannelData else {
-            throw PremiumAudioPlaybackError.unsupportedFormat
-        }
-        let channelCount = Int(buffer.format.channelCount)
-        let frameCount = Int(buffer.frameLength)
-        var peak: Float = 0
-
-        for channel in 0..<channelCount {
-            let samples = channelData[channel]
-            for frame in 0..<frameCount {
-                peak = max(peak, abs(samples[frame]))
-            }
-        }
-        return peak
-    }
-
-    static func apply(to buffer: AVAudioPCMBuffer) throws -> Float {
-        let appliedGain = gain(forPeak: try peak(in: buffer))
-        try apply(gain: appliedGain, to: buffer)
-        return appliedGain > 1 ? 20 * log10(appliedGain) : 0
-    }
-
-    static func apply(gain appliedGain: Float, to buffer: AVAudioPCMBuffer) throws {
-        guard let channelData = buffer.floatChannelData else {
-            throw PremiumAudioPlaybackError.unsupportedFormat
-        }
-        let channelCount = Int(buffer.format.channelCount)
-        let frameCount = Int(buffer.frameLength)
-
-        guard appliedGain > 1 else { return }
-        for channel in 0..<channelCount {
-            let samples = channelData[channel]
-            for frame in 0..<frameCount {
-                samples[frame] *= appliedGain
-            }
-        }
-    }
-}
-
-enum PremiumAudioPlaybackError: Error {
-    case emptyAudio
-    case unsupportedFormat
-    case engineConfigurationChanged
-}
-
-struct PreparedPremiumAudio: @unchecked Sendable {
-    let buffers: [AVAudioPCMBuffer]
-    let gainDecibels: Float
-}
-
-enum PremiumAudioPreparer {
-    static func prepare(dataSegments: [Data]) async throws -> PreparedPremiumAudio {
-        let task = Task.detached(priority: .userInitiated) {
-            try prepareSynchronously(dataSegments: dataSegments)
-        }
-        return try await withTaskCancellationHandler {
-            try await task.value
-        } onCancel: {
-            task.cancel()
-        }
-    }
-
-    static func prepareSynchronously(dataSegments: [Data]) throws -> PreparedPremiumAudio {
-        guard !dataSegments.isEmpty else { throw PremiumAudioPlaybackError.emptyAudio }
-        var buffers: [AVAudioPCMBuffer] = []
-        var utterancePeak: Float = 0
-
-        for data in dataSegments {
-            try Task.checkCancellation()
-            let buffer = try decode(data: data)
-            utterancePeak = max(utterancePeak, try SpeechAudioPeakNormaliser.peak(in: buffer))
-            buffers.append(buffer)
-        }
-
-        let gain = SpeechAudioPeakNormaliser.gain(forPeak: utterancePeak)
-        for buffer in buffers {
-            try Task.checkCancellation()
-            try SpeechAudioPeakNormaliser.apply(gain: gain, to: buffer)
-        }
-        return PreparedPremiumAudio(
-            buffers: buffers,
-            gainDecibels: gain > 1 ? 20 * log10(gain) : 0
-        )
-    }
-
-    private static func decode(data: Data) throws -> AVAudioPCMBuffer {
-        let temporaryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("mp3")
-        try data.write(to: temporaryURL, options: .atomic)
-        defer { try? FileManager.default.removeItem(at: temporaryURL) }
-
-        let file = try AVAudioFile(forReading: temporaryURL)
-        guard file.length > 0, file.length <= AVAudioFramePosition(UInt32.max),
-              let buffer = AVAudioPCMBuffer(
-                pcmFormat: file.processingFormat,
-                frameCapacity: AVAudioFrameCount(file.length)
-              ) else {
-            throw PremiumAudioPlaybackError.emptyAudio
-        }
-        try file.read(into: buffer)
-        guard buffer.frameLength > 0 else { throw PremiumAudioPlaybackError.emptyAudio }
-        return buffer
-    }
-}
-
 @MainActor
 protocol PremiumAudioPlaying: AnyObject {
     var isPlaying: Bool { get }
@@ -474,7 +358,7 @@ protocol PremiumAudioPlaying: AnyObject {
 }
 
 @MainActor
-private final class NormalisedPremiumAudioPlayer: PremiumAudioPlaying {
+final class NormalisedPremiumAudioPlayer: PremiumAudioPlaying {
 
     private var engine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
@@ -926,6 +810,18 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var audioSessionReleaseRetryAttempts = 0
     private var activeRideSessionID: UUID?
     private var diagnosticAppState: DiagnosticAppState = .foreground
+#if INTERNAL_AUDIO_CALIBRATION
+    private let calibrationProcessor: PremiumSpeechProcessing = DefaultPremiumSpeechProcessor()
+    private let calibrationPremiumAudioPlayer: PremiumAudioPlaying = NormalisedPremiumAudioPlayer()
+    private let calibrationAppleSpeechOutput: AppleSpeechOutputting = AppleSpeechOutput()
+    private var calibrationPreparationTask: Task<Void, Never>?
+    private var calibrationPlaybackToken = UUID()
+    private var calibrationPremiumCompletion: ((Result<PreparedPremiumAudio, Error>) -> Void)?
+    private var calibrationAppleCompletion: ((Result<Void, Error>) -> Void)?
+    private var calibrationPlaybackStarted: (() -> Void)?
+    private var calibrationDiagnosticContext: SpeechCalibrationDiagnosticSnapshot?
+    private var calibrationAppleSessionActivationFailed = false
+#endif
 
     @Published var lastKnownLocation: CLLocationCoordinate2D?
     @Published var lastKnownAddress: Address?
@@ -1143,6 +1039,33 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 playbackPath: event.provider == .apple ? .apple : .premiumVoice
             )
         }
+#if INTERNAL_AUDIO_CALIBRATION
+        self.calibrationAppleSpeechOutput.onPlaybackWillStart = { [weak self] requestID in
+            guard let self, requestID == self.calibrationPlaybackToken else { return false }
+            let acquired = self.acquireAudioSessionForSpeech(provider: .apple, announcementID: nil)
+            self.calibrationAppleSessionActivationFailed = !acquired
+            if acquired { self.calibrationPlaybackStarted?() }
+            return acquired
+        }
+        self.calibrationAppleSpeechOutput.onFinish = { [weak self] requestID in
+            guard let self, requestID == self.calibrationPlaybackToken else { return }
+            self.finishCalibrationApple(with: .success(()))
+        }
+        self.calibrationAppleSpeechOutput.onCancel = { [weak self] requestID in
+            guard let self, requestID == self.calibrationPlaybackToken else { return }
+            let outcome: SpeechCalibrationDiagnosticOutcome = self.calibrationAppleSessionActivationFailed
+                ? .sessionFailed
+                : .cancelled
+            self.finishCalibrationApple(
+                with: .failure(
+                    self.calibrationAppleSessionActivationFailed
+                        ? SpeechCalibrationError.playbackFailed
+                        : SpeechCalibrationError.cancelled
+                ),
+                failureOutcome: outcome
+            )
+        }
+#endif
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.pausesLocationUpdatesAutomatically = false
@@ -1520,6 +1443,238 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             ignoreQuietMode: true
         )
     }
+
+#if INTERNAL_AUDIO_CALIBRATION
+    var isRideActiveForCalibration: Bool {
+        rideSessionState.isActive
+    }
+
+    var calibrationAudioSnapshot: AudioSessionSnapshot {
+        audioSession.snapshot
+    }
+
+    func playCalibrationApple(
+        announcementText: String,
+        fixtureID: SpeechCalibrationFixture,
+        profileID: String,
+        onPlaybackStarted: @escaping @MainActor () -> Void,
+        completion: @escaping @MainActor (Result<Void, Error>) -> Void
+    ) {
+        guard !rideSessionState.isActive else {
+            completion(.failure(SpeechCalibrationError.rideActive))
+            return
+        }
+        stopCalibrationPlayback()
+        let token = UUID()
+        calibrationPlaybackToken = token
+        calibrationAppleCompletion = completion
+        calibrationPlaybackStarted = onPlaybackStarted
+        calibrationAppleSessionActivationFailed = false
+        calibrationDiagnosticContext = SpeechCalibrationDiagnosticSnapshot(
+            fixtureID: fixtureID.rawValue,
+            provider: .apple,
+            profileID: profileID,
+            appliedGainDB: nil,
+            compressionPreset: nil,
+            presenceGainDB: nil,
+            resultingSamplePeak: nil,
+            processingDurationSeconds: nil,
+            terminalOutcome: nil
+        )
+        if let calibrationDiagnosticContext {
+            diagnostics.recordCalibration(.speechCalibrationStarted, snapshot: calibrationDiagnosticContext)
+        }
+        calibrationAppleSpeechOutput.speak(
+            text: announcementText,
+            boundary: nil,
+            voice: resolveSpeechVoice(),
+            requestID: token
+        )
+    }
+
+    func playCalibrationPremium(
+        rawSpeechAudio: Data,
+        profile: SpeechProcessingProfile,
+        fixtureID: SpeechCalibrationFixture,
+        profileID: String,
+        onPlaybackStarted: @escaping @MainActor () -> Void,
+        completion: @escaping @MainActor (Result<PreparedPremiumAudio, Error>) -> Void
+    ) {
+        guard !rideSessionState.isActive else {
+            completion(.failure(SpeechCalibrationError.rideActive))
+            return
+        }
+        stopCalibrationPlayback()
+        let token = UUID()
+        calibrationPlaybackToken = token
+        calibrationPremiumCompletion = completion
+        calibrationPlaybackStarted = onPlaybackStarted
+        calibrationDiagnosticContext = SpeechCalibrationDiagnosticSnapshot(
+            fixtureID: fixtureID.rawValue,
+            provider: .premiumVoice,
+            profileID: profileID,
+            appliedGainDB: nil,
+            compressionPreset: profile.compressionPreset.rawValue,
+            presenceGainDB: profile.presenceGainDB,
+            resultingSamplePeak: nil,
+            processingDurationSeconds: nil,
+            terminalOutcome: nil
+        )
+        if let calibrationDiagnosticContext {
+            diagnostics.recordCalibration(.speechCalibrationStarted, snapshot: calibrationDiagnosticContext)
+        }
+        let processor = calibrationProcessor
+        calibrationPreparationTask = Task { [weak self] in
+            do {
+                let prepared = try await processor.prepare(
+                    speechAudio: [rawSpeechAudio],
+                    profile: profile
+                )
+                try Task.checkCancellation()
+                await MainActor.run {
+                    guard let self, self.calibrationPlaybackToken == token else { return }
+                    self.calibrationPreparationTask = nil
+                    guard let firstBuffer = prepared.buffers.first else {
+                        self.finishCalibrationPremium(
+                            with: .failure(PremiumAudioPlaybackError.emptyAudio),
+                            failureOutcome: .preparationFailed
+                        )
+                        return
+                    }
+                    guard self.acquireAudioSessionForSpeech(provider: .proxyElevenLabs, announcementID: nil) else {
+                        self.finishCalibrationPremium(
+                            with: .failure(SpeechCalibrationError.playbackFailed),
+                            failureOutcome: .sessionFailed
+                        )
+                        return
+                    }
+                    do {
+                        try self.calibrationPremiumAudioPlayer.play(buffer: firstBuffer) { [weak self] result in
+                            guard let self, self.calibrationPlaybackToken == token else { return }
+                            switch result {
+                            case .success:
+                                self.finishCalibrationPremium(with: .success(prepared))
+                            case .failure(let error):
+                                self.finishCalibrationPremium(with: .failure(error))
+                            }
+                        }
+                        self.calibrationPlaybackStarted?()
+                    } catch {
+                        self.finishCalibrationPremium(with: .failure(error))
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    guard let self, self.calibrationPlaybackToken == token else { return }
+                    self.calibrationPreparationTask = nil
+                    self.finishCalibrationPremium(
+                        with: .failure(error),
+                        failureOutcome: .preparationFailed
+                    )
+                }
+            }
+        }
+        ProxyDiagnostics.log(
+            "Speech",
+            "Calibration prepared fixture=\(fixtureID.rawValue), profile=\(profileID), outputGainDb=\(profile.outputGainDB), compression=\(profile.compressionPreset.rawValue), presenceGainDb=\(profile.presenceGainDB)."
+        )
+    }
+
+    func stopCalibrationPlayback() {
+        let premiumCompletion = calibrationPremiumCompletion
+        let appleCompletion = calibrationAppleCompletion
+        calibrationPlaybackToken = UUID()
+        calibrationPreparationTask?.cancel()
+        calibrationPreparationTask = nil
+        calibrationPremiumAudioPlayer.stop()
+        calibrationAppleSpeechOutput.stop()
+        calibrationPremiumCompletion = nil
+        calibrationAppleCompletion = nil
+        calibrationPlaybackStarted = nil
+        calibrationAppleSessionActivationFailed = false
+        announcementStatus = .idle
+        releaseAudioSessionAfterSpeech()
+        if premiumCompletion != nil || appleCompletion != nil {
+            recordCalibrationTerminal(.cancelled, event: .speechCalibrationCancelled)
+        }
+        premiumCompletion?(.failure(SpeechCalibrationError.cancelled))
+        appleCompletion?(.failure(SpeechCalibrationError.cancelled))
+    }
+
+    private func finishCalibrationPremium(
+        with result: Result<PreparedPremiumAudio, Error>,
+        failureOutcome: SpeechCalibrationDiagnosticOutcome = .playbackFailed
+    ) {
+        let completion = calibrationPremiumCompletion
+        calibrationPremiumCompletion = nil
+        calibrationPlaybackStarted = nil
+        calibrationPremiumAudioPlayer.stop()
+        announcementStatus = .idle
+        releaseAudioSessionAfterSpeech()
+        switch result {
+        case .success(let prepared):
+            recordCalibrationTerminal(
+                .completed,
+                event: .speechCalibrationFinished,
+                prepared: prepared
+            )
+        case .failure(let error):
+            let outcome: SpeechCalibrationDiagnosticOutcome = error as? SpeechCalibrationError == .cancelled
+                ? .cancelled
+                : failureOutcome
+            recordCalibrationTerminal(
+                outcome,
+                event: outcome == .cancelled ? .speechCalibrationCancelled : .speechCalibrationFailed
+            )
+        }
+        completion?(result)
+    }
+
+    private func finishCalibrationApple(
+        with result: Result<Void, Error>,
+        failureOutcome: SpeechCalibrationDiagnosticOutcome = .playbackFailed
+    ) {
+        let completion = calibrationAppleCompletion
+        calibrationAppleCompletion = nil
+        calibrationPlaybackStarted = nil
+        announcementStatus = .idle
+        releaseAudioSessionAfterSpeech()
+        switch result {
+        case .success:
+            recordCalibrationTerminal(.completed, event: .speechCalibrationFinished)
+        case .failure(let error):
+            let outcome: SpeechCalibrationDiagnosticOutcome = failureOutcome == .sessionFailed
+                ? .sessionFailed
+                : (error as? SpeechCalibrationError == .cancelled ? .cancelled : failureOutcome)
+            recordCalibrationTerminal(
+                outcome,
+                event: outcome == .cancelled ? .speechCalibrationCancelled : .speechCalibrationFailed
+            )
+        }
+        completion?(result)
+    }
+
+    private func recordCalibrationTerminal(
+        _ outcome: SpeechCalibrationDiagnosticOutcome,
+        event: RideDiagnosticEvent,
+        prepared: PreparedPremiumAudio? = nil
+    ) {
+        guard let context = calibrationDiagnosticContext else { return }
+        let snapshot = SpeechCalibrationDiagnosticSnapshot(
+            fixtureID: context.fixtureID,
+            provider: context.provider,
+            profileID: context.profileID,
+            appliedGainDB: prepared?.gainDecibels,
+            compressionPreset: context.compressionPreset,
+            presenceGainDB: context.presenceGainDB,
+            resultingSamplePeak: prepared?.resultingSamplePeak,
+            processingDurationSeconds: prepared?.processingDuration,
+            terminalOutcome: outcome
+        )
+        diagnostics.recordCalibration(event, snapshot: snapshot)
+        calibrationDiagnosticContext = nil
+    }
+#endif
 
     private func normalizeContextValue(_ value: String) -> String? {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)

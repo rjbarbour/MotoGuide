@@ -237,6 +237,104 @@ private struct ConstantPlaceFactGenerator: PlaceFactGenerating {
     }
 }
 
+#if INTERNAL_AUDIO_CALIBRATION
+private struct RecordingCalibrationFixtureLoader: SpeechCalibrationFixtureLoading {
+    final class State {
+        var loadCount = 0
+    }
+
+    let state: State
+    let bytes: Data
+
+    func manifest() throws -> SpeechCalibrationManifest {
+        SpeechCalibrationManifest(
+            schemaVersion: 1,
+            fixtureRevision: "test-fixtures-v1",
+            generationDate: "2026-08-03",
+            proxySpeechContractRevision: "test-contract",
+            elevenLabsModel: "test-model",
+            elevenLabsOutputFormat: "test-format",
+            voiceConfigurationRevision: "test-voice",
+            privacyStatement: "No personal data or credentials.",
+            fixtures: SpeechCalibrationFixture.allCases.map {
+                SpeechCalibrationManifest.Fixture(
+                    id: $0,
+                    filename: "\($0.rawValue).mp3",
+                    announcementText: "Fixture \($0.rawValue)",
+                    byteLength: bytes.count,
+                    sha256: "unused-in-recording-loader",
+                    rawIntegratedLUFS: -24,
+                    rawTruePeakDBFS: -6
+                )
+            }
+        )
+    }
+
+    func load(_ fixture: SpeechCalibrationFixture) throws -> LoadedSpeechCalibrationFixture {
+        state.loadCount += 1
+        let metadata = try XCTUnwrap(manifest().fixtures.first { $0.id == fixture })
+        return LoadedSpeechCalibrationFixture(
+            metadata: metadata,
+            rawSpeechAudio: bytes,
+            revision: "test-fixtures-v1"
+        )
+    }
+}
+
+@MainActor
+private final class RecordingCalibrationHost: SpeechCalibrationAudioHosting {
+    struct PremiumRequest: Equatable {
+        let bytes: Data
+        let profile: SpeechProcessingProfile
+        let fixtureID: SpeechCalibrationFixture
+        let profileID: String
+    }
+
+    var isRideActiveForCalibration = false
+    var calibrationAudioSnapshot = AudioSessionSnapshot(
+        outputVolume: 0.5,
+        outputRouteTypes: ["test"],
+        isOtherAudioPlaying: true,
+        shouldYieldToPrimaryAudio: false
+    )
+    private(set) var premiumRequests: [PremiumRequest] = []
+    private(set) var appleTexts: [String] = []
+    private(set) var stopCount = 0
+
+    func playCalibrationApple(
+        announcementText: String,
+        fixtureID: SpeechCalibrationFixture,
+        profileID: String,
+        onPlaybackStarted: @escaping @MainActor () -> Void,
+        completion: @escaping @MainActor (Result<Void, Error>) -> Void
+    ) {
+        appleTexts.append(announcementText)
+        onPlaybackStarted()
+    }
+
+    func playCalibrationPremium(
+        rawSpeechAudio: Data,
+        profile: SpeechProcessingProfile,
+        fixtureID: SpeechCalibrationFixture,
+        profileID: String,
+        onPlaybackStarted: @escaping @MainActor () -> Void,
+        completion: @escaping @MainActor (Result<PreparedPremiumAudio, Error>) -> Void
+    ) {
+        premiumRequests.append(PremiumRequest(
+            bytes: rawSpeechAudio,
+            profile: profile,
+            fixtureID: fixtureID,
+            profileID: profileID
+        ))
+        onPlaybackStarted()
+    }
+
+    func stopCalibrationPlayback() {
+        stopCount += 1
+    }
+}
+#endif
+
 final class LocationManagerTests: XCTestCase {
     override func setUp() {
         super.setUp()
@@ -277,6 +375,346 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(SpeechAudioPeakNormaliser.gain(forPeak: 0), 1, accuracy: 0.001)
     }
 
+    func testSpeechCalibrationProfileMappingsAreDeterministicAndBounded() {
+        let profile = SpeechProcessingProfile.calibrationCandidate(
+            outputGainDB: 99,
+            compressionPreset: .medium,
+            presenceGainDB: -3
+        )
+
+        XCTAssertEqual(profile.outputGainDB, 12)
+        XCTAssertEqual(profile.compressionPreset.ratio, 3)
+        XCTAssertEqual(profile.compressionPreset.thresholdDBFS, -22)
+        XCTAssertEqual(profile.presenceGainDB, 0)
+        XCTAssertEqual(profile.highPassFrequencyHz, 100)
+        XCTAssertEqual(profile.samplePeakCeilingDBFS, -2)
+        XCTAssertEqual(SpeechProcessingProfile.production.highPassFrequencyHz, 0)
+        XCTAssertEqual(SpeechProcessingProfile.production.compressionPreset, .off)
+        XCTAssertEqual(SpeechCompressionPreset.light.ratio, 2)
+        XCTAssertEqual(SpeechCompressionPreset.light.thresholdDBFS, -18)
+        XCTAssertEqual(SpeechCompressionPreset.strong.ratio, 4)
+        XCTAssertEqual(SpeechCompressionPreset.strong.thresholdDBFS, -24)
+    }
+
+#if INTERNAL_AUDIO_CALIBRATION
+    func testCandidateOutputGainRaisesFixtureMeanLevelWithoutExceedingPeakCeiling() async throws {
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.shortFact)
+        let processor = DefaultPremiumSpeechProcessor()
+        let quiet = try await processor.prepare(
+            speechAudio: [fixture.rawSpeechAudio],
+            profile: .calibrationCandidate(
+                outputGainDB: 0,
+                compressionPreset: .off,
+                presenceGainDB: 0
+            )
+        )
+        let louder = try await processor.prepare(
+            speechAudio: [fixture.rawSpeechAudio],
+            profile: .calibrationCandidate(
+                outputGainDB: 12,
+                compressionPreset: .off,
+                presenceGainDB: 0
+            )
+        )
+
+        func meanAbsoluteLevel(_ prepared: PreparedPremiumAudio) throws -> Float {
+            var total: Float = 0
+            var sampleCount = 0
+            for buffer in prepared.buffers {
+                let channels = try XCTUnwrap(buffer.floatChannelData)
+                for channel in 0..<Int(buffer.format.channelCount) {
+                    for frame in 0..<Int(buffer.frameLength) {
+                        total += abs(channels[channel][frame])
+                        sampleCount += 1
+                    }
+                }
+            }
+            return total / Float(sampleCount)
+        }
+
+        XCTAssertGreaterThan(try meanAbsoluteLevel(louder), try meanAbsoluteLevel(quiet) * 1.25)
+        XCTAssertGreaterThan(louder.gainDecibels, quiet.gainDecibels)
+        XCTAssertLessThanOrEqual(louder.resultingSamplePeak, pow(Float(10), Float(-2) / 20) + 0.000_1)
+    }
+
+    func testCalibrationBundleContainsThreeIntegrityCheckedFixtures() throws {
+        let loader = BundleSpeechCalibrationFixtureLoader(bundle: .main)
+        let manifest = try loader.manifest()
+
+        XCTAssertEqual(Set(manifest.fixtures.map(\.id)), Set(SpeechCalibrationFixture.allCases))
+        for fixture in SpeechCalibrationFixture.allCases {
+            let loaded = try loader.load(fixture)
+            XCTAssertFalse(loaded.rawSpeechAudio.isEmpty)
+            XCTAssertEqual(loaded.rawSpeechAudio.count, loaded.metadata.byteLength)
+        }
+    }
+
+    @MainActor
+    func testCalibrationAAndBReloadImmutableBytesAndUseOnlySelectedProfiles() {
+        let state = RecordingCalibrationFixtureLoader.State()
+        let loader = RecordingCalibrationFixtureLoader(state: state, bytes: Data([1, 2, 3]))
+        let host = RecordingCalibrationHost()
+        let suiteName = "SpeechCalibrationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let model = SpeechCalibrationLabModel(
+            host: host,
+            fixtureLoader: loader,
+            profileStore: SpeechCalibrationProfileStore(defaults: defaults)
+        )
+        model.candidateProfile = .calibrationCandidate(
+            outputGainDB: 4,
+            compressionPreset: .light,
+            presenceGainDB: 2
+        )
+
+        model.playCurrentA()
+        model.playCandidateB()
+        model.selectedFixture = .boundary
+        model.selectedProvider = .appleVoice
+        model.repeatLast()
+
+        XCTAssertEqual(state.loadCount, 3)
+        XCTAssertEqual(host.premiumRequests.map(\.bytes), Array(repeating: Data([1, 2, 3]), count: 3))
+        XCTAssertEqual(host.premiumRequests[0].profile, .production)
+        XCTAssertEqual(host.premiumRequests[1].profile, model.candidateProfile)
+        XCTAssertEqual(host.premiumRequests[2].profile, model.candidateProfile)
+        XCTAssertEqual(host.premiumRequests[2].fixtureID, .placeName)
+        XCTAssertEqual(host.premiumRequests.map(\.profileID), ["current-a", "candidate-b", "candidate-b"])
+    }
+
+    @MainActor
+    func testCalibrationApplePathUsesFixtureTextWithoutPremiumProcessing() {
+        let state = RecordingCalibrationFixtureLoader.State()
+        let loader = RecordingCalibrationFixtureLoader(state: state, bytes: Data([1]))
+        let host = RecordingCalibrationHost()
+        let model = SpeechCalibrationLabModel(host: host, fixtureLoader: loader)
+        model.selectedProvider = .appleVoice
+        model.selectedFixture = .boundary
+
+        model.playCurrentA()
+
+        XCTAssertEqual(host.appleTexts, ["Fixture boundary"])
+        XCTAssertTrue(host.premiumRequests.isEmpty)
+    }
+
+    @MainActor
+    func testCalibrationRefusesPlaybackDuringActiveRide() {
+        let state = RecordingCalibrationFixtureLoader.State()
+        let host = RecordingCalibrationHost()
+        host.isRideActiveForCalibration = true
+        let model = SpeechCalibrationLabModel(
+            host: host,
+            fixtureLoader: RecordingCalibrationFixtureLoader(state: state, bytes: Data([1]))
+        )
+
+        model.playCandidateB()
+
+        XCTAssertEqual(state.loadCount, 0)
+        XCTAssertTrue(host.premiumRequests.isEmpty)
+        guard case .failed = model.playbackState else {
+            return XCTFail("Expected active-ride refusal")
+        }
+    }
+
+    @MainActor
+    func testSavedCalibrationProfilePersistsWithoutChangingProductionDefault() throws {
+        let suiteName = "SpeechCalibrationPersistence-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = SpeechCalibrationProfileStore(defaults: defaults)
+        let model = SpeechCalibrationLabModel(
+            host: RecordingCalibrationHost(),
+            fixtureLoader: RecordingCalibrationFixtureLoader(
+                state: RecordingCalibrationFixtureLoader.State(),
+                bytes: Data([1])
+            ),
+            profileStore: store
+        )
+        model.candidateProfile = .calibrationCandidate(
+            outputGainDB: 5,
+            compressionPreset: .medium,
+            presenceGainDB: 2
+        )
+
+        try model.saveCandidate(now: Date(timeIntervalSince1970: 0))
+
+        XCTAssertEqual(store.load().map(\.profile), [model.candidateProfile])
+        XCTAssertEqual(SpeechProcessingProfile.production.outputGainDB, 0)
+        XCTAssertEqual(SpeechProcessingProfile.production.compressionPreset, .off)
+    }
+
+    func testCalibrationProcessorKeepsFixtureWithinConfiguredSamplePeakCeiling() async throws {
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.shortFact)
+        let profile = SpeechProcessingProfile.calibrationCandidate(
+            outputGainDB: 12,
+            compressionPreset: .strong,
+            presenceGainDB: 4
+        )
+
+        let prepared = try await DefaultPremiumSpeechProcessor().prepare(
+            speechAudio: [fixture.rawSpeechAudio],
+            profile: profile
+        )
+        let ceiling = pow(Float(10), profile.samplePeakCeilingDBFS / 20)
+
+        XCTAssertLessThanOrEqual(prepared.resultingSamplePeak, ceiling + 0.000_1)
+        XCTAssertGreaterThan(prepared.processingDuration, 0)
+    }
+
+    @MainActor
+    func testCalibrationPreparationFailureRecordsTerminalOutcomeAndReleasesSession() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory, persistenceDelay: 0)
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(audioSession: audioSession, diagnostics: diagnostics)
+        let completed = expectation(description: "Preparation failure completes")
+
+        locationManager.playCalibrationPremium(
+            rawSpeechAudio: Data([0, 1, 2]),
+            profile: .production,
+            fixtureID: .placeName,
+            profileID: "current-a",
+            onPlaybackStarted: {}
+        ) { result in
+            if case .success = result { XCTFail("Expected preparation failure") }
+            completed.fulfill()
+        }
+
+        await fulfillment(of: [completed], timeout: 3)
+        XCTAssertEqual(audioSession.activationRequests.count, 0)
+        XCTAssertEqual(
+            diagnostics.entries.last?.speechCalibration?.terminalOutcome,
+            .preparationFailed
+        )
+    }
+
+    @MainActor
+    func testCalibrationAudioSessionFailureRecordsTerminalOutcomeAndReleasesOwnership() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory, persistenceDelay: 0)
+        let audioSession = RecordingAudioSessionManager()
+        audioSession.activationFailuresRemaining = 1
+        let locationManager = LocationManager(audioSession: audioSession, diagnostics: diagnostics)
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.placeName)
+        let completed = expectation(description: "Session failure completes")
+
+        locationManager.playCalibrationPremium(
+            rawSpeechAudio: fixture.rawSpeechAudio,
+            profile: .production,
+            fixtureID: .placeName,
+            profileID: "current-a",
+            onPlaybackStarted: {}
+        ) { result in
+            if case .success = result { XCTFail("Expected session failure") }
+            completed.fulfill()
+        }
+
+        await fulfillment(of: [completed], timeout: 5)
+        XCTAssertEqual(audioSession.activationRequests.count, 1)
+        XCTAssertEqual(
+            diagnostics.entries.last?.speechCalibration?.terminalOutcome,
+            .sessionFailed
+        )
+    }
+
+    @MainActor
+    func testCalibrationCancellationPreventsPlaybackAndRecordsTerminalOutcome() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory, persistenceDelay: 0)
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(audioSession: audioSession, diagnostics: diagnostics)
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.shortFact)
+        let completed = expectation(description: "Cancellation completes")
+
+        locationManager.playCalibrationPremium(
+            rawSpeechAudio: fixture.rawSpeechAudio,
+            profile: .calibrationCandidate(
+                outputGainDB: 12,
+                compressionPreset: .strong,
+                presenceGainDB: 4
+            ),
+            fixtureID: .shortFact,
+            profileID: "candidate-b",
+            onPlaybackStarted: {}
+        ) { result in
+            guard case .failure(let error) = result,
+                  error as? SpeechCalibrationError == .cancelled else {
+                return XCTFail("Expected cancellation")
+            }
+            completed.fulfill()
+        }
+        locationManager.stopCalibrationPlayback()
+
+        await fulfillment(of: [completed], timeout: 3)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(audioSession.activationRequests.count, 0)
+        XCTAssertEqual(
+            diagnostics.entries.last?.speechCalibration?.terminalOutcome,
+            .cancelled
+        )
+    }
+
+    @MainActor
+    func testCalibrationActivePlaybackCancellationReleasesOwnedAudioSession() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory, persistenceDelay: 0)
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(audioSession: audioSession, diagnostics: diagnostics)
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.shortFact)
+        let completed = expectation(description: "Active playback cancellation completes")
+
+        locationManager.playCalibrationPremium(
+            rawSpeechAudio: fixture.rawSpeechAudio,
+            profile: .production,
+            fixtureID: .shortFact,
+            profileID: "current-a",
+            onPlaybackStarted: {}
+        ) { result in
+            guard case .failure(let error) = result,
+                  error as? SpeechCalibrationError == .cancelled else {
+                return XCTFail("Expected cancellation")
+            }
+            completed.fulfill()
+        }
+        for _ in 0..<100 where audioSession.activationRequests.isEmpty {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(audioSession.activationRequests.count, 1)
+        locationManager.stopCalibrationPlayback()
+
+        await fulfillment(of: [completed], timeout: 3)
+        XCTAssertEqual(audioSession.deactivationCount, 1)
+        XCTAssertEqual(diagnostics.entries.last?.speechCalibration?.terminalOutcome, .cancelled)
+    }
+
+    @MainActor
+    func testCalibrationPlaybackCompletionReleasesOwnedAudioSession() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let diagnostics = RideDiagnosticsStore(directoryURL: directory, persistenceDelay: 0)
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(audioSession: audioSession, diagnostics: diagnostics)
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.placeName)
+        let completed = expectation(description: "Playback completion completes")
+
+        locationManager.playCalibrationPremium(
+            rawSpeechAudio: fixture.rawSpeechAudio,
+            profile: .production,
+            fixtureID: .placeName,
+            profileID: "current-a",
+            onPlaybackStarted: {}
+        ) { result in
+            if case .failure(let error) = result { XCTFail("Unexpected playback failure: \(error)") }
+            completed.fulfill()
+        }
+
+        await fulfillment(of: [completed], timeout: 8)
+        XCTAssertEqual(audioSession.activationRequests.count, 1)
+        XCTAssertEqual(audioSession.deactivationCount, 1)
+        XCTAssertEqual(diagnostics.entries.last?.speechCalibration?.terminalOutcome, .completed)
+    }
+#endif
+
     func testPremiumSpeechPeakNormaliserAppliesCalculatedGainToPcmSamples() throws {
         let format = try XCTUnwrap(AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -301,7 +739,11 @@ final class LocationManagerTests: XCTestCase {
         let encodedMP3 = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYyLjEyLjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAADAAAB7wCTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5PKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysr///////////////////////////////////////////8AAAAATGF2YzYyLjI4AAAAAAAAAAAAAAAAJAKjAAAAAAAAAe8WobKwAAAAAAD/+xDEAAAEdBNVVJCAMKYJrzcaIAIAAa05QAABWTo9UFAIBgkB8HwfB8oCAIBhEHwf1Ag7E4f4g3AEk/bAYDgcDgAAAAAAKIkqmRRkCOkCSBaj94UB8BMb8CKUL6gaEvwkDSoAAADgCf/7EsQCggUcHS+90AAgo4PmtrgABoAAAOC4IEAFJQRgMbD4SaWFOYlBOYKASCQCLJAoAmvd3f+v1EQCMMMACzE1TjAAMABw5FtzepxMYhkIDaE8vGg+yu32r8U9v/1/96Ouh4wJEa0CI//7EMQDgAVQQ0YZs4AAlwam65gwBAeHTQVwo6rgtPSMSdi31/6PNmsL3g6EnvlxsR8GgW+FSzfxUBi7C4AAAEwlCMTnmSSDUDq8kiSFKlp5KJIoKArGMKd4lulQW4lqTEFNRTMuMTAw"
         let mp3 = try XCTUnwrap(Data(base64Encoded: encodedMP3))
 
-        let prepared = try await PremiumAudioPreparer.prepare(dataSegments: [mp3, mp3])
+        let processor: PremiumSpeechProcessing = DefaultPremiumSpeechProcessor()
+        let prepared = try await processor.prepare(
+            speechAudio: [mp3, mp3],
+            profile: .production
+        )
 
         XCTAssertEqual(prepared.buffers.count, 2)
         XCTAssertGreaterThan(prepared.buffers[0].frameLength, 0)

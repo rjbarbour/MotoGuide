@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "fixtureRevision": "premium-voice-2026-08-03-r1",
+  "generationDate": "2026-08-03",
+  "proxySpeechContractRevision": "FACT_PROXY_OPENAPI.yaml sha256:98495fe2deeef924fd59a3d10288ace047d3f4c55e3ac61e253e79e4c2e4266c",
+  "elevenLabsModel": "eleven_multilingual_v2",
+  "elevenLabsOutputFormat": "mp3_44100_128",
+  "voiceConfigurationRevision": "fly-production-voice-2026-08-03",
+  "measurement": "FFmpeg ebur128 with peak=true; raw returned MP3 audio",
+  "privacyStatement": "These fixtures contain no personal data, credentials, custom rider instructions, installation identifiers or authenticated request headers.",
+  "fixtures": [
+    {
+      "id": "placeName",
+      "filename": "premium-place-name.mp3",
+      "announcementText": "Cheltenham.",
+      "byteLength": 16762,
+      "sha256": "ea16181a7a17287d8d583aaa2394a18b2258980d9d7ccb196fd06bcce7ed46af",
+      "rawIntegratedLUFS": -24.0,
+      "rawTruePeakDBFS": -6.6
+    },
+    {
+      "id": "boundary",
+      "filename": "premium-boundary.mp3",
+      "announcementText": "Welcome to Wales. You are now entering Monmouthshire.",
+      "byteLength": 52288,
+      "sha256": "cca5098fb62542c6a855cc4d9afe955a618183882e3ec239deb0e16ad4742b35",
+      "rawIntegratedLUFS": -22.6,
+      "rawTruePeakDBFS": -5.9
+    },
+    {
+      "id": "shortFact",
+      "filename": "premium-short-fact.mp3",
+      "announcementText": "Stroud grew around the wool trade, with steep Cotswold valleys providing fast-flowing water for its historic mills.",
+      "byteLength": 104533,
+      "sha256": "7d8487e65fd94a8b517b41366784141ad6bcb16158b8eb26fcbd952375b15cba",
+      "rawIntegratedLUFS": -24.6,
+      "rawTruePeakDBFS": -6.8
+    }
+  ]
+}

@@ -8,7 +8,7 @@ Prepare a private external TestFlight beta for 3–5 named iPhone testers. This 
 
 ## Last verified result
 
-RideHorizon `0.12.3 (20260803.2218)` is installed and launched on the physical iPhone. It opens idle, starts and ends continuous work only through explicit **Start ride / End ride** actions, and retains the bounded inactivity lifecycle. During this Debug validation campaign, Test Mode defaults on unless the user has explicitly changed it; Release/TestFlight still defaults off. Road plus Names Only are applied once when this Debug campaign starts, without overwriting later explicit choices. Both manual Test Mode controls enter the same `advanceTestLocation()` pipeline. The enabled music setting activates a non-mixing audio session immediately before actual Apple or Premium Voice playback, temporarily interrupting other audio, then deactivates with notification so iOS can resume it. No preflight primary-audio hint or timer delays an announcement. Genuine observed interruption/secondary-audio intervals pause speech and restart it immediately only after every overlapping interval ends. Premium Voice is decoded off-main and peak-normalised by at most +6.02 dB using one gain across the announcement. A privacy-safe private-beta diagnostic chain correlates place lookup through fact generation, TTS, audio readiness, playback, interruption, cancellation, restart and release, and adds coarse public network-path snapshots only at proxy-backed request stages. It retains no text, coordinates, carrier identity, IP addresses or credentials. The previously Apple-validated `20260803.0032` archive is superseded and must not be uploaded.
+RideHorizon internal calibration candidate `0.12.3 (20260803.2300)` is installed and launched on the physical iPhone. It retains the explicit ride lifecycle and event-driven music interruption/restoration behaviour from `20260803.2218`. The production Premium Voice profile is unchanged. An internal-only Speech Calibration Lab now compares that baseline with bounded local candidate processing using three immutable Premium Voice fixtures and the live production Apple Voice path. Every fixture play reloads original bundled bytes, makes no proxy request and uses the existing announcement audio-session lifecycle. Experimental profiles remain separate from production. Calibration-specific diagnostics retain only fixture/profile identifiers, processing measurements and terminal outcomes. The Calibration target passed 185 physical-device tests and the normal Debug target passed 173; representative and extreme offline renders remained at or below −2.1 dBFS true peak. The unsigned normal Release build succeeded and contains no calibration resources, UI labels, navigation entry or persistence key. The previously Apple-validated `20260803.0032` archive remains superseded and must not be uploaded.
 
 ## Delivery Risk Cube
 
@@ -18,7 +18,7 @@ RideHorizon `0.12.3 (20260803.2218)` is installed and launched on the physical i
 
 ## Current gate
 
-**VERIFY — YouTube Music gate.** Increment 1 revision is installed and launched as `0.12.3 (20260803.2218)`. All 172 physical-device tests passed, signed Debug and Release builds succeeded, and the live Fly health endpoint returned `ok`; the earlier live fact and Premium Voice smoke remained compatible because this batch did not change the proxy contract. Rob must now verify one Apple Voice and one Premium Voice announcement with YouTube Music through the phone output, then repeat the passing case through the helmet headset. Judge the revised location-to-voice latency, speech loudness and the transition when iOS resumes music. Do not tune Google Maps, archive or upload until this gate is accepted.
+**VERIFY — Speech Calibration human gate.** Internal candidate `0.12.3 (20260803.2300)` is installed and launched. While stopped, Rob must open Settings → Developer → Speech Calibration, start YouTube Music manually and compare Current A with Candidate B for Place Name, Boundary and Short Fact through the phone and helmet headset. Judge intelligibility, harshness/clipping and the transition when iOS restores music. Save/export a candidate only if useful. Do not promote a profile, tune Google Maps, archive or upload until Rob accepts or rejects the calibration approach.
 
 ## Residual risks
 
@@ -32,6 +32,6 @@ RideHorizon `0.12.3 (20260803.2218)` is installed and launched on the physical i
 
 ## Next outcomes
 
-1. Run the YouTube Music gate on `0.12.3 (20260803.2218)`: Apple Voice and Premium Voice through the phone output, then the passing case through the helmet headset.
-2. If it passes, complete the remaining stationary checks, archive and validate this replacement code, then upload it for Internal TestFlight.
+1. Run the stationary Speech Calibration gate on `0.12.3 (20260803.2300)` through the phone output and helmet headset, with and without YouTube Music.
+2. Record whether Current A or a saved Candidate B is accepted. Only then promote the chosen profile and repeat the required audio tests.
 3. Install the exact TestFlight binary and complete the road, background, inactivity, audio, network and power evidence before external review submission.
