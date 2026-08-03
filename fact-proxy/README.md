@@ -6,7 +6,7 @@ The same proxy also fronts ElevenLabs text-to-speech. The ElevenLabs key, voice 
 
 OpenAPI contract source: `/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml`.
 
-Human-readable companion: `/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_CONTRACT.md`.
+Human-readable companion: `/Users/rob_dev/DocsLocal/motoguide/repo/docs/architecture/contracts/FACT_PROXY_CONTRACT.md`.
 
 ## Prerequisites
 

@@ -4,7 +4,7 @@ Date: 2026-07-03
 
 ## 2026-07-17 Identity Migration
 
-`REBRANDING_PLAN.md` defines the clean identity migration before the first App Store Connect upload. The renamed proxy must not be deployed until its secret retrieval complies with AXON SOP: Secret Management in Agentic AI Development v3.0.
+`docs/product/plans/REBRANDING_PLAN.md` defines the clean identity migration before the first App Store Connect upload. The renamed proxy must not be deployed until its secret retrieval complies with AXON SOP: Secret Management in Agentic AI Development v3.0.
 
 The local source migration is complete and the renamed proxy unit suite passes. iOS signing awaits the new Apple App ID and the developer account in Xcode; unsigned asset compilation is currently blocked by the unavailable CoreSimulator runtime.
 
@@ -23,9 +23,9 @@ The plans are now aligned with the codebase at a high level:
 - Standard rider-facing speech term is **announcements**. Use **ride-aware announcements** for the planned delay/mute-by-ride-state feature.
 - Fact quality review on 2026-07-03 shows isolated facts improved, but ride sequences still repeat regional topics. The next fact-quality step is ride context, topic memory, and sequence evaluation.
 - The commercial vision is broader than MVP1: user-controlled guidance from silent mode to adaptive always-on tour guide, with POI discovery, voice questions, rider preferences, and navigation handoff.
-- PMF Factory / 100 Tasks review is now captured in `PMF_FACTORY_100_TASKS_REVIEW.md`; use it to keep validation work focused and to avoid premature scale/funding/org tasks.
+- PMF Factory / 100 Tasks review is now captured in `docs/product/strategy/PMF_FACTORY_100_TASKS_REVIEW.md`; use it to keep validation work focused and to avoid premature scale/funding/org tasks.
 - Deep-research report is available at `/Users/rob_dev/DocsLocal/motoguide/resources/RideHorizon_market_deep-research-report.md`.
-- Current market-validation operating plan is `TWO_WEEK_MARKET_VALIDATION_PLAN.md`.
+- Current market-validation operating plan is `docs/product/strategy/TWO_WEEK_MARKET_VALIDATION_PLAN.md`.
 
 ## Status By Milestone
 
@@ -69,8 +69,8 @@ The plans are now aligned with the codebase at a high level:
 
 ## Fact Quality Direction Notes
 
-- `fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md` shows the refined prompt direction: Short Facts at 35-45 words and Long Facts at 75-90 words.
-- `fact-quality/FACT_SEQUENCE_QUALITY_REVIEW_2026-07-03.md` shows the remaining failure: good isolated facts still become stale when several nearby places repeat the same regional setup.
+- `docs/evidence/fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md` shows the refined prompt direction: Short Facts at 35-45 words and Long Facts at 75-90 words.
+- `docs/evidence/fact-quality/FACT_SEQUENCE_QUALITY_REVIEW_2026-07-03.md` shows the remaining failure: good isolated facts still become stale when several nearby places repeat the same regional setup.
 - Next contract work: optional `rideContext` with previous spoken places, previous topics, avoid topics, desired novelty, and familiarity policy.
 - Next app work: keep a small topic memory for the last 3-5 spoken facts and add a home quiet radius after MVP1 field validation.
 - Next test work: a sequence fixture that confirms repeated towns avoid repeating Cotswolds/limestone/stone/wool/cloth/mills unless the fact is truly distinctive.
@@ -85,12 +85,12 @@ The plans are now aligned with the codebase at a high level:
 ## Known Sync Notes
 
 - `MILESTONES.md` is the forward roadmap.
-- `ROADMAP_STATUS.md` is the current implementation-status ledger.
-- `MVP_POLISH_PLAN.md` is the quality/spec bar for M6.5.
-- `MAP_SITUATIONAL_AWARENESS.md` is the Location screen design spec.
-- `PMF_FACTORY_100_TASKS_REVIEW.md` maps RideHorizon to the local PMF Factory and 100 Tasks material.
-- `TWO_WEEK_MARKET_VALIDATION_PLAN.md` turns the deep-research report into the current 14-day validation sprint.
-- `MILESTONE_*_STATUS.md` files are historical status notes and should be updated when a milestone changes state.
+- `docs/project/status/ROADMAP_STATUS.md` is the current implementation-status ledger.
+- `docs/product/plans/MVP_POLISH_PLAN.md` is the quality/spec bar for M6.5.
+- `docs/architecture/design/MAP_SITUATIONAL_AWARENESS.md` is the Location screen design spec.
+- `docs/product/strategy/PMF_FACTORY_100_TASKS_REVIEW.md` maps RideHorizon to the local PMF Factory and 100 Tasks material.
+- `docs/product/strategy/TWO_WEEK_MARKET_VALIDATION_PLAN.md` turns the deep-research report into the current 14-day validation sprint.
+- `docs/project/status/MILESTONE_*_STATUS.md` files are historical status notes and should be updated when a milestone changes state.
 
 ## Next Human-Operable Steps
 
@@ -109,11 +109,11 @@ The plans are now aligned with the codebase at a high level:
 5. Run the first MVP1 field trial on 2026-07-03.
    Expected result: one ride report records GPS, background behavior, headset audio, fact timing, and Location screen usefulness.
 
-6. Review the field-trial result against `PMF_FACTORY_100_TASKS_REVIEW.md`.
+6. Review the field-trial result against `docs/product/strategy/PMF_FACTORY_100_TASKS_REVIEW.md`.
    Expected result: the next work is either another validation loop, focused polish, TestFlight recruitment, or a pause/reposition decision.
 
 7. Start the 14-day market validation sprint.
-   Expected result: the landing-page/survey path, rider interviews, community posts, and private-beta recruitment are driven from `TWO_WEEK_MARKET_VALIDATION_PLAN.md`.
+   Expected result: the landing-page/survey path, rider interviews, community posts, and private-beta recruitment are driven from `docs/product/strategy/TWO_WEEK_MARKET_VALIDATION_PLAN.md`.
 
 8. After the first field ride, decide whether to implement ride-aware announcements before broader testing.
    Expected result: either M7.5 is pulled forward because speech timing felt distracting, or it stays post-MVP1 because the current sparse timing is acceptable.

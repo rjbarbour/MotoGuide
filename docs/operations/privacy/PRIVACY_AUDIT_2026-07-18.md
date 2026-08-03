@@ -60,7 +60,7 @@ Primary external sources:
 - [ElevenLabs: Zero Retention Mode](https://elevenlabs.io/docs/eleven-api/resources/zero-retention-mode)
 - [Fly.io: Logging overview](https://fly.io/docs/monitoring/logging-overview/)
 
-Detailed Apple research is in `research/2026-07-18-apple-app-privacy-requirements.md`.
+Detailed Apple research is in `docs/research/2026-07-18-apple-app-privacy-requirements.md`.
 
 ## Actual Data Flows
 

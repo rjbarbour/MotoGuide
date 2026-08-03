@@ -129,7 +129,7 @@ xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xco
 
 Expected result: the RideHorizon unit test target builds and runs in the iOS Simulator.
 
-Actual result: **BUILD SUCCEEDED** and **TEST SUCCEEDED** on iPhone 17 simulator running iOS 26.3.1. This result was recorded in `MILESTONE_1_STATUS.md` on 2026-07-01.
+Actual result: **BUILD SUCCEEDED** and **TEST SUCCEEDED** on iPhone 17 simulator running iOS 26.3.1. This result was recorded in `docs/project/status/MILESTONE_1_STATUS.md` on 2026-07-01.
 
 ## OTA Device Deploy Result
 

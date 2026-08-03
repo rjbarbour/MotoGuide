@@ -122,7 +122,7 @@ Contract requirements:
 - Bound and validate every request field before cryptographic or upstream processing.
 - Use generic client-facing authentication failures without revealing validation internals.
 - Never include credential material in logs, metrics, exception messages, documentation, or tests.
-- Update `FACT_PROXY_OPENAPI.yaml` and `FACT_PROXY_CONTRACT.md` in the same change as the implementation.
+- Update `FACT_PROXY_OPENAPI.yaml` and `docs/architecture/contracts/FACT_PROXY_CONTRACT.md` in the same change as the implementation.
 
 ## Database Changes
 
@@ -359,5 +359,5 @@ If verified provisioning fails after deployment:
 - Apple, Validating apps that connect to your server: https://developer.apple.com/documentation/devicecheck/validating-apps-that-connect-to-your-server
 - Apple, Preparing to use the App Attest service: https://developer.apple.com/documentation/DeviceCheck/preparing-to-use-the-app-attest-service
 - Project secret-management SOP: https://www.notion.so/320a4c502b1781d9ab34c4abf6d44152
-- Current proxy contract: `FACT_PROXY_OPENAPI.yaml` and `FACT_PROXY_CONTRACT.md`
-- Current reliability record: `ELEVENLABS_RELIABILITY_PLAN.md`
+- Current proxy contract: `FACT_PROXY_OPENAPI.yaml` and `docs/architecture/contracts/FACT_PROXY_CONTRACT.md`
+- Current reliability record: `docs/architecture/plans/ELEVENLABS_RELIABILITY_PLAN.md`

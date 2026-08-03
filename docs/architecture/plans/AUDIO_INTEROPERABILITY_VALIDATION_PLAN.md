@@ -9,8 +9,9 @@ Status: **Candidate `0.12.3 (20260803.2218)` is installed at the physical YouTub
 This document is the requirements and validation plan for RideHorizon coexistence with audio from other iOS apps.
 
 - `Backlog.md` remains the authority for delivery status and gates.
-- `TESTFLIGHT_FIELD_TEST_EVIDENCE.md` remains the authority for test runs and results.
+- `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md` remains the authority for test runs and results.
 - This document owns the audio-interoperability requirements, platform assumptions, diagnostic contract and staged test design.
+- `docs/architecture/specs/SPEECH_INTELLIGIBILITY_CALIBRATION_SPEC.md` owns the bounded intelligibility probe: audit the existing peak-normalisation delta, use three immutable Premium Voice fixtures, keep the calibration lab internal-only and stop for human profile selection before changing the production default.
 
 The current commitment is a private TestFlight beta. This is a production-quality and implementation-fidelity increment, not new product breadth.
 
@@ -148,7 +149,7 @@ Do not log:
 - an inferred external-app identity.
 - carrier identity, SIM/service identifiers, IP addresses or precise radio measurements.
 
-The test operator records the known external app and scenario in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`. The app log records only what iOS and RideHorizon actually observed.
+The test operator records the known external app and scenario in `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md`. The app log records only what iOS and RideHorizon actually observed.
 
 ## Increment 1 — Diagnostic sufficiency and YouTube Music
 

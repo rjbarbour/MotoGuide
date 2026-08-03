@@ -4,7 +4,7 @@ Date: 2026-07-03
 
 ## 2026-07-17 Identity Migration
 
-The prototype is being cleanly renamed from RideHorizon to RideHorizon before the first App Store Connect build upload. See `REBRANDING_PLAN.md` for the binding identity map, acceptance criteria, and deployment constraint. This migration changes the app's bundle identifier, source namespaces, proxy contract names, and current documentation; it does not change the rider-safety product scope.
+The prototype is being cleanly renamed from RideHorizon to RideHorizon before the first App Store Connect build upload. See `docs/product/plans/REBRANDING_PLAN.md` for the binding identity map, acceptance criteria, and deployment constraint. This migration changes the app's bundle identifier, source namespaces, proxy contract names, and current documentation; it does not change the rider-safety product scope.
 
 ## Product Goal
 
@@ -70,7 +70,7 @@ Date: 2026-07-03
 - Add optional coarse home/familiar-region context and a later home quiet radius so the app can avoid facts near familiar places. Do not send an exact home address.
 - Keep the implemented map-first Location screen and finish the remaining M6 items: nearby towns, previous street, stopped-only zoom presets, presentation tests, and field readability pass.
 - Keep the long-term product narrative visible during validation: the app can range from silent to always-on guidance, with user-controlled detail and interests.
-- Use `TWO_WEEK_MARKET_VALIDATION_PLAN.md` as the current market-validation sprint after the deep-research report at `/Users/rob_dev/DocsLocal/motoguide/resources/RideHorizon_market_deep-research-report.md`.
+- Use `docs/product/strategy/TWO_WEEK_MARKET_VALIDATION_PLAN.md` as the current market-validation sprint after the deep-research report at `/Users/rob_dev/DocsLocal/motoguide/resources/RideHorizon_market_deep-research-report.md`.
 
 ## Milestone 0: Project Setup And Baseline Verification
 
@@ -79,7 +79,7 @@ Target outcome: the local checkout, docs, signing path, and test environment are
 Existing baseline:
 
 - The repository is cloned at `/Users/rob_dev/DocsLocal/motoguide/repo`.
-- `AGENTS.md`, `MILESTONES.md`, and `MILESTONE_0_STATUS.md` exist in the repository root.
+- `AGENTS.md` and `MILESTONES.md` exist in the repository root; milestone status records are in `docs/project/status/`.
 - Xcode sees the `RideHorizon` scheme.
 - CoreDevice has seen `Robert's iPhone` over the OTA path as `Roberts-iPhone-17.coredevice.local`; `xcodebuild -showdestinations` may not always list it.
 - Xcode now has an iPhone 17 Pro Max simulator runtime available.
@@ -89,7 +89,7 @@ Remaining work:
 - Keep Robert's iPhone unlocked, trusted, and on the same Wi-Fi as the Mac for OTA deploys.
 - Re-run on the physical phone after any coherent app-code batch.
 - Re-run simulator tests after any simulator launch issue is cleared.
-- Keep `MILESTONE_0_STATUS.md` updated with the latest pass/fail result.
+- Keep `docs/project/status/MILESTONE_0_STATUS.md` updated with the latest pass/fail result.
 
 Done when:
 
@@ -236,13 +236,13 @@ Existing baseline:
 - The app can already speak selected place/address components.
 - The proposed first-region route is known.
 - Short Facts and Long Facts use the OpenAI-backed RideHorizon fact proxy as the primary implementation path.
-- The proxy API contract is documented in `FACT_PROXY_OPENAPI.yaml`, with `FACT_PROXY_CONTRACT.md` as the human-readable companion.
+- The proxy API contract is documented in `FACT_PROXY_OPENAPI.yaml`, with `docs/architecture/contracts/FACT_PROXY_CONTRACT.md` as the human-readable companion.
 
 Enhancement work:
 
 - Define short and long fact formats.
 - Use the OpenAI-backed fact proxy first. Keep the iOS client and proxy server aligned with `FACT_PROXY_OPENAPI.yaml`.
-- Keep `LOCAL_LLM_FACTS_FALLBACK_PLAN.md` as an alternative if OpenAI cost, latency, connectivity, privacy, or quality becomes a blocker.
+- Keep `docs/architecture/plans/LOCAL_LLM_FACTS_FALLBACK_PLAN.md` as an alternative if OpenAI cost, latency, connectivity, privacy, or quality becomes a blocker.
 - Add a content-depth parameter, including names only, Short Facts, and Long Facts.
 - Revise fact length targets from the 2026-07-03 prompt-refinement pass:
   - Short Facts: 35-45 words, one sentence or two short sentences.
@@ -294,7 +294,7 @@ Done when:
 
 Target outcome: riders can glance at the Location screen and understand where they are in the geographic hierarchy and relative to nearby towns, without turn-by-turn navigation.
 
-Design reference: `MAP_SITUATIONAL_AWARENESS.md`
+Design reference: `docs/architecture/design/MAP_SITUATIONAL_AWARENESS.md`
 
 Existing baseline:
 
@@ -330,7 +330,7 @@ Done when:
 
 Target outcome: RideHorizon feels like a focused rider app, not a developer test harness, and avoids obvious App Store review problems before broader testing.
 
-Design reference: `MVP_POLISH_PLAN.md`
+Design reference: `docs/product/plans/MVP_POLISH_PLAN.md`
 
 Work:
 

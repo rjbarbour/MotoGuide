@@ -33,7 +33,7 @@ Actual result: the path was not present on this machine, so this review uses the
 |-------------------|------------------|
 | 1. Idea Capture | Done. RideHorizon has an ICB and product definition. |
 | 2. AutoVC evaluation | Partial. The use case is clear, but willingness-to-use and willingness-to-pay are unproven. |
-| 3. Validation Plan | Started. `BUSINESS_VALIDATION_PLAN.md` defines MiroFish, interviews, ride tests, waitlist, and TestFlight. |
+| 3. Validation Plan | Started. `docs/product/strategy/BUSINESS_VALIDATION_PLAN.md` defines MiroFish, interviews, ride tests, waitlist, and TestFlight. |
 | 4. MVP Design | Mostly done for MVP1. Scope is live location, boundary changes, helmet speech, names/facts/quiet modes. |
 | 5. Reusable Primitives | Not the priority. Extract only if repeated across PMF Factory products. |
 | 6. Build | In progress. The iOS prototype and fact proxy exist. Field polish remains. |
@@ -51,7 +51,7 @@ Deep-research report:
 Current operating plan:
 
 ```text
-/Users/rob_dev/DocsLocal/motoguide/repo/TWO_WEEK_MARKET_VALIDATION_PLAN.md
+/Users/rob_dev/DocsLocal/motoguide/repo/docs/product/strategy/TWO_WEEK_MARKET_VALIDATION_PLAN.md
 ```
 
 Supporting landing-page tool:

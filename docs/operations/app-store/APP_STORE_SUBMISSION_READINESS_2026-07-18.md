@@ -183,7 +183,7 @@ The detailed privacy audit recommends answering **Yes** to data collection. The 
 
 Declare **No** for tracking only if the final app, proxy, providers, and privacy manifests do not link data across other companies' apps or websites for advertising, measurement, or data-broker purposes. Recheck the answers against a captured Release network trace and the final provider contracts immediately before submission.
 
-See `PRIVACY_AUDIT_2026-07-18.md` for the evidence and remediation detail.
+See `docs/operations/privacy/PRIVACY_AUDIT_2026-07-18.md` for the evidence and remediation detail.
 
 ## Recommended Order
 

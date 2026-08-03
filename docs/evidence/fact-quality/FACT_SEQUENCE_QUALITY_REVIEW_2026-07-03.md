@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 
-Scope: review the latest generated facts from `FACT_QUALITY_REVIEW_2026-07-03.md`, especially:
+Scope: review the latest generated facts from `docs/evidence/fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md`, especially:
 
 - `length-range-iteration-3-diverse`
 - `length-range-iteration-3-gloucestershire`
@@ -208,7 +208,7 @@ uv run --python 3.13 /Users/rob_dev/DocsLocal/motoguide/repo/scripts/review_fact
 Expected result:
 
 ```text
-Wrote 20 generated fact rows to /Users/rob_dev/DocsLocal/motoguide/repo/fact-quality/FACT_SEQUENCE_QUALITY_REVIEW_2026-07-03.md
+Wrote 20 generated fact rows to /Users/rob_dev/DocsLocal/motoguide/repo/docs/evidence/fact-quality/FACT_SEQUENCE_QUALITY_REVIEW_2026-07-03.md
 ```
 
 That command still tests isolated proxy calls. The next harness should simulate a route and pass previous-place/topic context once the contract supports it.

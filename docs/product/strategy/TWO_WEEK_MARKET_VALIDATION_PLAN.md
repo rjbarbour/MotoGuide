@@ -252,7 +252,7 @@ Work:
 - Run the owner field ride if not already done.
 - Recruit 3 to 5 private beta riders if build logistics allow.
 - Collect post-ride feedback immediately.
-- Use `TESTFLIGHT_PRIVATE_BETA_PACK.md` for the tester invitation, first-ride instructions, feedback questions, and release gate. Do not invite external testers until every release-gate item is true.
+- Use `docs/operations/testflight/TESTFLIGHT_PRIVATE_BETA_PACK.md` for the tester invitation, first-ride instructions, feedback questions, and release gate. Do not invite external testers until every release-gate item is true.
 
 Expected result: at least one real ride report, preferably several beta commitments.
 

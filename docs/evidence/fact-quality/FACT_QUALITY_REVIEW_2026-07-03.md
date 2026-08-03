@@ -136,7 +136,7 @@ uv run --python 3.13 /Users/rob_dev/DocsLocal/motoguide/repo/scripts/review_fact
 Expected result:
 
 ```text
-Wrote 10 generated fact rows to /Users/rob_dev/DocsLocal/motoguide/repo/fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md
+Wrote 10 generated fact rows to /Users/rob_dev/DocsLocal/motoguide/repo/docs/evidence/fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md
 ```
 
 Object-store next step:

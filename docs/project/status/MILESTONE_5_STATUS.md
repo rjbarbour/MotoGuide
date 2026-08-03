@@ -30,7 +30,7 @@ The iOS app no longer needs an OpenAI API key. It calls the proxy; the proxy own
 
 OpenAPI contract source: `FACT_PROXY_OPENAPI.yaml`.
 
-Human-readable companion: `FACT_PROXY_CONTRACT.md`.
+Human-readable companion: `docs/architecture/contracts/FACT_PROXY_CONTRACT.md`.
 
 | Mode | LLM calls | Facts spoken |
 |------|-----------|--------------|
@@ -139,8 +139,8 @@ Update the proxy contract and implementation before broader testing:
 
 ## Fact Quality Review References
 
-- Raw generation log: `fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md`
-- Sequence review: `fact-quality/FACT_SEQUENCE_QUALITY_REVIEW_2026-07-03.md`
+- Raw generation log: `docs/evidence/fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md`
+- Sequence review: `docs/evidence/fact-quality/FACT_SEQUENCE_QUALITY_REVIEW_2026-07-03.md`
 - Current prompt override example: `prompt-overrides/fact-quality-2026-07-03.json`
 
 ## Tests

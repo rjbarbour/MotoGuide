@@ -51,6 +51,22 @@ Current interface:
 
 Log: scrollable history and manual test/current-location log button.
 
+## Speech and content terminology
+
+Use these terms consistently in product discussions, code, logs, and tests:
+
+- **Fact**: the place-related information generated or selected for the rider.
+- **Announcement text**: the rider-facing text prepared from the fact and any location context.
+- **Text-to-speech (TTS)**: the process of sending announcement text to ElevenLabs (or an Apple voice) for vocalisation.
+- **Synthesised speech audio**: the audio returned by the TTS provider. Use **speech audio** as the short form.
+- **Audio stream** or **audio chunks**: use only when the provider returns the speech audio incrementally rather than as one complete file.
+- **MP3 audio**: use when describing the current encoded transport or file format, not as the general product term.
+- **Utterance**: the text intended to be spoken, not the audio returned by TTS. Avoid using it for the returned file.
+
+The canonical pipeline is: **fact → announcement text → TTS → synthesised speech audio → playback**.
+
+Recommended identifiers are `announcementText`, `speechAudio`, `SpeechAudioChunk`, and `speechAudioPlayer` where those distinctions are needed.
+
 ## Product Definition
 
 Use this definition when making product or architecture decisions:
@@ -144,9 +160,9 @@ ICB catalogue context:
 
 Market validation context:
 
-- Business validation plan: `/Users/rob_dev/DocsLocal/motoguide/repo/BUSINESS_VALIDATION_PLAN.md`
-- PMF Factory / 100 Tasks review: `/Users/rob_dev/DocsLocal/motoguide/repo/PMF_FACTORY_100_TASKS_REVIEW.md`
-- Current 14-day validation sprint: `/Users/rob_dev/DocsLocal/motoguide/repo/TWO_WEEK_MARKET_VALIDATION_PLAN.md`
+- Business validation plan: `/Users/rob_dev/DocsLocal/motoguide/repo/docs/product/strategy/BUSINESS_VALIDATION_PLAN.md`
+- PMF Factory / 100 Tasks review: `/Users/rob_dev/DocsLocal/motoguide/repo/docs/product/strategy/PMF_FACTORY_100_TASKS_REVIEW.md`
+- Current 14-day validation sprint: `/Users/rob_dev/DocsLocal/motoguide/repo/docs/product/strategy/TWO_WEEK_MARKET_VALIDATION_PLAN.md`
 - Deep-research report: `/Users/rob_dev/DocsLocal/motoguide/resources/RideHorizon_market_deep-research-report.md`
 - Supporting landing-page tool: `/Users/rob_dev/DocsLocal/landing_page_tool`
 
@@ -166,6 +182,7 @@ Notion operating references read on 2026-07-02:
 
 ## Working Rules
 
+- Treat questions, musings, and hypotheticals as read-only. Do not edit files, run tests or builds, deploy, delegate, or commit unless the user explicitly requests implementation or another state-changing action. A question asked during an active implementation task does not expand that task's scope.
 - Preserve rider safety as a first-order requirement.
 - Keep speech short, sparse, and interruptible.
 - Prefer deterministic location logic before AI-generated content.
@@ -195,7 +212,7 @@ All agents work in one checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`. Ther
 
 Batch changes, then validate once:
 
-1. **First** capture the requested work in plan/spec docs before touching implementation. Update the relevant plan files (for example `MVP_POLISH_PLAN.md`, `MILESTONE_5_STATUS.md`, `MILESTONES.md`, and any active feature spec) with the exact ask, acceptance criteria, and rationale.
+1. **First** capture the requested work in plan/spec docs before touching implementation. Update the relevant plan files (for example `docs/product/plans/MVP_POLISH_PLAN.md`, `docs/project/status/MILESTONE_5_STATUS.md`, `MILESTONES.md`, and any active feature spec) with the exact ask, acceptance criteria, and rationale.
 2. Confirm the plan and implementation files are in sync before coding.
 3. Implement a coherent chunk of work (feature slice, bugfix, or polish group).
 4. Run a compile check (`xcodebuild build` for the physical device destination).

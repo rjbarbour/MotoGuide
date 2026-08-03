@@ -246,8 +246,8 @@ Layout track:
 
 ## Existing Documentation
 
-- Product and UI plan: `MVP_POLISH_PLAN.md`
-- Identity and deployment constraint: `REBRANDING_PLAN.md`
-- HTTP contract: `FACT_PROXY_OPENAPI.yaml` and `FACT_PROXY_CONTRACT.md`
-- Image licensing: `ONBOARDING_IMAGE_ATTRIBUTION.md`
+- Product and UI plan: `docs/product/plans/MVP_POLISH_PLAN.md`
+- Identity and deployment constraint: `docs/product/plans/REBRANDING_PLAN.md`
+- HTTP contract: `FACT_PROXY_OPENAPI.yaml` and `docs/architecture/contracts/FACT_PROXY_CONTRACT.md`
+- Image licensing: `docs/operations/app-store/ONBOARDING_IMAGE_ATTRIBUTION.md`
 - Project rules: `AGENTS.md`

@@ -8,7 +8,7 @@ Status: Alternative plan. Do not implement before the OpenAI proxy path has been
 
 Use the existing OpenAI-backed fact proxy as the first Short Facts implementation.
 
-Current proxy contract: `FACT_PROXY_OPENAPI.yaml`, with `FACT_PROXY_CONTRACT.md` as the human-readable companion.
+Current proxy contract: `FACT_PROXY_OPENAPI.yaml`, with `docs/architecture/contracts/FACT_PROXY_CONTRACT.md` as the human-readable companion.
 
 Keep this plan as a fallback if OpenAI cost, latency, connectivity, privacy, or reliability becomes a problem during MVP1 field testing.
 

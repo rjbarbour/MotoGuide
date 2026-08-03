@@ -8,7 +8,7 @@ Date: 2026-08-03
 
 RideHorizon announcements were not consistently intelligible over YouTube Music. iOS controls the attenuation produced by `AVAudioSession.CategoryOptions.duckOthers`; the app cannot tune the ducking amount. Rob observed both insufficient attenuation and inconsistent apparent pause/duck behaviour while using two UI triggers that already call the same location-advance method.
 
-The immediate commitment is a safe private iPhone beta. Increment 1 of `AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md` covers YouTube Music only; Google Maps policy remains behind a later evidence gate.
+The immediate commitment is a safe private iPhone beta. Increment 1 of `docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md` covers YouTube Music only; Google Maps policy remains behind a later evidence gate.
 
 ## Decision
 
@@ -38,6 +38,6 @@ Validate with Apple Voice and Premium Voice through the phone output and the hel
 ## Traceability
 
 - Work item: `Backlog.md` RH-004, Increment 1
-- Validation plan: `AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md`
-- Evidence record: `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`
+- Validation plan: `docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md`
+- Evidence record: `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md`
 - Apple references: [duckOthers](https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions-swift.struct/duckothers), [mixWithOthers](https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions-swift.struct/mixwithothers), [notifyOthersOnDeactivation](https://developer.apple.com/documentation/avfaudio/avaudiosession/setactiveoptions/notifyothersondeactivation)

@@ -14,9 +14,9 @@ MVP1 validation role: use MVP1 as a private-beta proof of function, trust, and r
 
 ## PMF Factory And 100 Tasks Reference
 
-Use `PMF_FACTORY_100_TASKS_REVIEW.md` as the RideHorizon-specific filter over the local PMF Factory and 100 Tasks material.
+Use `docs/product/strategy/PMF_FACTORY_100_TASKS_REVIEW.md` as the RideHorizon-specific filter over the local PMF Factory and 100 Tasks material.
 
-Use `TWO_WEEK_MARKET_VALIDATION_PLAN.md` as the current operating plan for turning the market research into interviews, landing-page tests, community posts, private beta recruitment, and pricing/package signals.
+Use `docs/product/strategy/TWO_WEEK_MARKET_VALIDATION_PLAN.md` as the current operating plan for turning the market research into interviews, landing-page tests, community posts, private beta recruitment, and pricing/package signals.
 
 Deep-research source report:
 
@@ -90,7 +90,7 @@ Use these rules when interpreting validation evidence:
 MiroFish was cloned outside the iOS app checkout:
 
 ```text
-/Users/rob_dev/DocsLocal/motoguide/MiroFish
+/Users/rob_dev/DocsLocal/mirofish
 ```
 
 Upstream:
@@ -231,6 +231,16 @@ Simulate how UK and Europe touring motorcyclists react to the full RideHorizon v
 
 Expected result: determine whether the strongest commercial promise is passive place awareness, adaptive tour guide, interactive POI discovery, offline touring packs, or a combination.
 
+### Run 8: Personalisation And Packaging
+
+Simulation requirement:
+
+```text
+Simulate how UK and Europe touring motorcyclists react to two RideHorizon experiences: a cost-efficient standard guide that may reuse shared place facts and speech, and a personalised guide that adapts facts to the rider's interests, familiarity and custom instructions. Do not describe cache hits or AI-generation costs as customer-facing pricing units. Test whether personalisation changes perceived value, whether riders understand a simple package distinction, and whether it supports a touring pass, premium subscription, offline pack or no separate charge. Identify the smallest real-rider test that could distinguish curiosity from willingness to pay.
+```
+
+Expected result: pricing and package hypotheses for real interviews or a paid smoke test. Do not create tiers from simulated evidence alone.
+
 ## Other Validation Tooling
 
 ### Real-Ride Test Log
@@ -307,6 +317,7 @@ Use willingness-to-pay tests carefully:
 - Ask whether riders would pay for the MVP1-level product if it worked reliably.
 - Ask separately whether they would pay for the full adaptive tour guide with voice questions, richer descriptions, POI suggestions, and navigation handoff.
 - Test package preference: free beta, one-month touring pass, offline touring pack, annual subscription, or bundled premium features.
+- Keep caching invisible to customers. Test payment for useful capabilities such as personalisation or offline availability, not for whether an internal request happens to reuse cached content.
 - Treat refusal to pay for MVP1 as useful information, not a rejection of the full product.
 
 Expected result: decide whether MVP1 is enough for a low-priced product, or whether it should remain a private-beta stepping stone toward a higher-value guide.
@@ -400,23 +411,31 @@ Timebox: 7 days.
 Check the clone:
 
 ```bash
-cd /Users/rob_dev/DocsLocal/motoguide/MiroFish && git log -1 --oneline
+cd /Users/rob_dev/DocsLocal/mirofish && git log -1 --oneline
 ```
 
 Expected result: prints the latest commit, currently `96096ea Merge pull request #640 from lllopic/fix/add-type-hints-and-helper-method`.
 
-Create local environment config:
+Create local non-secret configuration:
 
 ```bash
-cd /Users/rob_dev/DocsLocal/motoguide/MiroFish && cp .env.example .env
+cd /Users/rob_dev/DocsLocal/mirofish && cp .env.example .env
 ```
 
-Expected result: `.env` exists and can be edited with `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL_NAME`, and `ZEP_API_KEY`.
+Expected result: `.env` contains Keychain references for `LLM_API_KEY` and `ZEP_API_KEY`, plus non-secret model configuration. Never replace those references with credential values.
+
+Verify the required Keychain items without printing their values:
+
+```bash
+security find-generic-password -s MiroFish -a LLM_API_KEY >/dev/null && security find-generic-password -s MiroFish -a ZEP_API_KEY >/dev/null
+```
+
+Expected result: no output and exit status `0`.
 
 Install dependencies:
 
 ```bash
-cd /Users/rob_dev/DocsLocal/motoguide/MiroFish && npm run setup:all
+cd /Users/rob_dev/DocsLocal/mirofish && npm run setup:all
 ```
 
 Expected result: root/frontend Node dependencies install and backend `uv sync` creates the Python environment.
@@ -424,7 +443,7 @@ Expected result: root/frontend Node dependencies install and backend `uv sync` c
 Start MiroFish:
 
 ```bash
-cd /Users/rob_dev/DocsLocal/motoguide/MiroFish && npm run dev
+cd /Users/rob_dev/DocsLocal/mirofish && npm run dev
 ```
 
 Expected result: frontend runs at `http://localhost:3000` and backend API runs at `http://localhost:5001`.
@@ -435,8 +454,8 @@ Use these as seed material:
 
 - `/Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue/staged_icbs/6a1047a6a591ed37d9fd4e0e.md`
 - `/Users/rob_dev/DocsLocal/motoguide/repo/MILESTONES.md`
-- `/Users/rob_dev/DocsLocal/motoguide/repo/ROADMAP_STATUS.md`
-- `/Users/rob_dev/DocsLocal/motoguide/repo/MVP_POLISH_PLAN.md`
+- `/Users/rob_dev/DocsLocal/motoguide/repo/docs/project/status/ROADMAP_STATUS.md`
+- `/Users/rob_dev/DocsLocal/motoguide/repo/docs/product/plans/MVP_POLISH_PLAN.md`
 - A short manual note with the target headset, iPhone, example announcement phrases, and competitor list.
 
 Expected result: MiroFish has enough context to generate rider personas, discussion behaviour, and validation reports.

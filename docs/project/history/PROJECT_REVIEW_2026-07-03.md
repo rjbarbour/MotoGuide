@@ -39,7 +39,7 @@ The main risks are not in the code. They are in workspace hygiene: a stale dupli
 
 ### MiroFish (`MiroFish`)
 
-- A clone of the third-party `666ghj/MiroFish` social-simulation tool, used to run market-validation simulations for RideHorizon (documented in `API_RUNBOOK.md` and `BUSINESS_VALIDATION_PLAN.md`).
+- A clone of the third-party `666ghj/MiroFish` social-simulation tool, used to run market-validation simulations for RideHorizon (documented in `API_RUNBOOK.md` and `docs/product/strategy/BUSINESS_VALIDATION_PLAN.md`).
 - Sensible use of an off-the-shelf tool.
 - Secrets handling (runtime `secret_resolver.py`, `.env` gitignored) follows the project SOP.
 

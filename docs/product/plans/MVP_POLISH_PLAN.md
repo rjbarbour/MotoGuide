@@ -82,7 +82,7 @@ Licensing decision:
 
 2026-07-17 implementation result:
 
-- Added forest, coast, and alpine onboarding images with a dark readability overlay, static navigation spacing, visible page indicator, and a compact RideHorizon mark. Attribution is recorded in `ONBOARDING_IMAGE_ATTRIBUTION.md`.
+- Added forest, coast, and alpine onboarding images with a dark readability overlay, static navigation spacing, visible page indicator, and a compact RideHorizon mark. Attribution is recorded in `docs/operations/app-store/ONBOARDING_IMAGE_ATTRIBUTION.md`.
 - Anchored the Location screen to the lower physical edge and raised the map controls by 62 points while retaining their existing 114-point hit targets.
 - Test Mode now seeds the first test-route waypoint immediately when tracking starts or Test Mode is enabled.
 - Map controls use a top offset of 100 points. The starting map span is 3.6 km (three times the former 1.2 km span), and the visible map-width label updates after every zoom action. Map zoom remains session-only and is not restored after relaunch.
@@ -130,7 +130,7 @@ Rename UI only where rider-visible; keep code identifiers stable.
 - Keep compact status header: current place, announcement mode, and always-running indicator.
 - Show **last spoken** phrase and timestamp.
 - Show "Waiting for GPS", permission-denied, and geocoder-failure states.
-- Keep the map-first layout per `MAP_SITUATIONAL_AWARENESS.md`: full map, compact overlay, current place, mode, and last phrase.
+- Keep the map-first layout per `docs/architecture/design/MAP_SITUATIONAL_AWARENESS.md`: full map, compact overlay, current place, mode, and last phrase.
 - Add nearby towns, previous street, stopped-only zoom presets, and presentation tests.
 - Show low-level location status text only in test mode to reduce non-signal clutter at ride speed.
 - Show compact semantic version and ISO-like build timestamp clearly near the RideHorizon title in test mode.
@@ -422,5 +422,5 @@ Rationale:
 - Settings simplify to **Announcement style** + **What to announce**; everything else in Advanced.
 - Code defaults for interval, content mode, and boundaries are already ride-sensible; main gaps are **permission timing** and **UI exposure**.
 - Milestone 6.5 sits between Location completion (M6) and Field Trial (M8).
-- Location screen (`MAP_SITUATIONAL_AWARENESS.md`) is the strongest single UX upgrade for "where am I" without competing with nav apps.
+- Location screen (`docs/architecture/design/MAP_SITUATIONAL_AWARENESS.md`) is the strongest single UX upgrade for "where am I" without competing with nav apps.
 - Field trial on 2026-07-03 should test **ride value**, not confusion about toggles and jargon.

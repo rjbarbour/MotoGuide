@@ -6,7 +6,7 @@ Status: **Audio Increment 1 build `20260803.2218` is installed and waiting at th
 
 This is the operational evidence record for stationary, road and background testing. `Backlog.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
 
-`AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md` is the requirements and staged test-design authority for coexistence with YouTube Music, Google Maps and later audio apps. Record run results here; do not duplicate delivery status in that plan.
+`docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md` is the requirements and staged test-design authority for coexistence with YouTube Music, Google Maps and later audio apps. Record run results here; do not duplicate delivery status in that plan.
 
 ## Safety rules
 
@@ -95,6 +95,37 @@ Create one record per candidate or materially different environment.
 
 Use `Not run`, `Pass`, `Fail` or `Blocked`. A pass needs the evidence named in the row.
 
+### Manual stationary observation — 2026-08-03
+
+This observation came from Rob during a clean-install/manual run while another development task was reinstalling builds. The precise installed build was therefore not confirmed and this record does not replace exact-build evidence for the release gate.
+
+| Field | Value |
+|---|---|
+| Test run ID | `2026-08-03-RB-01` |
+| App version and build | Unconfirmed Xcode development build |
+| Install source | Xcode; concurrent reinstall activity |
+| iPhone and iOS version | iPhone 17 Pro Max / iOS 26.5.2 |
+| Tester | Rob |
+
+| Area | Observed result | Assessment | Follow-up |
+|---|---|---|---|
+| Clean install and onboarding | Completed without crash or hang. Privacy details and the full public privacy-policy link worked. No invite code, proxy token, API key or other credential prompt appeared. RideHorizon naming was consistent. | Pass for the observed development build; exact TestFlight build remains required. | Onboarding and initial-screen usability findings are captured under RH-010. |
+| Development Test Mode default | Test Mode was on after installation. | Expected for the current Debug testing campaign; not acceptable as the Release/TestFlight default. Existing build configuration is intended to default Release builds to off and must be verified on the exact TestFlight build. | RH-002 exact-build check. |
+| Real-location start | With Test Mode off, the map immediately reached a plausible real position and displayed the current road. The active control changed to End Ride. No initial Apple Voice announcement occurred and no credential prompt appeared. Permission-prompt timing was inconclusive because another task was reinstalling the app. | Core foreground location behaviour observed. Contextual permission timing and diagnostic evidence remain unproved. | Retest TF-SESSION-02 on the exact build without concurrent installation. |
+| Empty announcement state | Before any announcement, the sheet displayed “No spoken phrase yet” alongside repeat/stop instructions. | Non-blocking usability debt. | RH-010. |
+| Manual end | End Ride returned the control to Start Ride. There was no positive acknowledgement that tracking had stopped. | Visible state transition observed, but resource cleanup was not evidenced. | RH-010 for acknowledgement; TF-SESSION-03 still requires the diagnostic log and location-indicator observation. |
+
+### Manual Premium Voice observation — 2026-08-03
+
+| Field | Value |
+|---|---|
+| Test run ID | `2026-08-03-RB-02` |
+| App version and build | Unconfirmed Xcode development build |
+| Conditions | Stationary; Wi-Fi; Test Mode; Road; Names Only; Premium Voice; no competing audio reported |
+| Tester | Rob |
+
+Three consecutive **Next Test Location** actions produced matching main-screen, spoken and log results in the expected order. Premium Voice succeeded every time without Apple Voice fallback. Speech was not missing, stale or duplicated at the event level. The visible location included Woolaston Court Cottage, Lydney, Gloucestershire, England and United Kingdom. One announcement said “Gloucestershire. Lydney, Gloucestershire.”, redundantly repeating the county; this is recorded as non-blocking wording defect RH-012. No logging defect was observed. Because the exact build was not confirmed, retain the exact-Internal-TestFlight smoke requirement.
+
 ## Mandatory pre-road tests
 
 | ID | Test | Expected result | Evidence | Status |
@@ -150,7 +181,7 @@ External TestFlight invitations remain blocked until:
 - all mandatory pre-road tests pass on the exact uploaded build;
 - all mandatory field, inactivity and end-of-ride tests pass on the same build or an approved replacement;
 - no unresolved failure can cause distracting audio, a sudden volume increase, failure to honour an observable iOS audio interruption, unbounded background location, a crash or a credential prompt;
-- `TESTFLIGHT_PRIVATE_BETA_PACK.md` administrative gates are complete;
+- `docs/operations/testflight/TESTFLIGHT_PRIVATE_BETA_PACK.md` administrative gates are complete;
 - Rob records the explicit milestone decision: **continue**, **revise**, **refactor**, **research**, **prototype**, **reduce scope**, **pause** or **stop**.
 
 This evidence format follows [SOP: Adaptive Agentic Software Delivery v1.2](https://app.notion.com/p/3aea4c502b1781a888b1f8e851697813), reviewed on 2026-08-02. Recheck that source if its version or current date changes materially.

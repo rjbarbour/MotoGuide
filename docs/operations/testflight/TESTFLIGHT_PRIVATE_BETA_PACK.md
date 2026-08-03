@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 
-Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Release candidate `0.12.3 (20260803.0032)` adds explicit bounded ride sessions, playback-scoped audio ownership and privacy-safe Release diagnostics. Its physical-iPhone unit target passes 144/144; the signed development app builds, installs and launches; the proxy suite passes; and live automatic session, fact and Premium Voice requests return HTTP 200. Xcode has re-signed the exact archive with cloud-managed Apple Distribution signing, Apple server-side validation has passed, and the retained IPA passes strict signature verification with `get-task-allow=false`. Upload remains paused only for the five stationary checks in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`. Earlier candidates must not be assigned to testers.
+Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Release candidate `0.12.3 (20260803.0032)` adds explicit bounded ride sessions, playback-scoped audio ownership and privacy-safe Release diagnostics. Its physical-iPhone unit target passes 144/144; the signed development app builds, installs and launches; the proxy suite passes; and live automatic session, fact and Premium Voice requests return HTTP 200. Xcode has re-signed the exact archive with cloud-managed Apple Distribution signing, Apple server-side validation has passed, and the retained IPA passes strict signature verification with `get-task-allow=false`. Upload remains paused only for the five stationary checks in `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md`. Earlier candidates must not be assigned to testers.
 
 ## Release Decisions — 2026-07-31
 
@@ -17,7 +17,7 @@ Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and r
 - App Store Connect uses `https://ridehorizon.digitalmercenaries.ai/app-privacy-policy` as the privacy-policy URL.
 - The same URL is reachable from the privacy notice inside the shipped iOS build.
 - The privacy-policy page is public over HTTPS, requires no sign-in, contains no placeholder text, and identifies Digital Mercenaries Limited and a monitored privacy contact.
-- The App Store Connect Beta App Description, What to Test text, and Beta App Review notes match the actual build and are copied from `APP_STORE_CONNECT_TEST_INFORMATION.md`.
+- The App Store Connect Beta App Description, What to Test text, and Beta App Review notes match the actual build and are copied from `docs/operations/app-store/APP_STORE_CONNECT_TEST_INFORMATION.md`.
 - Reviewers can exercise the core experience without an account, invite code, proxy token, API key, motorcycle ride, or Bluetooth hardware.
 - A fresh install starts with Test Mode off and processes live location; reviewers can enable Test Mode explicitly while stationary.
 - Test Mode can trigger representative location changes, AI facts, Premium Voice, and Apple Voice fallback while stationary.
@@ -90,7 +90,7 @@ Use these questions in a short form or email reply:
 Do not invite external testers until all items are true:
 
 - A signed, non-internal-only build has uploaded and processed in App Store Connect.
-- The exact build has passed every mandatory stationary, field, inactivity and end-of-ride test in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`, with retained evidence.
+- The exact build has passed every mandatory stationary, field, inactivity and end-of-ride test in `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md`, with retained evidence.
 - Ride tracking begins only after an explicit Start ride action and ends after an explicit End ride action or the accepted inactivity policy.
 - The audio session is active only around announcements and releases other audio smoothly after finish, cancellation, interruption and ride end.
 - Automatic restricted proxy sessions work in the TestFlight environment; the app also retains names-only and Apple-voice behaviour when proxy access is unavailable.
