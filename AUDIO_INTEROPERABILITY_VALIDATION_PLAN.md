@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 
-Status: **Increment 1 implementation is installed in `0.12.3 (20260803.2100)` and is waiting at the physical YouTube Music validation gate. Do not tune Google Maps behaviour until Rob accepts the YouTube Music result.**
+Status: **Increment 1 revision is at the physical YouTube Music validation gate. Music interruption works consistently from both Test Mode controls; the revision removes the artificial wait only in Debug Test Mode, applies bounded per-utterance Premium Voice gain and extends correlated latency diagnostics. Do not tune Google Maps behaviour until Rob accepts the revised YouTube Music result.**
 
 ## Authority and scope
 
@@ -183,6 +183,34 @@ For each scenario record app/build version, iOS version, output route, RideHoriz
 - Premium Voice generation proceeds while music is present or exposes a bounded, diagnosable state; it does not silently stall.
 - Exported diagnostics explain the observed outcome without relying on Xcode's live console.
 - No external app identity, content, coordinates or credentials appear in the export.
+
+### Physical gate evidence and Increment 1 revision — 2026-08-03
+
+Rob confirmed that YouTube Music now pauses for announcements triggered from both the main sheet and the log view. The shared trigger path therefore passes; the earlier inconsistent pause/duck behaviour is not present in build `0.12.3 (20260803.2100)`.
+
+The same run exposed three revision items:
+
+- YouTube Music resumes abruptly and Premium Voice is perceptually quieter than the resumed music.
+- The latest five successful Premium Voice samples took five to six seconds from `announcementTextReady` to `audioPlaybackStarted`.
+- Test Mode should start this campaign with Road enabled and Names Only selected, without changing the Release/TestFlight live-riding defaults.
+
+The exported phone diagnostics isolate the measured five-to-six-second interval as:
+
+- three to four seconds in the bounded primary-audio wait;
+- one to two seconds from `ttsRequested` to `speechAudioReady`;
+- zero to one second from speech-audio readiness to playback, including audio-session activation and timestamp rounding.
+
+The three-second bounded wait is inappropriate for this controlled YouTube Music campaign when Debug Test Mode deliberately interrupts music. Bypass it only when `DEBUG`, Test Mode and `.interrupt` are all active. Live mode and Release/TestFlight must continue to yield whenever iOS reports primary audio because iOS does not identify the external app. This preserves the Google Maps safety policy until Increment 2.
+
+Set Apple utterances explicitly to the maximum supported per-player volume. Do not change system volume. ElevenLabs voice settings do not provide a loudness control: `use_speaker_boost` changes voice similarity and may add latency.
+
+A live 2026-08-03 sample from the configured proxy and voice took 1,058 ms end to end at the proxy boundary. It measured −24.1 LUFS integrated with a −8.2 dBFS true peak, confirming that the source is quiet and has about 6 dB of usable headroom. Premium Voice playback should therefore decode locally and apply per-utterance peak normalisation: no attenuation, at most 2×/+6.02 dB gain, and a target sample peak of −2 dBFS. The decode and peak scan run off the main actor, all chunks in one utterance use the same gain, and audio-engine configuration changes terminate through the normal release/fallback path. This is bounded source-level gain, not system-volume control. Defer compression or server transcoding unless physical evidence shows that conservative peak normalisation is insufficient.
+
+iOS, not RideHorizon, controls how an interrupted third-party app resumes after `notifyOthersOnDeactivation`; there is no public cross-app fade control. Do not simulate a fade by holding the audio session after speech, because that only delays restoration and can leave music suppressed. The next physical gate must judge whether the normalised speech level makes the transition acceptable.
+
+Client diagnostics remain the source for end-to-end perceived latency. Place lookup start, finish, cancellation and phrase-ready events now retain one lookup identifier, so rapid Test Mode advances remain measurable without accidentally joining different requests. Server logs contain total fact-request timing, and optional upstream OpenAI and ElevenLabs timings when `RIDEHORIZON_DIAGNOSTICS_ENABLED=true`; they are supporting evidence, not a replacement for client timing.
+
+The Debug campaign applies Road plus Names Only once per `LocationManager` lifetime. Turning Test Mode off and on does not overwrite a subsequent explicit choice.
 
 ### Stop condition and gate
 

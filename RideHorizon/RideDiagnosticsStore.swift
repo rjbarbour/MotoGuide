@@ -9,6 +9,10 @@ enum RideDiagnosticEvent: String, Codable, Equatable {
     case rideMovementResumed
     case rideEnded
     case locationSampleObserved
+    case placeLookupStarted
+    case placeLookupFinished
+    case placeLookupFailed
+    case placeLookupCancelled
     case factGenerationStarted
     case factGenerationFinished
     case announcementTextReady
@@ -110,6 +114,7 @@ struct RideDiagnosticEntry: Identifiable, Codable, Equatable {
     let sequenceNumber: UInt64?
     let diagnosticSessionID: UUID?
     let rideSessionID: UUID?
+    let placeLookupID: UUID?
     let announcementID: UUID?
     let event: RideDiagnosticEvent
     let reason: RideDiagnosticReason?
@@ -200,6 +205,7 @@ final class RideDiagnosticsStore: ObservableObject {
     func record(
         _ event: RideDiagnosticEvent,
         rideSessionID: UUID? = nil,
+        placeLookupID: UUID? = nil,
         announcementID: UUID? = nil,
         reason: RideDiagnosticReason? = nil,
         appState: DiagnosticAppState? = nil,
@@ -222,6 +228,7 @@ final class RideDiagnosticsStore: ObservableObject {
             sequenceNumber: nextSequenceNumber,
             diagnosticSessionID: diagnosticSessionID,
             rideSessionID: rideSessionID,
+            placeLookupID: placeLookupID,
             announcementID: announcementID,
             event: event,
             reason: reason,
@@ -245,6 +252,8 @@ final class RideDiagnosticsStore: ObservableObject {
         let terminalEvent: Bool = switch event {
         case .appEnteredBackground,
              .rideEnded,
+             .placeLookupFailed,
+             .placeLookupCancelled,
              .announcementCancelled,
              .announcementFailed,
              .audioPlaybackFinished,
@@ -338,14 +347,50 @@ final class RideDiagnosticsStore: ObservableObject {
 
     private static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(iso8601String(from: date, includingFractionalSeconds: true))
+        }
         return encoder
     }
 
     private static func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            if let date = iso8601Date(from: value, includingFractionalSeconds: true)
+                ?? iso8601Date(from: value, includingFractionalSeconds: false) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected an ISO-8601 timestamp."
+            )
+        }
         return decoder
+    }
+
+    private nonisolated static func iso8601String(
+        from date: Date,
+        includingFractionalSeconds: Bool
+    ) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = includingFractionalSeconds
+            ? [.withInternetDateTime, .withFractionalSeconds]
+            : [.withInternetDateTime]
+        return formatter.string(from: date)
+    }
+
+    private nonisolated static func iso8601Date(
+        from value: String,
+        includingFractionalSeconds: Bool
+    ) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = includingFractionalSeconds
+            ? [.withInternetDateTime, .withFractionalSeconds]
+            : [.withInternetDateTime]
+        return formatter.date(from: value)
     }
 
     private static func encodedSize(of entry: RideDiagnosticEntry) -> Int {

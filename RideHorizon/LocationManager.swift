@@ -312,6 +312,7 @@ final class AppleSpeechOutput: NSObject, AppleSpeechOutputting, AVSpeechSynthesi
         activeUtterance = (ObjectIdentifier(utterance), requestID)
         utterance.voice = voice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        utterance.volume = 1
         guard onPlaybackWillStart?(requestID) != false else {
             activeUtterance = nil
             onCancel?(requestID)
@@ -346,12 +347,220 @@ final class AppleSpeechOutput: NSObject, AppleSpeechOutputting, AVSpeechSynthesi
     }
 }
 
+enum SpeechAudioPeakNormaliser {
+    static let maximumGain: Float = 2
+    static let targetPeak: Float = 0.794_328_2 // -2 dBFS
+
+    static func gain(forPeak peak: Float) -> Float {
+        guard peak > 0 else { return 1 }
+        return max(1, min(maximumGain, targetPeak / peak))
+    }
+
+    static func peak(in buffer: AVAudioPCMBuffer) throws -> Float {
+        guard let channelData = buffer.floatChannelData else {
+            throw PremiumAudioPlaybackError.unsupportedFormat
+        }
+        let channelCount = Int(buffer.format.channelCount)
+        let frameCount = Int(buffer.frameLength)
+        var peak: Float = 0
+
+        for channel in 0..<channelCount {
+            let samples = channelData[channel]
+            for frame in 0..<frameCount {
+                peak = max(peak, abs(samples[frame]))
+            }
+        }
+        return peak
+    }
+
+    static func apply(to buffer: AVAudioPCMBuffer) throws -> Float {
+        let appliedGain = gain(forPeak: try peak(in: buffer))
+        try apply(gain: appliedGain, to: buffer)
+        return appliedGain > 1 ? 20 * log10(appliedGain) : 0
+    }
+
+    static func apply(gain appliedGain: Float, to buffer: AVAudioPCMBuffer) throws {
+        guard let channelData = buffer.floatChannelData else {
+            throw PremiumAudioPlaybackError.unsupportedFormat
+        }
+        let channelCount = Int(buffer.format.channelCount)
+        let frameCount = Int(buffer.frameLength)
+
+        guard appliedGain > 1 else { return }
+        for channel in 0..<channelCount {
+            let samples = channelData[channel]
+            for frame in 0..<frameCount {
+                samples[frame] *= appliedGain
+            }
+        }
+    }
+}
+
+enum PremiumAudioPlaybackError: Error {
+    case emptyAudio
+    case unsupportedFormat
+    case engineConfigurationChanged
+}
+
+struct PreparedPremiumAudio: @unchecked Sendable {
+    let buffers: [AVAudioPCMBuffer]
+    let gainDecibels: Float
+}
+
+enum PremiumAudioPreparer {
+    static func prepare(dataSegments: [Data]) async throws -> PreparedPremiumAudio {
+        let task = Task.detached(priority: .userInitiated) {
+            try prepareSynchronously(dataSegments: dataSegments)
+        }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    static func prepareSynchronously(dataSegments: [Data]) throws -> PreparedPremiumAudio {
+        guard !dataSegments.isEmpty else { throw PremiumAudioPlaybackError.emptyAudio }
+        var buffers: [AVAudioPCMBuffer] = []
+        var utterancePeak: Float = 0
+
+        for data in dataSegments {
+            try Task.checkCancellation()
+            let buffer = try decode(data: data)
+            utterancePeak = max(utterancePeak, try SpeechAudioPeakNormaliser.peak(in: buffer))
+            buffers.append(buffer)
+        }
+
+        let gain = SpeechAudioPeakNormaliser.gain(forPeak: utterancePeak)
+        for buffer in buffers {
+            try Task.checkCancellation()
+            try SpeechAudioPeakNormaliser.apply(gain: gain, to: buffer)
+        }
+        return PreparedPremiumAudio(
+            buffers: buffers,
+            gainDecibels: gain > 1 ? 20 * log10(gain) : 0
+        )
+    }
+
+    private static func decode(data: Data) throws -> AVAudioPCMBuffer {
+        let temporaryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("mp3")
+        try data.write(to: temporaryURL, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
+
+        let file = try AVAudioFile(forReading: temporaryURL)
+        guard file.length > 0, file.length <= AVAudioFramePosition(UInt32.max),
+              let buffer = AVAudioPCMBuffer(
+                pcmFormat: file.processingFormat,
+                frameCapacity: AVAudioFrameCount(file.length)
+              ) else {
+            throw PremiumAudioPlaybackError.emptyAudio
+        }
+        try file.read(into: buffer)
+        guard buffer.frameLength > 0 else { throw PremiumAudioPlaybackError.emptyAudio }
+        return buffer
+    }
+}
+
 @MainActor
-final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlayerDelegate {
+protocol PremiumAudioPlaying: AnyObject {
+    var isPlaying: Bool { get }
+    func play(
+        buffer: AVAudioPCMBuffer,
+        completion: @escaping @MainActor (Result<Void, Error>) -> Void
+    ) throws
+    func stop()
+}
+
+@MainActor
+private final class NormalisedPremiumAudioPlayer: PremiumAudioPlaying {
+
+    private var engine: AVAudioEngine?
+    private var playerNode: AVAudioPlayerNode?
+    private var activeBuffer: AVAudioPCMBuffer?
+    private var configurationObserver: NSObjectProtocol?
+    private var playbackID = UUID()
+
+    var isPlaying: Bool {
+        playerNode?.isPlaying == true
+    }
+
+    func play(
+        buffer: AVAudioPCMBuffer,
+        completion: @escaping @MainActor (Result<Void, Error>) -> Void
+    ) throws {
+        stop()
+        let engine = AVAudioEngine()
+        let playerNode = AVAudioPlayerNode()
+        let playbackID = UUID()
+        self.playbackID = playbackID
+        self.engine = engine
+        self.playerNode = playerNode
+        activeBuffer = buffer
+
+        engine.attach(playerNode)
+        engine.connect(playerNode, to: engine.mainMixerNode, format: buffer.format)
+        playerNode.scheduleBuffer(
+            buffer,
+            at: nil,
+            options: [],
+            completionCallbackType: .dataPlayedBack
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.playbackID == playbackID else { return }
+                self.finishPlayback()
+                completion(.success(()))
+            }
+        }
+        engine.prepare()
+        try engine.start()
+        playerNode.play()
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.playbackID == playbackID else { return }
+                self.finishPlayback()
+                completion(.failure(PremiumAudioPlaybackError.engineConfigurationChanged))
+            }
+        }
+    }
+
+    func stop() {
+        playbackID = UUID()
+        removeConfigurationObserver()
+        playerNode?.stop()
+        engine?.stop()
+        playerNode = nil
+        engine = nil
+        activeBuffer = nil
+    }
+
+    private func finishPlayback() {
+        playbackID = UUID()
+        removeConfigurationObserver()
+        engine?.stop()
+        playerNode = nil
+        engine = nil
+        activeBuffer = nil
+    }
+
+    private func removeConfigurationObserver() {
+        guard let configurationObserver else { return }
+        NotificationCenter.default.removeObserver(configurationObserver)
+        self.configurationObserver = nil
+    }
+}
+
+@MainActor
+final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
     private let proxySpeechGenerator: ProxySpeechGenerating
     private let appleSpeechOutput: AppleSpeechOutputting
-    private var proxyAudioPlayer: AVAudioPlayer?
-    private var proxyAudioChunks: [Data] = []
+    private let proxyAudioPlayer: PremiumAudioPlaying
+    private var proxyAudioChunks: [AVAudioPCMBuffer] = []
     private var proxyRequestTask: Task<Void, Never>?
     private var playbackToken = UUID()
     private var currentProxyFallbackText = ""
@@ -370,20 +579,22 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
     var isSpeaking: Bool {
         proxyRequestTask != nil
             || appleSpeechOutput.isSpeaking
-            || (proxyAudioPlayer?.isPlaying == true)
+            || proxyAudioPlayer.isPlaying
             || !proxyAudioChunks.isEmpty
     }
 
     var isPlayingAudio: Bool {
-        appleSpeechOutput.isSpeaking || (proxyAudioPlayer?.isPlaying == true)
+        appleSpeechOutput.isSpeaking || proxyAudioPlayer.isPlaying
     }
 
     init(
         proxySpeechGenerator: ProxySpeechGenerating = ProxySpeechGenerator(),
-        appleSpeechOutput: AppleSpeechOutputting? = nil
+        appleSpeechOutput: AppleSpeechOutputting? = nil,
+        proxyAudioPlayer: PremiumAudioPlaying? = nil
     ) {
         self.proxySpeechGenerator = proxySpeechGenerator
         self.appleSpeechOutput = appleSpeechOutput ?? AppleSpeechOutput()
+        self.proxyAudioPlayer = proxyAudioPlayer ?? NormalisedPremiumAudioPlayer()
         super.init()
         self.appleSpeechOutput.onPlaybackWillStart = { [weak self] requestID in
             guard let self,
@@ -430,10 +641,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
         proxyRequestTask?.cancel()
         proxyRequestTask = nil
         appleSpeechOutput.stop()
-        if proxyAudioPlayer?.isPlaying == true {
-            proxyAudioPlayer?.stop()
-        }
-        proxyAudioPlayer = nil
+        proxyAudioPlayer.stop()
         proxyAudioChunks.removeAll()
         hasStartedCurrentPlayback = false
         clearProxyFallbackContext()
@@ -466,7 +674,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
             ))
         }
         proxyRequestTask?.cancel()
-        proxyAudioPlayer?.stop()
+        proxyAudioPlayer.stop()
         proxyAudioChunks.removeAll()
         let token = UUID()
         playbackToken = token
@@ -482,19 +690,15 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
         proxyRequestTask = Task { [weak self] in
             do {
                 let audioDataSegments = try await proxySpeechGenerator.speechAudios(for: text)
+                guard !audioDataSegments.isEmpty else {
+                    throw PremiumAudioPlaybackError.emptyAudio
+                }
+                let preparedAudio = try await PremiumAudioPreparer.prepare(
+                    dataSegments: audioDataSegments
+                )
                 await MainActor.run {
                     guard let self, !Task.isCancelled, self.playbackToken == token else { return }
                     self.proxyRequestTask = nil
-                    if audioDataSegments.isEmpty {
-                        self.handlePremiumVoiceFailure(
-                            message: "Premium voice failed: proxy returned no audio. Apple fallback used.",
-                            text: text,
-                            boundary: boundary,
-                            appleVoice: appleVoice,
-                            allowAppleFallback: allowAppleFallback
-                        )
-                        return
-                    }
                     if let announcementID = self.currentAnnouncementID {
                         self.onPipelineEvent?(SpeechOutputPipelineEvent(
                             announcementID: announcementID,
@@ -502,7 +706,14 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
                             stage: .speechAudioReady
                         ))
                     }
-                    self.proxyAudioChunks = audioDataSegments
+                    self.proxyAudioChunks = preparedAudio.buffers
+                    ProxyDiagnostics.log(
+                        "Speech",
+                        String(
+                            format: "Premium Voice local utterance peak-normalisation gainDb=%.2f.",
+                            preparedAudio.gainDecibels
+                        )
+                    )
                     self.playNextProxyChunk(
                         token: token,
                         boundary: boundary,
@@ -588,7 +799,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
             return
         }
 
-        guard let audioData = proxyAudioChunks.first else {
+        guard let audioBuffer = proxyAudioChunks.first else {
             clearProxyFallbackContext()
             onFinish?()
             return
@@ -596,25 +807,26 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
 
         proxyAudioChunks.removeFirst()
         do {
-            let player = try AVAudioPlayer(data: audioData)
-            proxyAudioPlayer = player
-            player.delegate = self
-            guard player.prepareToPlay() else {
-                handleActiveProxyPlaybackFailure(message: "Premium voice failed: audio preparation error. Apple fallback used.")
-                return
-            }
             guard prepareForPlayback(provider: .proxyElevenLabs) else {
-                proxyAudioPlayer = nil
+                proxyAudioPlayer.stop()
                 proxyAudioChunks.removeAll()
                 clearProxyFallbackContext()
                 onCancel?()
                 return
             }
-            guard player.play() else {
-                handleActiveProxyPlaybackFailure(message: "Premium voice failed: audio playback start error. Apple fallback used.")
-                return
+            try proxyAudioPlayer.play(buffer: audioBuffer) { [weak self] result in
+                switch result {
+                case .success:
+                    self?.handleProxyChunkFinished(token: token)
+                case .failure:
+                    guard let self, self.playbackToken == token else { return }
+                    self.handleActiveProxyPlaybackFailure(
+                        message: "Premium voice failed: audio output changed during playback. Apple fallback used."
+                    )
+                }
             }
         } catch {
+            proxyAudioPlayer.stop()
             handlePremiumVoiceFailure(
                 message: "Premium voice failed: audio playback error. Apple fallback used.",
                 text: originalText,
@@ -634,35 +846,19 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine, AVAudioPlay
         return true
     }
 
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor [weak self] in
-            guard let self, self.proxyAudioPlayer === player else { return }
-            self.proxyAudioPlayer = nil
-            guard flag else {
-                self.handleActiveProxyPlaybackFailure(message: "Premium voice failed: audio playback error. Apple fallback used.")
-                return
-            }
-            let token = self.playbackToken
-            self.playNextProxyChunk(
-                token: token,
-                boundary: self.currentProxyFallbackBoundary,
-                appleVoice: self.currentProxyFallbackAppleVoice,
-                originalText: self.currentProxyFallbackText,
-                allowAppleFallback: self.currentProxyAllowsAppleFallback
-            )
-        }
-    }
-
-    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
-        Task { @MainActor [weak self] in
-            guard let self, self.proxyAudioPlayer === player else { return }
-            self.handleActiveProxyPlaybackFailure(message: "Premium voice failed: audio decode error. Apple fallback used.")
-        }
+    private func handleProxyChunkFinished(token: UUID) {
+        guard playbackToken == token else { return }
+        playNextProxyChunk(
+            token: token,
+            boundary: currentProxyFallbackBoundary,
+            appleVoice: currentProxyFallbackAppleVoice,
+            originalText: currentProxyFallbackText,
+            allowAppleFallback: currentProxyAllowsAppleFallback
+        )
     }
 
     private func handleActiveProxyPlaybackFailure(message: String) {
-        proxyAudioPlayer?.stop()
-        proxyAudioPlayer = nil
+        proxyAudioPlayer.stop()
         proxyAudioChunks.removeAll()
         let text = currentProxyFallbackText
         let boundary = currentProxyFallbackBoundary
@@ -720,6 +916,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var rideStartedAt: Date?
     private var rideSessionGeneration = UUID()
     private var geocodeRequestGeneration = UUID()
+    private var activePlaceLookupID: UUID?
+    private var hasAppliedDebugTestModeCampaignDefaults = false
     private var audioSessionReleaseRetryWorkItem: DispatchWorkItem?
     private var audioSessionReleaseRetryAttempts = 0
     private var activeRideSessionID: UUID?
@@ -756,6 +954,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             )
 #endif
             if testMode {
+                applyDebugTestModeCampaignDefaults()
                 locationManager.stopUpdatingLocation()
                 locationManager.allowsBackgroundLocationUpdates = false
                 isTracking = false
@@ -871,6 +1070,14 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         interruptsMusic ? .interrupt : .mix
     }
 
+    private var bypassesPrimaryAudioHintForDebugMusicValidation: Bool {
+#if DEBUG
+        testMode && audioCoexistencePolicy == .interrupt
+#else
+        false
+#endif
+    }
+
     var onAddressChange: ((Address) -> Void)?
     var onRideLog: ((CLLocationCoordinate2D, Address, String?) -> Void)?
 
@@ -891,6 +1098,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         self.externalAudioResumeDelaySeconds = externalAudioResumeDelaySeconds
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
+        if testMode {
+            applyDebugTestModeCampaignDefaults()
+        }
         self.speechOutput.onPlaybackWillStart = { [weak self] provider in
             guard let self else { return false }
             return self.acquireAudioSessionForSpeech(
@@ -972,6 +1182,15 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         )
 
         ensurePreferredVoiceSelection()
+    }
+
+    private func applyDebugTestModeCampaignDefaults() {
+#if DEBUG
+        guard !hasAppliedDebugTestModeCampaignDefaults else { return }
+        hasAppliedDebugTestModeCampaignDefaults = true
+        contentMode = .namesOnly
+        announceStreet = true
+#endif
     }
 
     private static func makeDefaultFactGenerator() -> PlaceFactGenerating {
@@ -1085,6 +1304,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         interruptedSpeechPlan = nil
         cancelPendingAnnouncement(reason: .rideEnded)
         stopSpeechOutput()
+        cancelActivePlaceLookup(reason: .rideEnded)
         geocoder.cancelGeocode()
         hasSeededTestRoute = false
         testIndex = 0
@@ -1201,6 +1421,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         case .none:
             return
         case .inactivityPrompt(let deadline):
+            cancelActivePlaceLookup(reason: .inactivityPrompted)
             geocodeRequestGeneration = UUID()
             geocoder.cancelGeocode()
             inFlightFactTask?.cancel()
@@ -1376,9 +1597,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         processResolvedAddress(currentAddress)
     }
 
-    private func processResolvedAddress(_ address: Address) {
+    private func processResolvedAddress(_ address: Address, placeLookupID: UUID? = nil) {
         if speakAfterEveryGeocode {
-            handleDebugSpeech(for: address)
+            handleDebugSpeech(for: address, placeLookupID: placeLookupID)
             return
         }
 
@@ -1425,10 +1646,15 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
         if let factMode = contentMode.factMode, aiSharingAllowed(), plan.boundary != .street {
             lastBoundaryAnnouncementTime = Date()
-            fetchFactAndEnqueue(plan: plan, address: address, mode: factMode)
+            fetchFactAndEnqueue(
+                plan: plan,
+                address: address,
+                mode: factMode,
+                placeLookupID: placeLookupID
+            )
         } else if contentMode != .quiet {
             lastBoundaryAnnouncementTime = Date()
-            enqueueAnnouncement(plan)
+            enqueueAnnouncement(plan, placeLookupID: placeLookupID)
         } else if testMode {
             recordTestLog(utteredPhrase: nil)
         }
@@ -1493,7 +1719,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         return true
     }
 
-    private func fetchFactAndEnqueue(plan: AnnouncementPlan, address: Address, mode: FactMode) {
+    private func fetchFactAndEnqueue(
+        plan: AnnouncementPlan,
+        address: Address,
+        mode: FactMode,
+        placeLookupID: UUID? = nil
+    ) {
         let token = UUID()
         activeAnnouncementToken = token
         inFlightFactTask?.cancel()
@@ -1525,7 +1756,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                         announcementID: plan.id,
                         reason: .factUnavailable
                     )
-                    self.enqueueAnnouncement(plan)
+                    self.enqueueAnnouncement(plan, placeLookupID: placeLookupID)
                     return
                 }
                 self.recordDiagnostic(
@@ -1542,12 +1773,15 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                     ProxyDiagnostics.log("Facts", "No proxy fact available. Speaking base phrase for \(request.cacheKey).")
                 }
                 let text = FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact, mode: mode)
-                self.enqueueAnnouncement(AnnouncementPlan(id: plan.id, text: text, boundary: plan.boundary))
+                self.enqueueAnnouncement(
+                    AnnouncementPlan(id: plan.id, text: text, boundary: plan.boundary),
+                    placeLookupID: placeLookupID
+                )
             }
         }
     }
 
-    private func handleDebugSpeech(for address: Address) {
+    private func handleDebugSpeech(for address: Address, placeLookupID: UUID? = nil) {
         guard contentMode != .quiet else { return }
 
         guard let speechText = AnnouncementDecision.speechText(
@@ -1563,10 +1797,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         previousAddress = address
         lastBoundaryAnnouncementTime = Date()
         let plan = AnnouncementPlan(text: speechText, boundary: .town)
-        enqueueAnnouncement(plan)
+        enqueueAnnouncement(plan, placeLookupID: placeLookupID)
     }
 
-    private func enqueueAnnouncement(_ plan: AnnouncementPlan) {
+    private func enqueueAnnouncement(_ plan: AnnouncementPlan, placeLookupID: UUID? = nil) {
         if isSpeechOutputActive, let speakingBoundary = currentlySpeakingBoundary {
             if AnnouncementQueue.shouldDropWhileSpeaking(
                 newBoundary: plan.boundary,
@@ -1590,8 +1824,16 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             boundary: plan.boundary
         )
         announcementStatus = .phraseReady
-        recordDiagnostic(.announcementTextReady, announcementID: plan.id)
-        recordDiagnostic(.announcementQueued, announcementID: plan.id)
+        recordDiagnostic(
+            .announcementTextReady,
+            placeLookupID: placeLookupID,
+            announcementID: plan.id
+        )
+        recordDiagnostic(
+            .announcementQueued,
+            placeLookupID: placeLookupID,
+            announcementID: plan.id
+        )
         delayWorkItem?.cancel()
 
         let workItem = DispatchWorkItem { [weak self] in
@@ -1723,7 +1965,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private func reverseGeocode(location: CLLocation, completion: (@MainActor () -> Void)? = nil) {
         let rideGeneration = rideSessionGeneration
         let requestGeneration = UUID()
+        cancelActivePlaceLookup(reason: .supersededByNewerContext)
+        geocoder.cancelGeocode()
         geocodeRequestGeneration = requestGeneration
+        activePlaceLookupID = requestGeneration
+        recordDiagnostic(.placeLookupStarted, placeLookupID: requestGeneration)
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             if error != nil {
                 Task { @MainActor [weak self] in
@@ -1732,6 +1978,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                             rideGeneration: rideGeneration,
                             requestGeneration: requestGeneration
                           ) else { return }
+                    self.activePlaceLookupID = nil
+                    self.recordDiagnostic(.placeLookupFailed, placeLookupID: requestGeneration)
                     self.locationStatus = .placeUnavailable("Place lookup failed. GPS is still active.")
                 }
                 AppDiagnostics.log("Reverse geocoding failed.")
@@ -1745,6 +1993,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                             rideGeneration: rideGeneration,
                             requestGeneration: requestGeneration
                           ) else { return }
+                    self.activePlaceLookupID = nil
+                    self.recordDiagnostic(.placeLookupFailed, placeLookupID: requestGeneration)
                     self.locationStatus = .placeUnavailable("Place name is unavailable here.")
                 }
                 AppDiagnostics.log("No placemark was returned.")
@@ -1758,13 +2008,25 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                         rideGeneration: rideGeneration,
                         requestGeneration: requestGeneration
                       ) else { return }
+                self.activePlaceLookupID = nil
                 self.lastKnownAddress = address
+                self.recordDiagnostic(.placeLookupFinished, placeLookupID: requestGeneration)
                 AppDiagnostics.log("Resolved a place name.")
 
                 completion?()
-                self.processResolvedAddress(address)
+                self.processResolvedAddress(address, placeLookupID: requestGeneration)
             }
         }
+    }
+
+    private func cancelActivePlaceLookup(reason: RideDiagnosticReason) {
+        guard let activePlaceLookupID else { return }
+        recordDiagnostic(
+            .placeLookupCancelled,
+            placeLookupID: activePlaceLookupID,
+            reason: reason
+        )
+        self.activePlaceLookupID = nil
     }
 
     private func canAcceptGeocodeResult(
@@ -1779,6 +2041,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private func recordDiagnostic(
         _ event: RideDiagnosticEvent,
         at timestamp: Date = Date(),
+        placeLookupID: UUID? = nil,
         announcementID: UUID? = nil,
         reason: RideDiagnosticReason? = nil,
         audioPolicy: AudioCoexistencePolicy? = nil,
@@ -1801,6 +2064,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         diagnostics.record(
             event,
             rideSessionID: activeRideSessionID,
+            placeLookupID: placeLookupID,
             announcementID: announcementID,
             reason: reason,
             appState: diagnosticAppState,
@@ -1984,10 +2248,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 announcementID: activeSpeechPlan?.id ?? announcementQueue.pending?.id,
                 reason: .primaryAudioActive
             )
-            pauseForPrimaryAudio(
-                reason: .primaryAudioActive,
-                allowsBoundedResume: true
-            )
+            if !bypassesPrimaryAudioHintForDebugMusicValidation {
+                pauseForPrimaryAudio(
+                    reason: .primaryAudioActive,
+                    allowsBoundedResume: true
+                )
+            }
         case .end:
             recordDiagnostic(
                 .primaryAudioEnded,
@@ -2099,7 +2365,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         bypassPrimaryAudioCheck: Bool = false
     ) {
         guard ignoreQuietMode || contentMode != .quiet else { return }
-        if shouldYieldToPrimaryAudio && !bypassPrimaryAudioCheck {
+        if shouldYieldToPrimaryAudio,
+           !bypassesPrimaryAudioHintForDebugMusicValidation,
+           !bypassPrimaryAudioCheck {
             interruptedSpeechPlan = AnnouncementPlan(
                 id: announcementID,
                 text: text,
@@ -2161,8 +2429,16 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         speak(text: text, boundary: boundary, shouldRecordTestLog: false, ignoreQuietMode: true)
     }
 
-    func processResolvedAddressForTesting(_ address: Address) {
-        processResolvedAddress(address)
+    func processResolvedAddressForTesting(_ address: Address, placeLookupID: UUID? = nil) {
+        processResolvedAddress(address, placeLookupID: placeLookupID)
+    }
+
+    func beginPlaceLookupDiagnosticForTesting() -> UUID {
+        let lookupID = UUID()
+        geocodeRequestGeneration = lookupID
+        activePlaceLookupID = lookupID
+        recordDiagnostic(.placeLookupStarted, placeLookupID: lookupID)
+        return lookupID
     }
 
     var hasInterruptedSpeechPlanForTesting: Bool {

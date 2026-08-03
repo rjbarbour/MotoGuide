@@ -8,7 +8,7 @@ Prepare a private external TestFlight beta for 3–5 named iPhone testers. This 
 
 ## Last verified result
 
-RideHorizon `0.12.3 (20260803.2100)` is the current physical-device candidate. It opens idle, starts and ends continuous work only through explicit **Start ride / End ride** actions, and retains the bounded inactivity lifecycle. During this Debug validation campaign, Test Mode defaults on unless the user has explicitly changed it; Release/TestFlight still defaults off. Both manual Test Mode controls now enter the same `advanceTestLocation()` pipeline. The enabled music setting activates a non-mixing audio session immediately before actual Apple or Premium Voice playback, temporarily interrupting other audio, then deactivates with notification so iOS can resume it. Playback is cancelled if session activation fails, and repeated release failure falls back to a non-suppressing mixing configuration. A privacy-safe persistent diagnostic chain correlates fact generation through TTS, audio readiness, playback, interruption, cancellation, restart and release without retaining text, coordinates or credentials. The complete `RideHorizonTests` target passed with zero failures on the physical iPhone; the signed app built, installed and launched on `Robert’s iPhone 17`. The previously Apple-validated `20260803.0032` archive is superseded and must not be uploaded.
+RideHorizon `0.12.3 (20260803.2155)` is the current physical-device candidate. It opens idle, starts and ends continuous work only through explicit **Start ride / End ride** actions, and retains the bounded inactivity lifecycle. During this Debug validation campaign, Test Mode defaults on unless the user has explicitly changed it; Release/TestFlight still defaults off. Road plus Names Only are applied once when this Debug campaign starts, without overwriting later explicit choices. Both manual Test Mode controls enter the same `advanceTestLocation()` pipeline. The enabled music setting activates a non-mixing audio session immediately before actual Apple or Premium Voice playback, temporarily interrupting other audio, then deactivates with notification so iOS can resume it. Debug Test Mode bypasses the primary-audio wait for the controlled YouTube Music check; live mode and Release/TestFlight still yield to every iOS primary-audio signal. Premium Voice is decoded off-main and peak-normalised by at most +6.02 dB using one gain across the utterance. A privacy-safe persistent diagnostic chain now correlates place lookup through fact generation, TTS, audio readiness, playback, interruption, cancellation, restart and release without retaining text, coordinates or credentials. The previously Apple-validated `20260803.0032` archive is superseded and must not be uploaded.
 
 ## Delivery Risk Cube
 
@@ -18,7 +18,7 @@ RideHorizon `0.12.3 (20260803.2100)` is the current physical-device candidate. I
 
 ## Current gate
 
-**VERIFY — YouTube Music gate.** Increment 1 is installed as `0.12.3 (20260803.2100)`. Automated physical-device tests and the signed build pass. Rob must now verify one Apple Voice and one Premium Voice announcement with YouTube Music through the phone output, then repeat the passing case through the helmet headset. Music should pause during each announcement and resume smoothly within one second. Do not tune Google Maps, archive or upload until this gate is accepted.
+**VERIFY — YouTube Music gate.** Increment 1 revision is installed and launched as `0.12.3 (20260803.2155)`. All 168 physical-device tests passed, the signed build succeeded, and the live proxy smoke test returned healthy fact and Premium Voice responses. Rob must now verify one Apple Voice and one Premium Voice announcement with YouTube Music through the phone output, then repeat the passing case through the helmet headset. Judge the revised location-to-voice latency, speech loudness and the transition when iOS resumes music. Do not tune Google Maps, archive or upload until this gate is accepted.
 
 ## Residual risks
 
@@ -32,6 +32,6 @@ RideHorizon `0.12.3 (20260803.2100)` is the current physical-device candidate. I
 
 ## Next outcomes
 
-1. Run the YouTube Music gate on `0.12.3 (20260803.2100)`: Apple Voice and Premium Voice through the phone output, then the passing case through the helmet headset.
+1. Run the YouTube Music gate on `0.12.3 (20260803.2155)`: Apple Voice and Premium Voice through the phone output, then the passing case through the helmet headset.
 2. If it passes, complete the remaining stationary checks, archive and validate this replacement code, then upload it for Internal TestFlight.
 3. Install the exact TestFlight binary and complete the road, background, inactivity, audio, network and power evidence before external review submission.

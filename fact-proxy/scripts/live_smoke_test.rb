@@ -63,7 +63,10 @@ def request(method, path, headers: {}, body: nil)
   req = request_class.new(uri)
   headers.each { |name, value| req[name] = value }
   req.body = JSON.generate(body) if body
-  http.request(req)
+  started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  response = http.request(req)
+  duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round
+  [response, duration_ms]
 end
 
 def require_status!(response, expected, step)
@@ -73,12 +76,12 @@ def require_status!(response, expected, step)
 end
 
 begin
-  health = request(:get, "/health")
+  health, health_duration_ms = request(:get, "/health")
   require_status!(health, 200, "health")
   fail_step!("health", "unexpected response body") unless health.body.strip == "ok"
-  progress("health: HTTP 200, body ok")
+  progress("health: HTTP 200, body ok, durationMs=#{health_duration_ms}")
 
-  session = request(
+  session, session_duration_ms = request(
     :post,
     "/v1/session/fallback",
     headers: {
@@ -92,11 +95,11 @@ begin
   token = session_payload.fetch("sessionToken")
   fail_step!("session", "token entropy check failed") if token.bytesize < 32
   fail_step!("session", "fallback marker missing") unless session_payload["fallback"] == true
-  progress("session: HTTP 200, restricted fallback session issued")
+  progress("session: HTTP 200, restricted fallback session issued, durationMs=#{session_duration_ms}")
 
   authorization = { "Authorization" => "Bearer #{token}", "Content-Type" => "application/json" }
 
-  fact = request(
+  fact, fact_duration_ms = request(
     :post,
     "/v1/fact",
     headers: authorization,
@@ -120,9 +123,9 @@ begin
   fact_payload = parse_json!(fact, "fact")
   fact_length = fact_payload.fetch("fact").to_s.length
   fail_step!("fact", "empty fact") if fact_length.zero?
-  progress("fact: HTTP 200, application/json, #{fact_length} characters")
+  progress("fact: HTTP 200, application/json, #{fact_length} characters, durationMs=#{fact_duration_ms}")
 
-  speech = request(
+  speech, speech_duration_ms = request(
     :post,
     "/v1/speech",
     headers: authorization,
@@ -132,7 +135,10 @@ begin
   content_type = speech["Content-Type"].to_s.split(";").first
   fail_step!("speech", "unexpected content type") unless content_type == "audio/mpeg"
   fail_step!("speech", "returned too little audio") if speech.body.bytesize < 1_000
-  progress("speech: HTTP 200, audio/mpeg, #{speech.body.bytesize} bytes")
+  if (audio_path = ENV["RIDEHORIZON_SMOKE_AUDIO"])
+    File.binwrite(audio_path, speech.body)
+  end
+  progress("speech: HTTP 200, audio/mpeg, #{speech.body.bytesize} bytes, durationMs=#{speech_duration_ms}")
 rescue KeyError
   fail_step!("response", "required field missing")
 rescue SocketError, SystemCallError, IOError, Timeout::Error => error
