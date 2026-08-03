@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 
-Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Development candidate `0.12.3 (20260803.0032)` adds explicit bounded ride sessions, playback-scoped audio ownership and privacy-safe Release diagnostics. Its physical-iPhone unit target passes 144/144; the signed app builds, installs and launches; the proxy suite passes; and live automatic session, fact and Premium Voice requests return HTTP 200. The exact Release archive exists and passes local store-oriented validation. Upload remains paused for the five stationary checks in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and creation of the missing Apple Distribution certificate. Earlier candidates must not be assigned to testers.
+Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Release candidate `0.12.3 (20260803.0032)` adds explicit bounded ride sessions, playback-scoped audio ownership and privacy-safe Release diagnostics. Its physical-iPhone unit target passes 144/144; the signed development app builds, installs and launches; the proxy suite passes; and live automatic session, fact and Premium Voice requests return HTTP 200. Xcode has re-signed the exact archive with cloud-managed Apple Distribution signing, Apple server-side validation has passed, and the retained IPA passes strict signature verification with `get-task-allow=false`. Upload remains paused only for the five stationary checks in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`. Earlier candidates must not be assigned to testers.
 
 ## Release Decisions — 2026-07-31
 
@@ -25,7 +25,7 @@ Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and r
 - Optional AI and Premium Voice disclosures are presented before provider sharing; names-only announcements and Apple Voice remain available when sharing is declined.
 - A clean launch does not contact the RideHorizon proxy until the rider enables optional AI features and a proxy-backed feature first needs access.
 - Onboarding tells the rider to complete setup while stopped, avoid interacting with the phone while moving, and stop using RideHorizon if it becomes distracting.
-- Candidate `20260803.0032` installs and launches on the target physical iPhone, passes 144 physical-device unit tests, and uses the production proxy whose live `/v1/speech` route returned valid MP3 audio. Complete the five stationary checks before archive/upload, then run the full location, background and Bluetooth evidence on the exact replacement Internal TestFlight binary.
+- Candidate `20260803.0032` installs and launches on the target physical iPhone, passes 144 physical-device unit tests, is distribution-signed and Apple-validated, and uses the production proxy whose live `/v1/speech` route returned valid MP3 audio. Complete the five stationary checks before upload, then run the full location, background and Bluetooth evidence on the exact replacement Internal TestFlight binary.
 
 ## Purpose
 

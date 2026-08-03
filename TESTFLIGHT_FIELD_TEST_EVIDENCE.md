@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 
-Status: **Development candidate ready for stationary verification. Do not upload or invite external testers until the mandatory safety gates pass.**
+Status: **Distribution-signed, Apple-validated candidate ready for stationary verification. Do not upload or invite external testers until the mandatory safety gates pass.**
 
 This is the operational evidence record for stationary, road and background testing. `Backlog.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
 
@@ -66,6 +66,10 @@ Candidate `0.12.3 (20260803.0032)` provides this Release-build ring buffer, capp
 - Proxy Gradle suite: `BUILD SUCCESSFUL`.
 - Live health, automatic restricted session, fact and Premium Voice requests: HTTP 200 on 2026-08-03; the fact contained 263 characters and speech returned `audio/mpeg`, 38,078 bytes.
 - Product, support and privacy-policy URLs: HTTP 200 through the fixed-origin Cloudflare worker.
+- Exact archive `0.12.3 (20260803.0032)`: re-signed by Xcode with the cloud-managed Apple Distribution certificate and App Store profile for `ai.digitalmercenaries.ridehorizon`.
+- Apple server-side validation: passed at `2026-08-03T01:44:00+01:00` with no validation issues.
+- Retained IPA: strict code signature passed; `beta-reports-active=true`; `get-task-allow=false`; iPhone-only; `PrivacyInfo.xcprivacy` present; SHA-256 `d435b14b2c6a7080fe82ad4f109e3da4e076072d3152000f50632eeb27157620`.
+- App Store Connect upload: deliberately not started; the five stationary checks below remain the pre-upload safety gate.
 - XCUITest did not execute: XCTest timed out while enabling automation mode on the physical device, and CoreSimulator services were unavailable. This is a test-harness blocker, not positive app evidence; use the human stationary rows below.
 
 ## Test run record
