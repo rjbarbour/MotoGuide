@@ -6,7 +6,8 @@ This Cloudflare Pages project serves the RideHorizon public product, support and
 - `GET` or `HEAD /support` and `/support/` serve the support page.
 - `GET` or `HEAD /app-privacy-policy` serves the static policy.
 - `GET` or `HEAD /app-privacy-policy/` serves the same policy.
-- Every other path is transparently forwarded to `https://motoguide-fact-proxy.fly.dev`, including `/health`, `/v1/session/*`, `/v1/fact`, and `/v1/speech`.
+- Every other path is transparently forwarded to the current Fly origin, including `/health`, `/v1/session/*`, `/v1/fact`, and `/v1/speech`.
+- The current Fly origin retains its legacy app name as a temporary infrastructure detail. Clients use only the stable RideHorizon domain; change the Worker origin and deployment target together during a later cutover.
 - The project contains no app or provider secret.
 
 ## Local verification

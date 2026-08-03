@@ -15,7 +15,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'ridehorizon-fact-proxy' }}
+  # The stable RideHorizon edge currently forwards to this existing Fly app.
+  # Change the repository variable only when the Cloudflare origin is cut over.
+  FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'motoguide-fact-proxy' }}
 
 jobs:
   deploy:
@@ -48,4 +50,4 @@ jobs:
         run: '"$HOME/.fly/bin/flyctl" deploy --remote-only --app "$FLY_APP_NAME" --config fly.toml'
 
       - name: Smoke-check health endpoint
-        run: 'curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 --max-time 20 "https://${FLY_APP_NAME}.fly.dev/health"'
+        run: 'curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 --max-time 20 "https://ridehorizon.digitalmercenaries.ai/health"'

@@ -159,6 +159,13 @@ final class CachedPlaceFactGeneratorTests: XCTestCase {
 }
 
 final class ProxyFactGeneratorTests: XCTestCase {
+    func testProductionProxyUsesStableRideHorizonEdge() {
+        XCTAssertEqual(
+            FactProxyContract.productionBaseURL,
+            URL(string: "https://ridehorizon.digitalmercenaries.ai")
+        )
+    }
+
     // Contract coverage: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
     private let endpoint = URL(string: "https://proxy.test/v1/fact")!
 

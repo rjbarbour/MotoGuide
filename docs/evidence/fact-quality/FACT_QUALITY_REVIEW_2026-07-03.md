@@ -130,7 +130,7 @@ Exact command to rerun the review:
 
 ```bash
 cd /Users/rob_dev/DocsLocal/motoguide/repo
-uv run --python 3.13 /Users/rob_dev/DocsLocal/motoguide/repo/scripts/review_fact_quality.py --label manual-check --rider-context full
+uv run --python 3.13 /Users/rob_dev/DocsLocal/motoguide/repo/scripts/review_fact_quality.py --label manual-check --rider-context full --retain-generated-facts
 ```
 
 Expected result:

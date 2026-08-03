@@ -20,6 +20,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
+        "ridehorizon.proxy-token=operator-test-token",
+        "ridehorizon.fallback-fact-daily-limit=1",
+        "ridehorizon.verified-fact-daily-limit=3",
+        "ridehorizon.global-fact-daily-limit=10",
         "spring.datasource.url=jdbc:h2:mem:automatic-session-http;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
@@ -62,5 +66,18 @@ class AutomaticSessionHttpTest {
                         .content(FactRequestFixture.shortFactRequestWithDefaults()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fact").value("Known for its wool trade."));
+    }
+
+    @Test
+    void operatorAccessUsesOperatorQuotaInsteadOfFallbackQuota() throws Exception {
+        when(openAiService.generateFact(any())).thenReturn("Known for its wool trade.");
+
+        for (int requestNumber = 0; requestNumber < 2; requestNumber++) {
+            mockMvc.perform(post("/v1/fact")
+                            .header("Authorization", "Bearer operator-test-token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                    .andExpect(status().isOk());
+        }
     }
 }

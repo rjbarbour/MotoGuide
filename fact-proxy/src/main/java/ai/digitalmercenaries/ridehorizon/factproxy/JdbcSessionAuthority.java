@@ -223,14 +223,14 @@ class JdbcSessionAuthority implements SessionAuthority {
         if (auth == null) {
             throw new SessionAuthority.UnauthorizedAccess();
         }
-        if (auth.installationId() == null && !auth.fallback()) {
+        if (auth.installationId() == null && !auth.fallback() && !auth.operatorToken()) {
             throw new BadRequestException("session is invalid");
         }
         if (auth.quotaSubjectHash() == null || auth.quotaSubjectHash().isBlank()) {
             throw new SessionAuthority.UnauthorizedAccess();
         }
 
-        boolean fallback = auth.fallback();
+        boolean fallback = auth.fallback() && !auth.operatorToken();
         authorizeDailyUsage(auth.quotaSubjectHash(), auth.installationId(), fallback, factRequests, speechChars);
     }
 

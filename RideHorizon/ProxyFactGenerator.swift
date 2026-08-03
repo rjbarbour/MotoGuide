@@ -108,13 +108,9 @@ enum ProxyDiagnostics {
 
 enum FactProxyContract {
     // Source of truth: /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
-    /// Temporary private-beta compatibility switch. Remove once the RideHorizon host is live.
-    static let useLegacyProductionProxy = true
-    static let rideHorizonProductionBaseURL = URL(string: "https://ridehorizon.digitalmercenaries.ai")!
-    static let legacyProductionBaseURL = URL(string: "https://motoguide-fact-proxy.fly.dev")!
-    static var productionBaseURL: URL {
-        useLegacyProductionProxy ? legacyProductionBaseURL : rideHorizonProductionBaseURL
-    }
+    /// Stable public edge. Cloudflare owns origin cutover so released apps never
+    /// need to know the transitional Fly app name.
+    static let productionBaseURL = URL(string: "https://ridehorizon.digitalmercenaries.ai")!
     static let localDevelopmentBaseURL = URL(string: "http://127.0.0.1:3000")!
     static let keychainService = "RideHorizonProxy"
     static let deviceIdKeychainService = "RideHorizonDeviceId"

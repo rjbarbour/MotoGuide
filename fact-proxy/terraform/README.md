@@ -42,8 +42,13 @@ The `Tests` workflow runs iOS and fact-proxy tests for pull requests and pushes 
 `main`. The workflow `.github/workflows/fact-proxy-deploy.yml` then performs:
 
 1. Verify that the completed `Tests` run was a successful push to this repository's `main` branch.
-2. Deploy the exact tested commit to the existing `ridehorizon-fact-proxy` Fly app.
-3. Smoke-check the Fly health endpoint.
+2. Deploy the exact tested commit to the current `motoguide-fact-proxy` Fly origin.
+3. Smoke-check the stable `ridehorizon.digitalmercenaries.ai` edge end to end.
+
+The legacy Fly app name is an infrastructure compatibility detail. Released iOS
+builds use only the RideHorizon edge. Keep deployment on the current origin until
+the replacement Fly app exists and the Cloudflare origin has been cut over; then
+set the `FLY_APP_NAME` repository variable to the replacement app.
 
 Terraform remains the manual app-shell bootstrap and recovery path. It is not run
 from an ephemeral CI runner because the project does not yet have a shared remote

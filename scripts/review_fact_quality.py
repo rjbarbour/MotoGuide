@@ -16,6 +16,7 @@ from pathlib import Path
 
 PRODUCTION_BASE_URL = "https://ridehorizon.digitalmercenaries.ai"
 KEYCHAIN_SERVICE = "RideHorizonProxy"
+SANITIZE_FOR_LLM = os.environ.get("SANITIZE_FOR_LLM", "true").lower() not in {"0", "false", "no"}
 
 GLOUCESTERSHIRE_TEST_CASES = [
     {
@@ -232,7 +233,7 @@ def main() -> int:
     parser.add_argument("--label", required=True, help="Review run label, for example before or after-2026-07-03")
     parser.add_argument(
         "--output",
-        default="fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md",
+        default="docs/evidence/fact-quality/FACT_QUALITY_REVIEW_2026-07-03.md",
         help="Markdown file to append to, relative to repo root unless absolute.",
     )
     parser.add_argument("--timeout", type=float, default=20.0)
@@ -250,12 +251,27 @@ def main() -> int:
         default="gloucestershire",
         help="Place set to sample.",
     )
+    parser.add_argument(
+        "--retain-generated-facts",
+        action="store_true",
+        help="Explicitly retain provider-generated fact text in the evidence file for controlled human review.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
     output_path = Path(args.output)
     if not output_path.is_absolute():
         output_path = repo_root / output_path
+
+    if not args.retain_generated_facts:
+        progress("Refusing live collection without --retain-generated-facts; generated task content is redacted by default.")
+        return 2
+
+    request_count = len(test_cases_for_fixture(args.fixture)) * len(FACT_MODES)
+    progress(
+        f"SLOW OPERATION WARNING: up to {request_count} production fact requests; "
+        "generated fact retention was explicitly enabled."
+    )
 
     token = load_proxy_token()
     if not token:
@@ -276,7 +292,7 @@ def main() -> int:
         args.fixture,
     )
     append_markdown(output_path, args.label, started, args.base_url.rstrip("/"), args.rider_context, args.fixture, results)
-    print(f"Wrote {len(results)} generated fact rows to {output_path}")
+    progress(f"Wrote {len(results)} generated fact rows to {display_path(output_path, repo_root)}")
     return 0
 
 
@@ -311,6 +327,7 @@ def collect_results(
     fixture: str,
 ) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
+    total_requests = len(test_cases_for_fixture(fixture)) * len(FACT_MODES)
     for test_case in test_cases_for_fixture(fixture):
         for fact_mode in FACT_MODES:
             request_body = {
@@ -337,8 +354,9 @@ def collect_results(
                 result["fact"] = response_error_body(exc)
             except Exception as exc:  # noqa: BLE001 - review script should capture all row failures.
                 result["status"] = exc.__class__.__name__
-                result["fact"] = str(exc)
+                result["fact"] = "[error detail redacted]" if SANITIZE_FOR_LLM else str(exc)
             results.append(result)
+            progress(f"Request {len(results)}/{total_requests}: {result['status']}")
     return results
 
 
@@ -396,6 +414,8 @@ def request_fact(
 
 
 def response_error_body(exc: urllib.error.HTTPError) -> str:
+    if SANITIZE_FOR_LLM:
+        return "[provider error body redacted]"
     try:
         body = exc.read().decode("utf-8", errors="replace").strip()
     except Exception:  # noqa: BLE001
@@ -445,5 +465,53 @@ def markdown_escape(value: str) -> str:
     return value.replace("\n", "<br>").replace("|", "\\|")
 
 
+def timestamp() -> str:
+    return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def progress(message: str) -> None:
+    print(f"{timestamp()} {message}", flush=True)
+
+
+def display_path(path: Path, repo_root: Path) -> str:
+    if not SANITIZE_FOR_LLM:
+        return str(path)
+    try:
+        return f"[repo]/{path.relative_to(repo_root)}"
+    except ValueError:
+        return f"[temporary]/{path.name}"
+
+
+def run_with_diagnostic_log() -> int:
+    log_path = Path(os.environ.get(
+        "RIDEHORIZON_FACT_REVIEW_LOG",
+        f"/tmp/ridehorizon-fact-review-{dt.datetime.now(dt.UTC).strftime('%Y%m%dT%H%M%SZ')}.log",
+    ))
+    tee = subprocess.Popen(
+        ["tee", str(log_path)],
+        stdin=subprocess.PIPE,
+        text=True,
+    )
+    if tee.stdin is None:
+        raise RuntimeError("tee did not expose stdin")
+
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    sys.stdout = tee.stdin
+    sys.stderr = tee.stdin
+    outcome = "FAIL"
+    try:
+        progress(f"START RideHorizon fact quality collection; SANITIZE_FOR_LLM={str(SANITIZE_FOR_LLM).lower()}")
+        result = main()
+        outcome = "PASS" if result == 0 else "FAIL"
+        return result
+    finally:
+        progress(f"DONE RideHorizon fact quality collection: {outcome}")
+        tee.stdin.close()
+        tee.wait(timeout=5)
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run_with_diagnostic_log())

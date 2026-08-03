@@ -202,7 +202,7 @@ Exact command to rerun the current diverse fixture:
 
 ```bash
 cd /Users/rob_dev/DocsLocal/motoguide/repo
-uv run --python 3.13 /Users/rob_dev/DocsLocal/motoguide/repo/scripts/review_fact_quality.py --label sequence-baseline --rider-context full --fixture diverse --output fact-quality/FACT_SEQUENCE_QUALITY_REVIEW_2026-07-03.md
+uv run --python 3.13 /Users/rob_dev/DocsLocal/motoguide/repo/scripts/review_fact_quality.py --label sequence-baseline --rider-context full --fixture diverse --output docs/evidence/fact-quality/FACT_SEQUENCE_QUALITY_REVIEW_2026-07-03.md --retain-generated-facts
 ```
 
 Expected result:
