@@ -6,15 +6,17 @@ Current scope:
 
 - Provision the `ridehorizon-fact-proxy` Fly app shell.
 - Keep the app name/org as code.
-- Keep secrets out of Git by passing them from CI/local environment variables.
+- Keep secrets out of Git.
 
-Secrets (for CI) are still applied through GitHub Actions and `flyctl secrets set`.
+Runtime secrets are managed directly in Fly Secrets. GitHub Actions stores only the
+`FLY_API_TOKEN` needed to deploy the existing app and does not copy provider keys or
+RideHorizon credentials between secret stores.
 
 ## Prerequisites
 
 - Terraform >= 1.5.0
 - `FLY_API_TOKEN` set in your shell or CI secret
-- Optional: GitHub Actions workflow variables/secrets as documented below.
+- Optional: the GitHub Actions `FLY_API_TOKEN` repository secret for automated deployment.
 
 ## Files
 
@@ -32,16 +34,17 @@ Secrets (for CI) are still applied through GitHub Actions and `flyctl secrets se
    - `terraform import fly_app.fact_proxy ridehorizon-fact-proxy`
 3. Apply:
    - `terraform apply`
-4. Run deploy via existing GitHub workflow or manual `flyctl deploy`.
+4. Run a manual `flyctl deploy`; subsequent tested changes can use the GitHub workflow.
 
 ## CI deployment flow
 
-The workflow `.github/workflows/fact-proxy-deploy.yml` performs:
+The `Tests` workflow runs iOS and fact-proxy tests for pull requests and pushes to
+`main`. The workflow `.github/workflows/fact-proxy-deploy.yml` then performs:
 
-1. Terraform init/validate and apply of app definition
-2. `flyctl secrets set` for runtime variables:
-   - `OPENAI_API_KEY`
-   - `RIDEHORIZON_PROXY_TOKEN`
-   - `OPENAI_MODEL`
-   - optional host allowlist/auth token
-3. `flyctl deploy --config fly.toml`
+1. Verify that the completed `Tests` run was a successful push to this repository's `main` branch.
+2. Deploy the exact tested commit to the existing `ridehorizon-fact-proxy` Fly app.
+3. Smoke-check the Fly health endpoint.
+
+Terraform remains the manual app-shell bootstrap and recovery path. It is not run
+from an ephemeral CI runner because the project does not yet have a shared remote
+Terraform state backend.

@@ -183,7 +183,7 @@ cd /Users/rob_dev/DocsLocal/motoguide/repo/fact-proxy
 ./build.sh
 fly deploy
 
-# Option B: Terraform-managed app shell + GitHub Action deployment
+# Option B: Terraform-managed app shell + test-gated GitHub deployment
 cd fact-proxy/terraform
 FLY_API_TOKEN=fo1_... terraform init -input=false
 FLY_API_TOKEN=fo1_... terraform apply
@@ -192,17 +192,17 @@ cd ..
 flyctl deploy --config fly.toml
 ```
 
-GitHub Action for this flow: `.github/workflows/fact-proxy-deploy.yml`
+GitHub Actions run the iOS and proxy tests first. A successful `main` push then
+deploys that exact commit through `.github/workflows/fact-proxy-deploy.yml`.
 
-Secrets are managed through GitHub repository/organization secrets and injected at runtime:
+Provider keys and RideHorizon credentials remain in Fly Secrets. GitHub needs only
+the deploy-scoped `FLY_API_TOKEN` repository secret:
 
 ```bash
 FLY_API_TOKEN=fo1_...
-OPENAI_API_KEY=sk-...
-RIDEHORIZON_PROXY_TOKEN=...
 ```
 
-Then secrets are set via:
+Manage runtime values directly in Fly when they need to change:
 
 ```bash
 fly secrets set \
