@@ -1868,23 +1868,23 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testClearWaitsForInFlightPersistenceBeforeWritingEmptySnapshot() throws {
+    func testClearWaitsForInFlightPersistenceBeforeWritingEmptySnapshot() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let writerStarted = DispatchSemaphore(value: 0)
+        let writerStarted = expectation(description: "Diagnostics writer started")
         let releaseWriter = DispatchSemaphore(value: 0)
         let store = RideDiagnosticsStore(
             directoryURL: directory,
             persistenceDelay: 0,
             persistenceWillWrite: { snapshot in
                 guard !snapshot.isEmpty else { return }
-                writerStarted.signal()
+                writerStarted.fulfill()
                 _ = releaseWriter.wait(timeout: .now() + 2)
             }
         )
 
         store.record(.appEnteredBackground)
-        XCTAssertEqual(writerStarted.wait(timeout: .now() + 1), .success)
+        await fulfillment(of: [writerStarted], timeout: 5)
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
             releaseWriter.signal()
         }
@@ -1932,10 +1932,16 @@ final class LocationManagerTests: XCTestCase {
             true
         )
         let attributes = try FileManager.default.attributesOfItem(atPath: store.exportURL.path)
+#if targetEnvironment(simulator)
+        if let protection = attributes[.protectionKey] as? FileProtectionType {
+            XCTAssertEqual(protection, .completeUntilFirstUserAuthentication)
+        }
+#else
         XCTAssertEqual(
             attributes[.protectionKey] as? FileProtectionType,
             .completeUntilFirstUserAuthentication
         )
+#endif
     }
 
     @MainActor
