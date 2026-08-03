@@ -570,12 +570,20 @@ private struct LocationScreenView: View {
                         .font(.system(size: scaledFont(14)))
                         .foregroundStyle(panelStyle.warningText)
                 } else {
-                    Label(
-                        locationManager.rideSessionState.riderLabel,
-                        systemImage: locationManager.rideSessionState.isActive ? "location.fill" : "location.slash"
-                    )
-                        .font(.system(size: scaledFont(14)))
-                        .foregroundStyle(panelStyle.primaryText)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Label(
+                            locationManager.rideSessionState.riderLabel,
+                            systemImage: locationManager.rideSessionState.isActive ? "location.fill" : "location.slash"
+                        )
+#if INTERNAL_AUDIO_CALIBRATION
+                        if SpeechCalibrationRuntimeProfileStore().activeProfile() != nil {
+                            Label("Candidate B active", systemImage: "waveform.badge.checkmark")
+                                .foregroundStyle(panelStyle.warningText)
+                        }
+#endif
+                    }
+                    .font(.system(size: scaledFont(14)))
+                    .foregroundStyle(panelStyle.primaryText)
                 }
             }
 

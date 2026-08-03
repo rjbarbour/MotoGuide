@@ -333,6 +333,24 @@ private final class RecordingCalibrationHost: SpeechCalibrationAudioHosting {
         stopCount += 1
     }
 }
+
+@MainActor
+private final class RecordingOutputVolumeObserver: SpeechCalibrationOutputVolumeObserving {
+    private(set) var startCount = 0
+    private var onChange: ((Float) -> Void)?
+    var currentVolume: Float = 0.25
+
+    func start(onChange: @escaping @MainActor (Float) -> Void) {
+        startCount += 1
+        self.onChange = onChange
+        onChange(currentVolume)
+    }
+
+    func emit(_ volume: Float) {
+        currentVolume = volume
+        onChange?(volume)
+    }
+}
 #endif
 
 final class LocationManagerTests: XCTestCase {
@@ -382,10 +400,18 @@ final class LocationManagerTests: XCTestCase {
             presenceGainDB: -3
         )
 
-        XCTAssertEqual(profile.outputGainDB, 12)
+        XCTAssertEqual(profile.outputGainDB, 24)
         XCTAssertEqual(profile.compressionPreset.ratio, 3)
         XCTAssertEqual(profile.compressionPreset.thresholdDBFS, -22)
         XCTAssertEqual(profile.presenceGainDB, 0)
+        XCTAssertEqual(
+            SpeechProcessingProfile.calibrationCandidate(
+                outputGainDB: 0,
+                compressionPreset: .off,
+                presenceGainDB: 99
+            ).presenceGainDB,
+            18
+        )
         XCTAssertEqual(profile.highPassFrequencyHz, 100)
         XCTAssertEqual(profile.samplePeakCeilingDBFS, -2)
         XCTAssertEqual(SpeechProcessingProfile.production.highPassFrequencyHz, 0)
@@ -462,11 +488,9 @@ final class LocationManagerTests: XCTestCase {
             fixtureLoader: loader,
             profileStore: SpeechCalibrationProfileStore(defaults: defaults)
         )
-        model.candidateProfile = .calibrationCandidate(
-            outputGainDB: 4,
-            compressionPreset: .light,
-            presenceGainDB: 2
-        )
+        model.outputGainDB = 4
+        model.compressionPreset = .light
+        model.presenceGainDB = 2
 
         model.playCurrentA()
         model.playCandidateB()
@@ -531,11 +555,9 @@ final class LocationManagerTests: XCTestCase {
             ),
             profileStore: store
         )
-        model.candidateProfile = .calibrationCandidate(
-            outputGainDB: 5,
-            compressionPreset: .medium,
-            presenceGainDB: 2
-        )
+        model.outputGainDB = 5
+        model.compressionPreset = .medium
+        model.presenceGainDB = 2
 
         try model.saveCandidate(now: Date(timeIntervalSince1970: 0))
 
@@ -544,12 +566,141 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(SpeechProcessingProfile.production.compressionPreset, .off)
     }
 
+    @MainActor
+    func testCalibrationVolumeObservationUpdatesWhileLabIsOpen() {
+        let observer = RecordingOutputVolumeObserver()
+        let host = RecordingCalibrationHost()
+        let model = SpeechCalibrationLabModel(
+            host: host,
+            fixtureLoader: RecordingCalibrationFixtureLoader(
+                state: RecordingCalibrationFixtureLoader.State(),
+                bytes: Data([1])
+            ),
+            outputVolumeObserver: observer
+        )
+
+        XCTAssertEqual(model.systemOutputVolume, 0.25)
+        observer.emit(0.75)
+        XCTAssertEqual(model.systemOutputVolume, 0.75)
+        XCTAssertEqual(observer.startCount, 1)
+    }
+
+    @MainActor
+    func testCandidateBDoesNotActivateRideOverrideUntilExplicitlyEnabled() throws {
+        let suiteName = "SpeechCalibrationOverride-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let runtimeStore = SpeechCalibrationRuntimeProfileStore(defaults: defaults)
+        let model = SpeechCalibrationLabModel(
+            host: RecordingCalibrationHost(),
+            fixtureLoader: RecordingCalibrationFixtureLoader(
+                state: RecordingCalibrationFixtureLoader.State(),
+                bytes: Data([1])
+            ),
+            runtimeProfileStore: runtimeStore,
+            outputVolumeObserver: RecordingOutputVolumeObserver()
+        )
+        model.outputGainDB = 18
+        model.compressionPreset = .strong
+        model.presenceGainDB = 12
+
+        model.playCandidateB()
+        XCTAssertNil(runtimeStore.activeProfile())
+        try model.saveCandidate(now: Date(timeIntervalSince1970: 0))
+        XCTAssertNil(runtimeStore.activeProfile())
+
+        model.setUseCandidateForNormalPremiumVoice(true)
+        XCTAssertEqual(runtimeStore.activeProfile(), model.candidateProfile)
+        XCTAssertEqual(
+            PremiumAudioPreparer.processingProfile(defaults: defaults),
+            model.candidateProfile
+        )
+
+        model.outputGainDB = 24
+        XCTAssertEqual(runtimeStore.activeProfile()?.outputGainDB, 24)
+
+        model.setUseCandidateForNormalPremiumVoice(false)
+        XCTAssertNil(runtimeStore.activeProfile())
+        XCTAssertEqual(
+            PremiumAudioPreparer.processingProfile(defaults: defaults),
+            .production
+        )
+    }
+
+    @MainActor
+    func testActiveRideCannotMutateOrDisableCandidateRideOverride() throws {
+        let suiteName = "SpeechCalibrationActiveRideGuard-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let runtimeStore = SpeechCalibrationRuntimeProfileStore(defaults: defaults)
+        let host = RecordingCalibrationHost()
+        let model = SpeechCalibrationLabModel(
+            host: host,
+            fixtureLoader: RecordingCalibrationFixtureLoader(
+                state: RecordingCalibrationFixtureLoader.State(),
+                bytes: Data([1])
+            ),
+            runtimeProfileStore: runtimeStore,
+            outputVolumeObserver: RecordingOutputVolumeObserver()
+        )
+        model.outputGainDB = 12
+        model.compressionPreset = .light
+        model.presenceGainDB = 6
+        model.setUseCandidateForNormalPremiumVoice(true)
+        let activeProfile = try XCTUnwrap(runtimeStore.activeProfile())
+        host.isRideActiveForCalibration = true
+
+        model.outputGainDB = 24
+        model.compressionPreset = .strong
+        model.presenceGainDB = 18
+        model.resetCandidate()
+        model.setUseCandidateForNormalPremiumVoice(false)
+
+        XCTAssertEqual(model.candidateProfile, activeProfile)
+        XCTAssertEqual(runtimeStore.activeProfile(), activeProfile)
+        XCTAssertTrue(model.useCandidateForNormalPremiumVoice)
+        XCTAssertThrowsError(try model.saveCandidate())
+    }
+
+    func testStrongCompressionChangesCandidateFixtureSamples() async throws {
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.shortFact)
+        let processor = DefaultPremiumSpeechProcessor()
+        let off = try await processor.prepare(
+            speechAudio: [fixture.rawSpeechAudio],
+            profile: .calibrationCandidate(
+                outputGainDB: 0,
+                compressionPreset: .off,
+                presenceGainDB: 0
+            )
+        )
+        let strong = try await processor.prepare(
+            speechAudio: [fixture.rawSpeechAudio],
+            profile: .calibrationCandidate(
+                outputGainDB: 0,
+                compressionPreset: .strong,
+                presenceGainDB: 0
+            )
+        )
+        let offSamples = try XCTUnwrap(off.buffers.first?.floatChannelData?[0])
+        let strongSamples = try XCTUnwrap(strong.buffers.first?.floatChannelData?[0])
+        let frameCount = min(
+            Int(try XCTUnwrap(off.buffers.first).frameLength),
+            Int(try XCTUnwrap(strong.buffers.first).frameLength)
+        )
+        var absoluteDifference: Float = 0
+        for frame in 0..<frameCount {
+            absoluteDifference += abs(offSamples[frame] - strongSamples[frame])
+        }
+
+        XCTAssertGreaterThan(absoluteDifference, 1)
+    }
+
     func testCalibrationProcessorKeepsFixtureWithinConfiguredSamplePeakCeiling() async throws {
         let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.shortFact)
         let profile = SpeechProcessingProfile.calibrationCandidate(
-            outputGainDB: 12,
+            outputGainDB: 24,
             compressionPreset: .strong,
-            presenceGainDB: 4
+            presenceGainDB: 18
         )
 
         let prepared = try await DefaultPremiumSpeechProcessor().prepare(

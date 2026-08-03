@@ -169,6 +169,23 @@ Use deterministic preset mappings. Initial mappings may be:
 
 These are starting values for the probe, not accepted production constants. Keep attack, release, knee, high-pass frequency and peak ceiling out of the main calibration UI.
 
+### Human calibration follow-up — 2026-08-03
+
+The first physical-iPhone comparison found that the system output-volume value was only sampled when the screen loaded, +12 dB output gain and the original +4 dB presence range were too subtle for useful discrimination, and Strong compression was not perceptually obvious. Candidate A remained acceptable; Candidate B was only slightly clearer and began to sound distorted.
+
+For the next bounded comparison:
+
+- observe `AVAudioSession.outputVolume` dynamically while the lab is visible;
+- expose output gain as 0, +6, +12, +18 and +24 dB choices;
+- expose presence gain as 0, +6, +12 and +18 dB choices;
+- retain the deterministic compression mappings, visibly state that they apply only to Candidate B, and add automated evidence that Strong changes the rendered Premium fixture;
+- add an explicit internal-build-only switch that applies the current Candidate B profile to normal Premium Voice announcements after leaving the lab;
+- persist that experimental override locally, update it when Candidate B changes, and make its active state obvious;
+- never enable the override merely by pressing Candidate B, saving a profile or opening the lab;
+- compile the override and all related keys/UI out of normal Release/TestFlight.
+
+This is a reversible road-evaluation override, not promotion of Candidate B to the production profile. The production default remains unchanged until Rob explicitly selects a final profile after road evidence.
+
 Do not display a value as an exact LUFS target unless the app actually implements a standards-based loudness measurement. It is acceptable for the lab to expose output gain and then measure saved candidates offline. The expected comparison band is roughly −16 to −14 LUFS, beginning around −15 LUFS, but perceptual helmet evidence decides the result.
 
 ## Calibration-lab interface
@@ -363,6 +380,20 @@ If implementation chooses a Calibration configuration on the existing scheme rat
 - Release executable string inspection: no Speech Calibration navigation/UI label, fixture filename, manifest name or internal saved-profile key.
 - Proxy contract, Google Maps policy and production processing profile: unchanged.
 - Acceptance state: stopped at Rob's stationary human calibration gate; no candidate has been promoted.
+
+### Follow-up evidence — 2026-08-03
+
+- Internal build: `RideHorizonCalibration`, `0.12.3 (20260803.2345)`.
+- Calibration physical-device unit target: 189 passed, zero failed or skipped.
+- Normal Debug physical-device unit target: 173 passed, zero failed or skipped.
+- Live volume: model-level observation test proves updates after the lab has loaded; physical button behaviour remains part of Rob's UI gate.
+- Control wiring: automated fixture comparison proves Strong compression changes rendered samples.
+- Override isolation: tests prove Candidate B playback does not activate normal-announcement processing, explicit enablement does, edits update the active profile, disablement restores Current A, and the normal Premium Voice preparer reads the active internal profile.
+- Offline processed-candidate inspection: all three fixtures were rendered at representative (+12 dB output, Light compression, +6 dB presence) and maximum (+24 dB output, Strong compression, +18 dB presence) settings. FFmpeg EBU R128 true-peak analysis measured −2.9 to −2.1 dBFS.
+- Normal unsigned Release build: passed after the follow-up.
+- Release bundle and executable inspection: no calibration resource, navigation/UI label, profile key or ride-override persistence key.
+- Production profile, proxy contract and Google Maps policy: unchanged.
+- Acceptance state: stopped before Rob's stationary adjustment and authorised internal-profile road evaluation.
 
 ## Independent evaluation
 

@@ -53,9 +53,9 @@ struct SpeechProcessingProfile: Codable, Equatable, Sendable {
         presenceGainDB: Float
     ) -> SpeechProcessingProfile {
         SpeechProcessingProfile(
-            outputGainDB: min(12, max(0, outputGainDB)),
+            outputGainDB: min(24, max(0, outputGainDB)),
             compressionPreset: compressionPreset,
-            presenceGainDB: min(4, max(0, presenceGainDB)),
+            presenceGainDB: min(18, max(0, presenceGainDB)),
             highPassFrequencyHz: 100,
             samplePeakCeilingDBFS: -2,
             automaticPeakNormalisationMaximumGainDB: Self.production.automaticPeakNormalisationMaximumGainDB
@@ -313,7 +313,7 @@ struct DefaultPremiumSpeechProcessor: PremiumSpeechProcessing {
         let releaseCoefficient = exp(-1 / (Float(buffer.format.sampleRate) * 0.050))
         // Leave bounded headroom for reconstruction peaks because this probe uses
         // a sample limiter rather than claiming standards-based true-peak limiting.
-        let limiterCeiling = ceiling * 0.92
+        let limiterCeiling = ceiling * 0.88
         var limiterGain: Float = 1
 
         for frame in 0..<Int(buffer.frameLength) {
@@ -391,10 +391,21 @@ enum SpeechAudioPeakNormaliser {
 }
 
 enum PremiumAudioPreparer {
+#if INTERNAL_AUDIO_CALIBRATION
+    static func processingProfile(defaults: UserDefaults = .standard) -> SpeechProcessingProfile {
+        SpeechCalibrationRuntimeProfileStore(defaults: defaults).activeProfile() ?? .production
+    }
+#endif
+
     static func prepare(dataSegments: [Data]) async throws -> PreparedPremiumAudio {
-        try await DefaultPremiumSpeechProcessor().prepare(
+#if INTERNAL_AUDIO_CALIBRATION
+        let profile = processingProfile()
+#else
+        let profile = SpeechProcessingProfile.production
+#endif
+        return try await DefaultPremiumSpeechProcessor().prepare(
             speechAudio: dataSegments,
-            profile: .production
+            profile: profile
         )
     }
 }

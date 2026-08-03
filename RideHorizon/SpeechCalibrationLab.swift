@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 import UIKit
 import CryptoKit
+import AVFoundation
 
 enum SpeechCalibrationFixture: String, CaseIterable, Identifiable, Codable {
     case placeName
@@ -145,6 +146,57 @@ struct SpeechCalibrationProfileStore {
     }
 }
 
+struct SpeechCalibrationRuntimeProfileStore {
+    private static let enabledKey = "RideHorizonInternalSpeechCalibrationRideOverrideEnabled"
+    private static let profileKey = "RideHorizonInternalSpeechCalibrationRideOverrideProfile"
+    let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func activeProfile() -> SpeechProcessingProfile? {
+        guard defaults.bool(forKey: Self.enabledKey),
+              let data = defaults.data(forKey: Self.profileKey) else { return nil }
+        return try? JSONDecoder().decode(SpeechProcessingProfile.self, from: data)
+    }
+
+    func setActiveProfile(_ profile: SpeechProcessingProfile?) {
+        guard let profile else {
+            defaults.set(false, forKey: Self.enabledKey)
+            defaults.removeObject(forKey: Self.profileKey)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(profile) else { return }
+        defaults.set(data, forKey: Self.profileKey)
+        defaults.set(true, forKey: Self.enabledKey)
+    }
+}
+
+@MainActor
+protocol SpeechCalibrationOutputVolumeObserving: AnyObject {
+    var currentVolume: Float { get }
+    func start(onChange: @escaping @MainActor (Float) -> Void)
+}
+
+@MainActor
+final class SystemSpeechCalibrationOutputVolumeObserver: SpeechCalibrationOutputVolumeObserving {
+    private let session: AVAudioSession
+    private var observation: NSKeyValueObservation?
+
+    init(session: AVAudioSession = .sharedInstance()) {
+        self.session = session
+    }
+
+    var currentVolume: Float { session.outputVolume }
+
+    func start(onChange: @escaping @MainActor (Float) -> Void) {
+        observation = session.observe(\.outputVolume, options: [.initial, .new]) { session, _ in
+            Task { @MainActor in onChange(session.outputVolume) }
+        }
+    }
+}
+
 @MainActor
 protocol SpeechCalibrationAudioHosting: AnyObject {
     var isRideActiveForCalibration: Bool { get }
@@ -191,14 +243,18 @@ enum SpeechCalibrationPlaybackState: Equatable {
 final class SpeechCalibrationLabModel: ObservableObject {
     @Published var selectedFixture: SpeechCalibrationFixture = .placeName
     @Published var selectedProvider: SpeechCalibrationProvider = .premiumFixture
-    @Published var candidateProfile: SpeechProcessingProfile = .production
+    @Published private(set) var candidateProfile: SpeechProcessingProfile
     @Published var playbackState: SpeechCalibrationPlaybackState = .ready
     @Published var profileName = "Candidate"
+    @Published private(set) var systemOutputVolume: Float
+    @Published private(set) var useCandidateForNormalPremiumVoice: Bool
     @Published private(set) var savedProfiles: [SavedSpeechCalibrationProfile]
 
     private let host: SpeechCalibrationAudioHosting
     private let fixtureLoader: SpeechCalibrationFixtureLoading
     private let profileStore: SpeechCalibrationProfileStore
+    private let runtimeProfileStore: SpeechCalibrationRuntimeProfileStore
+    private let outputVolumeObserver: SpeechCalibrationOutputVolumeObserving
     private var lastSelection: (
         profile: SpeechProcessingProfile,
         profileID: String,
@@ -209,12 +265,25 @@ final class SpeechCalibrationLabModel: ObservableObject {
     init(
         host: SpeechCalibrationAudioHosting,
         fixtureLoader: SpeechCalibrationFixtureLoading = BundleSpeechCalibrationFixtureLoader(),
-        profileStore: SpeechCalibrationProfileStore = SpeechCalibrationProfileStore()
+        profileStore: SpeechCalibrationProfileStore = SpeechCalibrationProfileStore(),
+        runtimeProfileStore: SpeechCalibrationRuntimeProfileStore = SpeechCalibrationRuntimeProfileStore(),
+        outputVolumeObserver: SpeechCalibrationOutputVolumeObserving? = nil
     ) {
+        let resolvedOutputVolumeObserver = outputVolumeObserver
+            ?? SystemSpeechCalibrationOutputVolumeObserver()
         self.host = host
         self.fixtureLoader = fixtureLoader
         self.profileStore = profileStore
+        self.runtimeProfileStore = runtimeProfileStore
+        self.outputVolumeObserver = resolvedOutputVolumeObserver
+        let activeProfile = runtimeProfileStore.activeProfile()
+        candidateProfile = activeProfile ?? .production
+        useCandidateForNormalPremiumVoice = activeProfile != nil
+        systemOutputVolume = resolvedOutputVolumeObserver.currentVolume
         savedProfiles = profileStore.load()
+        resolvedOutputVolumeObserver.start { [weak self] volume in
+            self?.systemOutputVolume = volume
+        }
     }
 
     var isRideActive: Bool { host.isRideActiveForCalibration }
@@ -222,17 +291,26 @@ final class SpeechCalibrationLabModel: ObservableObject {
 
     var outputGainDB: Float {
         get { candidateProfile.outputGainDB }
-        set { updateCandidate(outputGainDB: newValue) }
+        set {
+            guard !host.isRideActiveForCalibration else { return }
+            updateCandidate(outputGainDB: newValue)
+        }
     }
 
     var compressionPreset: SpeechCompressionPreset {
         get { candidateProfile.compressionPreset }
-        set { updateCandidate(compressionPreset: newValue) }
+        set {
+            guard !host.isRideActiveForCalibration else { return }
+            updateCandidate(compressionPreset: newValue)
+        }
     }
 
     var presenceGainDB: Float {
         get { candidateProfile.presenceGainDB }
-        set { updateCandidate(presenceGainDB: newValue) }
+        set {
+            guard !host.isRideActiveForCalibration else { return }
+            updateCandidate(presenceGainDB: newValue)
+        }
     }
 
     func playCurrentA() {
@@ -259,10 +337,21 @@ final class SpeechCalibrationLabModel: ObservableObject {
     }
 
     func resetCandidate() {
+        guard !host.isRideActiveForCalibration else { return }
         candidateProfile = .production
+        persistActiveCandidateIfNeeded()
+    }
+
+    func setUseCandidateForNormalPremiumVoice(_ enabled: Bool) {
+        guard !host.isRideActiveForCalibration else { return }
+        useCandidateForNormalPremiumVoice = enabled
+        runtimeProfileStore.setActiveProfile(enabled ? candidateProfile : nil)
     }
 
     func saveCandidate(now: Date = Date()) throws {
+        guard !host.isRideActiveForCalibration else {
+            throw SpeechCalibrationError.rideActive
+        }
         let trimmedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
         let revision = try fixtureLoader.manifest().fixtureRevision
         let saved = SavedSpeechCalibrationProfile(
@@ -345,6 +434,12 @@ final class SpeechCalibrationLabModel: ObservableObject {
             compressionPreset: compressionPreset ?? candidateProfile.compressionPreset,
             presenceGainDB: presenceGainDB ?? candidateProfile.presenceGainDB
         )
+        persistActiveCandidateIfNeeded()
+    }
+
+    private func persistActiveCandidateIfNeeded() {
+        guard useCandidateForNormalPremiumVoice else { return }
+        runtimeProfileStore.setActiveProfile(candidateProfile)
     }
 }
 
@@ -368,7 +463,7 @@ struct SpeechCalibrationLabView: View {
 
             Section("Output") {
                 LabeledContent("Route", value: model.audioSnapshot.outputRouteTypes.joined(separator: ", ").nilIfEmpty ?? "No output")
-                LabeledContent("System output volume (read-only)", value: String(format: "%.0f%%", model.audioSnapshot.outputVolume * 100))
+                LabeledContent("System output volume (read-only)", value: String(format: "%.0f%%", model.systemOutputVolume * 100))
             }
 
             Section("Comparison") {
@@ -395,13 +490,13 @@ struct SpeechCalibrationLabView: View {
             }
 
             Section("Candidate B") {
-                VStack(alignment: .leading) {
-                    Text("Output gain: \(model.outputGainDB, specifier: "%.1f") dB")
-                    Slider(
-                        value: Binding(get: { Double(model.outputGainDB) }, set: { model.outputGainDB = Float($0) }),
-                        in: 0...12,
-                        step: 0.5
-                    )
+                Picker("Output gain", selection: Binding(
+                    get: { model.outputGainDB },
+                    set: { model.outputGainDB = $0 }
+                )) {
+                    ForEach([Float(0), 6, 12, 18, 24], id: \.self) { value in
+                        Text(value == 0 ? "0 dB" : "+\(Int(value)) dB").tag(value)
+                    }
                 }
                 Picker("Compression", selection: Binding(
                     get: { model.compressionPreset },
@@ -409,15 +504,40 @@ struct SpeechCalibrationLabView: View {
                 )) {
                     ForEach(SpeechCompressionPreset.allCases) { Text($0.label).tag($0) }
                 }
-                VStack(alignment: .leading) {
-                    Text("Presence: \(model.presenceGainDB, specifier: "%.0f") dB")
-                    Slider(
-                        value: Binding(get: { Double(model.presenceGainDB) }, set: { model.presenceGainDB = Float($0) }),
-                        in: 0...4,
-                        step: 1
-                    )
+                Picker("Presence", selection: Binding(
+                    get: { model.presenceGainDB },
+                    set: { model.presenceGainDB = $0 }
+                )) {
+                    ForEach([Float(0), 6, 12, 18], id: \.self) { value in
+                        Text(value == 0 ? "0 dB" : "+\(Int(value)) dB").tag(value)
+                    }
                 }
                 Button("Reset to Current A") { model.resetCandidate() }
+                Text("Output gain, compression and presence affect Candidate B only.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Text("Higher gain settings drive the safety limiter harder and may add audible distortion. Compare them while stopped before enabling a ride test.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .disabled(model.isRideActive)
+
+            Section("Normal Premium Voice ride test") {
+                Toggle(
+                    "Use Candidate B for normal Premium Voice",
+                    isOn: Binding(
+                        get: { model.useCandidateForNormalPremiumVoice },
+                        set: { model.setUseCandidateForNormalPremiumVoice($0) }
+                    )
+                )
+                .disabled(model.isRideActive)
+                Text(
+                    model.useCandidateForNormalPremiumVoice
+                        ? "Active in this internal build. Normal Premium Voice announcements will use the current Candidate B settings after you leave this screen."
+                        : "Off. Normal announcements use Current A. Pressing Candidate B does not enable this switch."
+                )
+                .font(.footnote)
+                .foregroundStyle(model.useCandidateForNormalPremiumVoice ? .orange : .secondary)
             }
 
             Section("Save or export") {
@@ -453,7 +573,7 @@ struct SpeechCalibrationLabView: View {
             }
 
             Section {
-                Text("Candidate values are experimental and never replace the production profile automatically.")
+                Text("Candidate values are experimental. The ride-test switch affects only this internal build and never changes the production profile.")
                     .font(.footnote)
             }
         }

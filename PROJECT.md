@@ -8,7 +8,7 @@ Prepare a private external TestFlight beta for 3–5 named iPhone testers. This 
 
 ## Last verified result
 
-RideHorizon internal calibration candidate `0.12.3 (20260803.2300)` is installed and launched on the physical iPhone. It retains the explicit ride lifecycle and event-driven music interruption/restoration behaviour from `20260803.2218`. The production Premium Voice profile is unchanged. An internal-only Speech Calibration Lab now compares that baseline with bounded local candidate processing using three immutable Premium Voice fixtures and the live production Apple Voice path. Every fixture play reloads original bundled bytes, makes no proxy request and uses the existing announcement audio-session lifecycle. Experimental profiles remain separate from production. Calibration-specific diagnostics retain only fixture/profile identifiers, processing measurements and terminal outcomes. The Calibration target passed 185 physical-device tests and the normal Debug target passed 173; representative and extreme offline renders remained at or below −2.1 dBFS true peak. The unsigned normal Release build succeeded and contains no calibration resources, UI labels, navigation entry or persistence key. The previously Apple-validated `20260803.0032` archive remains superseded and must not be uploaded.
+RideHorizon internal calibration candidate `0.12.3 (20260803.2345)` makes system output volume live, exposes wider 6 dB Candidate B choices, proves Strong compression changes rendered speech, and provides an explicit internal-only switch for using the current Candidate B profile during normal Premium Voice ride evaluation. Pressing Candidate B or saving it does not enable the switch. The override persists locally only in the Calibration build, is visible on the main screen and cannot be changed or disabled while a ride is active; the production profile remains unchanged. The Calibration target passed 189 physical-device tests and normal Debug passed 173. Representative and maximum offline renders remained at or below −2.1 dBFS true peak. The unsigned normal Release build succeeded and contains no calibration resources, UI labels, navigation entry or override persistence key. The previously Apple-validated `20260803.0032` archive remains superseded and must not be uploaded.
 
 ## Delivery Risk Cube
 
@@ -18,7 +18,7 @@ RideHorizon internal calibration candidate `0.12.3 (20260803.2300)` is installed
 
 ## Current gate
 
-**VERIFY — Speech Calibration human gate.** Internal candidate `0.12.3 (20260803.2300)` is installed and launched. While stopped, Rob must open Settings → Developer → Speech Calibration, start YouTube Music manually and compare Current A with Candidate B for Place Name, Boundary and Short Fact through the phone and helmet headset. Judge intelligibility, harshness/clipping and the transition when iOS restores music. Save/export a candidate only if useful. Do not promote a profile, tune Google Maps, archive or upload until Rob accepts or rejects the calibration approach.
+**VERIFY — Speech Calibration and road-evaluation gate.** Internal candidate `0.12.3 (20260803.2345)` must first be adjusted while stationary under Settings → Developer → Speech Calibration. If a Candidate B is worth road testing, explicitly enable **Use Candidate B for normal Premium Voice**, leave the lab and run the normal Premium Voice path with music. This is an internal runtime override, not production-profile promotion. Do not tune Google Maps, archive or upload until Rob accepts or rejects the candidate after the ride.
 
 ## Residual risks
 
@@ -32,6 +32,6 @@ RideHorizon internal calibration candidate `0.12.3 (20260803.2300)` is installed
 
 ## Next outcomes
 
-1. Run the stationary Speech Calibration gate on `0.12.3 (20260803.2300)` through the phone output and helmet headset, with and without YouTube Music.
-2. Record whether Current A or a saved Candidate B is accepted. Only then promote the chosen profile and repeat the required audio tests.
+1. Run the stationary Speech Calibration gate on `0.12.3 (20260803.2345)` through the phone output and helmet headset, with and without YouTube Music.
+2. If useful, explicitly enable the internal Candidate B normal-announcement override and evaluate it during a normal ride with music; then accept, revise or reject it.
 3. Install the exact TestFlight binary and complete the road, background, inactivity, audio, network and power evidence before external review submission.
