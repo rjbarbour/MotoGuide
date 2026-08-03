@@ -13,12 +13,12 @@ RideHorizon `0.12.3 (20260803.0032)` is the current development candidate. It no
 ## Delivery Risk Cube
 
 - **Functional breadth:** Sufficient for the private beta: onboarding, location awareness, Test Mode, names, facts, Apple Voice, Premium Voice and Quiet Mode.
-- **Implementation fidelity:** Live services, clean-install compact-iPhone portrait and landscape evidence, a validated earlier Release archive, and installation/launch of the current signed development candidate exist; the current Release archive, App Store Connect processing, TestFlight installation and manual ride smoke test remain unproved.
+- **Implementation fidelity:** Live services, clean-install compact-iPhone portrait and landscape evidence, installation/launch of the current signed development candidate, and an exact current Release archive with Xcode store-oriented bundle validation exist. Distribution signing, App Store Connect processing, TestFlight installation and the manual ride smoke test remain unproved.
 - **Production-quality depth:** Privacy policy, consent, no pre-consent proxy access, explicit in-app rider-safety wording, minimal background modes, iPhone-only packaging, bounded ride/audio lifecycles, provider fallback and green automated checks are in place. Stationary music-ducking, Bluetooth, background-end and real-world battery evidence still define the release gate.
 
 ## Current gate
 
-**VERIFY.** RH-003 and the deterministic part of RH-004 are implemented in development candidate `0.12.3 (20260803.0032)`. Rob must now complete `TF-SESSION-01` to `TF-SESSION-03` and `TF-AUDIO-01` to `TF-AUDIO-02` while stationary. Do not upload until these checks pass. Then archive, validate and upload the exact replacement, install it through Internal TestFlight, and complete the remaining field evidence before external submission.
+**VERIFY.** RH-003 and the deterministic part of RH-004 are implemented in development candidate `0.12.3 (20260803.0032)`. The exact Release archive now exists and passes local structural and store-oriented validation. Rob must complete `TF-SESSION-01` to `TF-SESSION-03` and `TF-AUDIO-01` to `TF-AUDIO-02` while stationary, and authorise Xcode to create the missing Apple Distribution certificate. Do not upload until the five stationary checks pass. Then export, validate and upload the existing archive, install it through Internal TestFlight, and complete the remaining field evidence before external submission.
 
 ## Residual risks
 
@@ -33,5 +33,5 @@ RideHorizon `0.12.3 (20260803.0032)` is the current development candidate. It no
 ## Next outcomes
 
 1. Run the five mandatory stationary checks on `0.12.3 (20260803.0032)` and record evidence.
-2. Review and commit the candidate, then archive, validate and upload the exact source state.
+2. Create the Apple Distribution certificate in Xcode, then export, validate and upload the existing exact archive.
 3. Install through Internal TestFlight and complete the road, background, inactivity, audio, network and power evidence before external review submission.

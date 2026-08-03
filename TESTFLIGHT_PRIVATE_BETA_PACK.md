@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 
-Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Development candidate `0.12.3 (20260803.0032)` adds explicit bounded ride sessions, playback-scoped audio ownership and privacy-safe Release diagnostics. Its physical-iPhone unit target passes 144/144; the signed app builds, installs and launches; the proxy suite passes; and live automatic session, fact and Premium Voice requests return HTTP 200. Archive/upload remains paused only for the five stationary checks in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and final review closure. Earlier candidates must not be assigned to testers.
+Status: Build `0.12.3 (20260731.1608)` uploaded successfully on 2026-07-31 and remains the latest App Store Connect build. Development candidate `0.12.3 (20260803.0032)` adds explicit bounded ride sessions, playback-scoped audio ownership and privacy-safe Release diagnostics. Its physical-iPhone unit target passes 144/144; the signed app builds, installs and launches; the proxy suite passes; and live automatic session, fact and Premium Voice requests return HTTP 200. The exact Release archive exists and passes local store-oriented validation. Upload remains paused for the five stationary checks in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and creation of the missing Apple Distribution certificate. Earlier candidates must not be assigned to testers.
 
 ## Release Decisions — 2026-07-31
 
