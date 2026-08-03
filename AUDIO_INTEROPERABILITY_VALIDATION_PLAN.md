@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 
-Status: **Increment 1 revision is at the physical YouTube Music validation gate. Music interruption works consistently from both Test Mode controls; the revision removes the artificial wait only in Debug Test Mode, applies bounded per-utterance Premium Voice gain and extends correlated latency diagnostics. Do not tune Google Maps behaviour until Rob accepts the revised YouTube Music result.**
+Status: **Candidate `0.12.3 (20260803.2218)` is installed at the physical YouTube Music validation gate. Music interruption works consistently from both Test Mode controls; the revision removes the artificial primary-audio wait from every build mode, applies bounded per-announcement Premium Voice gain and extends correlated latency diagnostics. All 172 physical-device unit tests and signed Debug/Release builds pass. Do not tune Google Maps behaviour until Rob accepts the revised YouTube Music result.**
 
 ## Authority and scope
 
@@ -44,8 +44,8 @@ The work proceeds one interaction at a time:
 
 When YouTube Music is already playing:
 
-- RideHorizon must not wait indefinitely because `secondaryAudioShouldBeSilencedHint` is true.
-- Fact generation, announcement-text preparation and speech-audio generation must either progress or expose a bounded, visible waiting state.
+- RideHorizon must not delay or block an announcement merely because `secondaryAudioShouldBeSilencedHint` is true before playback.
+- Fact generation, announcement-text preparation and speech-audio generation must progress normally while music is present.
 - When RideHorizon plays, it should temporarily interrupt music so the announcement remains intelligible. RideHorizon must promptly deactivate its session with `notifyOthersOnDeactivation` so iOS can resume the interrupted app.
 - Music should return smoothly to its previous perceived level within one second after RideHorizon releases its session.
 - There must be no persistent suppression, abrupt volume blast, duplicate announcement or late stale announcement.
@@ -54,9 +54,10 @@ When YouTube Music starts during RideHorizon speech, record the actual iOS event
 
 ### Navigation behaviour
 
-When Google Maps is already speaking and iOS exposes an interruption or primary-audio signal:
+When RideHorizon has observed a genuine interruption or secondary-audio begin notification before an announcement becomes ready:
 
-- RideHorizon waits until the corresponding end or resumable state, applies a short settling delay, then starts the pending announcement.
+- RideHorizon waits for every corresponding end or resumable event, then starts the pending announcement immediately. Overlapping observed intervals must all end before restart. There is no timer-based settling delay.
+- A preflight `secondaryAudioShouldBeSilencedHint` value alone never starts a wait because it is also present during ordinary YouTube Music playback and does not identify navigation.
 
 When Google Maps begins speaking during a RideHorizon announcement and iOS exposes the event:
 
@@ -101,11 +102,23 @@ Apple controls the attenuation applied by `.duckOthers`; RideHorizon cannot sele
 
 ## Diagnostic requirements
 
-The existing persistent Release diagnostic ring buffer is the baseline. Keep its current bounds of 2,000 events, seven days or 1 MiB, its file protection, backup exclusion, local export and clear controls.
+The private-beta diagnostic ring buffer is the baseline. Keep its current bounds of 2,000 events, seven days or 1 MiB, its file protection, backup exclusion, local export and clear controls during the private beta.
+
+Diagnostics have three distinct levels:
+
+- the private-beta timing chain is enabled in beta builds so a road-test export can explain latency and audio lifecycle without Xcode;
+- verbose proxy HTTP and DNS logging remains Debug-only and explicitly switched off by default;
+- a public-production build must default diagnostics off and provide a build-time compilation switch that can remove the persistent recorder and diagnostic UI from the binary. Re-enable it only in a deliberate diagnostic build when investigating reported latency.
+
+The app makes two independent proxy calls for fact-backed Premium Voice announcements: `/v1/fact` returns text after the proxy calls OpenAI, then `/v1/speech` returns MP3 audio after the proxy calls ElevenLabs. Names Only and other non-fact modes skip `/v1/fact`; Apple Voice skips `/v1/speech`. Client timestamps must therefore distinguish place detection, reverse geocoding, fact request/response, speech request/last-byte response, local decode/preparation, audio-session activation and playback start.
+
+For beta network evidence, snapshot the public Network-framework path classification at the start and result stage of fact generation and Premium Voice TTS: satisfied state, interface class, expensive and constrained flags, plus the coarse link-quality category on iOS 26 or later when available. Do not duplicate network metadata onto unrelated ride events. Do not record carrier identity, SIM/service identifiers, IP addresses or radio details. iOS does not expose cellular dBm or signal bars through a supported public API, and the coarse link-quality value must supplement measured request duration rather than gate requests.
+
+The current client chain measures aggregate stage duration, including any retry and backoff, but does not persist individual attempt counts or failure classes. Debug-only proxy logs and optional server diagnostics provide that deeper evidence during an investigation. Add persistent per-attempt events only if beta failures show that aggregate timing and terminal outcome are insufficient.
 
 Before behavioural tuning, confirm that one exported log can reconstruct the following sequence without console access:
 
-`fact generation → announcement text ready → waiting/queued → speech-audio request → speech audio ready → audio-session activation → playback → interruption or completion → audio-session release → requeue/restart decision`
+`fact generation → announcement text ready → queued → speech-audio request → speech audio ready → audio-session activation → playback → interruption or completion → audio-session release → requeue/restart decision`
 
 Each relevant entry should contain, where applicable:
 
@@ -124,7 +137,7 @@ Each relevant entry should contain, where applicable:
 - secondary-audio hint begin/end;
 - output route and route-change reason;
 - output-volume snapshot, clearly treated as system output volume rather than measured loudness;
-- cancellation, supersession, retry, bounded-wait expiry and restart outcome.
+- cancellation, supersession, terminal outcome and restart outcome.
 
 Do not log:
 
@@ -133,6 +146,7 @@ Do not log:
 - precise coordinates or route history;
 - API keys, tokens or credentials;
 - an inferred external-app identity.
+- carrier identity, SIM/service identifiers, IP addresses or precise radio measurements.
 
 The test operator records the known external app and scenario in `TESTFLIGHT_FIELD_TEST_EVIDENCE.md`. The app log records only what iOS and RideHorizon actually observed.
 
@@ -146,7 +160,7 @@ An exported diagnostic log explains every state transition in a YouTube Music te
 
 - Audit the current diagnostic schema against this plan.
 - Add only the missing correlation, pipeline, decision and interruption fields needed to reconstruct the event chain.
-- Add or update unit tests for ordering, correlation, cancellation, bounded deferral, session activation and release.
+- Add or update unit tests for ordering, correlation, cancellation, immediate preflight behaviour, event-driven interruption recovery, session activation and release.
 - Route every manual Test Mode advance through one announcement/audio interface so the main sheet and log view cannot select different audio behaviour.
 - For this development campaign, default Test Mode on in Debug builds through one explicit configuration/migration point. Keep Release/TestFlight default off and preserve subsequent explicit choices.
 - Run stationary physical tests with YouTube Music, first through the phone output and then through the helmet Bluetooth headset.
@@ -168,7 +182,7 @@ Use one announcement per scenario and export diagnostics after each run:
 2. YouTube Music already playing: trigger Apple Voice and verify pause/resume.
 3. YouTube Music already playing: trigger Premium Voice and verify pause/resume.
 4. Start YouTube Music while RideHorizon is speaking.
-5. Stop or pause YouTube Music while a RideHorizon announcement is waiting.
+5. Stop or pause YouTube Music immediately before triggering a RideHorizon announcement.
 6. End ride during waiting, speech-audio generation and active playback; verify no later speech occurs.
 7. Repeat the passing coexistence case through the helmet Bluetooth headset.
 
@@ -176,11 +190,11 @@ For each scenario record app/build version, iOS version, output route, RideHoriz
 
 ### Acceptance evidence
 
-- Automated tests prove bounded wait, single restart, no stale restart, correlated diagnostic ordering and session release on every terminal path.
+- Automated tests prove that preflight audio hints add no delay, genuine interruption end events restart once without a timer, stale announcements do not restart, diagnostic ordering remains correlated and every terminal path releases the session.
 - The complete iOS unit target passes.
 - The signed app builds, installs and launches on the physical iPhone.
 - YouTube Music remains usable, pauses during RideHorizon speech and returns smoothly within one second after release.
-- Premium Voice generation proceeds while music is present or exposes a bounded, diagnosable state; it does not silently stall.
+- Premium Voice generation proceeds while music is present and exposes a diagnosable request state; it does not silently stall.
 - Exported diagnostics explain the observed outcome without relying on Xcode's live console.
 - No external app identity, content, coordinates or credentials appear in the export.
 
@@ -200,7 +214,7 @@ The exported phone diagnostics isolate the measured five-to-six-second interval 
 - one to two seconds from `ttsRequested` to `speechAudioReady`;
 - zero to one second from speech-audio readiness to playback, including audio-session activation and timestamp rounding.
 
-The three-second bounded wait is inappropriate for this controlled YouTube Music campaign when Debug Test Mode deliberately interrupts music. Bypass it only when `DEBUG`, Test Mode and `.interrupt` are all active. Live mode and Release/TestFlight must continue to yield whenever iOS reports primary audio because iOS does not identify the external app. This preserves the Google Maps safety policy until Increment 2.
+Decision superseded on 2026-08-03: remove the three-second primary-audio timer in every mode. A preflight `secondaryAudioShouldBeSilencedHint` does not defer an announcement. Genuine interruption and secondary-audio begin notifications may pause active speech, but recovery is driven only by the corresponding resumable/end event and happens immediately. Test Mode, live mode, Debug and Release/TestFlight use the same rule.
 
 Set Apple utterances explicitly to the maximum supported per-player volume. Do not change system volume. ElevenLabs voice settings do not provide a loudness control: `use_speaker_boost` changes voice similarity and may add latency.
 

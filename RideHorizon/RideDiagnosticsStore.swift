@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 enum RideDiagnosticEvent: String, Codable, Equatable {
     case appEnteredForeground
@@ -18,6 +19,7 @@ enum RideDiagnosticEvent: String, Codable, Equatable {
     case announcementTextReady
     case announcementQueued
     case announcementDeferred
+    // Legacy decode-only events retained so exports from superseded beta builds remain readable.
     case announcementRestartScheduled
     case boundedAudioWaitExpired
     case announcementRestarted
@@ -48,6 +50,7 @@ enum RideDiagnosticReason: String, Codable, Equatable {
     case factUnavailable
     case primaryAudioActive
     case primaryAudioEnded
+    // Legacy decode-only reason retained so exports from superseded beta builds remain readable.
     case boundedWaitExpired
     case interruptionBegan
     case interruptionShouldResume
@@ -60,6 +63,7 @@ enum RideDiagnosticReason: String, Codable, Equatable {
     case playbackCompleted
     case playbackCancelled
     case playbackFailed
+    case mediaServicesReset
     case deactivationRetry
     case deactivationRecovery
 }
@@ -108,6 +112,119 @@ struct AudioSessionSnapshot: Codable, Equatable {
     }
 }
 
+enum DiagnosticNetworkStatus: String, Codable, Equatable, Sendable {
+    case satisfied
+    case unsatisfied
+    case requiresConnection
+}
+
+enum DiagnosticNetworkInterface: String, Codable, Equatable, Sendable {
+    case cellular
+    case wifi
+    case wiredEthernet
+    case loopback
+    case other
+}
+
+enum DiagnosticNetworkLinkQuality: String, Codable, Equatable, Sendable {
+    case unknown
+    case minimal
+    case moderate
+    case good
+}
+
+/// Public, coarse connectivity metadata only. This schema deliberately cannot carry
+/// carrier identity, SIM/service identifiers, IP addresses or radio signal values.
+struct NetworkPathSnapshot: Codable, Equatable, Sendable {
+    let status: DiagnosticNetworkStatus
+    let interfaceTypes: [DiagnosticNetworkInterface]
+    let isExpensive: Bool
+    let isConstrained: Bool
+    let linkQuality: DiagnosticNetworkLinkQuality?
+}
+
+private final class NetworkPathDiagnosticMonitor: @unchecked Sendable {
+    static let shared = NetworkPathDiagnosticMonitor()
+
+    private let monitor = NWPathMonitor()
+    private let lock = NSLock()
+    private var latestSnapshot: NetworkPathSnapshot?
+
+    var snapshot: NetworkPathSnapshot? {
+        lock.lock()
+        defer { lock.unlock() }
+        return latestSnapshot
+    }
+
+    private init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            let snapshot = Self.makeSnapshot(from: path)
+            self.lock.lock()
+            self.latestSnapshot = snapshot
+            self.lock.unlock()
+        }
+        monitor.start(queue: DispatchQueue(
+            label: "ai.digitalmercenaries.ridehorizon.network-diagnostics",
+            qos: .utility
+        ))
+    }
+
+    deinit {
+        monitor.cancel()
+    }
+
+    private static func makeSnapshot(from path: NWPath) -> NetworkPathSnapshot {
+        let status: DiagnosticNetworkStatus = switch path.status {
+        case .satisfied:
+            .satisfied
+        case .unsatisfied:
+            .unsatisfied
+        case .requiresConnection:
+            .requiresConnection
+        @unknown default:
+            .unsatisfied
+        }
+
+        let candidates: [(NWInterface.InterfaceType, DiagnosticNetworkInterface)] = [
+            (.cellular, .cellular),
+            (.wifi, .wifi),
+            (.wiredEthernet, .wiredEthernet),
+            (.loopback, .loopback),
+            (.other, .other)
+        ]
+        let interfaceTypes = candidates.compactMap { type, diagnosticType in
+            path.usesInterfaceType(type) ? diagnosticType : nil
+        }
+
+        let linkQuality: DiagnosticNetworkLinkQuality?
+        if #available(iOS 26.0, *) {
+            linkQuality = switch path.linkQuality {
+            case .unknown:
+                .unknown
+            case .minimal:
+                .minimal
+            case .moderate:
+                .moderate
+            case .good:
+                .good
+            @unknown default:
+                .unknown
+            }
+        } else {
+            linkQuality = nil
+        }
+
+        return NetworkPathSnapshot(
+            status: status,
+            interfaceTypes: interfaceTypes,
+            isExpensive: path.isExpensive,
+            isConstrained: path.isConstrained,
+            linkQuality: linkQuality
+        )
+    }
+}
+
 struct RideDiagnosticEntry: Identifiable, Codable, Equatable {
     let id: UUID
     let timestamp: Date
@@ -120,6 +237,7 @@ struct RideDiagnosticEntry: Identifiable, Codable, Equatable {
     let reason: RideDiagnosticReason?
     let appState: DiagnosticAppState?
     let audio: AudioSessionSnapshot?
+    let network: NetworkPathSnapshot?
     let audioPolicy: AudioCoexistencePolicy?
     let elapsedRideSeconds: TimeInterval?
     let rideState: DiagnosticRideState?
@@ -164,6 +282,7 @@ final class RideDiagnosticsStore: ObservableObject {
     private let maxBytes: Int
     private let persistenceDelay: TimeInterval
     private let persistenceWillWrite: (([RideDiagnosticEntry]) -> Void)?
+    private let networkSnapshotProvider: () -> NetworkPathSnapshot?
     private let persistenceQueue = DispatchQueue(
         label: "ai.digitalmercenaries.ridehorizon.diagnostics",
         qos: .utility
@@ -180,7 +299,10 @@ final class RideDiagnosticsStore: ObservableObject {
         maxAge: TimeInterval = 7 * 24 * 60 * 60,
         maxBytes: Int = 1_048_576,
         persistenceDelay: TimeInterval = 1,
-        persistenceWillWrite: (([RideDiagnosticEntry]) -> Void)? = nil
+        persistenceWillWrite: (([RideDiagnosticEntry]) -> Void)? = nil,
+        networkSnapshotProvider: @escaping () -> NetworkPathSnapshot? = {
+            NetworkPathDiagnosticMonitor.shared.snapshot
+        }
     ) {
         let directory = directoryURL ?? FileManager.default.urls(
             for: .cachesDirectory,
@@ -193,6 +315,7 @@ final class RideDiagnosticsStore: ObservableObject {
         self.maxBytes = maxBytes
         self.persistenceDelay = persistenceDelay
         self.persistenceWillWrite = persistenceWillWrite
+        self.networkSnapshotProvider = networkSnapshotProvider
 
         try? FileManager.default.createDirectory(
             at: directory,
@@ -222,6 +345,14 @@ final class RideDiagnosticsStore: ObservableObject {
         locationSampleAgeSeconds: TimeInterval? = nil,
         at timestamp: Date? = nil
     ) {
+        let shouldCaptureNetwork = switch event {
+        case .factGenerationStarted, .factGenerationFinished:
+            true
+        case .ttsRequested, .speechAudioReady, .announcementFailed:
+            playbackPath == .premiumVoice
+        default:
+            false
+        }
         let entry = RideDiagnosticEntry(
             id: UUID(),
             timestamp: timestamp ?? now(),
@@ -234,6 +365,7 @@ final class RideDiagnosticsStore: ObservableObject {
             reason: reason,
             appState: appState,
             audio: audio,
+            network: shouldCaptureNetwork ? networkSnapshotProvider() : nil,
             audioPolicy: audioPolicy,
             elapsedRideSeconds: elapsedRideSeconds,
             rideState: rideState,

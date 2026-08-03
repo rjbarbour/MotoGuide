@@ -880,6 +880,11 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
 
 }
 
+private enum ObservedAudioPauseSource: Hashable {
+    case interruption
+    case primaryAudio
+}
+
 @MainActor
 class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate {
     static let movingMapInteractionThresholdMetersPerSecond = 8.0 / 3.6
@@ -900,7 +905,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var currentlySpeakingBoundary: BoundaryType?
     private var activeSpeechPlan: AnnouncementPlan?
     private var interruptedSpeechPlan: AnnouncementPlan?
-    private var interruptionResumeWorkItem: DispatchWorkItem?
+    private var observedAudioPauseSources: Set<ObservedAudioPauseSource> = []
     private let factGenerator: PlaceFactGenerating
     private let aiSharingAllowed: () -> Bool
     private let inactivityNotifier: RideInactivityNotifying
@@ -910,7 +915,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var activeAnnouncementToken = UUID()
     private var wantsRideTracking = false
     private var hasSeededTestRoute = false
-    private let externalAudioResumeDelaySeconds: TimeInterval
     private var rideSessionLifecycle = RideSessionLifecycle()
     private var inactivityTimer: DispatchSourceTimer?
     private var rideStartedAt: Date?
@@ -1062,20 +1066,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         speechOutput.isSpeaking
     }
 
-    private var shouldYieldToPrimaryAudio: Bool {
-        audioSession.shouldYieldToPrimaryAudio
-    }
-
     private var audioCoexistencePolicy: AudioCoexistencePolicy {
         interruptsMusic ? .interrupt : .mix
-    }
-
-    private var bypassesPrimaryAudioHintForDebugMusicValidation: Bool {
-#if DEBUG
-        testMode && audioCoexistencePolicy == .interrupt
-#else
-        false
-#endif
     }
 
     var onAddressChange: ((Address) -> Void)?
@@ -1087,7 +1079,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         inactivityNotifier: RideInactivityNotifying? = nil,
         audioSession: AudioSessionManaging? = nil,
         diagnostics: RideDiagnosticsStore? = nil,
-        externalAudioResumeDelaySeconds: TimeInterval = 3,
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
@@ -1095,7 +1086,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         self.inactivityNotifier = inactivityNotifier ?? UserNotificationRideInactivityNotifier()
         self.audioSession = audioSession ?? SystemAudioSessionManager()
         self.diagnostics = diagnostics ?? .shared
-        self.externalAudioResumeDelaySeconds = externalAudioResumeDelaySeconds
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
         if testMode {
@@ -1138,7 +1128,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             self?.recordDiagnostic(
                 .announcementFailed,
                 announcementID: self?.activeSpeechPlan?.id,
-                reason: .playbackFailed
+                reason: .playbackFailed,
+                playbackPath: .premiumVoice
             )
         }
         self.speechOutput.onPipelineEvent = { [weak self] event in
@@ -1299,8 +1290,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         inFlightFactBoundary = nil
         inFlightFactAnnouncementID = nil
         activeAnnouncementToken = UUID()
-        interruptionResumeWorkItem?.cancel()
-        interruptionResumeWorkItem = nil
+        observedAudioPauseSources.removeAll()
         interruptedSpeechPlan = nil
         cancelPendingAnnouncement(reason: .rideEnded)
         stopSpeechOutput()
@@ -1707,8 +1697,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         inFlightFactTask = nil
         inFlightFactBoundary = nil
         inFlightFactAnnouncementID = nil
-        interruptionResumeWorkItem?.cancel()
-        interruptionResumeWorkItem = nil
         interruptedSpeechPlan = nil
         cancelPendingAnnouncement(reason: .supersededByNewerContext)
         if speechOutput.isPlayingAudio {
@@ -2182,37 +2170,19 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         let interruptionReason = (userInfo[AVAudioSessionInterruptionReasonKey] as? NSNumber)?.uintValue
 
         if interruptionType == .began {
+            observedAudioPauseSources.insert(.interruption)
             recordDiagnostic(
                 .audioInterruptionBegan,
                 announcementID: activeSpeechPlan?.id ?? interruptedSpeechPlan?.id,
                 reason: .interruptionBegan,
                 interruptionReason: interruptionReason
             )
-            pauseForPrimaryAudio(
-                reason: .interruptionBegan,
-                allowsBoundedResume: false
-            )
+            pauseForObservedExternalAudio()
         } else if interruptionType == .ended {
-            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else {
-                let announcementID = interruptedSpeechPlan?.id
-                recordDiagnostic(
-                    .audioInterruptionEnded,
-                    announcementID: announcementID,
-                    reason: .interruptionMustNotResume,
-                    interruptionReason: interruptionReason,
-                    shouldResume: false
-                )
-                recordDiagnostic(
-                    .announcementCancelled,
-                    announcementID: announcementID,
-                    reason: .interruptionMustNotResume
-                )
-                interruptedSpeechPlan = nil
-                announcementStatus = .idle
-                return
-            }
+            let optionsValue = (userInfo[AVAudioSessionInterruptionOptionKey] as? NSNumber)?.uintValue ?? 0
             let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
             let shouldResume = options.contains(.shouldResume)
+            observedAudioPauseSources.remove(.interruption)
             recordDiagnostic(
                 .audioInterruptionEnded,
                 announcementID: interruptedSpeechPlan?.id,
@@ -2221,7 +2191,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 shouldResume: shouldResume
             )
             if shouldResume {
-                scheduleInterruptedSpeechResume(reason: .interruptionShouldResume)
+                resumeInterruptedSpeech(reason: .interruptionShouldResume)
             } else {
                 recordDiagnostic(
                     .announcementCancelled,
@@ -2243,24 +2213,23 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
         switch hintType {
         case .begin:
+            observedAudioPauseSources.insert(.primaryAudio)
             recordDiagnostic(
                 .primaryAudioBegan,
-                announcementID: activeSpeechPlan?.id ?? announcementQueue.pending?.id,
+                announcementID: activeSpeechPlan?.id
+                    ?? announcementQueue.pending?.id
+                    ?? interruptedSpeechPlan?.id,
                 reason: .primaryAudioActive
             )
-            if !bypassesPrimaryAudioHintForDebugMusicValidation {
-                pauseForPrimaryAudio(
-                    reason: .primaryAudioActive,
-                    allowsBoundedResume: true
-                )
-            }
+            pauseForObservedExternalAudio()
         case .end:
+            observedAudioPauseSources.remove(.primaryAudio)
             recordDiagnostic(
                 .primaryAudioEnded,
                 announcementID: interruptedSpeechPlan?.id,
                 reason: .primaryAudioEnded
             )
-            scheduleInterruptedSpeechResume(reason: .primaryAudioEnded)
+            resumeInterruptedSpeech(reason: .primaryAudioEnded)
         @unknown default:
             return
         }
@@ -2276,16 +2245,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         audioSessionReleaseRetryWorkItem = nil
         audioSessionReleaseRetryAttempts = 0
         ownsAudioSession = false
+        observedAudioPauseSources.removeAll()
         recordDiagnostic(.audioMediaServicesReset)
+        resumeInterruptedSpeech(reason: .mediaServicesReset)
     }
 
-    private func pauseForPrimaryAudio(
-        reason: RideDiagnosticReason,
-        allowsBoundedResume: Bool
-    ) {
-        interruptionResumeWorkItem?.cancel()
-        interruptionResumeWorkItem = nil
-
+    private func pauseForObservedExternalAudio() {
         if let activeSpeechPlan {
             interruptedSpeechPlan = activeSpeechPlan
         } else if let pending = announcementQueue.pending {
@@ -2306,54 +2271,24 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
         guard interruptedSpeechPlan != nil else { return }
         announcementStatus = .waitingForAudio
-        if allowsBoundedResume {
-            scheduleInterruptedSpeechResume(
-                reason: reason,
-                bypassPrimaryAudioCheck: true
-            )
-        }
     }
 
-    private func scheduleInterruptedSpeechResume(
-        reason: RideDiagnosticReason,
-        bypassPrimaryAudioCheck: Bool = false
-    ) {
-        guard rideSessionState == .riding, let plan = interruptedSpeechPlan else { return }
+    private func resumeInterruptedSpeech(reason: RideDiagnosticReason) {
+        guard observedAudioPauseSources.isEmpty,
+              rideSessionState == .riding,
+              let plan = interruptedSpeechPlan else { return }
+        interruptedSpeechPlan = nil
         recordDiagnostic(
-            .announcementRestartScheduled,
+            .announcementRestarted,
             announcementID: plan.id,
             reason: reason
         )
-
-        interruptionResumeWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self,
-                  self.rideSessionState == .riding,
-                  self.interruptedSpeechPlan == plan else { return }
-            self.interruptedSpeechPlan = nil
-            if bypassPrimaryAudioCheck {
-                self.recordDiagnostic(
-                    .boundedAudioWaitExpired,
-                    announcementID: plan.id,
-                    reason: .boundedWaitExpired
-                )
-            }
-            self.recordDiagnostic(
-                .announcementRestarted,
-                announcementID: plan.id,
-                reason: bypassPrimaryAudioCheck ? .boundedWaitExpired : reason
-            )
-            self.speak(
-                announcementID: plan.id,
-                text: plan.text,
-                boundary: plan.boundary,
-                shouldRecordTestLog: false,
-                bypassPrimaryAudioCheck: bypassPrimaryAudioCheck
-            )
-        }
-        interruptionResumeWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + externalAudioResumeDelaySeconds, execute: workItem)
-        AppDiagnostics.log("RideHorizon will resume after the primary-audio delay.")
+        speak(
+            announcementID: plan.id,
+            text: plan.text,
+            boundary: plan.boundary,
+            shouldRecordTestLog: false
+        )
     }
 
     private func speak(
@@ -2361,13 +2296,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         text: String,
         boundary: BoundaryType? = nil,
         shouldRecordTestLog: Bool = true,
-        ignoreQuietMode: Bool = false,
-        bypassPrimaryAudioCheck: Bool = false
+        ignoreQuietMode: Bool = false
     ) {
         guard ignoreQuietMode || contentMode != .quiet else { return }
-        if shouldYieldToPrimaryAudio,
-           !bypassesPrimaryAudioHintForDebugMusicValidation,
-           !bypassPrimaryAudioCheck {
+        if !observedAudioPauseSources.isEmpty {
             interruptedSpeechPlan = AnnouncementPlan(
                 id: announcementID,
                 text: text,
@@ -2377,12 +2309,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             recordDiagnostic(
                 .announcementDeferred,
                 announcementID: announcementID,
-                reason: .primaryAudioActive
-            )
-            AppDiagnostics.log("Primary audio is active; RideHorizon speech deferred.")
-            scheduleInterruptedSpeechResume(
-                reason: .primaryAudioActive,
-                bypassPrimaryAudioCheck: true
+                reason: observedAudioPauseSources.contains(.interruption)
+                    ? .interruptionBegan
+                    : .primaryAudioActive
             )
             return
         }
