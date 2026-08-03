@@ -150,8 +150,6 @@ struct ContentView: View {
                 },
                 mapLabelScale: mapLabelScale
             )
-            .navigationTitle(ProductIdentity.displayName)
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -173,25 +171,14 @@ struct ContentView: View {
                 }
 
                 ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        Text(AppBuildMetadata.shouldShow(testMode: locationManager.testMode) ? AppBuildMetadata.titlePrimaryLabel : ProductIdentity.displayName)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.75), radius: 2, x: 0, y: 1)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                        if AppBuildMetadata.shouldShow(testMode: locationManager.testMode) {
-                            Text(AppBuildMetadata.titleTimestampLabel)
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white.opacity(0.96))
-                                .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-                        }
-                    }
+                    Label(navigationStatus.label, systemImage: navigationStatus.systemImage)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.75), radius: 2, x: 0, y: 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                     .frame(maxWidth: 178)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(AppBuildMetadata.shouldShow(testMode: locationManager.testMode) ? "\(AppBuildMetadata.titlePrimaryLabel), \(AppBuildMetadata.titleTimestampLabel)" : ProductIdentity.displayName)
+                    .accessibilityIdentifier("announcementPipelineStatus")
                 }
 
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -307,6 +294,20 @@ struct ContentView: View {
         } message: {
             Text("RideHorizon has not confirmed 50 metres of movement in 10 minutes. Continue only while stopped; otherwise this ride will end automatically.")
         }
+    }
+
+    private var navigationStatus: (label: String, systemImage: String) {
+        if locationManager.announcementStatus != .idle {
+            return (
+                locationManager.announcementStatus.riderLabel,
+                locationManager.announcementStatus.systemImage
+            )
+        }
+
+        return (
+            locationManager.rideSessionState.riderLabel,
+            locationManager.rideSessionState.isActive ? "location.fill" : "location.slash"
+        )
     }
 
     private func configureRideCallbacks() {

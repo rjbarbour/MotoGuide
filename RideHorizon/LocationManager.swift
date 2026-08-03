@@ -41,6 +41,49 @@ enum LocationServiceStatus: Equatable {
     }
 }
 
+enum AnnouncementPipelineStatus: Equatable {
+    case idle
+    case retrievingContent
+    case phraseReady
+    case waitingForAudio
+    case preparingVoice
+    case speaking
+
+    var riderLabel: String {
+        switch self {
+        case .idle:
+            return "Ready"
+        case .retrievingContent:
+            return "Finding fact"
+        case .phraseReady:
+            return "Phrase ready"
+        case .waitingForAudio:
+            return "Waiting for audio"
+        case .preparingVoice:
+            return "Creating voice"
+        case .speaking:
+            return "Speaking"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .idle:
+            return "checkmark.circle"
+        case .retrievingContent:
+            return "sparkles"
+        case .phraseReady:
+            return "text.bubble"
+        case .waitingForAudio:
+            return "pause.circle"
+        case .preparingVoice:
+            return "waveform"
+        case .speaking:
+            return "speaker.wave.2.fill"
+        }
+    }
+}
+
 struct SpeechVoiceOption: Identifiable, Hashable {
     let identifier: String
     let displayName: String
@@ -574,7 +617,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var activeAnnouncementToken = UUID()
     private var wantsRideTracking = false
     private var hasSeededTestRoute = false
-    private let externalAudioResumeDelaySeconds: TimeInterval = 3
+    private let externalAudioResumeDelaySeconds: TimeInterval
     private var rideSessionLifecycle = RideSessionLifecycle()
     private var inactivityTimer: DispatchSourceTimer?
     private var rideStartedAt: Date?
@@ -711,6 +754,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published private(set) var lastSpeechDiagnosticNote: String?
     @Published private(set) var locationStatus: LocationServiceStatus = .idle
     @Published private(set) var currentSpeedMetersPerSecond: CLLocationSpeed?
+    @Published private(set) var announcementStatus: AnnouncementPipelineStatus = .idle
 
     var allowsMapInteraction: Bool {
         true
@@ -733,6 +777,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         inactivityNotifier: RideInactivityNotifying? = nil,
         audioSession: AudioSessionManaging? = nil,
         diagnostics: RideDiagnosticsStore? = nil,
+        externalAudioResumeDelaySeconds: TimeInterval = 3,
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
@@ -740,25 +785,30 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         self.inactivityNotifier = inactivityNotifier ?? UserNotificationRideInactivityNotifier()
         self.audioSession = audioSession ?? SystemAudioSessionManager()
         self.diagnostics = diagnostics ?? .shared
+        self.externalAudioResumeDelaySeconds = externalAudioResumeDelaySeconds
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
         self.speechOutput.onStart = { [weak self] provider in
+            self?.announcementStatus = .speaking
             self?.acquireAudioSessionForSpeech(provider: provider)
         }
         self.speechOutput.onFinish = { [weak self] in
             self?.activeSpeechPlan = nil
             self?.currentlySpeakingBoundary = nil
+            self?.announcementStatus = .idle
             self?.recordDiagnostic(.audioPlaybackFinished)
             self?.releaseAudioSessionAfterSpeech()
         }
         self.speechOutput.onCancel = { [weak self] in
             self?.activeSpeechPlan = nil
             self?.currentlySpeakingBoundary = nil
+            self?.announcementStatus = .idle
             self?.recordDiagnostic(.audioPlaybackCancelled)
             self?.releaseAudioSessionAfterSpeech()
         }
         self.speechOutput.onDiagnosticNote = { [weak self] note in
             self?.lastSpeechDiagnosticNote = note
+            self?.announcementStatus = .idle
             self?.recordDiagnostic(.announcementFailed)
         }
         locationManager.delegate = self
@@ -851,6 +901,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         locationManager.allowsBackgroundLocationUpdates = false
         isTracking = false
         locationStatus = .idle
+        announcementStatus = .idle
         currentSpeedMetersPerSecond = nil
         lastUpdateTime = nil
         lastLocationDiagnosticTime = nil
@@ -906,6 +957,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         lastSpokenPhrase = nil
         lastSpokenAt = nil
         lastSpeechDiagnosticNote = nil
+        announcementStatus = .idle
         locationStatus = .idle
         previousAddress = nil
         lastUpdateTime = nil
@@ -1255,6 +1307,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         inFlightFactTask?.cancel()
         inFlightFactBoundary = plan.boundary
         cancelPendingAnnouncement()
+        announcementStatus = .retrievingContent
 
         let request = AnnouncementPolicy.factRequest(
             for: plan,
@@ -1323,6 +1376,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
 
         let request = announcementQueue.replacePending(text: plan.text, boundary: plan.boundary)
+        announcementStatus = .phraseReady
         recordDiagnostic(.announcementQueued)
         delayWorkItem?.cancel()
 
@@ -1343,6 +1397,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         delayWorkItem = nil
         announcementQueue.clearPending()
         if hadPendingAnnouncement {
+            announcementStatus = .idle
             recordDiagnostic(.announcementCancelled)
         }
     }
@@ -1587,7 +1642,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
         if interruptionType == .began {
             recordDiagnostic(.audioInterruptionBegan)
-            pauseForPrimaryAudio(reason: "Audio session interruption began.")
+            pauseForPrimaryAudio(
+                reason: "Audio session interruption began.",
+                allowsBoundedResume: false
+            )
         } else if interruptionType == .ended {
             recordDiagnostic(.audioInterruptionEnded)
             guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else {
@@ -1613,7 +1671,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         switch hintType {
         case .begin:
             recordDiagnostic(.primaryAudioBegan)
-            pauseForPrimaryAudio(reason: "Primary audio started.")
+            pauseForPrimaryAudio(
+                reason: "Primary audio started.",
+                allowsBoundedResume: true
+            )
         case .end:
             recordDiagnostic(.primaryAudioEnded)
             scheduleInterruptedSpeechResume(reason: "Primary audio ended.")
@@ -1634,7 +1695,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         recordDiagnostic(.audioMediaServicesReset)
     }
 
-    private func pauseForPrimaryAudio(reason: String) {
+    private func pauseForPrimaryAudio(reason: String, allowsBoundedResume: Bool) {
         interruptionResumeWorkItem?.cancel()
         interruptionResumeWorkItem = nil
 
@@ -1651,9 +1712,21 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             AppDiagnostics.log("RideHorizon speech stopped for primary audio.")
             stopSpeechOutput()
         }
+
+        guard interruptedSpeechPlan != nil else { return }
+        announcementStatus = .waitingForAudio
+        if allowsBoundedResume {
+            scheduleInterruptedSpeechResume(
+                reason: "Primary audio remained active.",
+                bypassPrimaryAudioCheck: true
+            )
+        }
     }
 
-    private func scheduleInterruptedSpeechResume(reason: String) {
+    private func scheduleInterruptedSpeechResume(
+        reason: String,
+        bypassPrimaryAudioCheck: Bool = false
+    ) {
         guard rideSessionState == .riding, let plan = interruptedSpeechPlan else { return }
 
         interruptionResumeWorkItem?.cancel()
@@ -1662,7 +1735,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                   self.rideSessionState == .riding,
                   self.interruptedSpeechPlan == plan else { return }
             self.interruptedSpeechPlan = nil
-            self.speak(text: plan.text, boundary: plan.boundary, shouldRecordTestLog: false)
+            self.speak(
+                text: plan.text,
+                boundary: plan.boundary,
+                shouldRecordTestLog: false,
+                bypassPrimaryAudioCheck: bypassPrimaryAudioCheck
+            )
         }
         interruptionResumeWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + externalAudioResumeDelaySeconds, execute: workItem)
@@ -1673,13 +1751,19 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         text: String,
         boundary: BoundaryType? = nil,
         shouldRecordTestLog: Bool = true,
-        ignoreQuietMode: Bool = false
+        ignoreQuietMode: Bool = false,
+        bypassPrimaryAudioCheck: Bool = false
     ) {
         guard ignoreQuietMode || contentMode != .quiet else { return }
-        if shouldYieldToPrimaryAudio {
+        if shouldYieldToPrimaryAudio && !bypassPrimaryAudioCheck {
             interruptedSpeechPlan = AnnouncementPlan(text: text, boundary: boundary ?? .street)
+            announcementStatus = .waitingForAudio
             recordDiagnostic(.announcementDeferred)
             AppDiagnostics.log("Primary audio is active; RideHorizon speech deferred.")
+            scheduleInterruptedSpeechResume(
+                reason: "Continuous primary audio reached the bounded wait.",
+                bypassPrimaryAudioCheck: true
+            )
             return
         }
         currentlySpeakingBoundary = boundary
@@ -1692,10 +1776,12 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             recordTestLog(utteredPhrase: text)
         }
 
+        let provider = aiSharingAllowed() ? speechProvider : .apple
+        announcementStatus = .preparingVoice
         speechOutput.speak(
             text: text,
             boundary: boundary,
-            provider: aiSharingAllowed() ? speechProvider : .apple,
+            provider: provider,
             appleVoice: resolveSpeechVoice(),
             allowAppleFallback: aiSharingAllowed() ? premiumVoiceAppleFallbackEnabled : false
         )

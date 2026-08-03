@@ -8,7 +8,7 @@ Prepare a private external TestFlight beta for 3–5 named iPhone testers. This 
 
 ## Last verified result
 
-RideHorizon `0.12.3 (20260803.0032)` is the current release candidate. It now opens idle, starts and ends continuous work only through explicit **Start ride / End ride** actions, prompts after 10 minutes without confidence-adjusted 50-metre movement, and automatically ends after the two-minute grace. Expired prompts cannot resume a stale ride; late location callbacks and place-lookup results cannot restart or mutate work after End ride; and pre-prompt place lookups cannot become valid after Continue. Audio-session ownership begins at actual Apple or Premium Voice playback and ends on finish, cancellation, failure, interruption or ride end, with bounded retry if system deactivation fails. A privacy-safe Release diagnostic buffer is bounded by 2,000 events, seven days and 1 MiB, persists through serialised coalesced background writes, is excluded from backups, and can be viewed, exported or cleared under Advanced. The complete `RideHorizonTests` target passed on the physical iPhone: 144 tests, zero failures. The signed development app built, installed and launched on `Robert’s iPhone 17`. Xcode then re-signed the exact archive with a cloud-managed Apple Distribution certificate and TestFlight-enabled App Store profile. Apple reported **App validation complete** at `2026-08-03T01:44:00+01:00`; the exported IPA passes strict signature verification with `get-task-allow=false`. The live automatic session, fact and ElevenLabs speech chain returned HTTP 200, including a valid 38,078-byte `audio/mpeg` response; the product, support and privacy URLs returned HTTP 200 through the reviewed Cloudflare worker.
+RideHorizon `0.12.3 (20260803.2016)` is the current physical-device candidate. It opens idle, starts and ends continuous work only through explicit **Start ride / End ride** actions, prompts after 10 minutes without confidence-adjusted 50-metre movement, and automatically ends after the two-minute grace. Expired prompts cannot resume a stale ride; late location callbacks and place-lookup results cannot restart or mutate work after End ride; and pre-prompt place lookups cannot become valid after Continue. Audio-session ownership begins at actual Apple or Premium Voice playback and ends on finish, cancellation, failure, interruption or ride end, with bounded retry if system deactivation fails. Continuous music now causes only a bounded three-second announcement yield, while genuine audio interruptions remain deferred until iOS ends them. A privacy-safe Release diagnostic buffer is bounded by 2,000 events, seven days and 1 MiB, persists through serialised coalesced background writes, is excluded from backups, and can be viewed, exported or cleared under Advanced. The complete `RideHorizonTests` target passed on the physical iPhone, and the signed development app built, installed and launched on `Robert’s iPhone 17`. The live automatic session, fact and ElevenLabs speech chain returned HTTP 200, including a valid 40,586-byte `audio/mpeg` response; the product, support and privacy URLs returned HTTP 200 through the reviewed Cloudflare worker. The previously Apple-validated `20260803.0032` archive is superseded and must not be uploaded.
 
 ## Delivery Risk Cube
 
@@ -18,7 +18,7 @@ RideHorizon `0.12.3 (20260803.0032)` is the current release candidate. It now op
 
 ## Current gate
 
-**VERIFY.** RH-003 and the deterministic part of RH-004 are implemented in release candidate `0.12.3 (20260803.0032)`. Its App Store-signed IPA exists and has passed both strict local verification and Apple server-side validation. Rob must complete `TF-SESSION-01` to `TF-SESSION-03` and `TF-AUDIO-01` to `TF-AUDIO-02` while stationary. Do not upload until those five perceptual checks pass. Then upload the already validated archive, install it through Internal TestFlight, and complete the remaining field evidence before external submission.
+**VERIFY.** The failed competing-audio path was reproduced and corrected in `0.12.3 (20260803.2016)`. Continuous music now causes a bounded three-second yield; genuine interruptions remain deferred until iOS ends them. The duplicate centre brand is gone and the toolbar exposes content, phrase, audio-wait, voice-preparation and speaking states. Three targeted physical-iPhone tests and the complete unit suite passed, and the live proxy returned a fact plus 40,586 bytes of `audio/mpeg`. The corrected build is installed and launched on Rob's iPhone. Repeat all five stationary checks, especially YouTube Music ducking and restoration, before archiving or uploading.
 
 ## Residual risks
 
@@ -32,6 +32,6 @@ RideHorizon `0.12.3 (20260803.0032)` is the current release candidate. It now op
 
 ## Next outcomes
 
-1. Run the five mandatory stationary checks on `0.12.3 (20260803.0032)` and record evidence.
-2. After the stationary checks pass, upload the already distribution-signed and Apple-validated exact archive.
-3. Install through Internal TestFlight and complete the road, background, inactivity, audio, network and power evidence before external review submission.
+1. Repeat the five stationary checks on `0.12.3 (20260803.2016)` and record perceptual evidence for YouTube Music ducking, speech loudness and restoration.
+2. If they pass, archive and validate this replacement code, then upload it for Internal TestFlight.
+3. Install the exact TestFlight binary and complete the road, background, inactivity, audio, network and power evidence before external review submission.

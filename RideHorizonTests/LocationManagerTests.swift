@@ -222,6 +222,89 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSustainedOtherAudioDefersBrieflyThenProceedsWithAnnouncement() async {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        audioSession.shouldYieldToPrimaryAudio = true
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            inactivityNotifier: RecordingRideInactivityNotifier(),
+            audioSession: audioSession,
+            externalAudioResumeDelaySeconds: 0.01,
+            aiSharingAllowed: { true }
+        )
+        locationManager.startRide()
+
+        locationManager.speakForTesting(text: "Welcome to England.", boundary: .nation)
+
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+        XCTAssertEqual(locationManager.announcementStatus, .waitingForAudio)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Welcome to England."])
+        XCTAssertEqual(locationManager.announcementStatus, .preparingVoice)
+    }
+
+    @MainActor
+    func testGenuineAudioInterruptionDoesNotForceSpeechToResumeBeforeItEnds() async {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let audioSession = RecordingAudioSessionManager()
+        let locationManager = LocationManager(
+            speechOutput: speechOutput,
+            inactivityNotifier: RecordingRideInactivityNotifier(),
+            audioSession: audioSession,
+            externalAudioResumeDelaySeconds: 0.01,
+            aiSharingAllowed: { true }
+        )
+        locationManager.startRide()
+        locationManager.speakForTesting(text: "Welcome to England.", boundary: .nation)
+        speechOutput.beginPlayback()
+
+        NotificationCenter.default.post(
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
+        )
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Welcome to England."])
+        XCTAssertEqual(locationManager.announcementStatus, .waitingForAudio)
+        XCTAssertTrue(locationManager.hasInterruptedSpeechPlanForTesting)
+    }
+
+    @MainActor
+    func testFactPipelineReportsContentAndPhrasePreparationStates() async {
+        let factGenerator = MockPlaceFactGenerator()
+        factGenerator.delayNanoseconds = 50_000_000
+        let locationManager = LocationManager(
+            factGenerator: factGenerator,
+            speechOutput: RecordingSpeechOutputEngine(),
+            aiSharingAllowed: { true }
+        )
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 1
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Chester",
+            county: "Cheshire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Chepstow",
+            county: "Monmouthshire",
+            administrativeArea: "Wales",
+            country: "United Kingdom"
+        ))
+
+        XCTAssertEqual(locationManager.announcementStatus, .retrievingContent)
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(locationManager.announcementStatus, .phraseReady)
+    }
+
+    @MainActor
     func testStoppingSpeechReleasesOwnedAudioSession() {
         let speechOutput = RecordingSpeechOutputEngine()
         let audioSession = RecordingAudioSessionManager()

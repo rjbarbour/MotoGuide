@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 
-Status: **Distribution-signed, Apple-validated candidate ready for stationary verification. Do not upload or invite external testers until the mandatory safety gates pass.**
+Status: **Corrected build `20260803.2016` is installed for repeated stationary verification. Do not upload or invite external testers until the five safety checks pass on this build.**
 
 This is the operational evidence record for stationary, road and background testing. `Backlog.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
 
@@ -96,11 +96,11 @@ Use `Not run`, `Pass`, `Fail` or `Blocked`. A pass needs the evidence named in t
 | ID | Test | Expected result | Evidence | Status |
 |---|---|---|---|---|
 | TF-INSTALL-01 | Clean install and onboarding | No invite code, token or credential prompt. Test Mode is off. Privacy link opens. | Screen recording or screenshots while stationary; build number | Not run |
-| TF-SESSION-01 | Open the app after onboarding without starting a ride | App remains idle; no continuous/background location session and no active playback audio session | Diagnostic log plus iOS location indicator observation | Ready on `20260803.0032` |
-| TF-SESSION-02 | Tap Start ride while stationary | Ride state becomes active; the location permission request is contextual; location begins | Diagnostic log and screenshot | Ready on `20260803.0032` |
-| TF-SESSION-03 | Tap End ride | Location, pending requests, speech and timers stop; audio session deactivates; other audio remains at its prior level | Diagnostic log and short observation note | Ready on `20260803.0032` |
-| TF-AUDIO-01 | Preview Apple Voice and Premium Voice with no other audio | Both play once and finish cleanly; no session remains active afterwards | Diagnostic log and subjective loudness score | Ready on `20260803.0032` |
-| TF-AUDIO-02 | Play music, then trigger one announcement | Music is lowered only for the announcement and returns smoothly within one second, with no sudden loud jump | Diagnostic log and observation note | Ready on `20260803.0032` |
+| TF-SESSION-01 | Open the app after onboarding without starting a ride | App remains idle; no continuous/background location session and no active playback audio session | Diagnostic log plus iOS location indicator observation | Ready to repeat on `20260803.2016`; passed on superseded `20260803.0032` |
+| TF-SESSION-02 | Tap Start ride while stationary | Ride state becomes active; the location permission request is contextual; location begins | Diagnostic log and screenshot | Ready to repeat on `20260803.2016`; passed on superseded `20260803.0032` |
+| TF-SESSION-03 | Tap End ride | Location, pending requests, speech and timers stop; audio session deactivates; other audio remains at its prior level | Diagnostic log and short observation note | Ready to repeat on `20260803.2016`; passed on superseded `20260803.0032` |
+| TF-AUDIO-01 | Preview Apple Voice and Premium Voice with no other audio | Both play once and finish cleanly; no session remains active afterwards | Diagnostic log and subjective loudness score | Ready to repeat on `20260803.2016`; passed on superseded `20260803.0032` |
+| TF-AUDIO-02 | Play music, then trigger one announcement | Music is lowered only for the announcement and returns smoothly within one second, with no sudden loud jump | Diagnostic log and observation note | Ready to repeat on `20260803.2016`; failed on superseded `20260803.0032`; bounded-deferral regression tests and live Premium Voice proxy smoke now pass |
 | TF-PROXY-01 | Exercise Premium Voice after an idle proxy period | Either Premium Voice succeeds within the retry ceiling or Apple Voice fallback occurs once; no late duplicate speech | Diagnostic log | Not run |
 
 Do not begin the moving tests unless the session and audio pre-road tests pass.
