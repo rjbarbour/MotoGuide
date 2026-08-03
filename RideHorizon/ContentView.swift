@@ -1363,6 +1363,15 @@ private struct SettingsView: View {
                             isOn: $locationManager.testMode,
                             palette: palette
                         )
+#if DEBUG
+                        SettingsToggleRow(
+                            title: "Short inactivity timeout",
+                            subtitle: "Next ride: 30 seconds inactive, then 30 seconds to respond.",
+                            isOn: $locationManager.shortInactivityTimeout,
+                            palette: palette
+                        )
+                        .disabled(locationManager.rideSessionState.isActive)
+#endif
                         SettingsToggleRow(
                             title: "Allow Apple fallback for Premium Voice",
                             subtitle: "Feature flag. Off shows Premium Voice errors instead of speaking Apple.",

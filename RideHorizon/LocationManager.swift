@@ -144,6 +144,9 @@ private enum LocationManagerDefaults {
     static let boundarySpeechCooldownSecondsKey = "RideHorizonBoundarySpeechCooldownSeconds"
     static let testModeKey = "RideHorizonTestMode"
     static let audioInteropDebugTestModeChoiceKey = "RideHorizonAudioInteropDebugTestModeChoice"
+#if DEBUG
+    static let shortInactivityTimeoutKey = "RideHorizonShortInactivityTimeout"
+#endif
 }
 
 enum SpeechProvider: String, CaseIterable, Identifiable {
@@ -844,6 +847,18 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var announceCountry: Bool = true
     @Published var contentMode: ContentMode = .shortFacts
     @Published var bluetoothDelaySeconds: Double = 0.5
+#if DEBUG
+    @Published var shortInactivityTimeout: Bool = UserDefaults.standard.bool(
+        forKey: LocationManagerDefaults.shortInactivityTimeoutKey
+    ) {
+        didSet {
+            UserDefaults.standard.set(
+                shortInactivityTimeout,
+                forKey: LocationManagerDefaults.shortInactivityTimeoutKey
+            )
+        }
+    }
+#endif
     @Published var testMode: Bool = LocationManager.loadTestMode() {
         didSet {
             UserDefaults.standard.set(testMode, forKey: LocationManagerDefaults.testModeKey)
@@ -1135,6 +1150,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     private func startRide(at date: Date, startsLocationInput: Bool) {
         guard rideSessionState == .idle else { return }
+#if DEBUG
+        rideSessionLifecycle = shortInactivityTimeout
+            ? RideSessionLifecycle(inactivityInterval: 30, confirmationGracePeriod: 30)
+            : RideSessionLifecycle()
+#else
+        rideSessionLifecycle = RideSessionLifecycle()
+#endif
         rideSessionGeneration = UUID()
         activeRideSessionID = UUID()
         rideSessionLifecycle.start(at: date)
@@ -1346,7 +1368,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             stopSpeechOutput()
             inactivityNotifier.showInactivityPrompt(deadline: deadline)
             recordDiagnostic(.rideInactivityPrompted)
-            AppDiagnostics.log("Ride paused after 10 minutes without confirmed movement.")
+            AppDiagnostics.log("Ride paused after the configured inactivity interval without confirmed movement.")
         case .movementResumed:
             inactivityNotifier.cancelInactivityPrompt()
             recordDiagnostic(.rideMovementResumed)

@@ -31,9 +31,19 @@ enum RideSessionTransition: Equatable {
 }
 
 struct RideSessionLifecycle {
+    private let inactivityInterval: TimeInterval
+    private let confirmationGracePeriod: TimeInterval
     private(set) var state: RideSessionState = .idle
     private var lastConfirmedMovementAt: Date?
     private var movementAnchor: CLLocation?
+
+    init(
+        inactivityInterval: TimeInterval = 600,
+        confirmationGracePeriod: TimeInterval = 120
+    ) {
+        self.inactivityInterval = inactivityInterval
+        self.confirmationGracePeriod = confirmationGracePeriod
+    }
 
     mutating func start(at date: Date) {
         state = .riding
@@ -108,11 +118,11 @@ struct RideSessionLifecycle {
 
         guard case .riding = state,
               let lastConfirmedMovementAt,
-              date.timeIntervalSince(lastConfirmedMovementAt) >= 600 else {
+              date.timeIntervalSince(lastConfirmedMovementAt) >= inactivityInterval else {
             return .none
         }
 
-        let deadline = date.addingTimeInterval(120)
+        let deadline = date.addingTimeInterval(confirmationGracePeriod)
         state = .awaitingConfirmation(deadline: deadline)
         return .inactivityPrompt(deadline: deadline)
     }

@@ -33,6 +33,29 @@ final class RideSessionLifecycleTests: XCTestCase {
         )
     }
 
+    func testCustomShortTimingUsesTheSameInactivityAndGraceTransitions() {
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+        var lifecycle = RideSessionLifecycle(
+            inactivityInterval: 30,
+            confirmationGracePeriod: 30
+        )
+        lifecycle.start(at: startedAt)
+
+        XCTAssertEqual(
+            lifecycle.advanceTime(to: startedAt.addingTimeInterval(29)),
+            .none
+        )
+        XCTAssertEqual(
+            lifecycle.advanceTime(to: startedAt.addingTimeInterval(30)),
+            .inactivityPrompt(deadline: startedAt.addingTimeInterval(60))
+        )
+        XCTAssertEqual(
+            lifecycle.advanceTime(to: startedAt.addingTimeInterval(60)),
+            .automaticEnd
+        )
+        XCTAssertEqual(lifecycle.state, .idle)
+    }
+
     func testConfidenceAdjustedMovementResetsTheInactivityWindow() {
         let startedAt = Date(timeIntervalSince1970: 1_000)
         var lifecycle = RideSessionLifecycle()
