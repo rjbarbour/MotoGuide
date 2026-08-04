@@ -1,0 +1,22 @@
+{
+  "reference": "workbench/candidate-v2/reference-normalised-without-D.png",
+  "candidate_svg": "workbench/candidate-v3-designed/ridehorizon-rh-d-geometric-master.svg",
+  "foreground_intersection_over_union": 0.94644997,
+  "shape_mismatch_pixels": 2636,
+  "shape_mismatch_percent_of_canvas": 1.0055542,
+  "svg_bytes": 924,
+  "path_elements": 3,
+  "path_commands": 26,
+  "command_types": {
+    "H": 1,
+    "M": 3,
+    "V": 1,
+    "Z": 4,
+    "c": 2,
+    "h": 8,
+    "l": 6,
+    "m": 1
+  },
+  "numeric_values_in_path_data": 62,
+  "derived_asset_packs_regenerated": false
+}

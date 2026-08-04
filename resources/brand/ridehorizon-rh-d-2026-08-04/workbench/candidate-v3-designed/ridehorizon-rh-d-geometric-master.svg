@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">RideHorizon RH-D geometric candidate</title>
+  <desc id="desc">A deliberately constructed forward-leaning RH monogram divided by one rising colour plane.</desc>
+  <rect width="512" height="512" fill="#041A3A"/>
+  <defs>
+    <path id="r-shape" fill-rule="evenodd" d="M50 359 116 132h109c39 0 60 17 64 46 4 27 0 43-13 52l-25 25 28 104h-62l-63-128h-14l-37 128Zm108-182-15 54h60c22 0 36-12 36-31 0-15-8-23-23-23Z"/>
+    <path id="h-shape" d="M229 230h119l28-98h58l-65 227h-59l22-78h-87Z"/>
+    <clipPath id="mark-clip">
+      <use href="#r-shape"/>
+      <use href="#h-shape"/>
+    </clipPath>
+  </defs>
+  <g fill="#FEFDFD">
+    <use href="#r-shape"/>
+    <use href="#h-shape"/>
+  </g>
+  <path d="M0 300.819 512 197.505V512H0Z" fill="#F56C0E" clip-path="url(#mark-clip)"/>
+</svg>

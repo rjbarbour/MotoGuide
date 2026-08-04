@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">RideHorizon RH-D equal vertical rhythm candidate</title>
+  <desc id="desc">An experimental rational construction of the RideHorizon RH monogram.</desc>
+  <rect width="512" height="512" fill="#041A3A"/>
+  <defs>
+    <path id="r-shape" fill-rule="evenodd" d="M49.792 359 116 132h109c95 0 57 75.667 51 75.667H214.997L290.664 359H237.697L162.031 207.667H146.897L102.758 359ZM162.346 154.7L146.897 207.667H199.864C222.564 207.667 237.697 192.533 237.697 181.183S230.131 154.7 214.997 154.7Z"/>
+    <path id="h-stem" d="M381.033 132H434L367.792 359H314.825Z"/>
+    <path id="h-crossbar" d="M213.997 207.667H358.964L336.894 283.333H251.831Z"/>
+    <clipPath id="mark-clip">
+      <use href="#r-shape"/>
+      <use href="#h-stem"/>
+      <use href="#h-crossbar"/>
+    </clipPath>
+  </defs>
+  <g fill="#FEFDFD">
+    <use href="#r-shape"/>
+    <use href="#h-stem"/>
+    <use href="#h-crossbar"/>
+  </g>
+  <path d="M0 300.362 512 197.962V512H0Z" fill="#F56C0E" clip-path="url(#mark-clip)"/>
+</svg>

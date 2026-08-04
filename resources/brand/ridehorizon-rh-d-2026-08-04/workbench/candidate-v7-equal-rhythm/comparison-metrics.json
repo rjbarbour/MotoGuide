@@ -1,0 +1,23 @@
+{
+  "reference": "workbench/candidate-v2/reference-normalised-without-D.png",
+  "candidate_svg": "workbench/candidate-v7-equal-rhythm/ridehorizon-rh-d-equal-rhythm-master.svg",
+  "foreground_intersection_over_union": 0.80125043,
+  "shape_mismatch_pixels": 10395,
+  "shape_mismatch_percent_of_canvas": 3.96537781,
+  "svg_bytes": 1135,
+  "path_elements": 4,
+  "path_commands": 30,
+  "command_types": {
+    "C": 1,
+    "H": 9,
+    "L": 6,
+    "M": 5,
+    "S": 1,
+    "V": 1,
+    "Z": 5,
+    "c": 1,
+    "h": 1
+  },
+  "numeric_values_in_path_data": 53,
+  "derived_asset_packs_regenerated": false
+}

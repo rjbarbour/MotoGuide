@@ -1,0 +1,22 @@
+{
+  "reference": "workbench/candidate-v2/reference-normalised-without-D.png",
+  "candidate_svg": "workbench/candidate-v4-refined/ridehorizon-rh-d-refined-master.svg",
+  "foreground_intersection_over_union": 0.9609153,
+  "shape_mismatch_pixels": 1884,
+  "shape_mismatch_percent_of_canvas": 0.71868896,
+  "svg_bytes": 1271,
+  "path_elements": 4,
+  "path_commands": 28,
+  "command_types": {
+    "H": 1,
+    "M": 4,
+    "V": 1,
+    "Z": 5,
+    "c": 2,
+    "h": 9,
+    "l": 5,
+    "m": 1
+  },
+  "numeric_values_in_path_data": 61,
+  "derived_asset_packs_regenerated": false
+}

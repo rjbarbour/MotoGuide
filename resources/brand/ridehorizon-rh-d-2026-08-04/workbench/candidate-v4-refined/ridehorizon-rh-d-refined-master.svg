@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">RideHorizon RH-D refined geometric candidate</title>
+  <desc id="desc">A geometrically constructed forward-leaning RH monogram divided by one rising colour plane.</desc>
+  <rect width="512" height="512" fill="#041A3A"/>
+  <defs>
+    <!-- R: shared cap, crossbar and baseline anchors; parallel leg edges. -->
+    <path id="r-shape" fill-rule="evenodd" d="M50 359 116 132h109c37 0 64 15 64 44 0 29-1 54-13 54h-61l63 129h-60l-63-128h-12l-40 128Zm108-182-15 54h60c22 0 36-12 36-31 0-19-8-23-23-23Z"/>
+    <!-- H: an equal-width stem and a crossbar bounded by the R leg and H stem.
+         The crossbar includes a one-unit internal bleed to prevent raster seams. -->
+    <path id="h-stem" d="M380 132h54l-66 227h-54Z"/>
+    <path id="h-crossbar" d="M214 230h138l-16 53h-96Z"/>
+    <clipPath id="mark-clip">
+      <use href="#r-shape"/>
+      <use href="#h-stem"/>
+      <use href="#h-crossbar"/>
+    </clipPath>
+  </defs>
+  <g fill="#FEFDFD">
+    <use href="#r-shape"/>
+    <use href="#h-stem"/>
+    <use href="#h-crossbar"/>
+  </g>
+  <path d="M0 300.819 512 197.505V512H0Z" fill="#F56C0E" clip-path="url(#mark-clip)"/>
+</svg>
