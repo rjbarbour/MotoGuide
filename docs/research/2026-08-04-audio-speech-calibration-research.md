@@ -1,13 +1,15 @@
 # Audio speech calibration follow-up research
 
+> **Superseded implementation snapshot:** The Current A descriptions below record the peak-only production pipeline inspected before RH-004G was authorised later on 2026-08-04. RH-004G in `Backlog.md` is authoritative for the subsequently implemented phase-one production baseline.
+
 Date: 2026-08-04
 
-Status: Research and implementation plan only. No application code, build, deployment or production profile has been changed.
+Status: Historical research and implementation plan. At the time of this inspection no application code, build, deployment or production profile had been changed; RH-004G subsequently superseded the Current A implementation snapshot.
 
 ## Bottom line
 
 - The output-volume observer uses the API Apple documents as key-value observable, but the physical-device result shows that this implementation is not delivering live values in the calibration lifecycle. A visible `MPVolumeView` is the strongest supported fallback because Apple explicitly documents that its slider follows hardware-button changes while sound is playing. Keep the numeric KVO value only as a diagnostic until the device behaviour is reproduced and explained.
-- Candidate B is not raw ElevenLabs audio. With any edited Candidate B setting, the current chain is: decoded ElevenLabs fixture → 100 Hz high-pass → optional 2.8 kHz presence EQ → optional compressor → bounded peak normalisation → output gain → sample limiter. Current A decodes the same fixture and applies bounded peak normalisation, but no high-pass, presence EQ, compressor or limiter.
+- Candidate B is not raw ElevenLabs audio. With any edited Candidate B setting, the current chain is: decoded ElevenLabs fixture → 100 Hz high-pass → optional 2.8 kHz presence EQ → optional compressor → bounded peak normalisation → output gain → sample limiter. Current A decodes the same fixture and applies bounded peak normalisation, but no high-pass, presence EQ, compressor or limiter. The automatic normalisation is variable—between 0 and +6.02 dB—not a fixed +6 dB baseline. Candidate B’s output-gain control is already additional gain after that same calculation.
 - The current Strong compressor is already a 4:1 soft-knee compressor at −24 dBFS with 10 ms attack and 120 ms release. The app does not report how often or how deeply it reduces gain, and it applies no explicit compressor make-up gain. Those omissions make “Strong” impossible to assess from the label alone and can make a material waveform change sound subtle.
 - The rider’s `+12 dB / Strong / +6 dB` result is consistent with the implementation: extra gain drives the final limiter, so more gain can create flattening or distortion without producing a corresponding loudness advantage over dense music.
 - Simulated road noise is useful as a repeatable stationary screen, but it cannot replace an actual ride because helmet aerodynamics, speaker coupling, earplugs and the specific Bluetooth headset all change the result. Preserve signal-to-noise ratio at a safe absolute playback level; do not reproduce real motorway sound pressure at the ears.
@@ -49,11 +51,11 @@ Apple’s public documentation does not state that KVO requires an active sessio
 
 ### Current A
 
-The production profile specifies 0 dB output gain, compression off, 0 dB presence, no high-pass, a nominal −2 dBFS sample-peak target and at most 2×/+6.02 dB automatic peak gain (`RideHorizon/PremiumSpeechProcessor.swift`, lines 33–48).
+The production profile specifies 0 dB additional output gain, compression off, 0 dB presence, no high-pass, a nominal −2 dBFS sample-peak target and at most 2×/+6.02 dB automatic peak gain (`RideHorizon/PremiumSpeechProcessor.swift`, lines 33–48).
 
 The processor decodes the raw ElevenLabs MP3 fixture, measures the peak across the announcement and applies a non-attenuating gain between 1× and 2×. If the source is already above the nominal target, it is not turned down. Current A does not use Candidate B’s final limiter (`RideHorizon/PremiumSpeechProcessor.swift`, lines 101–155).
 
-Therefore Current A is lightly processed, not raw ElevenLabs audio. The closest raw reference would be a separate internal bypass path that decodes and plays the fixture without peak normalisation; none exists in the current A/B controls.
+Therefore Current A is lightly processed, not raw ElevenLabs audio. Its automatic gain is whatever the source peak permits between 0 and +6.02 dB; it should not be described as always “+6 dB”. The closest raw reference would be a separate internal bypass path that decodes and plays the fixture without peak normalisation; none exists in the current A/B controls.
 
 ### Candidate B
 
@@ -116,7 +118,7 @@ Do not add arbitrary ratios until the current fixtures have the measurements abo
 
 Keep the current 6 dB knee, 10 ms attack and 120 ms release during this first comparison so only threshold/ratio change. Add measured make-up gain or loudness matching as a separate switch: loudness-matched comparisons test compression character, while make-up-gain comparisons test whether compression creates useful headroom. Reject any preset with lost consonant onsets, pumping, clipped reconstruction peaks or no meaningful gain-reduction separation.
 
-The rider’s evidence supports reducing the internal output-gain choices to `0, +6, +12 dB`, with +12 dB clearly marked as the current distortion boundary rather than a presumed safe production setting. Add presence choices `+9 dB` and `+15 dB`, giving `0, +6, +9, +12, +15, +18 dB`, but retain the rejection rule because large boosts at 2.8 kHz can become harsh without improving words masked elsewhere.
+The rider’s clarification supports internal additional-output-gain choices of `0, +6, +9, +12 and +15 dB`. These values remain on top of the variable automatic normalisation shared with Current A. Mark +12 dB as the observed distortion onset and +15 dB as a deliberate rejection-boundary probe, not a presumed safe candidate. Add presence choices `+9 dB` and `+15 dB`, giving `0, +6, +9, +12, +15, +18 dB`, but retain the rejection rule because large boosts at 2.8 kHz can become harsh without improving words masked elsewhere.
 
 ## 4. Why dense rock music can remain perceptually louder
 
@@ -152,7 +154,7 @@ IEC 60268-16 defines Speech Transmission Index methods and test signals, but war
 
 Recommended order:
 
-1. **A RideHorizon-owned recording made inside Rob’s normal helmet.** This best matches the actual windscreen, helmet and motorcycle, and Digital Mercenaries controls its reuse. Use a securely mounted recorder and do not interact with it while riding. Remove speech and location-identifying material before retaining a fixture.
+1. **A RideHorizon-owned recording made inside Rob’s normal helmet.** Rob already has hours of tour recordings made with a helmet camera and in-helmet microphone. These are likely the best available ecologically representative maskers for the same helmet/bike context, and Digital Mercenaries controls their reuse. They are not calibrated measurements of the noise at the ear: microphone frequency response, placement, wind protection, camera pre-amplifier, automatic gain control, compression, codec, clipping and wind overload may all reshape the spectrum and dynamics. Inspect metadata and waveforms, identify stable speed/road sections, reject speech and clipped or gain-pumping passages, and retain privacy-clean excerpts with provenance. Use them at controlled relative speech-to-masker levels; do not infer original dBA SPL or “correct” the spectrum unless the recording chain can be characterised. A future measurement-microphone or ear-coupler recording can provide a better absolute reference. Use a securely mounted recorder and do not interact with it while riding.
 2. **A CC0 in-helmet reference for the first bench probe.** Freesound recording `181161` was captured with binaural microphones worn inside a helmet and is published as Creative Commons Zero by its uploader ([Freesound: in-helmet motorcycle recording](https://freesound.org/s/181161/)). Inspect the complete recording before use and retain source/licence metadata.
 3. **FSD50K for supplemental engine/revving material.** FSD50K contains more than 51,000 human-labelled clips and includes “Accelerating, revving, vroom”; every clip carries an individual Creative Commons licence and the dataset is distributed through Zenodo ([FSD50K companion site](https://fsannotator.upf.edu/fsd/release/FSD50K/), [FSD50K Zenodo record](https://zenodo.org/records/4060432)). Filter to CC0 or CC BY for any redistributable fixture and preserve per-clip attribution. It is not a substitute for helmet wind.
 
@@ -164,14 +166,14 @@ These are ordered to keep diagnosis ahead of tuning:
 
 1. **RH-004A — Diagnose live system-volume reporting.** Reproduce KVO versus visible `MPVolumeView` on the physical iPhone across idle, YouTube Music, fixture playback and Bluetooth route change. Acceptance: a live, correctly labelled indicator or an explicit documented limitation; no calibration-only session behaviour that disrupts external audio.
 2. **RH-004B — Add offline speech-processing metrics.** Capture P.56 active speech level, BS.1770 loudness/true peak, crest factor, compressor and limiter gain-reduction distributions, and post-encode clipping for all fixed fixtures. Acceptance: a repeatable report that explains how much every stage changes each fixture.
-3. **RH-004C — Bound the existing controls from evidence.** Limit output-gain choices to `0, +6, +12 dB`; add presence `+9` and `+15 dB`; identify +12 dB as the observed distortion boundary. Acceptance: no profile is promoted and all options remain internal-only.
+3. **RH-004C — Bound the existing controls from evidence.** Use additional-output-gain choices `0, +6, +9, +12 and +15 dB`; add presence `+9` and `+15 dB`; identify +12 dB as the observed distortion onset and +15 dB as a deliberate rejection boundary. Acceptance: the UI distinguishes automatic normalisation from additional gain, no profile is promoted and all options remain internal-only.
 4. **RH-004D — Widen the internal compression probe.** Add measured Stronger and Extreme presets only after RH-004B, with optional loudness-matched/make-up comparisons and explicit limiter metrics. Acceptance: presets have meaningfully separated gain-reduction distributions and no clipping; Extreme is a rejection boundary.
 5. **RH-004E — Add a controlled stationary masking fixture.** Use a RideHorizon-owned in-helmet recording where possible, otherwise a licence-verified CC0 probe. Provide fixed safe speech/music/noise mixes at stated relative levels and a short blinded word-recovery worksheet. Acceptance: repeatable stationary results with licence metadata and no claim that simulation replaces a ride.
 6. **RH-004F — Repeat the human gate.** Compare Current A and bounded candidates first in controlled stationary noise, then on a real ride. Acceptance: select, revise or reject a candidate using intelligibility, distortion, comfort and cross-app restoration evidence; production remains unchanged until that decision.
 
 ## Decisions supported now
 
-- Treat +12 dB as the present upper output-gain probe and distortion boundary.
+- Treat +12 dB as the observed additional-gain distortion onset; retain +15 dB only as a deliberate internal rejection-boundary probe.
 - Add +9 dB and +15 dB presence choices during the next implementation increment, but do not infer that more presence means more intelligibility.
 - Do not call Candidate B raw ElevenLabs audio.
 - Measure compressor and limiter action before adding stronger presets.

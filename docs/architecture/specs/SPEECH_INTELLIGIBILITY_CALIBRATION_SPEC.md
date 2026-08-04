@@ -18,6 +18,8 @@ The immediate deliverable is a developer-only Speech Calibration Lab that uses f
 
 The stop condition is human selection or rejection of a candidate profile. Do not automatically promote an experimental profile into normal RideHorizon playback merely because automated tests pass.
 
+**2026-08-04 bounded production amendment:** Rob separately authorised the conventional phase-one processing baseline after the calibration discussion. This is not promotion of a saved Candidate B profile. The authorised baseline uses per-announcement window-gated active-speech RMS adjustment, a conservative 90 Hz high-pass, +2 dB presence, Light compression and the existing sample limiter. The RMS heuristic must not be labelled LUFS, P.56 or true peak, and the result returns to human listening rather than automatic further tuning.
+
 ## Known baseline to verify
 
 The checkout inspected on 2026-08-03 already contains:

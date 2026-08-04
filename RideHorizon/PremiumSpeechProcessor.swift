@@ -37,14 +37,16 @@ struct SpeechProcessingProfile: Codable, Equatable, Sendable {
     let highPassFrequencyHz: Float
     let samplePeakCeilingDBFS: Float
     let automaticPeakNormalisationMaximumGainDB: Float
+    let activeSpeechTargetRMSDBFS: Float?
 
     static let production = SpeechProcessingProfile(
         outputGainDB: 0,
-        compressionPreset: .off,
-        presenceGainDB: 0,
-        highPassFrequencyHz: 0,
+        compressionPreset: .light,
+        presenceGainDB: 2,
+        highPassFrequencyHz: 90,
         samplePeakCeilingDBFS: -2,
-        automaticPeakNormalisationMaximumGainDB: 20 * log10(2)
+        automaticPeakNormalisationMaximumGainDB: 20 * log10(2),
+        activeSpeechTargetRMSDBFS: -18
     )
 
     static func calibrationCandidate(
@@ -58,7 +60,8 @@ struct SpeechProcessingProfile: Codable, Equatable, Sendable {
             presenceGainDB: min(18, max(0, presenceGainDB)),
             highPassFrequencyHz: 100,
             samplePeakCeilingDBFS: -2,
-            automaticPeakNormalisationMaximumGainDB: Self.production.automaticPeakNormalisationMaximumGainDB
+            automaticPeakNormalisationMaximumGainDB: Self.production.automaticPeakNormalisationMaximumGainDB,
+            activeSpeechTargetRMSDBFS: nil
         )
     }
 }
@@ -110,6 +113,7 @@ struct DefaultPremiumSpeechProcessor: PremiumSpeechProcessing {
             try Task.checkCancellation()
             buffers.append(try decode(data: data))
         }
+        buffers = try concatenateCompatibleBuffers(buffers)
 
         if profile.highPassFrequencyHz > 0 {
             try applyHighPass(profile.highPassFrequencyHz, to: buffers)
@@ -121,25 +125,34 @@ struct DefaultPremiumSpeechProcessor: PremiumSpeechProcessing {
             try applyCompression(profile.compressionPreset, to: buffers)
         }
 
-        let peakBeforeGain = try buffers.reduce(Float(0)) {
-            max($0, try SpeechAudioPeakNormaliser.peak(in: $1))
-        }
         let normalisationMaximum = Self.linearGain(decibels: profile.automaticPeakNormalisationMaximumGainDB)
         let ceiling = Self.linearGain(decibels: profile.samplePeakCeilingDBFS)
         let normalisationGain: Float
-        if peakBeforeGain > 0 {
-            normalisationGain = max(1, min(normalisationMaximum, ceiling / peakBeforeGain))
+        if let target = profile.activeSpeechTargetRMSDBFS,
+           let activeLevel = try SpeechActiveLevelNormaliser.activeRMSDBFS(in: buffers) {
+            normalisationGain = SpeechActiveLevelNormaliser.gain(
+                activeRMSDBFS: activeLevel,
+                targetDBFS: target,
+                maximumGainDB: profile.automaticPeakNormalisationMaximumGainDB
+            )
         } else {
-            normalisationGain = 1
+            let peakBeforeGain = try buffers.reduce(Float(0)) {
+                max($0, try SpeechAudioPeakNormaliser.peak(in: $1))
+            }
+            if peakBeforeGain > 0 {
+                normalisationGain = max(1, min(normalisationMaximum, ceiling / peakBeforeGain))
+            } else {
+                normalisationGain = 1
+            }
         }
         let requestedGain = normalisationGain * Self.linearGain(decibels: profile.outputGainDB)
 
         for buffer in buffers {
             try Task.checkCancellation()
-            if profile == .production {
-                try applyGain(requestedGain, to: buffer)
-            } else {
+            if profile.activeSpeechTargetRMSDBFS != nil || profile != .production {
                 try applyGainWithPeakLimiter(requestedGain, ceiling: ceiling, to: buffer)
+            } else {
+                try applyGain(requestedGain, to: buffer)
             }
         }
         let resultingPeak = try buffers.reduce(Float(0)) {
@@ -172,6 +185,40 @@ struct DefaultPremiumSpeechProcessor: PremiumSpeechProcessing {
         try file.read(into: buffer)
         guard buffer.frameLength > 0 else { throw PremiumAudioPlaybackError.emptyAudio }
         return buffer
+    }
+
+    private static func concatenateCompatibleBuffers(
+        _ buffers: [AVAudioPCMBuffer]
+    ) throws -> [AVAudioPCMBuffer] {
+        guard buffers.count > 1, let first = buffers.first else { return buffers }
+        guard buffers.dropFirst().allSatisfy({ $0.format == first.format }) else {
+            return buffers
+        }
+        let totalFrames = buffers.reduce(0) { $0 + UInt64($1.frameLength) }
+        guard totalFrames > 0, totalFrames <= UInt64(UInt32.max),
+              let combined = AVAudioPCMBuffer(
+                pcmFormat: first.format,
+                frameCapacity: AVAudioFrameCount(totalFrames)
+              ),
+              let destinationChannels = combined.floatChannelData else {
+            throw PremiumAudioPlaybackError.unsupportedFormat
+        }
+
+        var destinationOffset = 0
+        for buffer in buffers {
+            try Task.checkCancellation()
+            guard let sourceChannels = buffer.floatChannelData else {
+                throw PremiumAudioPlaybackError.unsupportedFormat
+            }
+            for channel in 0..<Int(first.format.channelCount) {
+                for frame in 0..<Int(buffer.frameLength) {
+                    destinationChannels[channel][destinationOffset + frame] = sourceChannels[channel][frame]
+                }
+            }
+            destinationOffset += Int(buffer.frameLength)
+        }
+        combined.frameLength = AVAudioFrameCount(totalFrames)
+        return [combined]
     }
 
     private static func applyHighPass(
@@ -332,6 +379,83 @@ struct DefaultPremiumSpeechProcessor: PremiumSpeechProcessing {
                 channels[channel][frame] *= gain * limiterGain
             }
         }
+    }
+
+    private static func linearGain(decibels: Float) -> Float {
+        pow(10, decibels / 20)
+    }
+}
+
+/// A lightweight, window-gated RMS estimate for normalising short announcements.
+/// This is deliberately not labelled LUFS or P.56: it is a local speech heuristic.
+enum SpeechActiveLevelNormaliser {
+    private static let windowDurationSeconds = 0.020
+    private static let relativeGateDB: Float = -25
+    private static let absoluteGateDBFS: Float = -50
+    private static let maximumAttenuationDB: Float = 6
+
+    static func activeRMSDBFS(in buffers: [AVAudioPCMBuffer]) throws -> Float? {
+        var windows: [(energy: Double, sampleCount: Int)] = []
+        var maximumWindowRMS: Float = 0
+
+        for buffer in buffers {
+            guard let channels = buffer.floatChannelData else {
+                throw PremiumAudioPlaybackError.unsupportedFormat
+            }
+            let channelCount = Int(buffer.format.channelCount)
+            let frameCount = Int(buffer.frameLength)
+            guard channelCount > 0, frameCount > 0 else { continue }
+            let windowFrames = max(1, Int(buffer.format.sampleRate * windowDurationSeconds))
+
+            for start in stride(from: 0, to: frameCount, by: windowFrames) {
+                try Task.checkCancellation()
+                let end = min(start + windowFrames, frameCount)
+                var energy: Double = 0
+                for channel in 0..<channelCount {
+                    let samples = channels[channel]
+                    for frame in start..<end {
+                        let sample = Double(samples[frame])
+                        energy += sample * sample
+                    }
+                }
+                let sampleCount = (end - start) * channelCount
+                guard sampleCount > 0 else { continue }
+                let rms = Float(sqrt(energy / Double(sampleCount)))
+                maximumWindowRMS = max(maximumWindowRMS, rms)
+                windows.append((energy, sampleCount))
+            }
+        }
+
+        guard maximumWindowRMS > 0 else { return nil }
+        let relativeGate = maximumWindowRMS * linearGain(decibels: relativeGateDB)
+        let absoluteGate = linearGain(decibels: absoluteGateDBFS)
+        let gate = max(relativeGate, absoluteGate)
+        var activeEnergy: Double = 0
+        var activeSampleCount = 0
+
+        for window in windows {
+            let rms = Float(sqrt(window.energy / Double(window.sampleCount)))
+            if rms >= gate {
+                activeEnergy += window.energy
+                activeSampleCount += window.sampleCount
+            }
+        }
+
+        guard activeSampleCount > 0 else { return nil }
+        let activeRMS = Float(sqrt(activeEnergy / Double(activeSampleCount)))
+        return 20 * log10(max(activeRMS, 0.000_001))
+    }
+
+    static func gain(
+        activeRMSDBFS: Float,
+        targetDBFS: Float,
+        maximumGainDB: Float
+    ) -> Float {
+        let adjustmentDB = min(
+            max(0, maximumGainDB),
+            max(-maximumAttenuationDB, targetDBFS - activeRMSDBFS)
+        )
+        return linearGain(decibels: adjustmentDB)
     }
 
     private static func linearGain(decibels: Float) -> Float {
