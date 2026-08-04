@@ -2980,7 +2980,8 @@ final class LocationManagerTests: XCTestCase {
         [
             "RideHorizonTestMode",
             "RideHorizonAudioInteropDebugTestModeChoice",
-            "RideHorizonInterruptsMusic"
+            "RideHorizonInterruptsMusic",
+            "RideHorizonShortInactivityTimeout"
         ].forEach(UserDefaults.standard.removeObject(forKey:))
     }
 
