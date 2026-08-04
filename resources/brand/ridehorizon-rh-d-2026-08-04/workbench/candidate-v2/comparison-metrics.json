@@ -1,0 +1,34 @@
+{
+  "reference": "reference/selected-concept-D.png",
+  "candidate_svg": "workbench/candidate-v2/ridehorizon-rh-d-candidate-master.svg",
+  "canvas": [
+    512,
+    512
+  ],
+  "foreground_pixels_reference": 47543,
+  "foreground_pixels_candidate": 48902,
+  "foreground_intersection_over_union": 0.97092001,
+  "shape_mismatch_pixels": 1423,
+  "shape_mismatch_percent_of_canvas": 0.54283142,
+  "palette": {
+    "background": "#041A3A",
+    "upper": "#FEFDFD",
+    "lower": "#F56C0E"
+  },
+  "colour_plane": {
+    "slope": -0.2017839353965061,
+    "intercept": 300.81866249111357,
+    "samples": 287
+  },
+  "trace": {
+    "engine": "VTracer 0.6.15",
+    "path_commands": 209
+  },
+  "alignment": {
+    "pre_alignment_iou": 0.9750807,
+    "scale": 0.996,
+    "translate_x": 0.0,
+    "translate_y": 0.5
+  },
+  "derived_asset_packs_regenerated": false
+}

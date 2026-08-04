@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">RideHorizon RH-D curve-refined geometric candidate</title>
+  <desc id="desc">A geometrically constructed forward-leaning RH monogram divided by one rising colour plane.</desc>
+  <rect width="512" height="512" fill="#041A3A"/>
+  <defs>
+    <!-- The outer bowl is one cubic from shoulder to shelf: no intermediate
+         anchor and therefore no artificially vertical section. -->
+    <path id="r-shape" fill-rule="evenodd" d="M50 359 116 132h109c95 0 57 98 51 98h-61l63 129h-60l-63-128h-12l-40 128Zm108-182-15 54h60c22 0 36-12 36-31 0-19-8-23-23-23Z"/>
+    <path id="h-stem" d="M380 132h54l-66 227h-54Z"/>
+    <!-- One-unit internal bleed prevents a raster seam at the R/H join. -->
+    <path id="h-crossbar" d="M214 230h138l-16 53h-96Z"/>
+    <clipPath id="mark-clip">
+      <use href="#r-shape"/>
+      <use href="#h-stem"/>
+      <use href="#h-crossbar"/>
+    </clipPath>
+  </defs>
+  <g fill="#FEFDFD">
+    <use href="#r-shape"/>
+    <use href="#h-stem"/>
+    <use href="#h-crossbar"/>
+  </g>
+  <path d="M0 300.819 512 197.505V512H0Z" fill="#F56C0E" clip-path="url(#mark-clip)"/>
+</svg>

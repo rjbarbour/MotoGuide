@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">RideHorizon v6 symbol for dark backgrounds</title>
+  <desc id="desc">The v6 rational RideHorizon RH monogram.</desc>
+  <defs>
+    <path id="mark-r" fill-rule="evenodd" d="M49.792 359 116 132h109c95 0 57 98.367 51 98.367H215.267L278.267 359H217.733L154.733 230.367H143L102.758 359ZM158 177.4L143 230.367H203C225.7 230.367 239 219.017 239 200.1S231.133 177.4 216 177.4Z"/>
+    <path id="mark-h-stem" d="M381.033 132H434L367.792 359H314.825Z"/>
+    <path id="mark-h-crossbar" d="M214.267 230.367H352.343L336.894 283.333H240.75Z"/>
+    <clipPath id="mark-clip">
+      <use href="#mark-r"/>
+      <use href="#mark-h-stem"/>
+      <use href="#mark-h-crossbar"/>
+    </clipPath>
+  </defs>
+  <g>
+  <g fill="#FEFDFD">
+    <use href="#mark-r"/>
+    <use href="#mark-h-stem"/>
+    <use href="#mark-h-crossbar"/>
+  </g>
+  <path d="M0 300.362 512 197.962V512H0Z" fill="#F56C0E" clip-path="url(#mark-clip)"/>
+  </g>
+</svg>

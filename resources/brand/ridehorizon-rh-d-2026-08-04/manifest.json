@@ -1,0 +1,777 @@
+{
+  "identity": "RideHorizon RH-D v6 rational",
+  "approved": "2026-08-04",
+  "canonical_master": "source/ridehorizon-master-v6.svg",
+  "palette": {
+    "midnight_navy": "#041A3A",
+    "horizon_orange": "#F56C0E",
+    "warm_white": "#FEFDFD"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3947,
+      "sha256": "affb34184354f9a66de52709b23be1eaf8b7054557f562f66fb410f3299551b2"
+    },
+    {
+      "path": "exports/general/mono-black/ridehorizon-symbol-mono-black-1024.png",
+      "bytes": 16483,
+      "sha256": "237c4ad4fae6e42a82e33afb4682a48ebb8d5db9d1a2eaf9050adca15b0da504",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-black/ridehorizon-symbol-mono-black-128.png",
+      "bytes": 1517,
+      "sha256": "2023d1bafc036986ec3ce292af4a0dee33774d658be5d6581bb671fd77c618fa",
+      "dimensions": [
+        128,
+        128
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-black/ridehorizon-symbol-mono-black-2048.png",
+      "bytes": 41438,
+      "sha256": "4e1879f24281c481d63593b2d1b307a7f76c4730cb70cbbf0a928455404ccc6a",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-black/ridehorizon-symbol-mono-black-256.png",
+      "bytes": 2925,
+      "sha256": "8ccd76761ee3359bbc489ef922a5b264c81b1b096d72e36dbadee9da6d4fca44",
+      "dimensions": [
+        256,
+        256
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-black/ridehorizon-symbol-mono-black-512.png",
+      "bytes": 6999,
+      "sha256": "ccb03a62001d82dbd624bbe75b2e68057bb1e4ecb817de08537c33800f45e861",
+      "dimensions": [
+        512,
+        512
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-black/ridehorizon-symbol-mono-black-64.png",
+      "bytes": 802,
+      "sha256": "59772818310e985eef16b9352ec9a5df617b58553ec45c3c94f622f772ca58fc",
+      "dimensions": [
+        64,
+        64
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-navy/ridehorizon-symbol-mono-navy-1024.png",
+      "bytes": 23362,
+      "sha256": "ce8208c7801fe092cf1151d78f78f00ab40529f10df7f7b5ef18a92be0b20341",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-navy/ridehorizon-symbol-mono-navy-128.png",
+      "bytes": 2348,
+      "sha256": "19e4adbbfadca973f5cf2eaf1b7015a59432edb41f8cf3c437cbdf6532d910d1",
+      "dimensions": [
+        128,
+        128
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-navy/ridehorizon-symbol-mono-navy-2048.png",
+      "bytes": 54351,
+      "sha256": "67f859ea3a5ce8dc2cdea433490f43a300273b1b41dd6b1eb823ddfd864c41c4",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-navy/ridehorizon-symbol-mono-navy-256.png",
+      "bytes": 4348,
+      "sha256": "dabcd7929833147980276ec7684b111eaeedb677c34d699ddd46cfc957fbaf0d",
+      "dimensions": [
+        256,
+        256
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-navy/ridehorizon-symbol-mono-navy-512.png",
+      "bytes": 10262,
+      "sha256": "912909dbd61c1deea23af29474dc5343087fbb21b502c9933acfaa62d03d3ebf",
+      "dimensions": [
+        512,
+        512
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-navy/ridehorizon-symbol-mono-navy-64.png",
+      "bytes": 1248,
+      "sha256": "6038ca5b7971d18f002c27412c9c96081c67b9139cd0155ec40c759afebf0e0f",
+      "dimensions": [
+        64,
+        64
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-white/ridehorizon-symbol-mono-white-1024.png",
+      "bytes": 22121,
+      "sha256": "6c7e0c633db51decdaecb96ceb8fb06bcb8f3df2d5ea3a2dea6af89c3fe50d79",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-white/ridehorizon-symbol-mono-white-128.png",
+      "bytes": 2127,
+      "sha256": "32bcf44f2d5388fdb0e9c3f71a2d033de1de25f46d0d22bc43b969403109f6e7",
+      "dimensions": [
+        128,
+        128
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-white/ridehorizon-symbol-mono-white-2048.png",
+      "bytes": 53385,
+      "sha256": "0711f7e82e1de875eefd9e94a832728189abe184e7525377bf4121998d8180d7",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-white/ridehorizon-symbol-mono-white-256.png",
+      "bytes": 4165,
+      "sha256": "020b1967202707e9b2bf63b2eff51584d367d56bf89e5bf486775035d1efe994",
+      "dimensions": [
+        256,
+        256
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-white/ridehorizon-symbol-mono-white-512.png",
+      "bytes": 9813,
+      "sha256": "97f29fbcd41c7266a3f26cdd878c265c3a8573cf7a41555563b8b22161fefaf6",
+      "dimensions": [
+        512,
+        512
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/mono-white/ridehorizon-symbol-mono-white-64.png",
+      "bytes": 1139,
+      "sha256": "32d4c1b79ffd72eee8e97e6285cd85367c0a4beea139c3fa3bf7d4e11aabdb4c",
+      "dimensions": [
+        64,
+        64
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-dark/ridehorizon-symbol-on-dark-1024.png",
+      "bytes": 25542,
+      "sha256": "08093129eab304119ec25d239c14a9eb05e042465196dc796cebf6c32bb43620",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-dark/ridehorizon-symbol-on-dark-128.png",
+      "bytes": 2688,
+      "sha256": "aef288a6a3502a70b81be15abf31906b348c806d6b5a5b2346ab8abb3f95e888",
+      "dimensions": [
+        128,
+        128
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-dark/ridehorizon-symbol-on-dark-2048.png",
+      "bytes": 59268,
+      "sha256": "ad505823786cccc2c218019c9f438024e5f491bee532d048ecc24a392ed3c656",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-dark/ridehorizon-symbol-on-dark-256.png",
+      "bytes": 4914,
+      "sha256": "304efd7f4dfcb44e90d6066a2b327212784a8b22f9c6ad2efec836ff3ecdd44a",
+      "dimensions": [
+        256,
+        256
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-dark/ridehorizon-symbol-on-dark-512.png",
+      "bytes": 11394,
+      "sha256": "810e7a0475814a1fe36f2e0090cb42a3020d010440efba1e8505fb39e3a54760",
+      "dimensions": [
+        512,
+        512
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-dark/ridehorizon-symbol-on-dark-64.png",
+      "bytes": 1421,
+      "sha256": "8c0fade2601d6d4b2973f2ce02b81b80c928407c2c1b19dbd79cb87b3e039a6e",
+      "dimensions": [
+        64,
+        64
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-light/ridehorizon-symbol-on-light-1024.png",
+      "bytes": 26374,
+      "sha256": "5d8ad7fa288b8d3dba9147bf651c852f5e8a313bd31c63939eddaaba70e71b5f",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-light/ridehorizon-symbol-on-light-128.png",
+      "bytes": 2855,
+      "sha256": "b517e3c785b0c8c2c9ec78a340ea9131c8918618908f1c023b2112e1f8672d2c",
+      "dimensions": [
+        128,
+        128
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-light/ridehorizon-symbol-on-light-2048.png",
+      "bytes": 60392,
+      "sha256": "4cdaaeeeda716f7eba919ecdbb2acf9afab5ae81afd8c1274a38addb9571bca3",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-light/ridehorizon-symbol-on-light-256.png",
+      "bytes": 5154,
+      "sha256": "4c017b97978769c30e68e04b59f82e99c69132951453bc93fcd2cc3abfcb5164",
+      "dimensions": [
+        256,
+        256
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-light/ridehorizon-symbol-on-light-512.png",
+      "bytes": 11991,
+      "sha256": "029591b69c3b20482f25fdedf17fdfe655737a31728b02f2a32de464bded76e5",
+      "dimensions": [
+        512,
+        512
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/on-light/ridehorizon-symbol-on-light-64.png",
+      "bytes": 1504,
+      "sha256": "7cc5d24861d30d0cba023c570665b30a90c1d92e9de74af0120cb77b3705fa42",
+      "dimensions": [
+        64,
+        64
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/general/svg/ridehorizon-app-icon.svg",
+      "bytes": 1088,
+      "sha256": "5c90ec684c6ab627caf599d80335bb64230e4d056c7546e596c7f8333a0bc084"
+    },
+    {
+      "path": "exports/general/svg/ridehorizon-lockup-on-dark.svg",
+      "bytes": 1373,
+      "sha256": "c4a97adad18aadd626f8f19b152ea37fb2638bdecc5a4fe99af1675daab33314"
+    },
+    {
+      "path": "exports/general/svg/ridehorizon-lockup-on-light.svg",
+      "bytes": 1323,
+      "sha256": "489cf17d0799a679eb18378abdf2f14d65d7083d562bd90b46bc40619e0b6250"
+    },
+    {
+      "path": "exports/general/svg/ridehorizon-master-v6.svg",
+      "bytes": 1102,
+      "sha256": "075dba00f651350d3892ab57117f525e98b90c70e4be7809b45bf04af60846c8"
+    },
+    {
+      "path": "exports/general/svg/ridehorizon-symbol-mono.svg",
+      "bytes": 1047,
+      "sha256": "5acd2c58d5dd8322252bfed699db095083ddb1eada348628629b127a7b6b69e0"
+    },
+    {
+      "path": "exports/general/svg/ridehorizon-symbol-on-dark.svg",
+      "bytes": 1057,
+      "sha256": "35147a5c86b3c6a626ae4cc48e8cb6218246622b493aacbfff8fe539a23c64c1"
+    },
+    {
+      "path": "exports/general/svg/ridehorizon-symbol-on-light.svg",
+      "bytes": 1058,
+      "sha256": "856c99946b26609812adffcdfa5427c33243acac8b84097cd4392f104d2f04fc"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/Contents.json",
+      "bytes": 226,
+      "sha256": "cc6eaf81fc891bd9a53de43e12f8026e5c8d8aa95b0eea5d95b6103abacd7dd8"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-1024.png",
+      "bytes": 25926,
+      "sha256": "5966e2d6f94aa97944e48a9bf679feb4951827324f62106808c43816b8e211d5",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-20.png",
+      "bytes": 528,
+      "sha256": "deeae7b03dec72c7c49267993d5fab6d1427f636ea1183e7534891b0add54347",
+      "dimensions": [
+        20,
+        20
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-20@3x.png",
+      "bytes": 1397,
+      "sha256": "073e6ff4caaf845d03bace803c4f2f979adf9ffdf2d3bbff94f0d1aea6d96321",
+      "dimensions": [
+        60,
+        60
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-29.png",
+      "bytes": 774,
+      "sha256": "99dc371d69cd94c309970e212d1bf7adbcbc85e79c83402faaa403feebc8206f",
+      "dimensions": [
+        29,
+        29
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-29@2x.png",
+      "bytes": 1402,
+      "sha256": "94bb788e718c60d728523cc60a7d41f0dc038feec74b45f26a1e25a2faae154a",
+      "dimensions": [
+        58,
+        58
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-29@3x.png",
+      "bytes": 1925,
+      "sha256": "7bf9677f54beaf7b10b5643f959d6cf28fa629443dcb568786a846ccd2769b48",
+      "dimensions": [
+        87,
+        87
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-40.png",
+      "bytes": 997,
+      "sha256": "d51b492c74834ceb0e665686671723a70997d0daaf26547151bea30373c8d23e",
+      "dimensions": [
+        40,
+        40
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-40@2x.png",
+      "bytes": 1839,
+      "sha256": "b47c9eceaf072bfc6e60e32f733b64891f24a623dda7b8d7d76bc9db4f7d07f0",
+      "dimensions": [
+        80,
+        80
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-40@3x.png",
+      "bytes": 2626,
+      "sha256": "dbbdc1519a40eb968e52689cdef3a9c6e78797209b326d81d3a652a2300e3905",
+      "dimensions": [
+        120,
+        120
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-60@2x.png",
+      "bytes": 2626,
+      "sha256": "dbbdc1519a40eb968e52689cdef3a9c6e78797209b326d81d3a652a2300e3905",
+      "dimensions": [
+        120,
+        120
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-60@3x.png",
+      "bytes": 3727,
+      "sha256": "8bdc533b8a4ac62ccd8fd7dc27b20f2936b3e28ae8beb319cc35bdd1ec27b9e5",
+      "dimensions": [
+        180,
+        180
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-76.png",
+      "bytes": 1740,
+      "sha256": "bab363a64f1b7cc748614f0f10f6a0974cfbd53f8887fe9a75f415bc03220827",
+      "dimensions": [
+        76,
+        76
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-76@2x.png",
+      "bytes": 3203,
+      "sha256": "d2c80051ed7f2f3df4d9a52e678fd435df198fa1863d260739abb97af3bca596",
+      "dimensions": [
+        152,
+        152
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/AppIcon.appiconset/app-icon-83.5@2x.png",
+      "bytes": 3564,
+      "sha256": "3683817957cf4f8b96dde630eb47ae9f2c75376d01e5fad911758d43ab874d24",
+      "dimensions": [
+        167,
+        167
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/icon-composer-layers/background-1024.png",
+      "bytes": 5695,
+      "sha256": "b8be1981b566fea8b7404eff3c0730a2aa06601c9b9eeaa6e9a4212abddeae59",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/icon-composer-layers/foreground-lower-1024.png",
+      "bytes": 14020,
+      "sha256": "d9a9acf47e652f3bf864d6b121a05acab3190e0e859fe2b98c05f6e131118125",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/icon-composer-layers/foreground-upper-1024.png",
+      "bytes": 22710,
+      "sha256": "e60c0f6a9fe1f9622e3828c1400a43e4d080b0c154dee027652e267214695203",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/ios/icon-composer-layers/mono-mark-1024.png",
+      "bytes": 22121,
+      "sha256": "6c7e0c633db51decdaecb96ceb8fb06bcb8f3df2d5ea3a2dea6af89c3fe50d79",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/social/open-graph-1200x630.png",
+      "bytes": 24043,
+      "sha256": "e721a74c241883f76f374f5e720a2d429d983da8812b8cf3818d5c733731d4e7",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/social/profile-image-1024.png",
+      "bytes": 25926,
+      "sha256": "5966e2d6f94aa97944e48a9bf679feb4951827324f62106808c43816b8e211d5",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/social/square-share-1200.png",
+      "bytes": 31243,
+      "sha256": "365f95c02971d001ccb744269d7490eeee5d3f66bd029babaa96d1a537889fd4",
+      "dimensions": [
+        1200,
+        1200
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/apple-touch-icon-180.png",
+      "bytes": 3727,
+      "sha256": "8bdc533b8a4ac62ccd8fd7dc27b20f2936b3e28ae8beb319cc35bdd1ec27b9e5",
+      "dimensions": [
+        180,
+        180
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/favicon-16.png",
+      "bytes": 436,
+      "sha256": "1dfe08d0375f67aa96338d803aad858f64eceef16dbfdfad1ff6c16d395f2340",
+      "dimensions": [
+        16,
+        16
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/favicon-32.png",
+      "bytes": 834,
+      "sha256": "5b58db0a7815244fe9c3fb05e0fc8e02c7e013b313e3bbd9c6a2bff91d40718c",
+      "dimensions": [
+        32,
+        32
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/favicon-48.png",
+      "bytes": 1191,
+      "sha256": "a5145e393f1334b4c146a4c88d3b855ba5dada249932356393728851c8fb20ee",
+      "dimensions": [
+        48,
+        48
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/favicon.ico",
+      "bytes": 4301,
+      "sha256": "851d9c3bbabb0deaf6f77d5c2825f775f682f618a0ad12c6a5bb5281450050a8",
+      "dimensions": [
+        48,
+        48
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/favicon.svg",
+      "bytes": 1088,
+      "sha256": "5c90ec684c6ab627caf599d80335bb64230e4d056c7546e596c7f8333a0bc084"
+    },
+    {
+      "path": "exports/web/logo-horizontal-on-dark-1200x300.png",
+      "bytes": 14994,
+      "sha256": "9299970956c9e6c6ca2921f7507e8cd321a340c150d06540809d35bbf58010bc",
+      "dimensions": [
+        1200,
+        300
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/logo-horizontal-on-light-1200x300.png",
+      "bytes": 13181,
+      "sha256": "34adeb74ce27401364866d820abe8013cdaed90b35f6b76fd69ed4a4faa02d46",
+      "dimensions": [
+        1200,
+        300
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/maskable-icon-192.png",
+      "bytes": 3463,
+      "sha256": "857166df7bc0ed2e55981157d9e772c5cad3083e62d30defe135d3cbc47f6885",
+      "dimensions": [
+        192,
+        192
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/maskable-icon-512.png",
+      "bytes": 9995,
+      "sha256": "e265977f2af26ebfeb3a16075eca035cccace0d8335fe1b075dadc18003dad70",
+      "dimensions": [
+        512,
+        512
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/ridehorizon-lockup-on-dark.svg",
+      "bytes": 1373,
+      "sha256": "c4a97adad18aadd626f8f19b152ea37fb2638bdecc5a4fe99af1675daab33314"
+    },
+    {
+      "path": "exports/web/ridehorizon-lockup-on-light.svg",
+      "bytes": 1323,
+      "sha256": "489cf17d0799a679eb18378abdf2f14d65d7083d562bd90b46bc40619e0b6250"
+    },
+    {
+      "path": "exports/web/ridehorizon-symbol-on-dark.svg",
+      "bytes": 1057,
+      "sha256": "35147a5c86b3c6a626ae4cc48e8cb6218246622b493aacbfff8fe539a23c64c1"
+    },
+    {
+      "path": "exports/web/ridehorizon-symbol-on-light.svg",
+      "bytes": 1058,
+      "sha256": "856c99946b26609812adffcdfa5427c33243acac8b84097cd4392f104d2f04fc"
+    },
+    {
+      "path": "exports/web/site.webmanifest",
+      "bytes": 632,
+      "sha256": "ac3bdc525c08dacc7e6d720bc60e8d2a73f36f2f981e8d44f83c5468f0884a2f"
+    },
+    {
+      "path": "exports/web/web-app-icon-192.png",
+      "bytes": 3939,
+      "sha256": "587a6fb7f3321d48600f0201492da8199ed1ed84e56928032ae813035eb21c5f",
+      "dimensions": [
+        192,
+        192
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "exports/web/web-app-icon-512.png",
+      "bytes": 11753,
+      "sha256": "83c6beb3f009e3b2dbd8fac9049249a285fcc4cee2c70c25d453f5adab08ca90",
+      "dimensions": [
+        512,
+        512
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "preview.png",
+      "bytes": 77134,
+      "sha256": "73919ab42f2517ce26e8e94aa43e618b4c4f60ffa0a6329f50f31fb44720ed7b",
+      "dimensions": [
+        1600,
+        1100
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "path": "reference/selected-concept-D.png",
+      "bytes": 167132,
+      "sha256": "15088ccfeb45f6008e6f383b4ce14f526642a63ad33e37e660122a4ec55c8f8c",
+      "dimensions": [
+        512,
+        512
+      ],
+      "mode": "RGB"
+    },
+    {
+      "path": "scripts/generate_assets.py",
+      "bytes": 14969,
+      "sha256": "8afb80c7e56ffac376817070ef97b42061c79257936d9d274d67655e236dc463"
+    },
+    {
+      "path": "scripts/render_svg.js",
+      "bytes": 553,
+      "sha256": "033df5712845ff7e0343f6182f602af209e280a09a37b1b96102bcc3b5245b37"
+    },
+    {
+      "path": "scripts/validate_assets.py",
+      "bytes": 7172,
+      "sha256": "2932fa1154bad3a477a4dae846e33fa6d8181616b7c92593588c4ee0fd5f3427"
+    },
+    {
+      "path": "source/ridehorizon-app-icon.svg",
+      "bytes": 1088,
+      "sha256": "5c90ec684c6ab627caf599d80335bb64230e4d056c7546e596c7f8333a0bc084"
+    },
+    {
+      "path": "source/ridehorizon-lockup-on-dark.svg",
+      "bytes": 1373,
+      "sha256": "c4a97adad18aadd626f8f19b152ea37fb2638bdecc5a4fe99af1675daab33314"
+    },
+    {
+      "path": "source/ridehorizon-lockup-on-light.svg",
+      "bytes": 1323,
+      "sha256": "489cf17d0799a679eb18378abdf2f14d65d7083d562bd90b46bc40619e0b6250"
+    },
+    {
+      "path": "source/ridehorizon-master-v6.svg",
+      "bytes": 1102,
+      "sha256": "075dba00f651350d3892ab57117f525e98b90c70e4be7809b45bf04af60846c8"
+    },
+    {
+      "path": "source/ridehorizon-symbol-mono.svg",
+      "bytes": 1047,
+      "sha256": "5acd2c58d5dd8322252bfed699db095083ddb1eada348628629b127a7b6b69e0"
+    },
+    {
+      "path": "source/ridehorizon-symbol-on-dark.svg",
+      "bytes": 1057,
+      "sha256": "35147a5c86b3c6a626ae4cc48e8cb6218246622b493aacbfff8fe539a23c64c1"
+    },
+    {
+      "path": "source/ridehorizon-symbol-on-light.svg",
+      "bytes": 1058,
+      "sha256": "856c99946b26609812adffcdfa5427c33243acac8b84097cd4392f104d2f04fc"
+    }
+  ]
+}

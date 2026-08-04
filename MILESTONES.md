@@ -2,15 +2,37 @@
 
 Date: 2026-07-03
 
+Product capability ladder refined: 2026-08-04
+
 ## 2026-07-17 Identity Migration
 
 The prototype is being cleanly renamed from RideHorizon to RideHorizon before the first App Store Connect build upload. See `docs/product/plans/REBRANDING_PLAN.md` for the binding identity map, acceptance criteria, and deployment constraint. This migration changes the app's bundle identifier, source namespaces, proxy contract names, and current documentation; it does not change the rider-safety product scope.
 
 ## Product Goal
 
-Build RideHorizon into a real-ride iPhone audio companion that gives motorcyclists short, useful spoken place context while they follow their normal navigation app.
+Build RideHorizon into the missing geographic-context layer beside normal navigation. Navigation tells a rider where to turn, where they are going and when they will arrive. RideHorizon helps them understand where they are now, what kind of place they are travelling through and why it matters.
 
-Long-term vision: RideHorizon should scale from silent display-only place awareness, through sparse boundary announcements, to an adaptive always-on tour guide that learns the rider's interests, preferred detail level, regions, and trip context. The rider should be able to control how much it speaks, ask general place questions, get richer descriptions, discover worthwhile stops, and hand selected destinations to a navigation app without RideHorizon becoming the route planner.
+The visual location display is the core product, not a fallback for speech. Higher levels add optional interpretation while preserving the usefulness of the lower levels. RideHorizon should scale from display-only geographic awareness, through sparse boundary and place announcements, to a passive tour guide and then an interactive guide that understands spoken follow-up questions and rider preferences. It may describe or help select a destination and hand it to a navigation app, but it does not become the route planner.
+
+RideHorizon maintains a continuously refreshed, best-available location and place estimate during an active ride. It must not claim that it always knows the rider's exact place: GPS and reverse geocoding can be delayed, coarse or unavailable, and later guide behaviour must preserve that uncertainty.
+
+## Product Capability Ladder
+
+Each level is independently useful. A rider can remain at visual awareness or sparse announcements without being forced into the richer guide experience.
+
+| Level | Rider value | Current behaviour | Principal delta | Roadmap home |
+| --- | --- | --- | --- | --- |
+| **1. Visual geographic awareness** | See the current location and geographic hierarchy without asking a navigation app to explain the surroundings. | Implemented map-first Location screen; live or test coordinates; Apple reverse-geocoded street, town, county, nation/region and country; visible location/place-lookup states; follow/recentre behaviour and manual pan/zoom. | Finish nearby-town and previous-place context; improve hierarchy presentation and uncertainty/freshness cues; implement and validate the planned speed-gated map-interaction policy; later add deterministic administrative and landscape regions where worthwhile. | Milestones 3 and 6. |
+| **2. Passive boundary and place awareness** | Hear occasional confirmation that the journey has entered a meaningful place or crossed a meaningful boundary. | Detects changes between successive reverse-geocoded addresses; prioritises country, nation, county, town and street; supports Quiet, Names Only, Short Facts and Long Facts; applies a cooldown and coalesces or supersedes some pending speech. | Add authoritative landscape/cultural regions, boundary hysteresis and stronger deduplication; make timing responsive to riding demand; prevent repetitive neighbouring-place facts; distinguish meaningful transitions from geocoder noise. | Milestones 2, 3, 5 and 7.5; RH-024 and RH-026. |
+| **3. Passive contextual tour guide** | Experience the ride as a coherent journey through landscape, history, roads and contemporary places without having to ask questions. | Short or long proxy-generated fact can follow a boundary announcement; rider interests, familiar regions and custom fact focus influence isolated requests. | Add bounded ride memory, topic continuity and contrast; identify landscape transitions, visible priorities, landmarks and other meaningful events; guide ahead when appropriate; select calm delivery windows; use stops for longer material; build narrative arcs and recaps; ground precise claims and prefer silence over filler. | Milestones 5 and 7; RH-024, RH-025, RH-026, RH-027 and RH-028, followed by separately shaped guide increments. |
+| **4. Interactive contextual tour guide** | Ask what or why, request more or less detail, refine the guide and act on a worthwhile nearby place. | Settings can change future fact interests and depth, and the rider can replay the last announcement. There is no microphone listening, speech recognition, contextual dialogue or voice-command state. | Add explicit bounded listening; microphone permission and clear listening state; speech recognition and intent handling; references to the current place, last subject and recent ride context; short moving responses and deferred stopped detail; interruption/cancel controls; session and durable preference refinement; POI selection and navigation handoff. | Milestones 9 and 10. |
+
+The stable foundation beneath all four levels is the active ride's location stream, place-resolution state and recent geographic context. The product-level unit of value changes by level: current place at Level 1, meaningful transition at Level 2, well-timed interpretation at Level 3 and a contextually resolved exchange at Level 4.
+
+Reference models:
+
+- `docs/product/reference/HUMAN_MOTORCYCLE_TOUR_GUIDE_REFERENCE.md`
+- `docs/product/reference/INTERACTIVE_TOUR_GUIDE_REFERENCE.md`
 
 ## Existing Baseline
 
@@ -32,7 +54,7 @@ In scope for MVP1:
 
 - iOS app.
 - UK motorbike use case.
-- Separate audio companion alongside normal navigation.
+- Separate geographic-awareness companion alongside normal navigation, with a map-first display and optional audio.
 - Live location tracking.
 - Reverse-geocoded address announcements as the current source of place context.
 - Ride-safe announcement controls.
@@ -154,7 +176,7 @@ Enhancement work:
 - Add names-only mode.
 - Add one-sentence mode for what is special about the current town or county.
 - Rename UI controls from address-component language to rider-facing language where appropriate.
-- Keep MVP1 as a separate audio companion that runs alongside normal navigation.
+- Keep MVP1 as a separate geographic-awareness companion that runs alongside normal navigation.
 - Add ride-aware announcement timing as a post-MVP1 enhancement: hold speech while the rider is cornering, braking, accelerating, rapidly changing heading, or otherwise in a busy riding state.
 - Coalesce held announcements so RideHorizon speaks only the latest relevant place update, not a backlog.
 
@@ -231,6 +253,8 @@ Done when:
 
 Target outcome: RideHorizon can add lightweight local context beyond names while keeping speech bounded and ride-safe.
 
+Long-term interpretation reference: `docs/product/reference/HUMAN_MOTORCYCLE_TOUR_GUIDE_REFERENCE.md`. Milestone 5 delivers bounded place facts; it does not by itself deliver the passive contextual tour-guide level.
+
 Existing baseline:
 
 - The app can already speak selected place/address components.
@@ -301,7 +325,7 @@ Existing baseline:
 - `LocationManager` provides throttled coordinates and reverse-geocoded `Address`.
 - `BoundaryType` and `AnnouncementPolicy` define the street → town → county → region → country hierarchy.
 - `ContentView` has a primary map-first Location screen with toolbar Settings and Log.
-- The app already shows a compact overlay with current-place summary, context line, last spoken phrase, quiet-mode status, visible location/geocoder states, manual map controls, moving-state map lock, and a full-screen MapKit map.
+- The app already shows a compact overlay with current-place summary, context line, last spoken phrase, quiet-mode status, visible location/geocoder states, follow/recentre behaviour, manual pan/zoom controls, and a full-screen MapKit map.
 
 Enhancement work:
 
@@ -405,7 +429,7 @@ Done when:
 
 ## Milestone 8: MVP1 Field Trial
 
-Target outcome: decide whether the separate audio companion is useful enough to continue.
+Target outcome: decide whether the separate geographic-awareness companion, including its optional audio, is useful enough to continue.
 
 First field trial target: 2026-07-03.
 
@@ -432,13 +456,15 @@ Done when:
 
 ## Milestone 9: MVP2 Listening And POI Handoff
 
-Target outcome: RideHorizon starts moving from passive place announcements toward the adaptive tour-guide vision. It can listen for simple rider replies, suggest nearby points of interest, give a short or longer description when appropriate, learn from expressed interests, and hand off a selected destination to navigation.
+Target outcome: RideHorizon adds the first controlled interactive-guide layer above passive place announcements. It can listen for simple rider replies, suggest nearby points of interest, give a short or longer description when appropriate, learn from expressed interests, and hand off a selected destination to navigation.
+
+Interaction reference: `docs/product/reference/INTERACTIVE_TOUR_GUIDE_REFERENCE.md`.
 
 MVP2 product boundary:
 
 - This is still not route planning. RideHorizon may help pick a destination, then hand off to a navigation app.
 - Listening should be explicit and bounded, not always-on open conversation.
-- This does not reject the always-on tour-guide vision. It is the first controlled version of it, so safety, trust, and interaction quality can be tested before broad open conversation.
+- This is the first controlled interactive-guide increment. The passive guide's continuously context-aware behaviour remains a separate capability and prerequisite.
 - POI suggestions should be sparse and rider-relevant: castles, viewpoints, historic places, cafes, fuel, museums, bridges, passes, border points, or landmarks.
 - Longer descriptions should be available when stopped or explicitly requested, not pushed automatically while riding.
 - The first implementation can use server/API data or pre-generated touring-pack content. Live LLM use is allowed only if cost, latency, and privacy are visible in the product and business model.
@@ -466,7 +492,9 @@ Done when:
 
 ## Milestone 10: Rider Questions
 
-Target outcome: RideHorizon can answer constrained place questions after the POI handoff pattern is validated, then progressively expand toward an always-on adaptive guide.
+Target outcome: RideHorizon can capture explicit spoken questions through the microphone and answer constrained place questions after the simpler listening and POI-handoff patterns are validated, then progressively expand toward an interactive adaptive guide.
+
+Interaction reference: `docs/product/reference/INTERACTIVE_TOUR_GUIDE_REFERENCE.md`.
 
 Boundary:
 
@@ -479,6 +507,7 @@ Boundary:
 Work:
 
 - Add a constrained question mode, for example: "What is that castle?", "Anything worth visiting nearby?", "Why is this town notable?", or "Tell me more when I stop."
+- Make microphone listening explicit, visibly and audibly bounded, cancellable and off by default outside a deliberate interaction window.
 - Ground answers in current place context, selected POI, trusted source text, cached touring-pack content, or proxy/API content.
 - Keep answers short by default and make longer answers explicit.
 - Add a way to defer longer answers until the ride stops.

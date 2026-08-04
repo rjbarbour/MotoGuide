@@ -4,15 +4,15 @@ Use plain language, direct instructions, no waffle. Use ISO-8601 dates.
 
 ## Project Purpose
 
-RideHorizon is a motorbike-specific audio guide for riders. It runs alongside normal navigation and speaks short, useful place context through a Bluetooth helmet headset.
+RideHorizon is a motorbike-specific geographic-awareness companion. It runs alongside normal navigation, shows the rider's best-available current place and can add short, useful place context through a Bluetooth helmet headset.
 
 The product is not a route planner. It is an ambient place-awareness companion.
 
 Primary user: a touring motorcyclist on long rides, international trips, or unfamiliar routes.
 
-Core value: help the rider know where they are and why it matters without looking at a screen.
+Core value: restore the geographic context that turn-by-turn navigation omits—where the rider is now, what kind of place they are travelling through and why it matters. The visual Location screen is independently useful; optional audio delivers the same core value without requiring the rider to look at the screen.
 
-Long-term vision: RideHorizon can range from silent display-only place awareness, through sparse boundary announcements, to an adaptive always-on tour guide. The rider controls frequency, length, topics, and detail level. Later versions should learn what the rider is interested in, answer place questions, suggest worthwhile stops, and hand selected destinations to an existing navigation app.
+Long-term vision: RideHorizon can range from silent display-only geographic awareness, through sparse boundary and place announcements, to a passive contextual tour guide and then an interactive guide. The rider controls frequency, length, topics and detail level. Later versions should learn what the rider is interested in, answer spoken place questions, refine the guide from rider instructions, suggest worthwhile stops and hand selected destinations to an existing navigation app. "Always-on guide" means continuously context-aware passive guidance; it does not imply an always-listening microphone.
 
 ## Current Product Shape
 
@@ -36,7 +36,7 @@ Current prototype capabilities:
 - Boundary priority: country → nation → county → town → street.
 - Rider context fields for home country, home region, familiar regions, fact interests, and custom fact focus.
 - Speech provider setting with Apple voice selection/preview and proxy-backed ElevenLabs option.
-- Map-first Location screen with compact overlay, manual zoom/reset controls, visible location/geocoder states, and moving-state map lock.
+- Map-first Location screen with compact overlay, follow/recentre behaviour, manual pan/zoom controls, and visible location/geocoder states.
 - Test mode with named Gloucestershire route coordinates.
 - Unit tests for address, announcements, facts (mocked), first-run state, and route fixture.
 - Short/Long Facts OpenAPI contract: `FACT_PROXY_OPENAPI.yaml`.
@@ -71,9 +71,10 @@ Recommended identifiers are `announcementText`, `speechAudio`, `SpeechAudioChunk
 
 Use this definition when making product or architecture decisions:
 
-- RideHorizon monitors the rider's live location.
+- RideHorizon monitors the rider's live location and maintains a best-available place estimate.
+- It displays the current place and geographic hierarchy as the core awareness experience.
 - It detects meaningful location changes, especially town, county, region, country, and later landmarks.
-- It speaks short announcements through helmet audio.
+- It can optionally speak short announcements through helmet audio.
 - It must avoid distracting the rider.
 - It must run alongside existing navigation apps.
 - It should avoid route calculation unless explicitly added later.
@@ -84,9 +85,10 @@ Build the MVP as one narrow mobile prototype:
 
 1. Run during a ride.
 2. Monitor GPS location.
-3. Detect town or county changes.
-4. Speak short place announcements through Bluetooth audio.
-5. Offer three modes:
+3. Display the best-available current place and geographic hierarchy.
+4. Detect town or county changes.
+5. Optionally speak short place announcements through Bluetooth audio.
+6. Offer three modes:
    - Names only.
    - Short facts.
    - Quiet mode.
@@ -101,7 +103,7 @@ MVP1 is a functional proof and private-beta learning tool. Do not treat MVP1 as 
 
 - Target motorbikes only.
 - Start with the UK.
-- Run as a separate audio companion alongside normal navigation.
+- Run as a separate geographic-awareness companion alongside normal navigation, with a map-first display and optional audio.
 - Speak on meaningful boundary changes, using the existing app pattern of location interval plus repeat controls.
 - Support configurable content depth: names only, one sentence, or more detail.
 - Add one sentence about what is special about the current town or county as the first content expansion beyond names.
@@ -113,14 +115,14 @@ MVP1 is a functional proof and private-beta learning tool. Do not treat MVP1 as 
 - Add explicit listening, nearby POI discovery, longer optional descriptions, and navigation handoff.
 - Example flow: RideHorizon suggests a nearby point of interest; the rider asks for more detail; RideHorizon gives a bounded description; the rider says "navigate to Caernarfon Castle"; RideHorizon hands the destination to Google Maps, Apple Maps, or another chosen navigation target.
 - Keep RideHorizon separate from route planning. It may help choose or describe a destination, but the navigation app owns the route.
-- Listening must start bounded and controllable as a safe route toward the always-on guide vision, not as a rejection of that vision.
+- Listening must start bounded and controllable as the first interactive-guide increment. It is separate from the passive guide's continuously updated geographic context.
 - Longer descriptions should be explicit, interruptible, and preferably stopped-only or rider-enabled while moving.
 - Begin learning preferences through simple feedback such as topics, "more like this", "less history", "shorter", and "more detail".
 - Choose the first navigation app or handoff target before implementation.
 
 ### Later Versions
 
-- Add open-ended rider questions after MVP2 validates listening and POI handoff, then expand toward adaptive always-on touring where the rider chooses how much guidance they want.
+- Add open-ended rider questions after MVP2 validates listening and POI handoff, then expand both passive and interactive guidance while the rider chooses how much guidance they want.
 - Expose custom instructions for announcement style and content preferences.
 - Support different instructions by boundary type, such as town, county, region, country, landmark, or history.
 - Expand from UK-only to UK and Europe.

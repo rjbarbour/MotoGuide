@@ -1,0 +1,23 @@
+{
+  "reference": "workbench/candidate-v2/reference-normalised-without-D.png",
+  "candidate_svg": "workbench/candidate-v6-rational/ridehorizon-rh-d-rational-master.svg",
+  "foreground_intersection_over_union": 0.95742872,
+  "shape_mismatch_pixels": 2053,
+  "shape_mismatch_percent_of_canvas": 0.78315735,
+  "svg_bytes": 1102,
+  "path_elements": 4,
+  "path_commands": 30,
+  "command_types": {
+    "C": 1,
+    "H": 9,
+    "L": 6,
+    "M": 5,
+    "S": 1,
+    "V": 1,
+    "Z": 5,
+    "c": 1,
+    "h": 1
+  },
+  "numeric_values_in_path_data": 53,
+  "derived_asset_packs_regenerated": false
+}

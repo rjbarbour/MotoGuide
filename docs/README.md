@@ -19,6 +19,7 @@ This directory contains durable supporting documentation for the private RideHor
 | `architecture/plans/` | Plan and assess technical work. | Proxy access, audio, speech reliability and fallback plans. |
 | `architecture/specs/` | Define bounded implementation specifications. | Speech intelligibility calibration specification. |
 | `product/plans/` | Plan product increments and product changes. | MVP polish and rebranding plans. |
+| `product/reference/` | Preserve durable service-design models that inform later product shaping without authorising implementation. | Human passive-guide and interactive-guide references. |
 | `product/strategy/` | Record market-validation and product-strategy work. | Business validation, PMF review and validation sprint. |
 | `operations/app-store/` | Prepare App Store Connect and public listing material. | Submission readiness, test information and attribution. |
 | `operations/privacy/` | Record privacy requirements, audits and publication work. | Privacy audit and policy publishing plan. |
