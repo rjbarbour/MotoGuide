@@ -4,6 +4,8 @@ Date: 2026-07-03
 
 Status: Planning note. Use this to shape premium speech, credits, and default fallback behaviour.
 
+> Pricing warning (2026-08-04): this note's `$0.05 per 1,000 characters` assumption matches current ElevenLabs Flash/Turbo, not RideHorizon's configured `eleven_multilingual_v2`, which is currently published at `$0.10 per 1,000 characters`. Use [RIDEHORIZON_UNIT_ECONOMICS_MODEL.md](../../product/strategy/RIDEHORIZON_UNIT_ECONOMICS_MODEL.md) for current commercial planning.
+
 ## Summary
 
 ElevenLabs speech looks viable as a premium feature.
