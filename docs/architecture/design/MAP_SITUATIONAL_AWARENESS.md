@@ -119,7 +119,6 @@ Share the same throttled geocode path as announcements (`locationCheckInterval`)
 - Map-first layout with compact current-place overlay.
 - Compact context: summary, hierarchy, last spoken phrase, Quiet mode, location/geocoder states.
 - Single MapKit map, user-following, context-aware default zoom showing roughly twice the current area.
-- Speed-gated map interaction.
 - Test mode parity with existing fixture.
 - Preview / simulator support without live GPS.
 - Visible states for waiting for GPS, location denied, geocoder failure, and Quiet mode.
@@ -128,6 +127,7 @@ Share the same throttled geocode path as announcements (`locationCheckInterval`)
 
 - Previous street when changed.
 - Nearby towns with distances and compass bearing.
+- Speed-gated map interaction that preserves automatic follow while moving and restores manual pan/zoom when stopped.
 - Stopped-only zoom presets.
 - Unit tests for: hierarchy presentation from `Address`, nearby-town sorting/formatting, summary text builder, previous-street visibility rules.
 - Field readability pass on the physical phone.
@@ -169,7 +169,7 @@ Shared state: existing `LocationManager` (`@StateObject` in `ContentView`) — m
 3. **Limit interaction while moving** — disable pan, pinch zoom, and zoom presets above ~8 km/h; re-enable when stopped.
 4. **No flashing or rapid UI updates** — throttle nearby-town refresh; smooth map camera updates.
 5. **Compact copy only** — summary fits one or two lines; nearby list capped at five rows or a single horizontally-scannable row.
-6. **Audio remains primary** — map supports what was already spoken; it does not replace helmet announcements.
+6. **No audio dependence** — the Location screen is independently useful as the core awareness surface; helmet announcements complement it for riders who want context without looking at the screen.
 7. **Quiet mode visible** — rider should see that speech is off without opening Settings.
 8. **Mounting** — design for portrait glance; landscape not required for M6.
 
