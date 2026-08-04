@@ -47,7 +47,9 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         working-directory: fact-proxy
-        run: '"$HOME/.fly/bin/flyctl" deploy --remote-only --app "$FLY_APP_NAME" --config fly.toml'
+        # Build on the GitHub runner. Fly's remote Depot builders currently receive
+        # Maven Central 403 responses while resolving the Gradle toolchain plugin.
+        run: '"$HOME/.fly/bin/flyctl" deploy --local-only --app "$FLY_APP_NAME" --config fly.toml'
 
       - name: Smoke-check health endpoint
         run: 'curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 --max-time 20 "https://ridehorizon.digitalmercenaries.ai/health"'
