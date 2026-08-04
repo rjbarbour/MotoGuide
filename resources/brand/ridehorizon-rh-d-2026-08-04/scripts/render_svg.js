@@ -1,7 +1,6 @@
 const path = require("node:path");
 
-const sharpPath = "/Users/rob_dev/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/sharp";
-const sharp = require(sharpPath);
+const sharp = require(process.env.RIDEHORIZON_SHARP_PATH || "sharp");
 
 const [inputPath, outputPath, widthText = "512", heightText = widthText] = process.argv.slice(2);
 if (!inputPath || !outputPath) {

@@ -47,10 +47,12 @@ Use sRGB for raster exports.
 
 ## Regeneration
 
+Prerequisites: Python 3 with Pillow, Node.js, Sharp, and the macOS Avenir Next Condensed font. The scripts resolve `node` from `PATH`; set `RIDEHORIZON_NODE` to override the executable and `RIDEHORIZON_SHARP_PATH` to supply a non-standard Sharp module path.
+
 Run:
 
 ```text
-/Users/rob_dev/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 resources/brand/ridehorizon-rh-d-2026-08-04/scripts/generate_assets.py
+python3 resources/brand/ridehorizon-rh-d-2026-08-04/scripts/generate_assets.py
 ```
 
 Expected result: the `source/` applications, `exports/` tree, preview, manifest and distributable ZIP are regenerated from the v6 master. The command prints both pack locations.
@@ -58,7 +60,7 @@ Expected result: the `source/` applications, `exports/` tree, preview, manifest 
 Validate:
 
 ```text
-/Users/rob_dev/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 resources/brand/ridehorizon-rh-d-2026-08-04/scripts/validate_assets.py
+python3 resources/brand/ridehorizon-rh-d-2026-08-04/scripts/validate_assets.py
 ```
 
 Expected result: the command reports `PASS` with the number of validated pack files and confirms the distributable ZIP. Validation includes pixel-identical checks between representative SVG and PNG exports.

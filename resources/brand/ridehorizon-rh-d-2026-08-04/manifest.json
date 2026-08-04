@@ -10,8 +10,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 3854,
-      "sha256": "f8e94729cc6f5cc3a357c6120a975ca14656921969967e2a528e58079e0d9306"
+      "bytes": 3947,
+      "sha256": "affb34184354f9a66de52709b23be1eaf8b7054557f562f66fb410f3299551b2"
     },
     {
       "path": "exports/general/mono-black/ridehorizon-symbol-mono-black-1024.png",
@@ -725,18 +725,18 @@
     },
     {
       "path": "scripts/generate_assets.py",
-      "bytes": 14881,
-      "sha256": "ee8a1dbf34eefc0a5e454099d2f9c13d4dea1f9f4465a8cb5982a4150f10709a"
+      "bytes": 14969,
+      "sha256": "8afb80c7e56ffac376817070ef97b42061c79257936d9d274d67655e236dc463"
     },
     {
       "path": "scripts/render_svg.js",
-      "bytes": 634,
-      "sha256": "eb6216e711b59b463499538c783b77ca9f1b994fc1b2b0ca0d03ba26f0368e76"
+      "bytes": 553,
+      "sha256": "033df5712845ff7e0343f6182f602af209e280a09a37b1b96102bcc3b5245b37"
     },
     {
       "path": "scripts/validate_assets.py",
-      "bytes": 7070,
-      "sha256": "7982a1c5adc3527f007fb25d3c03694de35221f1517b5d64782eade1b9e76c1e"
+      "bytes": 7172,
+      "sha256": "2932fa1154bad3a477a4dae846e33fa6d8181616b7c92593588c4ee0fd5f3427"
     },
     {
       "path": "source/ridehorizon-app-icon.svg",

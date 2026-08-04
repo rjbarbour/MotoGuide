@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -16,7 +18,9 @@ from PIL import Image, ImageChops
 
 
 ROOT = Path(__file__).resolve().parents[1]
-NODE = "/Users/rob_dev/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node"
+NODE = os.environ.get("RIDEHORIZON_NODE") or shutil.which("node")
+if NODE is None:
+    raise RuntimeError("Node.js is required; install it on PATH or set RIDEHORIZON_NODE")
 RENDERER = ROOT / "scripts/render_svg.js"
 CANONICAL = ROOT / "source/ridehorizon-master-v6.svg"
 APPROVED_CANDIDATE = ROOT / "workbench/candidate-v6-rational/ridehorizon-rh-d-rational-master.svg"

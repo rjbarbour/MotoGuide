@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -24,7 +25,9 @@ SOCIAL = EXPORTS / "social"
 SOURCE = ROOT / "source"
 CANONICAL = SOURCE / "ridehorizon-master-v6.svg"
 RENDERER = ROOT / "scripts/render_svg.js"
-NODE = "/Users/rob_dev/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node"
+NODE = os.environ.get("RIDEHORIZON_NODE") or shutil.which("node")
+if NODE is None:
+    raise RuntimeError("Node.js is required; install it on PATH or set RIDEHORIZON_NODE")
 ARCHIVE = ROOT.parent / f"{ROOT.name}.zip"
 
 NAVY = "#041A3A"
