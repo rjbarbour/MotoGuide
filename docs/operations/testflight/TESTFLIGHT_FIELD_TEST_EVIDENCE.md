@@ -2,7 +2,7 @@
 
 Date: 2026-08-04
 
-Status: **Release candidate `0.12.4 (20260804.0246)` has uploaded successfully and is processing in App Store Connect. Do not invite external testers until the exact Internal TestFlight binary passes the mandatory stationary and field evidence gate.**
+Status: **App Store Connect reports release candidate `0.12.4 (20260804.0246)` Complete and Ready to Submit. Do not invite external testers until the exact Internal TestFlight binary passes the mandatory stationary and field evidence gate.**
 
 This is the operational evidence record for stationary, road and background testing. `Backlog.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
 
@@ -70,8 +70,8 @@ Candidate `0.12.3 (20260803.0032)` provides this Release-build ring buffer, capp
 - The proxy Gradle suite passed. Live Fly checks returned HTTP 200 for health, automatic restricted session, fact and Premium Voice; speech returned valid `audio/mpeg` data.
 - Exact Release archive: `build/TestFlight/RideHorizon-0.12.4-20260804.0246.xcarchive`.
 - The distribution IPA passed strict signature verification, has `beta-reports-active=true` and `get-task-allow=false`, contains a valid `PrivacyInfo.xcprivacy`, contains no test or calibration artefacts, and has matching binary/dSYM UUID `2F154D31-0285-319A-956C-0FDE75B5D775`.
-- Xcode completed Apple server-side validation and reported `Upload succeeded` and `Uploaded package is processing.` on 2026-08-04.
-- App Store Connect processing status and installation of the exact TestFlight binary remain to be verified.
+- Xcode completed Apple server-side validation and reported `Upload succeeded` and `Uploaded package is processing.` on 2026-08-04. App Store Connect subsequently reported the upload **Complete** and the build **Ready to Submit**.
+- Installation and human validation of the exact Internal TestFlight binary remain to be verified under RH-002.
 
 ### Superseded evidence
 
