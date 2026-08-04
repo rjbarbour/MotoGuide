@@ -1,10 +1,10 @@
-# MotoGuide Agent Instructions
+# RideHorizon Agent Instructions
 
 Use plain language, direct instructions, no waffle. Use ISO-8601 dates.
 
 ## Project Purpose
 
-MotoGuide is a motorbike-specific audio guide for riders. It runs alongside normal navigation and speaks short, useful place context through a Bluetooth helmet headset.
+RideHorizon is a motorbike-specific audio guide for riders. It runs alongside normal navigation and speaks short, useful place context through a Bluetooth helmet headset.
 
 The product is not a route planner. It is an ambient place-awareness companion.
 
@@ -12,15 +12,15 @@ Primary user: a touring motorcyclist on long rides, international trips, or unfa
 
 Core value: help the rider know where they are and why it matters without looking at a screen.
 
-Long-term vision: MotoGuide can range from silent display-only place awareness, through sparse boundary announcements, to an adaptive always-on tour guide. The rider controls frequency, length, topics, and detail level. Later versions should learn what the rider is interested in, answer place questions, suggest worthwhile stops, and hand selected destinations to an existing navigation app.
+Long-term vision: RideHorizon can range from silent display-only place awareness, through sparse boundary announcements, to an adaptive always-on tour guide. The rider controls frequency, length, topics, and detail level. Later versions should learn what the rider is interested in, answer place questions, suggest worthwhile stops, and hand selected destinations to an existing navigation app.
 
 ## Current Product Shape
 
 The existing GitHub prototype is an iOS SwiftUI app:
 
-- Repository: `https://github.com/rjbarbour/MotoGuide.git`
+- Repository: `https://github.com/rjbarbour/RideHorizon.git`
 - Local checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`
-- Main app: `/Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide/`
+- Main app: `/Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon/`
 - Core modules: `LocationManager.swift`, `AnnouncementPolicy.swift`, `Address.swift`, `ProxyFactGenerator.swift`, `FirstRunState.swift`
 - UI: `ContentView.swift` (primary Location screen with toolbar Settings and Log), `OnboardingView.swift`
 - Test route: `TestRouteFixture.swift` (Gloucestershire waypoints)
@@ -51,11 +51,27 @@ Current interface:
 
 Log: scrollable history and manual test/current-location log button.
 
+## Speech and content terminology
+
+Use these terms consistently in product discussions, code, logs, and tests:
+
+- **Fact**: the place-related information generated or selected for the rider.
+- **Announcement text**: the rider-facing text prepared from the fact and any location context.
+- **Text-to-speech (TTS)**: the process of sending announcement text to ElevenLabs (or an Apple voice) for vocalisation.
+- **Synthesised speech audio**: the audio returned by the TTS provider. Use **speech audio** as the short form.
+- **Audio stream** or **audio chunks**: use only when the provider returns the speech audio incrementally rather than as one complete file.
+- **MP3 audio**: use when describing the current encoded transport or file format, not as the general product term.
+- **Utterance**: the text intended to be spoken, not the audio returned by TTS. Avoid using it for the returned file.
+
+The canonical pipeline is: **fact → announcement text → TTS → synthesised speech audio → playback**.
+
+Recommended identifiers are `announcementText`, `speechAudio`, `SpeechAudioChunk`, and `speechAudioPlayer` where those distinctions are needed.
+
 ## Product Definition
 
 Use this definition when making product or architecture decisions:
 
-- MotoGuide monitors the rider's live location.
+- RideHorizon monitors the rider's live location.
 - It detects meaningful location changes, especially town, county, region, country, and later landmarks.
 - It speaks short announcements through helmet audio.
 - It must avoid distracting the rider.
@@ -77,7 +93,7 @@ Build the MVP as one narrow mobile prototype:
 
 Do not expand into general travel planning, route planning, social ride tracking, or full AI tour guiding until MVP1 works on real rides.
 
-MVP1 is a functional proof and private-beta learning tool. Do not treat MVP1 as the whole commercial proposition. Use it to prove real-ride feasibility, safety, trust, and interest in the broader MotoGuide vision.
+MVP1 is a functional proof and private-beta learning tool. Do not treat MVP1 as the whole commercial proposition. Use it to prove real-ride feasibility, safety, trust, and interest in the broader RideHorizon vision.
 
 ## Product Decisions
 
@@ -95,8 +111,8 @@ MVP1 is a functional proof and private-beta learning tool. Do not treat MVP1 as 
 ### MVP2
 
 - Add explicit listening, nearby POI discovery, longer optional descriptions, and navigation handoff.
-- Example flow: MotoGuide suggests a nearby point of interest; the rider asks for more detail; MotoGuide gives a bounded description; the rider says "navigate to Caernarfon Castle"; MotoGuide hands the destination to Google Maps, Apple Maps, or another chosen navigation target.
-- Keep MotoGuide separate from route planning. It may help choose or describe a destination, but the navigation app owns the route.
+- Example flow: RideHorizon suggests a nearby point of interest; the rider asks for more detail; RideHorizon gives a bounded description; the rider says "navigate to Caernarfon Castle"; RideHorizon hands the destination to Google Maps, Apple Maps, or another chosen navigation target.
+- Keep RideHorizon separate from route planning. It may help choose or describe a destination, but the navigation app owns the route.
 - Listening must start bounded and controllable as a safe route toward the always-on guide vision, not as a rejection of that vision.
 - Longer descriptions should be explicit, interruptible, and preferably stopped-only or rider-enabled while moving.
 - Begin learning preferences through simple feedback such as topics, "more like this", "less history", "shorter", and "more detail".
@@ -132,22 +148,22 @@ Focus Planner context:
 - Local folder: `/Users/rob_dev/DocsLocal/focus_planner`
 - Trello export: `/Users/rob_dev/DocsLocal/focus_planner/bmWfhK1S - robs-todo.json`
 - Relevant cards:
-  - `#448 MotoGuide App`
-  - `#449 Test cursor and Claude with MotoGuide`
-  - `#455 Project (iPhone app, MotoGuide project)`
+  - `#448 RideHorizon App`
+  - `#449 Test cursor and Claude with RideHorizon`
+  - `#455 Project (iPhone app, RideHorizon project)`
 
 ICB catalogue context:
 
 - Local repo: `/Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue`
 - GitHub repo: `https://github.com/rjbarbour/icb-catalogue-processing.git`
-- MotoGuide ICB: `/Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue/staged_icbs/6a1047a6a591ed37d9fd4e0e.md`
+- RideHorizon ICB: `/Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue/staged_icbs/6a1047a6a591ed37d9fd4e0e.md`
 
 Market validation context:
 
-- Business validation plan: `/Users/rob_dev/DocsLocal/motoguide/repo/BUSINESS_VALIDATION_PLAN.md`
-- PMF Factory / 100 Tasks review: `/Users/rob_dev/DocsLocal/motoguide/repo/PMF_FACTORY_100_TASKS_REVIEW.md`
-- Current 14-day validation sprint: `/Users/rob_dev/DocsLocal/motoguide/repo/TWO_WEEK_MARKET_VALIDATION_PLAN.md`
-- Deep-research report: `/Users/rob_dev/DocsLocal/motoguide/resources/MotoGuide_market_deep-research-report.md`
+- Business validation plan: `/Users/rob_dev/DocsLocal/motoguide/repo/docs/product/strategy/BUSINESS_VALIDATION_PLAN.md`
+- PMF Factory / 100 Tasks review: `/Users/rob_dev/DocsLocal/motoguide/repo/docs/product/strategy/PMF_FACTORY_100_TASKS_REVIEW.md`
+- Current 14-day validation sprint: `/Users/rob_dev/DocsLocal/motoguide/repo/docs/product/strategy/TWO_WEEK_MARKET_VALIDATION_PLAN.md`
+- Deep-research report: `/Users/rob_dev/DocsLocal/motoguide/resources/RideHorizon_market_deep-research-report.md`
 - Supporting landing-page tool: `/Users/rob_dev/DocsLocal/landing_page_tool`
 
 Notion operating references read on 2026-07-02:
@@ -166,6 +182,7 @@ Notion operating references read on 2026-07-02:
 
 ## Working Rules
 
+- Treat questions, musings, and hypotheticals as read-only. Do not edit files, run tests or builds, deploy, delegate, or commit unless the user explicitly requests implementation or another state-changing action. A question asked during an active implementation task does not expand that task's scope.
 - Preserve rider safety as a first-order requirement.
 - Keep speech short, sparse, and interruptible.
 - Prefer deterministic location logic before AI-generated content.
@@ -177,6 +194,14 @@ Notion operating references read on 2026-07-02:
 
 ## Development Workflow
 
+## Adaptive agentic delivery
+
+For planning and software delivery, fetch and follow [SOP: Adaptive Agentic Software Delivery v1.2](https://app.notion.com/p/3aea4c502b1781a888b1f8e851697813). Treat it as binding for this personal project unless an explicit project requirement conflicts.
+
+`Backlog.md` is the canonical delivery ledger. Keep the long-range plan shallow and revisable, with only the next one to three work items **Ready**. Give the active item a Goal that references its ID and evidence contract. Use independent evaluation, link evidence before **Done**, update `PROJECT.md` without duplicating ledger status, and stop at every milestone health and replenishment gate.
+
+Use Plan for direction, Goal for the active work item and Loop only for bounded machine-verifiable iteration. Treat coding agents and IDEs as execution surfaces, not project trackers. Use the Delivery Risk Cube to compare the evidence shape with the project's next commitment. Record hard-to-reverse, cross-increment or surprising architectural choices in the project decision log or an ADR; do not embed them silently in code. Do not continue automatically into later milestones.
+
 All agents work in one checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`. There are no separate worktrees unless explicitly created.
 
 - Work on one coherent batch of changes at a time. Do not run parallel agents that edit the same repo.
@@ -187,7 +212,7 @@ All agents work in one checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`. Ther
 
 Batch changes, then validate once:
 
-1. **First** capture the requested work in plan/spec docs before touching implementation. Update the relevant plan files (for example `MVP_POLISH_PLAN.md`, `MILESTONE_5_STATUS.md`, `MILESTONES.md`, and any active feature spec) with the exact ask, acceptance criteria, and rationale.
+1. **First** capture the requested work in plan/spec docs before touching implementation. Update the relevant plan files (for example `docs/product/plans/MVP_POLISH_PLAN.md`, `docs/project/status/MILESTONE_5_STATUS.md`, `MILESTONES.md`, and any active feature spec) with the exact ask, acceptance criteria, and rationale.
 2. Confirm the plan and implementation files are in sync before coding.
 3. Implement a coherent chunk of work (feature slice, bugfix, or polish group).
 4. Run a compile check (`xcodebuild build` for the physical device destination).
@@ -227,6 +252,8 @@ After a **coherent batch** of app code changes, build and install on the physica
 
 One build and one install per batch is enough.
 
+When reporting that the app was installed or updated on the iPhone, always include the installed app version and bundle version, for example `RideHorizon v0.12.2 (20260703.0258)`.
+
 Primary device:
 
 ```text
@@ -236,17 +263,17 @@ Robert's iPhone — id 00008150-000C70883E87401C
 Check the device is available:
 
 ```bash
-xcodebuild -showdestinations -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide 2>&1 | rg "Robert's iPhone"
+xcodebuild -showdestinations -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon 2>&1 | rg "Robert's iPhone"
 ```
 
 Build, install, and launch:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
 
-xcrun devicectl device install app --device 00008150-000C70883E87401C /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData/Build/Products/Debug-iphoneos/MotoGuide.app
+xcrun devicectl device install app --device 00008150-000C70883E87401C /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData/Build/Products/Debug-iphoneos/RideHorizon.app
 
-xcrun devicectl device process launch --device 00008150-000C70883E87401C ai.dml.MotoGuide
+xcrun devicectl device process launch --device 00008150-000C70883E87401C ai.digitalmercenaries.ridehorizon
 ```
 
 Expected result: the latest build is on the phone and the app opens.
@@ -258,42 +285,42 @@ If the phone is not connected, say so briefly and continue. Do not block the tas
 Clone the GitHub project into the permanent working-copy subfolder:
 
 ```bash
-git clone https://github.com/rjbarbour/MotoGuide.git /Users/rob_dev/DocsLocal/motoguide/repo
+git clone https://github.com/rjbarbour/RideHorizon.git /Users/rob_dev/DocsLocal/motoguide/repo
 ```
 
-Expected result: `/Users/rob_dev/DocsLocal/motoguide/repo` contains `.git`, `MotoGuide.xcodeproj`, `MotoGuide/`, `MotoGuideTests/`, and `MotoGuideUITests/`.
+Expected result: `/Users/rob_dev/DocsLocal/motoguide/repo` contains `.git`, `RideHorizon.xcodeproj`, `RideHorizon/`, `RideHorizonTests/`, and `RideHorizonUITests/`.
 
 Open the Xcode project:
 
 ```bash
-open /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj
+open /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj
 ```
 
-Expected result: Xcode opens the MotoGuide project.
+Expected result: Xcode opens the RideHorizon project.
 
 Run unit tests on the simulator at a milestone or pre-commit checkpoint (not after every small change):
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/MotoGuide.xcodeproj -scheme MotoGuide -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -only-testing:MotoGuideTests
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -only-testing:RideHorizonTests
 ```
 
-Expected result: the MotoGuide unit test target builds and runs in the iOS Simulator.
+Expected result: the RideHorizon unit test target builds and runs in the iOS Simulator.
 
-Inspect the MotoGuide ICB:
+Inspect the RideHorizon ICB:
 
 ```bash
 sed -n '1,220p' /Users/rob_dev/DocsLocal/digital-mercenaries-ltd/icb-catalogue/staged_icbs/6a1047a6a591ed37d9fd4e0e.md
 ```
 
-Expected result: prints the 11-section Idea Capture Brief for MotoGuide.
+Expected result: prints the 11-section Idea Capture Brief for RideHorizon.
 
-Search Focus Planner for MotoGuide cards:
+Search Focus Planner for RideHorizon cards:
 
 ```bash
-jq -r '.cards[]? | select((.name + " " + (.desc // "")) | test("motoguide|moto guide"; "i")) | [.idShort, .name, .dateLastActivity] | @tsv' '/Users/rob_dev/DocsLocal/focus_planner/bmWfhK1S - robs-todo.json'
+jq -r '.cards[]? | select((.name + " " + (.desc // "")) | test("ridehorizon|moto guide"; "i")) | [.idShort, .name, .dateLastActivity] | @tsv' '/Users/rob_dev/DocsLocal/focus_planner/bmWfhK1S - robs-todo.json'
 ```
 
-Expected result: prints the MotoGuide-related Trello cards.
+Expected result: prints the RideHorizon-related Trello cards.
 
 ## Documentation Rules
 

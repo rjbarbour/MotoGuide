@@ -1,21 +1,36 @@
 server:
   port: ${PORT:3000}
 
-motoguide:
-  proxy-token: ${MOTOGUIDE_PROXY_TOKEN:}
-  admin-token: ${MOTOGUIDE_ADMIN_TOKEN:}
+ridehorizon:
+  proxy-token: ${RIDEHORIZON_PROXY_TOKEN:}
+  admin-token: ${RIDEHORIZON_ADMIN_TOKEN:}
   rate-limit-per-minute: ${RATE_LIMIT_PER_MINUTE:30}
-  diagnostics-enabled: ${MOTOGUIDE_DIAGNOSTICS_ENABLED:false}
-  prompt-overrides-enabled: ${MOTOGUIDE_PROMPT_OVERRIDES_ENABLED:false}
-  prompt-overrides-object-url: ${MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL:}
-  prompt-overrides-refresh-seconds: ${MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS:60}
-  prompt-overrides-auth-token: ${MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN:}
-  short-fact-prompt: ${MOTOGUIDE_SHORT_FACT_PROMPT:}
-  long-fact-prompt: ${MOTOGUIDE_LONG_FACT_PROMPT:}
+  diagnostics-enabled: ${RIDEHORIZON_DIAGNOSTICS_ENABLED:false}
+  prompt-overrides-enabled: ${RIDEHORIZON_PROMPT_OVERRIDES_ENABLED:false}
+  prompt-overrides-object-url: ${RIDEHORIZON_PROMPT_OVERRIDES_OBJECT_URL:}
+  prompt-overrides-refresh-seconds: ${RIDEHORIZON_PROMPT_OVERRIDES_REFRESH_SECONDS:60}
+  prompt-overrides-auth-token: ${RIDEHORIZON_PROMPT_OVERRIDES_AUTH_TOKEN:}
+  prompt-overrides-host-allowlist: ${RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST:}
+  short-fact-prompt: ${RIDEHORIZON_SHORT_FACT_PROMPT:}
+  long-fact-prompt: ${RIDEHORIZON_LONG_FACT_PROMPT:}
   eleven-labs-api-key: ${ELEVENLABS_API_KEY:}
   eleven-labs-voice-id: ${ELEVENLABS_VOICE_ID:JBFqnCBsd6RMkjVDRZzb}
   eleven-labs-model-id: ${ELEVENLABS_MODEL_ID:eleven_multilingual_v2}
   eleven-labs-output-format: ${ELEVENLABS_OUTPUT_FORMAT:mp3_44100_128}
+  attestation-challenge-ttl-seconds: ${RIDEHORIZON_ATTESTATION_CHALLENGE_TTL_SECONDS:300}
+  session-ttl-seconds: ${RIDEHORIZON_SESSION_TTL_SECONDS:3600}
+  fallback-session-ttl-seconds: ${RIDEHORIZON_FALLBACK_SESSION_TTL_SECONDS:900}
+  verified-fact-daily-limit: ${RIDEHORIZON_VERIFIED_FACT_DAILY_LIMIT:180}
+  verified-speech-char-daily-limit: ${RIDEHORIZON_VERIFIED_SPEECH_CHAR_DAILY_LIMIT:120000}
+  fallback-fact-daily-limit: ${RIDEHORIZON_FALLBACK_FACT_DAILY_LIMIT:20}
+  fallback-speech-char-daily-limit: ${RIDEHORIZON_FALLBACK_SPEECH_CHAR_DAILY_LIMIT:12000}
+  global-fact-daily-limit: ${RIDEHORIZON_GLOBAL_FACT_DAILY_LIMIT:2000}
+  global-speech-char-daily-limit: ${RIDEHORIZON_GLOBAL_SPEECH_CHAR_DAILY_LIMIT:250000}
+  session-record-retention-days: ${RIDEHORIZON_SESSION_RECORD_RETENTION_DAYS:30}
+  challenge-record-retention-hours: ${RIDEHORIZON_CHALLENGE_RECORD_RETENTION_HOURS:24}
+  fallback-usage-retention-days: ${RIDEHORIZON_FALLBACK_USAGE_RETENTION_DAYS:3}
+  retention-cleanup-initial-delay-ms: ${RIDEHORIZON_RETENTION_CLEANUP_INITIAL_DELAY_MS:60000}
+  retention-cleanup-delay-ms: ${RIDEHORIZON_RETENTION_CLEANUP_DELAY_MS:21600000}
 
 openai:
   api-key: ${OPENAI_API_KEY:}
@@ -24,7 +39,7 @@ openai:
 
 spring:
   application:
-    name: motoguide-fact-proxy
+    name: ridehorizon-fact-proxy
   jackson:
     deserialization:
       fail-on-unknown-properties: true

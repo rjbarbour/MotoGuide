@@ -1,12 +1,12 @@
-# MotoGuide fact proxy
+# RideHorizon fact proxy
 
-Java 25 / Spring Boot thin HTTP proxy: MotoGuide iPhone → this service → OpenAI. The OpenAI API key and prompt text live only on the server, not on the device.
+Java 25 / Spring Boot thin HTTP proxy: RideHorizon iPhone → this service → OpenAI. The OpenAI API key and prompt text live only on the server, not on the device.
 
 The same proxy also fronts ElevenLabs text-to-speech. The ElevenLabs key, voice id, model id, and output format live only on the server.
 
 OpenAPI contract source: `/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml`.
 
-Human-readable companion: `/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_CONTRACT.md`.
+Human-readable companion: `/Users/rob_dev/DocsLocal/motoguide/repo/docs/architecture/contracts/FACT_PROXY_CONTRACT.md`.
 
 ## Prerequisites
 
@@ -46,7 +46,7 @@ Expected result: `BUILD SUCCESSFUL` and JAR output at `build/libs/fact-proxy.jar
 ```bash
 sdk env
 export OPENAI_API_KEY="sk-..."
-export MOTOGUIDE_PROXY_TOKEN="dev-token"
+export RIDEHORIZON_PROXY_TOKEN="dev-token"
 ./gradlew bootRun --no-daemon
 ```
 
@@ -68,17 +68,25 @@ Validate the OpenAPI file without simulator or deployment:
 ruby -e 'require "yaml"; doc = YAML.load_file("/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml"); abort "missing openapi" unless doc["openapi"] == "3.0.3"; abort "missing /v1/fact" unless doc.dig("paths", "/v1/fact", "post"); abort "missing FactRequest" unless doc.dig("components", "schemas", "FactRequest"); puts "OpenAPI YAML parsed: #{doc["info"]["title"]} #{doc["info"]["version"]}"'
 ```
 
-Expected result: `OpenAPI YAML parsed: MotoGuide Fact Proxy API 0.1.0`.
+Expected result: `OpenAPI YAML parsed: RideHorizon Fact Proxy API 0.1.0`.
 
 ### `GET /health`
 
 Returns `200` with body `ok`.
 
+### `POST /v1/session/fallback`
+
+The app creates a random per-install identifier in Keychain and exchanges it automatically for a short-lived restricted session. Testers do not enter a code or token.
+
+Required header: `X-RideHorizon-Device-Id: <RANDOM_PER_INSTALL_IDENTIFIER>`.
+
+Response: JSON containing `sessionToken`, `expiresAt`, and `fallback: true`.
+
 ### `POST /v1/fact`
 
 **Headers**
 
-- `Authorization: Bearer <MOTOGUIDE_PROXY_TOKEN>` (required)
+- `Authorization: Bearer <SHORT_LIVED_SESSION_TOKEN>` (required)
 - `Content-Type: application/json`
 
 **Body**
@@ -132,7 +140,7 @@ The iOS app sends place hierarchy only. It does not send prompt text, model mess
 
 **Headers**
 
-- `Authorization: Bearer <MOTOGUIDE_PROXY_TOKEN>` (required)
+- `Authorization: Bearer <SHORT_LIVED_SESSION_TOKEN>` (required)
 - `Content-Type: application/json`
 
 **Body**
@@ -162,7 +170,7 @@ curl -sS -X POST http://127.0.0.1:3000/v1/fact \
 curl -sS -X POST http://127.0.0.1:3000/v1/speech \
   -H "Authorization: Bearer dev-token" \
   -H "Content-Type: application/json" \
-  -o /tmp/motoguide-speech.mp3 \
+  -o /tmp/ridehorizon-speech.mp3 \
   -d '{"text":"Stroud was known for its wool trade."}'
 ```
 
@@ -175,7 +183,7 @@ cd /Users/rob_dev/DocsLocal/motoguide/repo/fact-proxy
 ./build.sh
 fly deploy
 
-# Option B: Terraform-managed app shell + GitHub Action deployment
+# Option B: Terraform-managed app shell + test-gated GitHub deployment
 cd fact-proxy/terraform
 FLY_API_TOKEN=fo1_... terraform init -input=false
 FLY_API_TOKEN=fo1_... terraform apply
@@ -184,32 +192,32 @@ cd ..
 flyctl deploy --config fly.toml
 ```
 
-GitHub Action for this flow: `.github/workflows/fact-proxy-deploy.yml`
+GitHub Actions run the iOS and proxy tests first. A successful `main` push then
+deploys that exact commit through `.github/workflows/fact-proxy-deploy.yml`.
 
-Secrets are managed through GitHub repository/organization secrets and injected at runtime:
+Provider keys and RideHorizon credentials remain in Fly Secrets. GitHub needs only
+the deploy-scoped `FLY_API_TOKEN` repository secret:
 
 ```bash
 FLY_API_TOKEN=fo1_...
-OPENAI_API_KEY=sk-...
-MOTOGUIDE_PROXY_TOKEN=...
 ```
 
-Then secrets are set via:
+Manage runtime values directly in Fly when they need to change:
 
 ```bash
 fly secrets set \
   OPENAI_API_KEY="sk-..." \
-  MOTOGUIDE_PROXY_TOKEN="$(openssl rand -hex 24)"
+  RIDEHORIZON_PROXY_TOKEN="$(openssl rand -hex 24)"
 ```
 
 After deploy:
 
 ```bash
 fly status
-curl -sS https://motoguide-fact-proxy.fly.dev/health
+curl -sS https://ridehorizon.digitalmercenaries.ai/health
 ```
 
-Store `MOTOGUIDE_PROXY_TOKEN` in the iOS app Keychain (service `MotoGuideProxy`) — **not** the OpenAI key.
+The iOS app automatically stores only its short-lived session token in Keychain. Provider keys remain in Fly Secrets.
 
 ## Environment variables
 
@@ -217,29 +225,29 @@ Store `MOTOGUIDE_PROXY_TOKEN` in the iOS app Keychain (service `MotoGuideProxy`)
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Yes | OpenAI key (Fly secret only) |
 | `ELEVENLABS_API_KEY` | Yes for speech | ElevenLabs key (Fly secret only) |
-| `MOTOGUIDE_PROXY_TOKEN` | Yes | Shared secret the app sends as Bearer token |
+| `RIDEHORIZON_PROXY_TOKEN` | Operator compatibility only | Server-side operator credential; never ship it in the app |
 | `OPENAI_MODEL` | No | Fly runtime variable. Default `gpt-4o-mini` in `fly.toml` |
 | `ELEVENLABS_VOICE_ID` | No | Voice id for `/v1/speech`; default is the service default in `application.yml` |
 | `ELEVENLABS_MODEL_ID` | No | ElevenLabs model id. Default `eleven_multilingual_v2` |
 | `ELEVENLABS_OUTPUT_FORMAT` | No | ElevenLabs output format. Default `mp3_44100_128` |
-| `MOTOGUIDE_SHORT_FACT_PROMPT` | No | Optional server-side prompt override for `shortFacts` |
-| `MOTOGUIDE_LONG_FACT_PROMPT` | No | Optional server-side prompt override for `longFacts` |
+| `RIDEHORIZON_SHORT_FACT_PROMPT` | No | Optional server-side prompt override for `shortFacts` |
+| `RIDEHORIZON_LONG_FACT_PROMPT` | No | Optional server-side prompt override for `longFacts` |
 | `PORT` | No | Default `3000` |
 | `RATE_LIMIT_PER_MINUTE` | No | Default `30` per client IP |
-| `MOTOGUIDE_PROMPT_OVERRIDES_ENABLED` | No | Default `false`; enables remote prompt override loading |
-| `MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL` | No | Object-store URL for JSON prompt overrides |
-| `MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS` | No | Cache refresh interval; default `60` |
-| `MOTOGUIDE_PROMPT_OVERRIDES_AUTH_TOKEN` | No | Optional bearer token for object-store retrieval |
+| `RIDEHORIZON_PROMPT_OVERRIDES_ENABLED` | No | Default `false`; enables remote prompt override loading |
+| `RIDEHORIZON_PROMPT_OVERRIDES_OBJECT_URL` | No | Object-store URL for JSON prompt overrides |
+| `RIDEHORIZON_PROMPT_OVERRIDES_REFRESH_SECONDS` | No | Cache refresh interval; default `60` |
+| `RIDEHORIZON_PROMPT_OVERRIDES_AUTH_TOKEN` | No | Optional bearer token for object-store retrieval |
 
 ## iOS integration
 
-The iOS app uses `ProxyFactGenerator` to call `https://motoguide-fact-proxy.fly.dev/v1/fact`.
+The iOS app uses `ProxyFactGenerator` to call `https://ridehorizon.digitalmercenaries.ai/v1/fact`.
 
-Store `MOTOGUIDE_PROXY_TOKEN` in the iOS Keychain service `MotoGuideProxy`. Do not store the OpenAI key on the device.
+The app automatically stores the returned short-lived session token in Keychain service `RideHorizonProxy` and renews it when required. Do not store OpenAI or ElevenLabs keys on the device.
 
 ## Security notes
 
 - Minimal MVP proxy, not a full product backend.
-- Use a long random `MOTOGUIDE_PROXY_TOKEN` and rotate if leaked.
+- Keep `RIDEHORIZON_PROXY_TOKEN` server-side and rotate it if exposed.
 - Set OpenAI usage limits in the OpenAI dashboard.
 - Add per-rider auth before wider distribution.

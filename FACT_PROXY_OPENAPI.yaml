@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
-  title: MotoGuide Fact Proxy API
-  version: 0.1.0
+  title: RideHorizon Fact Proxy API
+  version: 0.2.0
   description: |
-    MVP contract for the MotoGuide iOS app to request a short or long
+    MVP contract for the RideHorizon iOS app to request a short or long
     ride-safe place fact without storing or sending an OpenAI API key from
     the device.
 servers:
-  - url: https://motoguide-fact-proxy.fly.dev
+  - url: https://ridehorizon.digitalmercenaries.ai
     description: Production Fly.io proxy
   - url: http://127.0.0.1:3000
     description: Local development proxy
@@ -16,14 +16,16 @@ tags:
     description: Proxy health checks.
   - name: Facts
     description: Ride-safe place facts.
+  - name: Sessions
+    description: Automatic restricted sessions for the private TestFlight beta.
   - name: Admin
     description: Operational controls. Not used by the iOS app.
 x-deployment:
   provider: Fly.io
-  app: motoguide-fact-proxy
+  app: ridehorizon-fact-proxy
   organization: dml
   primaryRegion: lhr
-  image: motoguide-fact-proxy:deployment-01KWFY4N628G4137Y7BMQPN6P9
+  image: ridehorizon-fact-proxy:deployment-01KWFY4N628G4137Y7BMQPN6P9
   machines:
     - id: 080d306c727d98
       process: app
@@ -40,34 +42,31 @@ x-deployment:
     dedicatedIpv6: "2a09:8280:1::13b:6469:0"
   deployedSecrets:
     - OPENAI_API_KEY
-    - MOTOGUIDE_PROXY_TOKEN
+    - ELEVENLABS_API_KEY
+    - ELEVENLABS_VOICE_ID
+    - RIDEHORIZON_PROXY_TOKEN
   optionalSecrets:
-    - MOTOGUIDE_ADMIN_TOKEN
+    - RIDEHORIZON_ADMIN_TOKEN
   runtimeConfiguration:
-    MOTOGUIDE_DIAGNOSTICS_ENABLED:
+    RIDEHORIZON_DIAGNOSTICS_ENABLED:
       default: false
       description: Enables verbose proxy diagnostics at startup.
-    MOTOGUIDE_PROMPT_OVERRIDES_ENABLED:
+    RIDEHORIZON_PROMPT_OVERRIDES_ENABLED:
       default: false
       description: Load optional prompt overrides from Fly object storage URL.
-    MOTOGUIDE_PROMPT_OVERRIDES_OBJECT_URL:
+    RIDEHORIZON_PROMPT_OVERRIDES_OBJECT_URL:
       description: Object-store URL containing optional prompt override JSON.
-    MOTOGUIDE_PROMPT_OVERRIDES_REFRESH_SECONDS:
+    RIDEHORIZON_PROMPT_OVERRIDES_REFRESH_SECONDS:
       default: 60
       description: How often proxy reloads prompt overrides from object storage.
-    MOTOGUIDE_SHORT_FACT_PROMPT:
+    RIDEHORIZON_SHORT_FACT_PROMPT:
       default: built-in short fact prompt
       description: Optional server-side prompt override for shortFacts requests. Never sent by iOS.
-    MOTOGUIDE_LONG_FACT_PROMPT:
+    RIDEHORIZON_LONG_FACT_PROMPT:
       default: built-in long fact prompt
       description: Optional server-side prompt override for longFacts requests. Never sent by iOS.
-    MOTOGUIDE_DEVICE_BINDING_REQUIRED:
-      default: false
-      description: When true, requires X-MotoGuide-Device-Id to be in MOTOGUIDE_TRUSTED_DEVICE_IDS.
-    MOTOGUIDE_TRUSTED_DEVICE_IDS:
-      description: Comma-separated list of allowed X-MotoGuide-Device-Id values when device binding is required.
-    MOTOGUIDE_PROMPT_OVERRIDES_HOST_ALLOWLIST:
-      description: Comma-separated host allowlist for prompt override JSON fetches. Required when MOTOGUIDE_PROMPT_OVERRIDES_ENABLED=true.
+    RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST:
+      description: Comma-separated host allowlist for prompt override JSON fetches. Required when RIDEHORIZON_PROMPT_OVERRIDES_ENABLED=true.
     OPENAI_MODEL:
       default: gpt-4o-mini
       description: OpenAI model selected by the Fly runtime environment.
@@ -76,16 +75,14 @@ x-deployment:
       description: Request limit for authenticated proxy calls, with user/device identity preference then IP fallback.
 x-current-security-model:
   transport: HTTPS through Fly.io public ingress.
-  appAuthentication: Shared bearer token in the Authorization header.
-  deviceSecretStorage: iOS Keychain generic-password service MotoGuideProxy.
+  appAuthentication: Automatic short-lived restricted sessions, with the shared Fly secret retained only for operator/developer access.
+  deviceSecretStorage: A per-install identifier and short-lived session token are stored in iOS Keychain.
   serverSecretStorage: Fly.io secrets.
   openAiKeyExposure: Server-side only. Never store the OpenAI API key in the iOS app or repository.
   currentLimitations:
-    - A leaked MOTOGUIDE_PROXY_TOKEN can call the proxy until rotated or rate-limited.
-    - A leaked MOTOGUIDE_PROXY_TOKEN can still be used by any bearer until rotated or rate-limited.
-    - Device binding is optional and must be enabled explicitly for non-Playground traffic.
+    - Automatic sessions are restricted by per-install, global daily, and per-IP request limits but are not yet protected by Apple App Attest.
+    - The server-side RIDEHORIZON_PROXY_TOKEN remains an operator-only compatibility path until the private beta migration is complete.
   plannedHardening:
-    - Per-device registration.
     - Apple App Attest assertion verification.
     - Server-side device approval, revocation, and quota state.
     - Per-user auth before wider non-TestFlight distribution.
@@ -115,9 +112,9 @@ x-observability:
   diagnostics:
     baselineRequestLogsAlwaysEnabled: true
     verboseDiagnosticsDefault: false
-    startupEnvironmentVariable: MOTOGUIDE_DIAGNOSTICS_ENABLED
+    startupEnvironmentVariable: RIDEHORIZON_DIAGNOSTICS_ENABLED
     adminEndpoint: /admin/diagnostics
-    adminEndpointRequiresSecret: MOTOGUIDE_ADMIN_TOKEN
+    adminEndpointRequiresSecret: RIDEHORIZON_ADMIN_TOKEN
     adminEndpointHiddenWhenSecretUnset: true
     runtimeChangesAreProcessLocal: true
 paths:
@@ -152,15 +149,15 @@ paths:
         `shortFacts` and `longFacts`. Optional rider context text, home region
         preferences, and fact-interest categories are treated as bounded user
         preference data, not as system prompt text. The iOS app must fall back
-        to the base place announcement
-        for any non-200 response, invalid response body, rejected fact, missing
-        token, or request timeout.
+        to the base place announcement after allowed transient retries are
+        exhausted, or immediately for a permanent non-200 response, invalid
+        response body, rejected fact, missing token, or operation timeout.
       operationId: createPlaceFact
       security:
-        - MotoGuideProxyToken: []
+        - RideHorizonProxyToken: []
       parameters:
         - in: header
-          name: X-MotoGuide-User-Id
+          name: X-RideHorizon-User-Id
           description: Optional rider/user identifier for server-side prompt override lookup.
           required: false
           schema:
@@ -168,18 +165,20 @@ paths:
             minLength: 4
             maxLength: 64
         - in: header
-          name: X-MotoGuide-Device-Id
+          name: X-RideHorizon-Device-Id
           description: |
-            Optional approved-device identifier. Required when
-            MOTOGUIDE_DEVICE_BINDING_REQUIRED=true.
+            Optional per-install identifier used for request-level rate limiting.
           required: false
           schema:
             type: string
             minLength: 4
             maxLength: 64
-      x-ios-keychain-service: MotoGuideProxy
-      x-ios-device-id-keychain-service: MotoGuideDeviceId
-      x-ios-timeout-seconds: 3
+      x-ios-keychain-service: RideHorizonProxy
+      x-ios-device-id-keychain-service: RideHorizonDeviceId
+      x-ios-attempt-timeout-seconds: 35
+      x-ios-operation-timeout-seconds: 60
+      x-ios-retry-delays-seconds: [3, 10]
+      x-ios-retry-http-statuses: [408, 502, 503, 504]
       x-ios-fallback: Speak the base place announcement without a fact.
       x-openai-api-key-location: Server-side only. Never store the OpenAI API key in the iOS app or repository.
       x-speech-safety-rules:
@@ -256,21 +255,24 @@ paths:
         text, or coordinates. The proxy owns all ElevenLabs configuration.
       operationId: createSpeech
       security:
-        - MotoGuideProxyToken: []
+        - RideHorizonProxyToken: []
       parameters:
         - in: header
-          name: X-MotoGuide-Device-Id
+          name: X-RideHorizon-Device-Id
           description: |
-            Optional approved-device identifier. Required when
-            MOTOGUIDE_DEVICE_BINDING_REQUIRED=true.
+            Optional per-install identifier used for request-level rate limiting.
           required: false
           schema:
             type: string
             minLength: 4
             maxLength: 64
-      x-ios-keychain-service: MotoGuideProxy
-      x-ios-device-id-keychain-service: MotoGuideDeviceId
-      x-ios-timeout-seconds: 3
+      x-ios-keychain-service: RideHorizonProxy
+      x-ios-device-id-keychain-service: RideHorizonDeviceId
+      x-ios-attempt-timeout-seconds: 35
+      x-ios-operation-timeout-seconds: 60
+      x-ios-retry-delays-seconds: [3, 10]
+      x-ios-retry-http-statuses: [408, 502, 503, 504]
+      x-ios-structured-502-retry-code: RH-TTS-04
       x-ios-fallback: Fall back to local Apple AVSpeechSynthesizer speech.
       x-elevenlabs-api-key-location: Server-side only. Never store the ElevenLabs API key in the iOS app or repository.
       requestBody:
@@ -300,7 +302,88 @@ paths:
         "500":
           description: Proxy is misconfigured, including missing server-side proxy token.
         "502":
-          description: ElevenLabs returned an error or unusable response.
+          description: ElevenLabs returned an error or unusable response. Raw provider/account details are never returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpeechErrorResponse"
+  /v1/session/fallback:
+    post:
+      tags:
+        - Sessions
+      summary: Issue an automatic restricted session
+      description: |
+        Used by the iOS app without any tester-entered code or token. The app
+        creates a random per-install identifier, stores it in Keychain, and sends
+        it in `X-RideHorizon-Device-Id`. The returned bearer token is short-lived.
+      operationId: issueFallbackSession
+      security: []
+      parameters:
+        - in: header
+          name: X-RideHorizon-Device-Id
+          required: true
+          schema:
+            type: string
+            minLength: 4
+            maxLength: 64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FallbackSessionRequest"
+      responses:
+        "200":
+          description: Restricted session issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          description: Missing or invalid per-install identifier, or invalid JSON.
+        "429":
+          description: Automatic-session per-IP rate limit exceeded.
+  /admin/v1/sessions:
+    get:
+      tags:
+        - Admin
+      summary: List registered installation metadata
+      operationId: listInstallations
+      security:
+        - RideHorizonAdminToken: []
+      responses:
+        "200":
+          description: Installation metadata without plaintext credentials or hashes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InstallationSummary"
+        "401":
+          description: Missing or wrong administrative bearer credential.
+  /admin/v1/sessions/{installationId}:
+    delete:
+      tags:
+        - Admin
+      summary: Revoke an installation and its active sessions
+      operationId: revokeInstallation
+      security:
+        - RideHorizonAdminToken: []
+      parameters:
+        - in: path
+          name: installationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Installation revoked.
+        "401":
+          description: Missing or wrong administrative bearer credential.
+        "404":
+          description: Installation was not found.
   /admin/diagnostics:
     get:
       tags:
@@ -308,11 +391,11 @@ paths:
       summary: Read verbose diagnostics state
       description: |
         Operational endpoint. Not used by the iOS app. Requires
-        `MOTOGUIDE_ADMIN_TOKEN`. If that token is not configured, this endpoint
+        `RIDEHORIZON_ADMIN_TOKEN`. If that token is not configured, this endpoint
         returns 404.
       operationId: getDiagnostics
       security:
-        - MotoGuideAdminToken: []
+        - RideHorizonAdminToken: []
       responses:
         "200":
           description: Current diagnostics state for this proxy process.
@@ -323,7 +406,7 @@ paths:
         "401":
           description: Missing or wrong admin bearer token.
         "404":
-          description: Admin diagnostics endpoint is disabled because MOTOGUIDE_ADMIN_TOKEN is not configured.
+          description: Admin diagnostics endpoint is disabled because RIDEHORIZON_ADMIN_TOKEN is not configured.
     put:
       tags:
         - Admin
@@ -331,10 +414,10 @@ paths:
       description: |
         Operational endpoint. Not used by the iOS app. Runtime changes are
         process-local; on multi-machine deployments, prefer
-        `MOTOGUIDE_DIAGNOSTICS_ENABLED` for a consistent fleet-wide setting.
+        `RIDEHORIZON_DIAGNOSTICS_ENABLED` for a consistent fleet-wide setting.
       operationId: updateDiagnostics
       security:
-        - MotoGuideAdminToken: []
+        - RideHorizonAdminToken: []
       requestBody:
         required: true
         content:
@@ -351,24 +434,81 @@ paths:
         "401":
           description: Missing or wrong admin bearer token.
         "404":
-          description: Admin diagnostics endpoint is disabled because MOTOGUIDE_ADMIN_TOKEN is not configured.
+          description: Admin diagnostics endpoint is disabled because RIDEHORIZON_ADMIN_TOKEN is not configured.
 components:
   securitySchemes:
-    MotoGuideProxyToken:
+    RideHorizonProxyToken:
       type: http
       scheme: bearer
-      bearerFormat: MOTOGUIDE_PROXY_TOKEN
+      bearerFormat: RideHorizonSessionToken
       description: |
-        Shared proxy token. The iOS app reads this from the Keychain generic-password
-        item with service `MotoGuideProxy`.
-    MotoGuideAdminToken:
+        Short-lived token issued automatically by `/v1/session/fallback`. The
+        iOS app stores it in Keychain and renews it automatically after expiry or
+        a 401 response. Testers never enter or see this token.
+    RideHorizonAdminToken:
       type: http
       scheme: bearer
-      bearerFormat: MOTOGUIDE_ADMIN_TOKEN
+      bearerFormat: RIDEHORIZON_ADMIN_TOKEN
       description: |
-        Separate operational token for `/admin/diagnostics`. This token must not
-        be shipped in the iOS app.
+        Separate operational token when configured. It is never shipped in the
+        iOS app.
   schemas:
+    FallbackSessionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          maxLength: 48
+          description: Non-sensitive diagnostic category; defaults to restricted.
+    SessionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionToken
+        - expiresAt
+        - fallback
+      properties:
+        sessionToken:
+          type: string
+          description: Short-lived bearer token. Never logged or displayed to the tester.
+        expiresAt:
+          type: string
+          format: date-time
+        fallback:
+          type: boolean
+          enum:
+            - true
+    InstallationSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - installationId
+        - keyId
+        - environment
+        - status
+        - createdAt
+      properties:
+        installationId:
+          type: string
+          format: uuid
+        keyId:
+          type: string
+        environment:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
     Boundary:
       type: string
       description: Boundary type that triggered the announcement.
@@ -517,6 +657,26 @@ components:
           maxLength: 1400
           description: Bounded rider-facing text to synthesize as speech.
           example: Stroud was known for its wool trade.
+    SpeechErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - code
+      properties:
+        error:
+          type: string
+          enum:
+            - Premium voice is temporarily unavailable.
+          description: Rider-safe message that never contains provider account, credit, quota, authentication, or billing details.
+        code:
+          type: string
+          enum:
+            - RH-TTS-01
+            - RH-TTS-02
+            - RH-TTS-03
+            - RH-TTS-04
+          description: Opaque RideHorizon diagnostic code for developer diagnostics.
     FactResponse:
       type: object
       additionalProperties: false

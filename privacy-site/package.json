@@ -1,0 +1,14 @@
+{
+  "name": "ridehorizon-edge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev site --port 8787 --compatibility-date 2026-07-31",
+    "test": "node --test",
+    "deploy": "wrangler pages deploy site --project-name ridehorizon-edge --branch main"
+  },
+  "devDependencies": {
+    "wrangler": "4.118.0"
+  }
+}

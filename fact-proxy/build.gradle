@@ -4,7 +4,7 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
-group = 'ai.dml.motoguide'
+group = 'ai.digitalmercenaries.ridehorizon'
 version = '0.1.0'
 
 java {
@@ -23,11 +23,20 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+    testRuntimeOnly 'com.h2database:h2'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    systemProperty 'spring.datasource.url', 'jdbc:h2:mem:ridehorizon-tests;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE'
+    systemProperty 'spring.datasource.username', 'sa'
+    systemProperty 'spring.datasource.password', ''
+    systemProperty 'spring.datasource.driver-class-name', 'org.h2.Driver'
 }
 
 tasks.named('bootJar') {
