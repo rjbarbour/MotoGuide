@@ -20,6 +20,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
     var onCancel: (() -> Void)?
     var onDiagnosticNote: ((String) -> Void)?
     var onPipelineEvent: ((SpeechOutputPipelineEvent) -> Void)?
+    var onRequest: (() -> Void)?
     private(set) var requests: [Request] = []
     private(set) var cancelPendingPreparationCount = 0
     private(set) var stopCount = 0
@@ -47,6 +48,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
                 allowAppleFallback: allowAppleFallback
             )
         )
+        onRequest?()
     }
 
     func stop() {
@@ -1401,6 +1403,8 @@ final class LocationManagerTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let diagnostics = RideDiagnosticsStore(directoryURL: directory)
         let speechOutput = RecordingSpeechOutputEngine()
+        let speechRequested = expectation(description: "Fact announcement reached speech output")
+        speechOutput.onRequest = { speechRequested.fulfill() }
         let audioSession = RecordingAudioSessionManager()
         let locationManager = LocationManager(
             factGenerator: ConstantPlaceFactGenerator(fact: "Known for its wool trade."),
@@ -1426,7 +1430,7 @@ final class LocationManagerTests: XCTestCase {
             administrativeArea: "England",
             country: "United Kingdom"
         ))
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        await fulfillment(of: [speechRequested], timeout: 3)
         XCTAssertEqual(speechOutput.requests.count, 1)
 
         speechOutput.beginPlayback()
