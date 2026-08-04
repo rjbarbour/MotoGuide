@@ -416,15 +416,89 @@ final class LocationManagerTests: XCTestCase {
         )
         XCTAssertEqual(profile.highPassFrequencyHz, 100)
         XCTAssertEqual(profile.samplePeakCeilingDBFS, -2)
-        XCTAssertEqual(SpeechProcessingProfile.production.highPassFrequencyHz, 0)
-        XCTAssertEqual(SpeechProcessingProfile.production.compressionPreset, .off)
+        XCTAssertEqual(SpeechProcessingProfile.production.highPassFrequencyHz, 90)
+        XCTAssertEqual(SpeechProcessingProfile.production.compressionPreset, .light)
+        XCTAssertEqual(SpeechProcessingProfile.production.presenceGainDB, 2)
+        XCTAssertEqual(SpeechProcessingProfile.production.activeSpeechTargetRMSDBFS, -18)
         XCTAssertEqual(SpeechCompressionPreset.light.ratio, 2)
         XCTAssertEqual(SpeechCompressionPreset.light.thresholdDBFS, -18)
         XCTAssertEqual(SpeechCompressionPreset.strong.ratio, 4)
         XCTAssertEqual(SpeechCompressionPreset.strong.thresholdDBFS, -24)
     }
 
+    func testActiveSpeechNormaliserTargetsWindowedSpeechAndIgnoresSilence() throws {
+        let format = try XCTUnwrap(
+            AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 1_000, channels: 1, interleaved: false)
+        )
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1_000))
+        buffer.frameLength = 1_000
+        let samples = try XCTUnwrap(buffer.floatChannelData?[0])
+        for frame in 0..<500 {
+            samples[frame] = 0
+        }
+        for frame in 500..<1_000 {
+            samples[frame] = frame.isMultiple(of: 2) ? 0.1 : -0.1
+        }
+
+        let level = try XCTUnwrap(SpeechActiveLevelNormaliser.activeRMSDBFS(in: [buffer]))
+        let gain = SpeechActiveLevelNormaliser.gain(
+            activeRMSDBFS: level,
+            targetDBFS: -18,
+            maximumGainDB: 20 * log10(2)
+        )
+
+        XCTAssertEqual(level, -20, accuracy: 0.05)
+        XCTAssertEqual(20 * log10(gain), 2, accuracy: 0.05)
+    }
+
+    func testActiveSpeechNormaliserAttenuatesHotSpeechAndBoundsQuietSpeechGain() {
+        XCTAssertEqual(
+            20 * log10(SpeechActiveLevelNormaliser.gain(
+                activeRMSDBFS: -10,
+                targetDBFS: -18,
+                maximumGainDB: 6
+            )),
+            -6,
+            accuracy: 0.05
+        )
+        XCTAssertEqual(
+            20 * log10(SpeechActiveLevelNormaliser.gain(
+                activeRMSDBFS: -40,
+                targetDBFS: -18,
+                maximumGainDB: 6
+            )),
+            6,
+            accuracy: 0.05
+        )
+    }
+
 #if INTERNAL_AUDIO_CALIBRATION
+    func testProductionProcessingTargetsFixtureActiveSpeechLevelWithinLimiterTolerance() async throws {
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.shortFact)
+        let prepared = try await DefaultPremiumSpeechProcessor().prepare(
+            speechAudio: [fixture.rawSpeechAudio],
+            profile: .production
+        )
+        let activeLevel = try XCTUnwrap(
+            SpeechActiveLevelNormaliser.activeRMSDBFS(in: prepared.buffers)
+        )
+        let ceiling = pow(Float(10), SpeechProcessingProfile.production.samplePeakCeilingDBFS / 20)
+
+        XCTAssertEqual(activeLevel, -18, accuracy: 1.5)
+        XCTAssertLessThanOrEqual(prepared.resultingSamplePeak, ceiling + 0.000_1)
+    }
+
+    func testProductionProcessingKeepsCompatibleSpeechChunksInOneDSPContinuityBoundary() async throws {
+        let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.placeName)
+        let prepared = try await DefaultPremiumSpeechProcessor().prepare(
+            speechAudio: [fixture.rawSpeechAudio, fixture.rawSpeechAudio],
+            profile: .production
+        )
+
+        XCTAssertEqual(prepared.buffers.count, 1)
+        XCTAssertGreaterThan(prepared.buffers[0].frameLength, 0)
+    }
+
     func testCandidateOutputGainRaisesFixtureMeanLevelWithoutExceedingPeakCeiling() async throws {
         let fixture = try BundleSpeechCalibrationFixtureLoader(bundle: .main).load(.shortFact)
         let processor = DefaultPremiumSpeechProcessor()
@@ -565,7 +639,7 @@ final class LocationManagerTests: XCTestCase {
 
         XCTAssertEqual(store.load().map(\.profile), [model.candidateProfile])
         XCTAssertEqual(SpeechProcessingProfile.production.outputGainDB, 0)
-        XCTAssertEqual(SpeechProcessingProfile.production.compressionPreset, .off)
+        XCTAssertEqual(SpeechProcessingProfile.production.compressionPreset, .light)
     }
 
     @MainActor
@@ -898,13 +972,15 @@ final class LocationManagerTests: XCTestCase {
             profile: .production
         )
 
-        XCTAssertEqual(prepared.buffers.count, 2)
+        XCTAssertEqual(prepared.buffers.count, 1)
         XCTAssertGreaterThan(prepared.buffers[0].frameLength, 0)
-        XCTAssertGreaterThanOrEqual(prepared.gainDecibels, 0)
-        let firstPeak = try SpeechAudioPeakNormaliser.peak(in: prepared.buffers[0])
-        let secondPeak = try SpeechAudioPeakNormaliser.peak(in: prepared.buffers[1])
-        XCTAssertEqual(firstPeak, secondPeak, accuracy: 0.001)
-        XCTAssertLessThanOrEqual(firstPeak, SpeechAudioPeakNormaliser.targetPeak + 0.001)
+        XCTAssertGreaterThanOrEqual(prepared.gainDecibels, -6.001)
+        XCTAssertLessThanOrEqual(
+            prepared.gainDecibels,
+            SpeechProcessingProfile.production.automaticPeakNormalisationMaximumGainDB + 0.001
+        )
+        let utterancePeak = try SpeechAudioPeakNormaliser.peak(in: prepared.buffers[0])
+        XCTAssertLessThanOrEqual(utterancePeak, SpeechAudioPeakNormaliser.targetPeak + 0.001)
     }
 
     @MainActor

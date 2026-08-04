@@ -1,6 +1,6 @@
 # RideHorizon Project State
 
-Last verified: 2026-08-03
+Last verified: 2026-08-04
 
 ## Current commitment
 
@@ -8,7 +8,7 @@ Prepare a private external TestFlight beta for 3–5 named iPhone testers. This 
 
 ## Last verified result
 
-RideHorizon internal calibration candidate `0.12.3 (20260803.2345)` makes system output volume live, exposes wider 6 dB Candidate B choices, proves Strong compression changes rendered speech, and provides an explicit internal-only switch for using the current Candidate B profile during normal Premium Voice ride evaluation. Pressing Candidate B or saving it does not enable the switch. The override persists locally only in the Calibration build, is visible on the main screen and cannot be changed or disabled while a ride is active; the production profile remains unchanged. The Calibration target passed 189 physical-device tests and normal Debug passed 173. Representative and maximum offline renders remained at or below −2.1 dBFS true peak. The unsigned normal Release build succeeded and contains no calibration resources, UI labels, navigation entry or override persistence key. The previously Apple-validated `20260803.0032` archive remains superseded and must not be uploaded.
+RideHorizon `0.12.3 (20260804.0231)` implements the authorised phase-one Premium Voice baseline in the existing processor: per-announcement window-gated active-speech RMS adjustment, 90 Hz high-pass, +2 dB presence, Light compression and the existing headroom-preserving sample limiter. Compatible multi-file TTS chunks are joined before DSP so the announcement has continuous processing state. Focused synthetic, real bundled-fixture and multi-chunk tests passed, followed by the complete `RideHorizonCalibration` unit target on the iPhone 17 simulator. Signed Debug and unsigned Release generic-iPhone builds passed. A simulator crash report was traced to an obsolete test that indexed the now-merged second buffer; the corrected whole-utterance regression and full suite passed. The physical iPhone was not connected, so this build has not yet been installed or heard through the phone/headset.
 
 ## Delivery Risk Cube
 
@@ -18,7 +18,7 @@ RideHorizon internal calibration candidate `0.12.3 (20260803.2345)` makes system
 
 ## Current gate
 
-**VERIFY — Speech Calibration and road-evaluation gate.** Internal candidate `0.12.3 (20260803.2345)` must first be adjusted while stationary under Settings → Developer → Speech Calibration. If a Candidate B is worth road testing, explicitly enable **Use Candidate B for normal Premium Voice**, leave the lab and run the normal Premium Voice path with music. This is an internal runtime override, not production-profile promotion. Do not tune Google Maps, archive or upload until Rob accepts or rejects the candidate after the ride.
+**VERIFY — Premium Voice listening gate.** Install `0.12.3 (20260804.0231)` on the physical iPhone, then compare ordinary Premium Voice announcements with and without YouTube Music through the phone and helmet headset. Check intelligibility, distortion and music restoration. Do not tune Google Maps, archive or upload until this bounded baseline is heard on the target device.
 
 ## Residual risks
 
@@ -32,6 +32,6 @@ RideHorizon internal calibration candidate `0.12.3 (20260803.2345)` makes system
 
 ## Next outcomes
 
-1. Run the stationary Speech Calibration gate on `0.12.3 (20260803.2345)` through the phone output and helmet headset, with and without YouTube Music.
-2. If useful, explicitly enable the internal Candidate B normal-announcement override and evaluate it during a normal ride with music; then accept, revise or reject it.
+1. Connect and unlock the physical iPhone, install `0.12.3 (20260804.0231)`, and run the stationary Premium Voice check through the phone output and helmet headset, with and without YouTube Music.
+2. Accept, revise or reject the phase-one baseline from intelligibility, distortion and restoration evidence; use the internal Calibration build only if a bounded comparison is still needed.
 3. Install the exact TestFlight binary and complete the road, background, inactivity, audio, network and power evidence before external review submission.
