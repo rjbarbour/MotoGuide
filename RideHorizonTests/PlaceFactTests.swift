@@ -444,8 +444,8 @@ final class ProxyFactGeneratorTests: XCTestCase {
         XCTAssertEqual(fact, "Great spot for a ride.")
     }
 
-    func testDefaultEndpointUsesProductionFlyProxyFromContract() async throws {
-        let expectedEndpoint = URL(string: "https://motoguide-fact-proxy.fly.dev/v1/fact")!
+    func testDefaultEndpointUsesStableRideHorizonEdgeFromContract() async throws {
+        let expectedEndpoint = URL(string: "https://ridehorizon.digitalmercenaries.ai/v1/fact")!
 
         MockURLProtocol.requestHandler = { urlRequest in
             XCTAssertEqual(urlRequest.url, expectedEndpoint)
@@ -639,7 +639,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
     }
 
     func testProxySpeechGeneratorUsesProductionSpeechEndpointByDefault() async throws {
-        let expectedEndpoint = URL(string: "https://motoguide-fact-proxy.fly.dev/v1/speech")!
+        let expectedEndpoint = URL(string: "https://ridehorizon.digitalmercenaries.ai/v1/speech")!
 
         MockURLProtocol.requestHandler = { urlRequest in
             XCTAssertEqual(urlRequest.url, expectedEndpoint)
