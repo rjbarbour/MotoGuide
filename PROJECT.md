@@ -8,17 +8,17 @@ Prepare a private external TestFlight beta for 3–5 named iPhone testers. This 
 
 ## Last verified result
 
-RideHorizon `0.12.4 (20260804.0246)` implements the authorised phase-one Premium Voice baseline in the existing processor: per-announcement window-gated active-speech RMS adjustment, 90 Hz high-pass, +2 dB presence, Light compression and the existing headroom-preserving sample limiter. Compatible multi-file TTS chunks are joined before DSP so the announcement has continuous processing state. Focused synthetic, real bundled-fixture and multi-chunk tests passed, followed by the complete `RideHorizonCalibration` unit target on the iPhone 17 simulator. Signed Debug and unsigned Release generic-iPhone builds passed. A simulator crash report was traced to an obsolete test that indexed the now-merged second buffer; the corrected whole-utterance regression and full suite passed. The signed `0.12.4` Debug build then built, installed and launched on the physical iPhone. Listening evidence for this exact post-tweak build remains outstanding.
+RideHorizon `0.12.4 (20260804.0246)` is the current private-TestFlight release candidate. All 177 iOS tests passed on the physical iPhone, the fact-proxy suite passed, and the live Fly health, automatic-session, fact and Premium Voice paths returned HTTP 200. The exact Release archive passed Apple Distribution signing, server-side validation, strict IPA signature and entitlement checks, privacy-manifest validation and binary/dSYM UUID matching. It is iPhone-only, contains no test or calibration artefacts, is installed and launches on the target iPhone, and Apple accepted its upload for processing. App Store Connect processing and exact-Internal-TestFlight human evidence remain outstanding.
 
 ## Delivery Risk Cube
 
 - **Functional breadth:** Sufficient for the private beta: onboarding, location awareness, Test Mode, names, facts, Apple Voice, Premium Voice and Quiet Mode.
-- **Implementation fidelity:** Live services, clean-install compact-iPhone portrait and landscape evidence, installation/launch of the current signed development candidate, and an exact current Release archive exist. The archive has passed cloud-managed Apple Distribution signing, strict local verification and Apple server-side validation. Build upload, App Store Connect processing, TestFlight installation and the manual ride smoke test remain unproved.
+- **Implementation fidelity:** Live services, clean-install compact-iPhone portrait and landscape evidence, installation/launch of the current signed development candidate, and an exact uploaded Release archive exist. The archive has passed cloud-managed Apple Distribution signing, strict local verification, Apple server-side validation and upload. App Store Connect processing, TestFlight installation and the manual ride smoke test remain unproved.
 - **Production-quality depth:** Privacy policy, consent, no pre-consent proxy access, explicit in-app rider-safety wording, minimal background modes, iPhone-only packaging, bounded ride/audio lifecycles, provider fallback and green automated checks are in place. Stationary music interruption/restoration, Bluetooth, background-end and real-world battery evidence still define the release gate.
 
 ## Current gate
 
-**VERIFY — Premium Voice listening gate.** Using the installed `0.12.4 (20260804.0246)` build, compare ordinary Premium Voice announcements with and without YouTube Music through the phone and helmet headset. Check intelligibility, distortion and music restoration. Do not tune Google Maps, archive or upload until this bounded baseline is heard on the target device.
+**VERIFY — App Store Connect processing and exact-build evidence.** Confirm that Apple finishes processing `0.12.4 (20260804.0246)`, add it to the internal group, install that exact TestFlight binary, then run the mandatory stationary and field checks. Do not invite external testers until the release gate is satisfied.
 
 ## Residual risks
 
@@ -32,6 +32,6 @@ RideHorizon `0.12.4 (20260804.0246)` implements the authorised phase-one Premium
 
 ## Next outcomes
 
-1. Run the stationary Premium Voice check on the installed `0.12.4 (20260804.0246)` build through the phone output and helmet headset, with and without YouTube Music.
-2. Accept, revise or reject the phase-one baseline from intelligibility, distortion and restoration evidence; use the internal Calibration build only if a bounded comparison is still needed.
-3. Install the exact TestFlight binary and complete the road, background, inactivity, audio, network and power evidence before external review submission.
+1. Confirm that App Store Connect reports build `0.12.4 (20260804.0246)` as processed successfully.
+2. Add the build to the internal group and install the exact TestFlight binary.
+3. Complete the stationary, road, background, inactivity, audio, network and power evidence before external review submission.

@@ -1,8 +1,8 @@
 # RideHorizon TestFlight Field-Test Evidence
 
-Date: 2026-08-03
+Date: 2026-08-04
 
-Status: **Audio Increment 1 build `20260803.2218` is installed and waiting at the YouTube Music validation gate. Do not tune Google Maps, upload or invite external testers until the stationary safety checks pass.**
+Status: **Release candidate `0.12.4 (20260804.0246)` has uploaded successfully and is processing in App Store Connect. Do not invite external testers until the exact Internal TestFlight binary passes the mandatory stationary and field evidence gate.**
 
 This is the operational evidence record for stationary, road and background testing. `Backlog.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
 
@@ -61,6 +61,19 @@ Shareable diagnostics must not contain precise location, API credentials, genera
 Candidate `0.12.3 (20260803.0032)` provides this Release-build ring buffer, capped at 2,000 events, seven days or 1 MiB, whichever limit is reached first. It uses `FileProtectionType.completeUntilFirstUserAuthentication`, is excluded from device backups, coalesces persistence away from the main actor, and provides view, export and clear actions under Advanced with stationary-use copy. The schema is typed and cannot accept coordinates, spoken text, credentials or external audio content.
 
 ## Automated and service evidence
+
+### Current release candidate — 2026-08-04
+
+- Release candidate: `0.12.4 (20260804.0246)`; bundle identifier `ai.digitalmercenaries.ridehorizon`; iPhone-only; arm64.
+- All 177 `RideHorizonTests` passed on `Robert’s iPhone 17`, iPhone 17 Pro Max, iOS 26.5.2.
+- The signed development build with the same version and build number installed and launched on the target iPhone.
+- The proxy Gradle suite passed. Live Fly checks returned HTTP 200 for health, automatic restricted session, fact and Premium Voice; speech returned valid `audio/mpeg` data.
+- Exact Release archive: `build/TestFlight/RideHorizon-0.12.4-20260804.0246.xcarchive`.
+- The distribution IPA passed strict signature verification, has `beta-reports-active=true` and `get-task-allow=false`, contains a valid `PrivacyInfo.xcprivacy`, contains no test or calibration artefacts, and has matching binary/dSYM UUID `2F154D31-0285-319A-956C-0FDE75B5D775`.
+- Xcode completed Apple server-side validation and reported `Upload succeeded` and `Uploaded package is processing.` on 2026-08-04.
+- App Store Connect processing status and installation of the exact TestFlight binary remain to be verified.
+
+### Superseded evidence
 
 - Physical device: `Robert’s iPhone 17`, iPhone 17 Pro Max, iOS 26.5.2.
 - `RideHorizonTests`: 144 passed, zero failed, zero skipped on 2026-08-03.

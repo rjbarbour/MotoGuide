@@ -172,6 +172,13 @@ If any condition fails, mark Coarse Location and Other User Content as linked.
 - The public privacy and health routes, automatic restricted session, fact and speech routes pass production checks; ElevenLabs returns valid MPEG audio.
 - Xcode's generated privacy report, exact physical-iPhone installation, background/Bluetooth ride smoke and App Store Connect upload/processing remain open.
 
+### Final archive update — 2026-08-04
+
+- Release candidate `0.12.4 (20260804.0246)` passed all 177 iOS tests on the physical iPhone. Automated consent coverage proves that declining optional AI sharing makes no fact-provider request and forces Apple Voice; proxy session provisioning remains lazy and occurs only when a consented proxy-backed feature first needs it.
+- The exact iPhone-only Release archive contains a valid root `PrivacyInfo.xcprivacy`. Its declared collected data types match the conservative App Store Connect table above: Coarse Location, Other User Content, Device ID, Product Interaction, Other Diagnostic Data and Other Data; tracking is disabled, and `UserDefaults` uses reason `CA92.1`.
+- The distribution IPA passes strict signature and entitlement checks with `get-task-allow=false` and contains no test or calibration artefacts. Xcode completed Apple server-side validation and accepted the upload for processing.
+- App Store Connect processing, publication of the exact matching App Privacy answers, installation of the exact TestFlight binary, and background/Bluetooth ride evidence remain open operator gates.
+
 ### P2 — Submission preparation
 
 1. Generate Xcode's privacy report from the final archive and reconcile it with this audit and App Store Connect.
