@@ -176,8 +176,8 @@ If any condition fails, mark Coarse Location and Other User Content as linked.
 
 - Release candidate `0.12.4 (20260804.0246)` passed all 177 iOS tests on the physical iPhone. Automated consent coverage proves that declining optional AI sharing makes no fact-provider request and forces Apple Voice; proxy session provisioning remains lazy and occurs only when a consented proxy-backed feature first needs it.
 - The exact iPhone-only Release archive contains a valid root `PrivacyInfo.xcprivacy`. Its declared collected data types match the conservative App Store Connect table above: Coarse Location, Other User Content, Device ID, Product Interaction, Other Diagnostic Data and Other Data; tracking is disabled, and `UserDefaults` uses reason `CA92.1`.
-- The distribution IPA passes strict signature and entitlement checks with `get-task-allow=false` and contains no test or calibration artefacts. Xcode completed Apple server-side validation and accepted the upload for processing.
-- App Store Connect processing, publication of the exact matching App Privacy answers, installation of the exact TestFlight binary, and background/Bluetooth ride evidence remain open operator gates.
+- The distribution IPA passes strict signature and entitlement checks with `get-task-allow=false` and contains no test or calibration artefacts. Xcode completed Apple server-side validation; App Store Connect reports the upload **Complete** and the build **Ready to Submit**.
+- Publication of the exact matching App Privacy answers, installation of the exact TestFlight binary, and background/Bluetooth ride evidence remain open operator gates.
 
 ### P2 — Submission preparation
 

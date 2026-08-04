@@ -2,7 +2,7 @@
 
 Date: 2026-08-04
 
-Status: Release candidate `0.12.4 (20260804.0246)` passed 177/177 iOS tests on the physical iPhone, the proxy suite, and live automatic-session, fact and Premium Voice checks. Its exact iPhone-only Release archive passed cloud-managed Apple Distribution signing, Apple server-side validation, strict IPA signature and entitlement checks, privacy-manifest validation and binary/dSYM UUID matching. Apple accepted the upload on 2026-08-04 and reports that the package is processing. Earlier candidates must not be assigned to testers. External invitations remain blocked until processing succeeds and the exact Internal TestFlight binary passes the mandatory evidence gate.
+Status: Release candidate `0.12.4 (20260804.0246)` passed 177/177 iOS tests on the physical iPhone, the proxy suite, and live automatic-session, fact and Premium Voice checks. Its exact iPhone-only Release archive passed cloud-managed Apple Distribution signing, Apple server-side validation, strict IPA signature and entitlement checks, privacy-manifest validation and binary/dSYM UUID matching. App Store Connect reports the upload **Complete** and the build **Ready to Submit**. Earlier candidates must not be assigned to testers. External invitations remain blocked until the exact Internal TestFlight binary passes the mandatory evidence gate.
 
 ## Release Decisions — 2026-07-31
 
