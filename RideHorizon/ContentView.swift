@@ -46,7 +46,12 @@ enum LocationSummaryFormatter {
     static func summaryLines(for address: Address?) -> [String] {
         guard let address else { return [] }
         let firstRow = dedupe([valid(address.street), valid(address.town)]).joined(separator: ", ")
-        let secondRow = dedupe([valid(address.county), valid(address.administrativeArea), valid(address.country)]).joined(separator: " · ")
+        let secondRow = dedupe([
+            valid(address.locality),
+            valid(address.county),
+            valid(address.administrativeArea),
+            valid(address.country)
+        ]).joined(separator: " · ")
 
         return [
             firstRow.isEmpty ? nil : firstRow,
@@ -69,6 +74,7 @@ enum LocationSummaryFormatter {
         guard let address else { return nil }
         let components = [
             valid(address.town),
+            valid(address.locality),
             valid(address.county),
             valid(address.administrativeArea),
             valid(address.country)
@@ -86,27 +92,47 @@ enum LocationSummaryFormatter {
 
     static func hierarchyRows(for address: Address?) -> [LocationHierarchyRow] {
         let values: [(id: String, label: String, value: String?)] = [
-            ("street", "Street", address.flatMap { valid($0.street) }),
-            ("town", "Town", address.flatMap { valid($0.town) }),
-            ("county", "County", address.flatMap { valid($0.county) }),
+            ("name", "Name", address.flatMap { valid($0.name) }),
+            ("houseNumber", "House number", address.flatMap { valid($0.houseNumber) }),
+            ("street", "Road", address.flatMap { valid($0.street) }),
+            ("subLocality", "Sub-locality", address.flatMap { valid($0.subLocality) }),
+            ("locality", "Locality", address.flatMap { valid($0.locality) }),
+            ("town", "Current place", address.flatMap { valid($0.town) }),
+            ("county", "District / county", address.flatMap { valid($0.county) }),
             ("region", "Region", address.flatMap { valid($0.administrativeArea) }),
-            ("country", "Country", address.flatMap { valid($0.country) })
+            ("postcode", "Postcode", address.flatMap { valid($0.postalCode) }),
+            ("countryCode", "Country code", address.flatMap { valid($0.isoCountryCode) }),
+            ("country", "Country", address.flatMap { valid($0.country) }),
+            ("inlandWater", "Inland water", address.flatMap { valid($0.inlandWater) }),
+            ("ocean", "Ocean", address.flatMap { valid($0.ocean) }),
+            ("areasOfInterest", "Areas of interest", address.flatMap { areasOfInterestText($0.areasOfInterest) }),
+            ("timeZone", "Timezone", address.flatMap { valid($0.timeZoneIdentifier) }),
+            ("appleRegion", "Apple region", address.flatMap { valid($0.regionIdentifier) })
         ]
-        let currentID = values.first { $0.value != nil }?.id
+        let availableValues = values.compactMap { item -> (id: String, label: String, value: String)? in
+            guard let value = item.value else { return nil }
+            return (item.id, item.label, value)
+        }
+        let currentID = availableValues.first?.id
 
-        return values.map { item in
+        return availableValues.map { item in
             LocationHierarchyRow(
                 id: item.id,
                 label: item.label,
-                value: item.value ?? "Unavailable",
+                value: item.value,
                 isCurrent: item.id == currentID,
-                isAvailable: item.value != nil
+                isAvailable: true
             )
         }
     }
 
     private static func valid(_ value: String) -> String? {
         Address.isValidPlaceName(value) ? value : nil
+    }
+
+    private static func areasOfInterestText(_ values: [String]) -> String? {
+        let validValues = values.compactMap(valid)
+        return validValues.isEmpty ? nil : dedupe(validValues.map(Optional.some)).joined(separator: " · ")
     }
 
     private static func dedupe(_ values: [String?]) -> [String] {
@@ -510,6 +536,8 @@ private struct LocationScreenView: View {
         VStack(alignment: .leading, spacing: 10) {
             statusPanel
 
+            applePlaceDataPanel
+
             VStack(alignment: .leading, spacing: 6) {
                 Text("Last spoken phrase")
                     .font(.system(size: scaledFont(15), weight: .bold))
@@ -544,6 +572,35 @@ private struct LocationScreenView: View {
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private var applePlaceDataPanel: some View {
+        let rows = LocationSummaryFormatter.hierarchyRows(for: locationManager.lastKnownAddress)
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Apple place data")
+                    .font(.system(size: scaledFont(15), weight: .bold))
+                    .foregroundStyle(panelStyle.secondaryText)
+                    .textCase(.uppercase)
+
+                ForEach(rows) { row in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(row.label)
+                            .font(.system(size: scaledFont(15), weight: .semibold))
+                            .foregroundStyle(panelStyle.secondaryText)
+                            .frame(width: 120, alignment: .leading)
+                        Text(row.value)
+                            .font(.system(size: scaledFont(16), weight: .medium))
+                            .foregroundStyle(panelStyle.primaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
     }
 
     @ViewBuilder
