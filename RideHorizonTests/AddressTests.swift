@@ -87,4 +87,44 @@ final class AddressTests: XCTestCase {
         XCTAssertTrue(json?.contains("Stroud") == true)
         XCTAssertTrue(json?.contains("Gloucestershire") == true)
     }
+
+    func testSubLocalityIsPreferredAsTheCurrentPlaceLabel() {
+        XCTAssertEqual(
+            Address.currentPlaceLabel(subLocality: "Surbiton", locality: "Kingston upon Thames"),
+            "Surbiton"
+        )
+        XCTAssertEqual(
+            Address.currentPlaceLabel(subLocality: nil, locality: "Weybridge"),
+            "Weybridge"
+        )
+    }
+
+    func testRetainsApplePlaceMetadata() {
+        let address = Address(
+            street: "Brighton Road",
+            town: "Surbiton",
+            county: "Greater London",
+            administrativeArea: "England",
+            country: "United Kingdom",
+            name: "Claremont Gardens",
+            houseNumber: "12",
+            subLocality: "Surbiton",
+            locality: "Kingston upon Thames",
+            postalCode: "KT6 5PL",
+            isoCountryCode: "GB",
+            inlandWater: "River Thames",
+            ocean: "N/A",
+            areasOfInterest: ["Claremont Gardens", "Surbiton Hill"],
+            timeZoneIdentifier: "Europe/London",
+            regionIdentifier: "Surbiton"
+        )
+
+        XCTAssertEqual(address.subLocality, "Surbiton")
+        XCTAssertEqual(address.locality, "Kingston upon Thames")
+        XCTAssertEqual(address.postalCode, "KT6 5PL")
+        XCTAssertEqual(address.areasOfInterest, ["Claremont Gardens", "Surbiton Hill"])
+        XCTAssertEqual(address.regionIdentifier, "Surbiton")
+        XCTAssertTrue(address.toJSON()?.contains("subLocality") == true)
+        XCTAssertTrue(address.toJSON()?.contains("areasOfInterest") == true)
+    }
 }

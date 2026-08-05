@@ -2437,7 +2437,18 @@ final class LocationManagerTests: XCTestCase {
             town: "Nailsworth",
             county: "Gloucestershire",
             administrativeArea: "England",
-            country: "United Kingdom"
+            country: "United Kingdom",
+            name: "Nailsworth Clock Tower",
+            houseNumber: "1",
+            subLocality: "Nailsworth",
+            locality: "Stroud",
+            postalCode: "GL6 0JL",
+            isoCountryCode: "GB",
+            inlandWater: "N/A",
+            ocean: "N/A",
+            areasOfInterest: ["Cotswolds"],
+            timeZoneIdentifier: "Europe/London",
+            regionIdentifier: "Nailsworth"
         )
 
         XCTAssertEqual(
@@ -2446,8 +2457,14 @@ final class LocationManagerTests: XCTestCase {
         )
 
         let rows = LocationSummaryFormatter.hierarchyRows(for: address)
-        XCTAssertEqual(rows.map(\.label), ["Street", "Town", "County", "Region", "Country"])
-        XCTAssertEqual(rows.map(\.value), ["B4066", "Nailsworth", "Gloucestershire", "England", "United Kingdom"])
+        XCTAssertEqual(
+            rows.map(\.label),
+            ["Name", "House number", "Road", "Sub-locality", "Locality", "Current place", "District / county", "Region", "Postcode", "Country code", "Country", "Areas of interest", "Timezone", "Apple region"]
+        )
+        XCTAssertEqual(
+            rows.map(\.value),
+            ["Nailsworth Clock Tower", "1", "B4066", "Nailsworth", "Stroud", "Nailsworth", "Gloucestershire", "England", "GL6 0JL", "GB", "United Kingdom", "Cotswolds", "Europe/London", "Nailsworth"]
+        )
         XCTAssertEqual(rows.first?.isCurrent, true)
     }
 
