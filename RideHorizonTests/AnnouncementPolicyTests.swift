@@ -48,6 +48,36 @@ final class AnnouncementPolicyTests: XCTestCase {
         XCTAssertEqual(plan?.boundary, .town)
     }
 
+    func testSubLocalityChangeUsesTheExistingTownAnnouncement() {
+        let kingston = Address(
+            street: "Brighton Road",
+            town: "Kingston upon Thames",
+            county: "Greater London",
+            administrativeArea: "England",
+            country: "United Kingdom",
+            locality: "Kingston upon Thames"
+        )
+        let surbiton = Address(
+            street: "Brighton Road",
+            town: "Surbiton",
+            county: "Greater London",
+            administrativeArea: "England",
+            country: "United Kingdom",
+            subLocality: "Surbiton",
+            locality: "Kingston upon Thames"
+        )
+
+        let plan = AnnouncementPolicy.plan(
+            previous: kingston,
+            current: surbiton,
+            settings: ridingSettings,
+            mode: .natural
+        )
+
+        XCTAssertEqual(plan?.boundary, .town)
+        XCTAssertEqual(plan?.text, "You are in Surbiton, Greater London")
+    }
+
     func testCountyChangeUsesWelcomePhrase() {
         let sameTownNewCounty = Address(
             street: "High Street",

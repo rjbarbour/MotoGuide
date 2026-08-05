@@ -47,7 +47,7 @@ enum LocationSummaryFormatter {
         guard let address else { return [] }
         let firstRow = dedupe([valid(address.street), valid(address.town)]).joined(separator: ", ")
         let secondRow = dedupe([
-            valid(address.locality),
+            enclosingLocality(for: address),
             valid(address.county),
             valid(address.administrativeArea),
             valid(address.country)
@@ -74,7 +74,7 @@ enum LocationSummaryFormatter {
         guard let address else { return nil }
         let components = [
             valid(address.town),
-            valid(address.locality),
+            enclosingLocality(for: address),
             valid(address.county),
             valid(address.administrativeArea),
             valid(address.country)
@@ -135,15 +135,24 @@ enum LocationSummaryFormatter {
         return validValues.isEmpty ? nil : dedupe(validValues.map(Optional.some)).joined(separator: " · ")
     }
 
+    private static func enclosingLocality(for address: Address) -> String? {
+        guard let locality = valid(address.locality) else { return nil }
+        guard let currentPlace = valid(address.town) else { return locality }
+        return normalized(locality) == normalized(currentPlace) ? nil : locality
+    }
+
     private static func dedupe(_ values: [String?]) -> [String] {
         var valuesSeen: [String] = []
         for value in values.compactMap({ $0 }) {
-            let normalized = value.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            if !valuesSeen.contains(where: { $0.lowercased() == normalized }) {
+            if !valuesSeen.contains(where: { normalized($0) == normalized(value) }) {
                 valuesSeen.append(value)
             }
         }
         return valuesSeen
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

@@ -2,6 +2,78 @@ import Foundation
 import CoreLocation
 
 struct Address: Equatable {
+    struct PlacemarkFields: Equatable {
+        let name: String?
+        let thoroughfare: String?
+        let subThoroughfare: String?
+        let subLocality: String?
+        let locality: String?
+        let subAdministrativeArea: String?
+        let administrativeArea: String?
+        let postalCode: String?
+        let isoCountryCode: String?
+        let country: String?
+        let inlandWater: String?
+        let ocean: String?
+        let areasOfInterest: [String]
+        let timeZoneIdentifier: String?
+        let regionIdentifier: String?
+
+        init(placemark: CLPlacemark) {
+            self.init(
+                name: placemark.name,
+                thoroughfare: placemark.thoroughfare,
+                subThoroughfare: placemark.subThoroughfare,
+                subLocality: placemark.subLocality,
+                locality: placemark.locality,
+                subAdministrativeArea: placemark.subAdministrativeArea,
+                administrativeArea: placemark.administrativeArea,
+                postalCode: placemark.postalCode,
+                isoCountryCode: placemark.isoCountryCode,
+                country: placemark.country,
+                inlandWater: placemark.inlandWater,
+                ocean: placemark.ocean,
+                areasOfInterest: placemark.areasOfInterest ?? [],
+                timeZoneIdentifier: placemark.timeZone?.identifier,
+                regionIdentifier: placemark.region?.identifier
+            )
+        }
+
+        init(
+            name: String? = nil,
+            thoroughfare: String? = nil,
+            subThoroughfare: String? = nil,
+            subLocality: String? = nil,
+            locality: String? = nil,
+            subAdministrativeArea: String? = nil,
+            administrativeArea: String? = nil,
+            postalCode: String? = nil,
+            isoCountryCode: String? = nil,
+            country: String? = nil,
+            inlandWater: String? = nil,
+            ocean: String? = nil,
+            areasOfInterest: [String] = [],
+            timeZoneIdentifier: String? = nil,
+            regionIdentifier: String? = nil
+        ) {
+            self.name = name
+            self.thoroughfare = thoroughfare
+            self.subThoroughfare = subThoroughfare
+            self.subLocality = subLocality
+            self.locality = locality
+            self.subAdministrativeArea = subAdministrativeArea
+            self.administrativeArea = administrativeArea
+            self.postalCode = postalCode
+            self.isoCountryCode = isoCountryCode
+            self.country = country
+            self.inlandWater = inlandWater
+            self.ocean = ocean
+            self.areasOfInterest = areasOfInterest
+            self.timeZoneIdentifier = timeZoneIdentifier
+            self.regionIdentifier = regionIdentifier
+        }
+    }
+
     let street: String
     let town: String
     let county: String
@@ -56,25 +128,29 @@ struct Address: Equatable {
     }
 
     init(placemark: CLPlacemark) {
-        let subLocality = Self.placemarkValue(placemark.subLocality)
-        let locality = Self.placemarkValue(placemark.locality)
+        self.init(placemarkFields: PlacemarkFields(placemark: placemark))
+    }
+
+    init(placemarkFields: PlacemarkFields) {
+        let subLocality = Self.placemarkValue(placemarkFields.subLocality)
+        let locality = Self.placemarkValue(placemarkFields.locality)
         self.init(
-            street: Self.placemarkValue(placemark.thoroughfare),
+            street: Self.placemarkValue(placemarkFields.thoroughfare),
             town: Self.currentPlaceLabel(subLocality: subLocality, locality: locality),
-            county: Self.placemarkValue(placemark.subAdministrativeArea),
-            administrativeArea: Self.placemarkValue(placemark.administrativeArea),
-            country: Self.placemarkValue(placemark.country),
-            name: Self.placemarkValue(placemark.name),
-            houseNumber: Self.placemarkValue(placemark.subThoroughfare),
+            county: Self.placemarkValue(placemarkFields.subAdministrativeArea),
+            administrativeArea: Self.placemarkValue(placemarkFields.administrativeArea),
+            country: Self.placemarkValue(placemarkFields.country),
+            name: Self.placemarkValue(placemarkFields.name),
+            houseNumber: Self.placemarkValue(placemarkFields.subThoroughfare),
             subLocality: subLocality,
             locality: locality,
-            postalCode: Self.placemarkValue(placemark.postalCode),
-            isoCountryCode: Self.placemarkValue(placemark.isoCountryCode),
-            inlandWater: Self.placemarkValue(placemark.inlandWater),
-            ocean: Self.placemarkValue(placemark.ocean),
-            areasOfInterest: (placemark.areasOfInterest ?? []).filter(Self.isValidPlaceName),
-            timeZoneIdentifier: Self.placemarkValue(placemark.timeZone?.identifier),
-            regionIdentifier: Self.placemarkValue(placemark.region?.identifier)
+            postalCode: Self.placemarkValue(placemarkFields.postalCode),
+            isoCountryCode: Self.placemarkValue(placemarkFields.isoCountryCode),
+            inlandWater: Self.placemarkValue(placemarkFields.inlandWater),
+            ocean: Self.placemarkValue(placemarkFields.ocean),
+            areasOfInterest: placemarkFields.areasOfInterest.filter(Self.isValidPlaceName),
+            timeZoneIdentifier: Self.placemarkValue(placemarkFields.timeZoneIdentifier),
+            regionIdentifier: Self.placemarkValue(placemarkFields.regionIdentifier)
         )
     }
 
