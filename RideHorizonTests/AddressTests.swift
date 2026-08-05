@@ -112,6 +112,7 @@ final class AddressTests: XCTestCase {
             isoCountryCode: "GB",
             country: "United Kingdom",
             inlandWater: "River Thames",
+            ocean: "Atlantic Ocean",
             areasOfInterest: ["Claremont Gardens"],
             timeZoneIdentifier: "Europe/London",
             regionIdentifier: "Surbiton"
@@ -125,8 +126,15 @@ final class AddressTests: XCTestCase {
         XCTAssertEqual(address.locality, "Kingston upon Thames")
         XCTAssertEqual(address.town, "Surbiton")
         XCTAssertEqual(address.county, "Greater London")
+        XCTAssertEqual(address.administrativeArea, "England")
         XCTAssertEqual(address.postalCode, "KT6 5PL")
         XCTAssertEqual(address.isoCountryCode, "GB")
+        XCTAssertEqual(address.country, "United Kingdom")
+        XCTAssertEqual(address.inlandWater, "River Thames")
+        XCTAssertEqual(address.ocean, "Atlantic Ocean")
+        XCTAssertEqual(address.areasOfInterest, ["Claremont Gardens"])
+        XCTAssertEqual(address.timeZoneIdentifier, "Europe/London")
+        XCTAssertEqual(address.regionIdentifier, "Surbiton")
     }
 
     func testSummaryKeepsAnOrdinaryLocalityOnOneLine() {
