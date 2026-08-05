@@ -99,6 +99,65 @@ final class AddressTests: XCTestCase {
         )
     }
 
+    func testPlacemarkFieldMappingRetainsSubLocalityAndEnclosingLocality() {
+        let placemarkFields = Address.PlacemarkFields(
+            name: "Claremont Gardens",
+            thoroughfare: "Brighton Road",
+            subThoroughfare: "12",
+            subLocality: "Surbiton",
+            locality: "Kingston upon Thames",
+            subAdministrativeArea: "Greater London",
+            administrativeArea: "England",
+            postalCode: "KT6 5PL",
+            isoCountryCode: "GB",
+            country: "United Kingdom",
+            inlandWater: "River Thames",
+            areasOfInterest: ["Claremont Gardens"],
+            timeZoneIdentifier: "Europe/London",
+            regionIdentifier: "Surbiton"
+        )
+        let address = Address(placemarkFields: placemarkFields)
+
+        XCTAssertEqual(address.name, "Claremont Gardens")
+        XCTAssertEqual(address.houseNumber, "12")
+        XCTAssertEqual(address.street, "Brighton Road")
+        XCTAssertEqual(address.subLocality, "Surbiton")
+        XCTAssertEqual(address.locality, "Kingston upon Thames")
+        XCTAssertEqual(address.town, "Surbiton")
+        XCTAssertEqual(address.county, "Greater London")
+        XCTAssertEqual(address.postalCode, "KT6 5PL")
+        XCTAssertEqual(address.isoCountryCode, "GB")
+    }
+
+    func testSummaryKeepsAnOrdinaryLocalityOnOneLine() {
+        let ordinaryAddress = Address(
+            street: "High Street",
+            town: "Weybridge",
+            county: "Elmbridge",
+            administrativeArea: "England",
+            country: "United Kingdom",
+            locality: "Weybridge"
+        )
+        let subLocalityAddress = Address(
+            street: "Brighton Road",
+            town: "Surbiton",
+            county: "Greater London",
+            administrativeArea: "England",
+            country: "United Kingdom",
+            subLocality: "Surbiton",
+            locality: "Kingston upon Thames"
+        )
+
+        XCTAssertEqual(
+            LocationSummaryFormatter.summaryLines(for: ordinaryAddress),
+            ["High Street, Weybridge", "Elmbridge · England · United Kingdom"]
+        )
+        XCTAssertEqual(
+            LocationSummaryFormatter.summaryLines(for: subLocalityAddress),
+            ["Brighton Road, Surbiton", "Kingston upon Thames · Greater London · England · United Kingdom"]
+        )
+    }
+
     func testRetainsApplePlaceMetadata() {
         let address = Address(
             street: "Brighton Road",
