@@ -6,7 +6,7 @@ This directory contains durable supporting documentation for the private RideHor
 
 1. Read `../AGENTS.md` for mandatory project rules.
 2. Read `../PROJECT.md` for the last verified state and current gate.
-3. Read `../Backlog.md` for active work and its evidence contract.
+3. Read `../ITEM-BACKLOG.md` for active work and its evidence contract.
 4. Use the areas below for the decision, plan, research or operational record relevant to that work.
 
 ## Areas
@@ -29,7 +29,7 @@ This directory contains durable supporting documentation for the private RideHor
 
 ## Placement rules
 
-- Keep current project control at the repository root: `AGENTS.md`, `PROJECT.md`, `Backlog.md` and `MILESTONES.md`.
+- Keep current project control at the repository root: `AGENTS.md`, `PROJECT.md`, `ITEM-BACKLOG.md` and `MILESTONES.md`.
 - Keep component instructions next to the component: for example, `fact-proxy/README.md` and `privacy-site/README.md`.
 - Use ISO-8601 dates in names for time-bound research, evidence, audits and status records.
 - Update an existing authoritative document rather than creating a parallel plan or status file.

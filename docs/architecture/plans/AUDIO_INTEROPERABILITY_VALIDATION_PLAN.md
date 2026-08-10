@@ -8,7 +8,7 @@ Status: **Candidate `0.12.3 (20260803.2218)` is installed at the physical YouTub
 
 This document is the requirements and validation plan for RideHorizon coexistence with audio from other iOS apps.
 
-- `Backlog.md` remains the authority for delivery status and gates.
+- `ITEM-BACKLOG.md` remains the authority for delivery status and gates.
 - `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md` remains the authority for test runs and results.
 - This document owns the audio-interoperability requirements, platform assumptions, diagnostic contract and staged test design.
 - `docs/architecture/specs/SPEECH_INTELLIGIBILITY_CALIBRATION_SPEC.md` owns the bounded intelligibility probe: audit the existing peak-normalisation delta, use three immutable Premium Voice fixtures, keep the calibration lab internal-only and stop for human profile selection before changing the production default.

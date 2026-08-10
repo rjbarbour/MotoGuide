@@ -4,7 +4,7 @@ Date: 2026-08-04
 
 Status: **App Store Connect reports release candidate `0.12.4 (20260804.0246)` Complete and Ready to Submit. Do not invite external testers until the exact Internal TestFlight binary passes the mandatory stationary and field evidence gate.**
 
-This is the operational evidence record for stationary, road and background testing. `Backlog.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
+This is the operational evidence record for stationary, road and background testing. `ITEM-BACKLOG.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
 
 `docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md` is the requirements and staged test-design authority for coexistence with YouTube Music, Google Maps and later audio apps. Record run results here; do not duplicate delivery status in that plan.
 
