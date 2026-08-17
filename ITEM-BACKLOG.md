@@ -4,19 +4,43 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 
 ## Active repository maintenance
 
+### RH-045 — Classify and preserve mixed local work
+
+- **Type:** Repository hygiene recovery.
+- **Claimed by:** Codex on branch `codex/rh-045-repository-hygiene`.
+- **Outcome:** Every material modified or untracked path in the existing `feat/sub-locality-geodata` checkout has a named task boundary, a recovery path and an explicit disposition, without changing app, release or product behaviour.
+- **Scope:** Inventory the dirty checkout and current worktrees; classify paths as active, paused, review-ready, local-only, evidence or uncertain; create preservation checkpoints only for clearly coherent non-secret work; and retain intentional worktrees/branches with documented purpose.
+- **Exclusions:** Do not merge PR 8 or PR 9; change app, tests, Xcode, proxy, TestFlight or product behaviour; read, commit, move or expose the uninspected local TestFlight configuration; redesign credentials; or delete any unproved-redundant state.
+- **Risk:** Medium. The checkout contains mixed release, product, tooling and potentially secret-bearing local configuration work; an incorrect split could lose provenance or publish unsuitable material.
+- **Decision impact:** No durable product decision is expected. Stop for Rob if a path has no evidenced owner, an intended split would alter meaning, or publication safety is uncertain.
+- **Delivery Risk Cube movement:** Raises production-quality depth only through recoverability and delivery control; functional breadth and implementation fidelity are unchanged.
+- **Acceptance criteria:** The feature checkout has no unexplained material state; every retained branch/worktree has a task ID, purpose and recovery path; the private configuration is explicitly local-only and excluded from commits; PR 8 and PR 9 remain unchanged; and `main` remains clean and current.
+- **Verification:** Record branch/worktree topology, preservation commit IDs and path classification; verify each checkpoint is clean, its branch is reachable remotely where publication is authorised, and `git diff --check` passes for hygiene-only changes.
+- **Stop condition:** Stop before a semantic merge, product/release decision, secret access, or deletion without reachability proof.
+- **Classification — 2026-08-17:** `RH-037` build identity is represented by the Settings/Xcode/project-state changes; `RH-002` owner UAT and headset/test-system evidence is represented by the field-test, protocol, headset and testing paths; `RH-019A` release-tool hardening is represented by the distribution tooling and its operational/research records; Apple place-audit tooling/evidence is related to PR 8 but requires a separate task-boundary decision before integration; and BackseatGuider planning is product-direction material awaiting a decision on PR 9 and the product-family route. The modified agent/ledger/index files are supporting control-plane material, not a standalone feature.
+- **Preservation checkpoint — 2026-08-17:** Local commit `59f58ce` on `codex/rh-045-preserve-local-state` preserves all non-secret paths exactly as found. The root local TestFlight configuration remains deliberately uninspected, uncommitted and local-only.
+- **Credential recovery — 2026-08-17:** Rob confirmed the designated personal Keychain PAT. A single value-suppressed process-local capability check verified `ADMIN` access to `rjbarbour/MotoGuide`; the standard request-local GitHub CLI credential helper then published both RH-045 recovery branches. No credential value was printed, persisted or copied into repository configuration.
+- **Remote recovery — 2026-08-17:** Commit `59f58ce` is reachable at `origin/codex/rh-045-preserve-local-state`; commit `2b750d8` is reachable at `origin/codex/rh-045-repository-hygiene`; and the already merged remote ref `codex/rh-044-item-backlog-migration` was deleted after reachability was proved. The root `.ios-testflight.json` remains deliberately uninspected, uncommitted and local-only in `/Users/rob_dev/DocsLocal/motoguide/repo`.
+- **Next action:** Review and merge the narrow RH-045 hygiene PR. Do not read, stage or publish `.ios-testflight.json`; keep PR 8 and PR 9 isolated; then split the preserved streams into separately tracked work before integration.
+- **After remote recovery:** Reconcile the exact TestFlight build identity across `PROJECT.md`, `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and the active UAT protocol; keep PR 8 and PR 9 isolated; then split the preserved streams into separately tracked work before integrating or closing RH-045.
+- **Status:** Review-ready — recovery branches published and the obsolete RH-044 remote ref retired — Codex, 2026-08-17.
+
+## Completed repository maintenance
+
 ### RH-044 — Migrate the tactical ledger to ITEM-BACKLOG.md
 
 - **Type:** Repository hygiene and control-plane alignment.
-- **Claimed by:** Codex on branch `codex/rh-044-item-backlog-migration` in an isolated worktree.
+- **Claimed by:** Codex on branch `codex/rh-044-item-backlog-migration` during execution.
 - **Outcome:** The canonical tactical ledger is named `ITEM-BACKLOG.md`, every live repository reference uses that filename, and historically accurate references retain their original filename with clarification where needed.
 - **Scope:** Rename the root tactical ledger without changing existing work-item content; update live Markdown links and operational references; verify no live `Backlog.md` or `BACKLOG.md` authority remains.
 - **Exclusions:** Do not implement backlog items, resolve existing work-item ID collisions, alter product or release state, modify the dirty `feat/sub-locality-geodata` checkout, merge existing pull requests, or initialise the strategic Backlog.md project-management system.
 - **Risk:** Low. The main risks are a broken relative link, rewriting historical provenance, or creating a competing ledger.
-- **Branch and worktree:** `codex/rh-044-item-backlog-migration` at `/Users/rob_dev/DocsLocal/motoguide/rh-044-item-backlog-migration`.
+- **Branch:** `codex/rh-044-item-backlog-migration`.
 - **Acceptance criteria:** `Backlog.md` is a Git-tracked rename to `ITEM-BACKLOG.md`; live references resolve to the new path; historical references remain accurate; repository-wide search finds no deprecated live authority; `git diff --check` passes; the original dirty checkout is unchanged.
 - **Done when:** The focused pull request is integrated, remote `main` contains the renamed ledger and aligned references, and temporary branch/worktree cleanup is complete.
 - **Verification — 2026-08-10:** Byte comparison confirms the pre-existing ledger content is unchanged apart from this RH-044 record. `git diff --check` passes. Repository-wide negative search finds no deprecated tactical filename outside this migration record. Updated relative ledger paths resolve to `ITEM-BACKLOG.md`. The original `feat/sub-locality-geodata` checkout retains its pre-existing branch and dirty paths.
-- **Status:** Review-ready — Codex, 2026-08-10. Integration and post-merge cleanup remain open.
+- **Integration — 2026-08-17:** PR 10 merged as `303794d`. Local `main` fast-forwarded to `origin/main`; the local task branch was deleted and its clean worktree was retained as the repository's integration checkout. Remote branch deletion was attempted after merge but is blocked by the selected Git CLI profile's GitHub `403`; the merged remote ref remains reachable and is harmless pending an authorised credential-route correction.
+- **Status:** DONE — all repository-state changes are integrated and verified; remote-ref retirement is an explicitly recorded credential follow-up, not a delivery blocker.
 
 ## Completed release increments
 
