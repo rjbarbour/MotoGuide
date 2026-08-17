@@ -59,16 +59,18 @@ Record the resulting topology in a final RH-050 documentation-only follow-up. Th
 
 ## Pre-compaction continuation checkpoint — 2026-08-17
 
-The closeout preparation is committed on `codex/rh-050-close-preservation-adjudication` at `420382b`. That commit changes only `ITEM-BACKLOG.md` and this continuation record relative to integrated `main` at `7d50042`. It has no upstream branch yet and has not been pushed or opened as a pull request.
+The closeout preparation and first review corrections are committed on `codex/rh-050-close-preservation-adjudication` at `25e8898`. Relative to integrated `main` at `7d50042`, the branch changes only `AGENTS.md`, `ITEM-BACKLOG.md` and this continuation record. It has no upstream branch yet and has not been pushed or opened as a pull request.
 
-The final exchange began an independent controller review with this exact scope: complete path-group disposition, independent reachability of every retained stream, accurate residual owner gates and safe source-shelf deletion conditions. The review ran only its first read-only inspection before compaction and produced no pass, finding or correction. Resume that review from `420382b`; do not infer a pass from the absence of findings.
+The first independent controller review of `420382b` reported four blockers. Commit `25e8898` corrected the path-count wording, narrowed the privacy claim to what the retained evidence supports, strengthened the deletion gate so the closeout proof must first be merged and verified on `origin/main`, and recorded why RH-050 uses a second closeout branch plus a final documentation-only post-cleanup increment.
+
+The final exchange began an independent re-review of `25e8898` against only those four blockers. It completed one read-only inspection: the checkout was clean at `25e8898`, the correction commit changed only `ITEM-BACKLOG.md` and this continuation record, `git diff --check 25e8898^..25e8898` produced no output, and the current comparison from `25e8898` to RH-045 contained 49 paths. The reviewer had not issued a pass or further finding before compaction. Resume that re-review from `25e8898`; do not infer a pass from the inspection results alone.
 
 Verified local topology at the checkpoint:
 
 | Checkout | Branch | Commit | Remote state |
 |---|---|---|---|
 | `/Users/rob_dev/DocsLocal/motoguide/repo` | `codex/rh-045-preserve-local-state` | `2a1a31e` | Tracks the same remote branch; clean source shelf. |
-| `/Users/rob_dev/DocsLocal/motoguide/integration` | `codex/rh-050-close-preservation-adjudication` | `420382b` | Local only; clean closeout branch. |
+| `/Users/rob_dev/DocsLocal/motoguide/integration` | `codex/rh-050-close-preservation-adjudication` | `25e8898` | Local only; clean closeout branch before this documentation refresh. |
 | `/Users/rob_dev/DocsLocal/motoguide/rh-019a-testflight-tooling` | `codex/rh-019a-testflight-tooling-recovery` | `ee4686d` | Tracks the same remote branch; clean retained WIP. |
 | `/Users/rob_dev/DocsLocal/motoguide/rh-051-apple-place-audit` | `codex/rh-051-apple-place-audit` | `2aa7dd1` | Clean merged-task branch; its integrated result is PR 16 at `82e5cb5`. |
 | `/Users/rob_dev/DocsLocal/motoguide/rh-052-test-system` | `codex/rh-052-test-system-reconciliation` | `cbbfabc` | Clean merged-task branch; its integrated result is PR 17 at `67c72d1`. |
@@ -77,15 +79,16 @@ Verified local topology at the checkpoint:
 
 Immediate continuation sequence:
 
-1. Complete the independent RH-050 controller review against `7d50042..420382b`, including a fresh enumeration of every path differing between `main` and RH-045 and confirmation that the grouped table covers all of them.
-2. Correct and recommit any review findings. If the review passes, push `codex/rh-050-close-preservation-adjudication`, open its RH-050 pull request and merge only after the applicable checks pass.
+1. Complete the independent RH-050 re-review of `25e8898` against the four recorded blockers. Confirm the grouped disposition table covers all 48 RH-045 paths that differed from pre-closeout `main` at `7d50042`; the 49th current difference is this closeout record itself.
+2. Correct and recommit any remaining review finding. If the review passes, include this refreshed checkpoint in the closeout branch, push `codex/rh-050-close-preservation-adjudication`, open its RH-050 pull request and merge only after the applicable checks pass.
 3. Re-verify `origin/main`, PRs 16–19, the remote RH-019A head `ee4686d` and the remote RH-045 head `2a1a31e` before cleanup.
 4. Perform the cleanup sequence above. Branch and worktree deletion is intentionally still pending; no destructive cleanup occurred before compaction.
 5. Record the final post-cleanup topology in this document and the ledger. The target is a clean canonical `main` checkout at `/Users/rob_dev/DocsLocal/motoguide/repo`, plus only the clean RH-019A WIP worktree.
 
 Useful read-only resumption commands and expected results:
 
-- `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --check 7d50042..420382b` — expected result: no output and exit status 0.
-- `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --name-status 7d50042..420382b` — expected result: only `ITEM-BACKLOG.md` and `docs/project/status/RH-050_CONTINUATION_2026-08-17.md`.
+- `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --check 7d50042..25e8898` — expected result: no output and exit status 0.
+- `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --name-status 7d50042..25e8898` — expected result: modified `AGENTS.md`, modified `ITEM-BACKLOG.md` and added `docs/project/status/RH-050_CONTINUATION_2026-08-17.md`.
+- `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --check 25e8898^..25e8898` — expected result: no output and exit status 0 for the four-finding correction commit.
 - `git -C /Users/rob_dev/DocsLocal/motoguide/integration worktree list --porcelain` — expected result before cleanup: the seven clean checkouts listed above.
 - `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --name-status 7d50042 2a1a31e` — expected result at this checkpoint: 48 differing RH-045 paths to reconcile against the disposition groups above.
