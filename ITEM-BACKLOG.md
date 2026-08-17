@@ -17,7 +17,8 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Acceptance criteria:** The ledger records the two merged PRs and current branch dispositions; each retired ref/worktree is proved reachable through `origin/main` first; the preservation checkpoint remains remote and explicitly local-only for TestFlight configuration; and the framework branch is retained pending product adjudication unless redundancy is proved.
 - **Verification:** Fetch/prune `origin`; prove each retirement candidate is an ancestor of `origin/main`; confirm the remaining remote branches and worktrees; run `git diff --check`; and confirm the integration checkout is clean and aligned after merge.
 - **Stop condition:** Stop before deleting unmerged work, changing product intent, accessing local configuration, or treating the framework branch as redundant without comparison evidence.
-- **Status:** In progress — Codex, 2026-08-17.
+- **Verification — 2026-08-17:** PR 9 merged at `91f708b`; PR 8 merged at `02aca86`. After an authenticated fetch/prune, the source refs `origin/agent/family-trip-validation-priorities`, `origin/feat/sub-locality-geodata` (at `4aea1ef`) and `origin/codex/rh-045-repository-hygiene` each proved ancestors of `origin/main`. Their clean worktrees, local branches and remote branches were then retired. `origin/codex/rh-045-preserve-local-state` remains the deliberate recovery checkpoint. `origin/agent/family-journey-product-framework` remains unmerged and has no PR; its 510-line `FAMILY_JOURNEY_PRODUCT_FRAMEWORK.md` covers wider product-shaping material than the merged priority ledger, so it is retained pending an explicit product decision.
+- **Status:** Review-ready — branch-retirement evidence recorded; merge this documentation-only closeout before updating the clean integration checkout — Codex, 2026-08-17.
 
 ### RH-045 — Classify and preserve mixed local work
 
