@@ -13,7 +13,7 @@ It is intended to help product owners, designers and future implementation agent
 It does **not**:
 
 - authorise implementation;
-- replace `MILESTONES.md`, `Backlog.md` or `PROJECT.md`;
+- replace `MILESTONES.md`, the Backlog.md CLI delivery ledger or `PROJECT.md`;
 - prescribe a workflow engine, rules engine, prompt hierarchy, agent framework or code architecture;
 - decide whether the family product is a separate app, target, repository or backlog; or
 - supersede the rider-safety constraints of RideHorizon.

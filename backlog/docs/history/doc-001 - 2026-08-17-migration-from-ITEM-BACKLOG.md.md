@@ -1,8 +1,33 @@
+---
+id: doc-001
+title: 2026-08-17 migration from ITEM-BACKLOG.md
+type: other
+created_date: '2026-08-17 22:33'
+updated_date: '2026-08-17 22:33'
+tags:
+  - history
+  - migration
+  - ITEM-BACKLOG
+---
 # RideHorizon Delivery Ledger
 
 This file is the canonical delivery ledger. Trello remains intake, Notion holds reusable SOPs, and `PROJECT.md` records only the last verified project state and current gate.
 
 ## Active control-plane increment
+
+### RH-056 — Adopt the Backlog.md CLI as the sole delivery ledger
+
+- **Type:** Repository control-plane migration and hygiene.
+- **State:** In progress — Codex on `codex/rh-056-adopt-backlog-cli`.
+- **Outcome:** RideHorizon uses MrLesk Backlog.md v1.50.1 as its sole live Git-backed delivery ledger; the former manual ledger is preserved historically and removed as a competing authority.
+- **Scope:** Initialise `backlog/` and root `backlog.config.yml` with prefix `RH` and three-digit IDs; recreate current and completed task records through supported public CLI commands; preserve this file as a CLI-managed historical document; record status and letter-suffix ID mappings; update project routing and terminology; verify remote branch inspection; retire `ITEM-BACKLOG.md`; integrate one migration pull request and clean up its branch.
+- **Exclusions:** Do not edit generated `backlog/` records directly; change app, proxy, release or credential behaviour; merge or modify RH-019A implementation; create a hosted tracker; or use undocumented browser/API mutation paths.
+- **Dependencies:** Owner adoption decision on 2026-08-17; SOP: Adopt Backlog.md CLI in an Existing Project v1.1; Adaptive Delivery v1.6; Tracked Work and Git Integration v0.6; installed Backlog.md v1.50.1; the existing RH task-ID convention and clean `main` baseline.
+- **Risk:** Medium. The migration can lose status/detail, renumber established tasks, create competing authorities or break task-to-branch correlation if performed partially.
+- **Acceptance criteria:** Every defined RH task is represented or explicitly mapped; letter-suffix tasks use documented CLI-supported child IDs; the former ledger is preserved as a discoverable history document; `ITEM-BACKLOG.md` is removed only after CLI verification; AGENTS/README/PROJECT route consistently; `remoteOperations` is enabled and verified; `main` and retained RH-019A state remain hygiene-clean after integration.
+- **Deterministic verification:** `backlog task list --json`, `backlog doc list`, `backlog decision list --json`, `backlog config get remoteOperations`, authenticated `git fetch origin --prune`, `git diff --check` and `git status --short --branch` all produce the expected clean, parseable or configured results.
+- **Stop condition:** Stop on unsupported ID/status preservation, unexplained source records, generated-file mutation outside the CLI, authentication failure after the established GH-PERSONAL route, or any need to change product behaviour.
+- **Gate:** Merge one documentation/control-plane PR only after an independent completeness review. No app build or test suite is required.
 
 ### RH-055 — Return delivery focus to core RideHorizon
 

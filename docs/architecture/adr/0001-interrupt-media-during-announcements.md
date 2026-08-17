@@ -37,7 +37,7 @@ Validate with Apple Voice and Premium Voice through the phone output and the hel
 
 ## Traceability
 
-- Work item: `ITEM-BACKLOG.md` RH-004, Increment 1
+- Work item: Backlog.md task `RH-004`, Increment 1
 - Validation plan: `docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md`
 - Evidence record: `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md`
 - Apple references: [duckOthers](https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions-swift.struct/duckothers), [mixWithOthers](https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions-swift.struct/mixwithothers), [notifyOthersOnDeactivation](https://developer.apple.com/documentation/avfaudio/avaudiosession/setactiveoptions/notifyothersondeactivation)

@@ -6,7 +6,7 @@ Status: **The latest locally verified automated rebuild `0.12.4 (20260806.221234
 
 Stationary execution protocol: [`../../testing/STATIONARY_PHYSICAL_TEST_PROTOCOL.md`](../../testing/STATIONARY_PHYSICAL_TEST_PROTOCOL.md). Owner road-test execution protocol: [`RIDE_UAT_PROTOCOL.md`](RIDE_UAT_PROTOCOL.md). This evidence document remains the authoritative run record and coverage matrix; the two protocols contain execution method only and do not carry competing results.
 
-This is the operational evidence record for stationary, road and background testing. `ITEM-BACKLOG.md` remains the delivery-status authority; this document records what was tested, on which build, and with what result.
+This is the operational evidence record for stationary, road and background testing. Backlog.md CLI records remain the delivery-status authority; this document records what was tested, on which build, and with what result.
 
 `docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md` is the requirements and staged test-design authority for coexistence with YouTube Music, Google Maps and later audio apps. Record run results here; do not duplicate delivery status in that plan.
 
@@ -267,7 +267,7 @@ Do not begin the moving tests unless the session and audio pre-road tests pass.
 
 ## Findings awaiting triage
 
-For today's owner ride, retain every result and finding here. Do not create a GitHub issue or edit `ITEM-BACKLOG.md` during the UAT session. Apply [SEERS — Standardised Bug Reporting](https://app.notion.com/p/322a4c502b1781e9873cd3008281d9f6) and retain the original evidence.
+For today's owner ride, retain every result and finding here. Do not create a GitHub issue or mutate Backlog.md tasks during the UAT session. Apply [SEERS — Standardised Bug Reporting](https://app.notion.com/p/322a4c502b1781e9873cd3008281d9f6) and retain the original evidence.
 
 | Finding ID | Test/run | S — evidence | E — environment | E — expected | E — actual | R — reproduction/time | S — severity | Triage decision |
 |---|---|---|---|---|---|---|---|---|

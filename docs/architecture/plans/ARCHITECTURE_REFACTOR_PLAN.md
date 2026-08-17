@@ -4,7 +4,7 @@ Date: 2026-08-04
 
 Status: Approved direction; execution is gated by the current private-beta work.
 
-Status authority: `../../../ITEM-BACKLOG.md`
+Status authority: Backlog.md CLI task records under `../../../backlog/`
 
 ## Bottom line
 
@@ -12,7 +12,7 @@ Refactor through small, behaviour-preserving milestones. Establish the iOS depen
 
 Keep the existing iOS application target and proxy deployment. Source-level boundaries and narrow interfaces are sufficient at this stage; separate Swift packages, services or deployments would add cost without solving the present problems.
 
-The first unattended run may complete only RH-013A. It must stop at that gate even if time remains. Later increments are deliberately not implementation-ready yet.
+The first unattended run may complete only RH-013.01 (legacy RH-013A). It must stop at that gate even if time remains. Later increments are deliberately not implementation-ready yet.
 
 ## Why this work is needed
 
@@ -95,7 +95,7 @@ Outcome: settings and dependency construction no longer leak across views and th
 
 Order:
 
-1. RH-013A: introduce a typed `RideSettings` snapshot, a narrow `RideSettingsStore` and the existing `UserDefaults` adapter.
+1. RH-013.01 (legacy RH-013A): introduce a typed `RideSettings` snapshot, a narrow `RideSettingsStore` and the existing `UserDefaults` adapter.
 2. Move concrete app dependency construction to the `RideHorizonApp` composition root.
 3. Pass feature dependencies explicitly; keep SwiftUI presentation state within feature models or views.
 
@@ -187,9 +187,9 @@ Work:
 
 Gate: complete concurrency checking is clean; no unchecked sendability is added merely to silence warnings; any location-policy change has physical evidence and a rollback point.
 
-## First unattended increment: RH-013A
+## First unattended increment: RH-013.01 (legacy RH-013A)
 
-RH-013A is the only increment authorised for an initial overnight implementation run. Its detailed delivery contract is in `../../../ITEM-BACKLOG.md`.
+RH-013.01 is the only increment authorised for an initial overnight implementation run. Inspect its delivery contract with `backlog task view RH-013.01 --plain` before execution.
 
 Suggested commit sequence:
 

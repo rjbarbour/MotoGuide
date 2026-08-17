@@ -110,6 +110,6 @@ The current significant gaps are deliberate evidence gaps, not assumed passes: r
 
 ## 9. Reporting and review
 
-Report: test object, scope, result, evidence, remaining risk and decision needed. Separate observation from diagnosis. Failed or blocked P0/P1 evidence is visible in `ITEM-BACKLOG.md` and the relevant run record; it is never hidden behind aggregate pass percentages.
+Report: test object, scope, result, evidence, remaining risk and decision needed. Separate observation from diagnosis. Failed or blocked P0/P1 evidence is visible in the relevant Backlog.md task and run record; it is never hidden behind aggregate pass percentages.
 
 At every milestone health gate, compare the current evidence with the next commitment using the Delivery Risk Cube: functional breadth, implementation fidelity and production-quality depth. The product owner then chooses **continue**, **revise**, **refactor**, **research**, **prototype**, **reduce scope**, **pause** or **stop**.

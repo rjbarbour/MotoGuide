@@ -23,14 +23,14 @@ The two app products are:
 - Keep the durable decisions and workstream boundaries stable; update repository evidence and unresolved gates when their source work changes.
 - The product-design session should consume the audience, interaction and pronunciation decisions without inheriting the delivery sequence as product authority.
 - The architecture session should consume the desired technical end state and verify or revise its proposed seams against the cleaned-up codebase.
-- Derive only the next phase and the smallest following experiment into ready work items in `ITEM-BACKLOG.md`. Do not create the complete future programme in advance.
+- Derive only the next phase and the smallest following experiment into Backlog.md tasks labelled `ready`. Do not create the complete future programme in advance.
 - Review the phase exit evidence before advancing. A phase heading is not itself a sprint commitment.
 
 ## Authority and boundaries
 
 - The integrated [Family Journey Product Framework](../reference/FAMILY_JOURNEY_PRODUCT_FRAMEWORK.md) is inspirational product context, not delivery authority. Do not convert it wholesale into work items.
-- The family-trip priority overlay was integrated through PR 9 and now lives in `ITEM-BACKLOG.md`. It supplies priorities, not a technical product split or implementation authorisation.
-- `ITEM-BACKLOG.md` is the sole live delivery ledger. Do not restore deprecated `Backlog.md`, introduce product-specific ledgers or improvise a new schema in this plan.
+- The family-trip priority overlay was integrated through PR 9 and is now represented in the Backlog.md task records. It supplies priorities, not a technical product split or implementation authorisation.
+- The Backlog.md CLI records under `backlog/` are the sole live delivery ledger. Do not introduce product-specific ledgers or improvise a new schema in this plan.
 - Keep parental controls and a parent experience out of the current implementation slice. Existing ideas may remain in the item backlog.
 - The landing-page demand test is a separate project and delivery stream. Coordinate learning and dependencies, but do not absorb its implementation into the app plan.
 - Do not start the broad architecture refactor merely to enable the first controlled family test. Capture the desired seams so the separate architecture review can account for them.
@@ -137,15 +137,15 @@ Configuration must be typed and testable. Do not scatter product checks such as 
 - **Workstream WS-06 — Build, signing and TestFlight:** Establish distinct product identifiers, schemes/targets, archives, App Store Connect records and exact-build evidence. Keep device/build identity reportable.
 - **Workstream WS-07 — Product-specific documentation:** Reconcile README, architecture, operations, testing and product docs so scope and instructions identify the relevant app product without duplicating shared rules.
 - **Workstream WS-08 — Validation:** Run comparative family field observation and coordinate with the separate landing-page demand experiment. Product usability evidence and market-demand evidence answer different questions.
-- **Workstream WS-09 — Control-plane maintenance:** Keep `AGENTS.md`, README/PROJECT, status documents and `ITEM-BACKLOG.md` aligned as product-family work becomes active. Do not create separate product ledgers merely because there are two app products.
+- **Workstream WS-09 — Control-plane maintenance:** Keep `AGENTS.md`, README/PROJECT, status documents and the Backlog.md CLI records aligned as product-family work becomes active. Do not create separate product ledgers merely because there are two app products.
 
 ## Recommended sequence
 
 ### Phase PH-01 — Reconcile in-flight work and establish a safe baseline — complete
 
-1. `ITEM-BACKLOG.md` became the sole canonical ledger through RH-044.
+1. RH-044 made `ITEM-BACKLOG.md` the sole canonical ledger at that point; RH-056 later preserved it as history and adopted the Backlog.md CLI.
 2. The family product framework was integrated as an inspirational reference without converting it wholesale into work items.
-3. The PR 9 family-trip priority overlay was reconciled into the canonical ledger without restoring deprecated `Backlog.md`.
+3. The PR 9 family-trip priority overlay was reconciled into the canonical ledger and is now retained in the migrated Backlog.md tasks.
 4. The mixed RH-045 state was checkpointed and its independent streams are being adjudicated through RH-050.
 5. Build-specific road-test and iPad defects remain evidence gates for any passenger experiment; do not infer them from old checkout state.
 
@@ -184,7 +184,7 @@ Stop before expanding parental features, durable child profiles, multi-device se
 
 Verified on 2026-08-17:
 
-- `ITEM-BACKLOG.md` is the sole live delivery ledger; RH-044 completed the migration.
+- The Backlog.md CLI records under `backlog/` are the sole live delivery ledger; RH-056 preserved the former manual ledger as doc-001.
 - PR 9's family-trip priority overlay is integrated in that ledger, including RH-046 and RH-047.
 - `docs/product/reference/FAMILY_JOURNEY_PRODUCT_FRAMEWORK.md` is integrated on `main` as inspirational product context.
 - RH-050 owns the remaining RH-045 source-shelf adjudication. This document and the dated name screen are the only retained ST-05 paths.
@@ -197,7 +197,7 @@ The next product session should not start by writing detailed tickets. It should
 1. Decide whether the family passenger experiment should take priority over current RideHorizon work.
 2. If yes, inventory concrete RideHorizon road-test defects and iPad blockers against exact app builds/devices.
 3. Complete the under-13 data/compliance gate before planning transcript logging or involving an under-13 tester.
-4. Convert only the smallest PH-02 experiment into one or more ready `ITEM-BACKLOG.md` items.
+4. Convert only the smallest PH-02 experiment into one or more Backlog.md tasks labelled `ready`.
 5. Keep **Backseat Guider** provisional unless the separate name-clearance gate is passed.
 
 Detailed target creation, refactoring and TestFlight operations must follow the canonical iOS deployment SOP at execution time.
