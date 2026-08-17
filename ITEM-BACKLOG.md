@@ -76,7 +76,10 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Exclusions:** Do not implement a second app or target, expand the live ledger into a future programme, adopt or register a product name, buy domains, repeat live availability searches, or restore deprecated `Backlog.md` material.
 - **Risk:** Low for documentation. The material becomes misleading if dated name signals are presented as current clearance or if a planning sequence is mistaken for implementation authority.
 - **Acceptance criteria:** The family framework remains product inspiration; the retained sequence adds only delivery decisions and phase gates; the name screen remains explicitly dated and preliminary; current `ITEM-BACKLOG.md` is the sole live ledger; stale branch, PR and checkout claims are removed; local links and `git diff --check` pass.
-- **Status:** Active — source comparison and reconciliation in progress.
+- **Disposition — 2026-08-17:** Retain both RH-045 ST-05 source files. The sequence adds delivery boundaries, data/compliance gates, an incremental product-split route and phase exits that the inspirational framework and priority overlay do not supply. Stale branch, PR, checkout and ledger-migration state was removed. The name screen remains useful as dated preliminary evidence; its contradictory GREEN subsection was corrected to the document's final AMBER judgement, and unrelated plugin follow-up was retired.
+- **Verification — 2026-08-17:** `git diff --check` and both local cross-document link checks passed. Searches found no stale RH-045 branch/worktree claims, in-flight ledger migration, provisional-name adoption or deprecated live-ledger instruction in the retained documents. No app build or test was run because this stream changes documentation only.
+- **Owner judgement:** None is required to retain these documents. Before implementation, Rob must separately choose whether the family passenger experiment outranks current RideHorizon work. Before adopting **Backseat Guider**, commission the documented solicitor-led clearance; before involving an under-13 tester, complete the explicit data/compliance gate.
+- **Status:** Review-ready — reconciliation complete; product activation, name adoption and under-13 testing remain separate owner gates.
 
 ## Completed repository maintenance
 
