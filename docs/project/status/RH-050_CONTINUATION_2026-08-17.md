@@ -18,7 +18,7 @@ This record supersedes its earlier continuation state. It does not authorise a T
 
 ## RH-045 path dispositions
 
-The final comparison from current `main` to RH-045 contains 48 differing paths. The original preservation comparison contained 55 paths; paths absent from this table now match integrated `main` exactly. Every remaining difference belongs to one of the groups below.
+The pre-closeout comparison from `main` at `7d50042` to RH-045 contained 48 differing paths. This closeout record itself adds a 49th expected difference because it did not exist on RH-045. The original preservation comparison contained 55 paths; original paths absent from this table now match integrated `main` exactly. Every remaining RH-045 difference belongs to one of the groups below.
 
 | Group | RH-045 paths | Final disposition |
 |---|---|---|
@@ -33,7 +33,7 @@ The final comparison from current `main` to RH-045 contains 48 differing paths. 
 ## Deliberate exclusions
 
 - No RH-045 build-number change, scheme reformatting, old release-candidate claim or deprecated ledger filename was transferred.
-- No credential value, private ride trace, tester identity or home-location detail was added to `main`.
+- No credential value, tester account identifier, private ride trace or unnecessary home-location detail was added to `main`. The canonical field record retains only the non-account label `Rob` where needed to attribute historical manual evidence.
 - No live Apple geocoding, App Store Connect operation, archive or TestFlight upload was used to adjudicate the streams.
 - No future family-product feature or name was authorised by preserving its planning evidence.
 
@@ -47,10 +47,45 @@ Only the first gate blocks the retained RH-019A branch from becoming a merge can
 
 ## Cleanup gate
 
-This closeout record must be published before the RH-045 source shelf is deleted. After publication:
+This closeout record must be merged and verified on `origin/main` before the RH-045 source shelf is deleted. After that integration:
 
-1. verify merged PRs 16–19 and all relevant branch heads remain independently reachable;
+1. verify the RH-050 closeout PR, merged PRs 16–19 and all relevant branch heads remain independently reachable from `origin/main` or the retained RH-019A WIP branch;
 2. remove the clean merged RH-051 to RH-054 worktrees and local branches;
 3. delete the RH-045 remote and local branch only after the RH-019A WIP branch and integrated `main` are verified;
 4. restore `/Users/rob_dev/DocsLocal/motoguide/repo` as the clean canonical `main` checkout;
 5. retain only the clean RH-019A WIP worktree alongside it.
+
+Record the resulting topology in a final RH-050 documentation-only follow-up. This two-phase closeout is deliberate: the first integration makes the deletion proof durable; the second records the post-deletion state without weakening that gate.
+
+## Pre-compaction continuation checkpoint — 2026-08-17
+
+The closeout preparation is committed on `codex/rh-050-close-preservation-adjudication` at `420382b`. That commit changes only `ITEM-BACKLOG.md` and this continuation record relative to integrated `main` at `7d50042`. It has no upstream branch yet and has not been pushed or opened as a pull request.
+
+The final exchange began an independent controller review with this exact scope: complete path-group disposition, independent reachability of every retained stream, accurate residual owner gates and safe source-shelf deletion conditions. The review ran only its first read-only inspection before compaction and produced no pass, finding or correction. Resume that review from `420382b`; do not infer a pass from the absence of findings.
+
+Verified local topology at the checkpoint:
+
+| Checkout | Branch | Commit | Remote state |
+|---|---|---|---|
+| `/Users/rob_dev/DocsLocal/motoguide/repo` | `codex/rh-045-preserve-local-state` | `2a1a31e` | Tracks the same remote branch; clean source shelf. |
+| `/Users/rob_dev/DocsLocal/motoguide/integration` | `codex/rh-050-close-preservation-adjudication` | `420382b` | Local only; clean closeout branch. |
+| `/Users/rob_dev/DocsLocal/motoguide/rh-019a-testflight-tooling` | `codex/rh-019a-testflight-tooling-recovery` | `ee4686d` | Tracks the same remote branch; clean retained WIP. |
+| `/Users/rob_dev/DocsLocal/motoguide/rh-051-apple-place-audit` | `codex/rh-051-apple-place-audit` | `2aa7dd1` | Clean merged-task branch; its integrated result is PR 16 at `82e5cb5`. |
+| `/Users/rob_dev/DocsLocal/motoguide/rh-052-test-system` | `codex/rh-052-test-system-reconciliation` | `cbbfabc` | Clean merged-task branch; its integrated result is PR 17 at `67c72d1`. |
+| `/Users/rob_dev/DocsLocal/motoguide/rh-053-build-identity` | `codex/rh-053-settings-build-identity` | `53829d4` | Clean merged-task branch; its integrated result is PR 18 at `f148845`. |
+| `/Users/rob_dev/DocsLocal/motoguide/rh-054-product-planning-reconciliation` | `codex/rh-054-product-planning-reconciliation` | `a344655` | Clean merged-task branch; its integrated result is PR 19 at `7d50042`. |
+
+Immediate continuation sequence:
+
+1. Complete the independent RH-050 controller review against `7d50042..420382b`, including a fresh enumeration of every path differing between `main` and RH-045 and confirmation that the grouped table covers all of them.
+2. Correct and recommit any review findings. If the review passes, push `codex/rh-050-close-preservation-adjudication`, open its RH-050 pull request and merge only after the applicable checks pass.
+3. Re-verify `origin/main`, PRs 16–19, the remote RH-019A head `ee4686d` and the remote RH-045 head `2a1a31e` before cleanup.
+4. Perform the cleanup sequence above. Branch and worktree deletion is intentionally still pending; no destructive cleanup occurred before compaction.
+5. Record the final post-cleanup topology in this document and the ledger. The target is a clean canonical `main` checkout at `/Users/rob_dev/DocsLocal/motoguide/repo`, plus only the clean RH-019A WIP worktree.
+
+Useful read-only resumption commands and expected results:
+
+- `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --check 7d50042..420382b` — expected result: no output and exit status 0.
+- `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --name-status 7d50042..420382b` — expected result: only `ITEM-BACKLOG.md` and `docs/project/status/RH-050_CONTINUATION_2026-08-17.md`.
+- `git -C /Users/rob_dev/DocsLocal/motoguide/integration worktree list --porcelain` — expected result before cleanup: the seven clean checkouts listed above.
+- `git -C /Users/rob_dev/DocsLocal/motoguide/integration diff --name-status 7d50042 2a1a31e` — expected result at this checkpoint: 48 differing RH-045 paths to reconcile against the disposition groups above.
