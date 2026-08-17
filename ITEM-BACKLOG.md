@@ -38,6 +38,21 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Review — 2026-08-17:** Independent standards and specification reviews found no implementation or scope defect. The retained README was corrected to describe the completed-cache dry-run accurately and to classify the live runner as an operator-only empirical probe rather than an LLM-safe diagnostic collector.
 - **Disposition:** Retain and integrate as supporting verification tooling and dated evidence. No owner judgement is required unless Rob wants to fund the deferred live iPhone/locale or MapKit comparison now.
 - **Status:** Review-ready — offline evidence complete; no live service or app change.
+### RH-052 — Reconcile beta UAT, headset and test-system records
+
+- **Type:** Release-evidence and test-documentation reconciliation.
+- **Claimed by:** Codex on branch `codex/rh-052-test-system-reconciliation`.
+- **Outcome:** Current `main` has one canonical owner ride protocol, durable stationary/headset and test-system guidance, and release evidence that identifies the latest locally verified Internal TestFlight receipt without transferring results between builds.
+- **Scope:** Reconcile the RH-045 headset documents, three ride-protocol variants, field evidence, testing framework and continuation records against current `PROJECT.md`, current `TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and the SHA-verified local receipt for `0.12.4 (20260806.221234)`.
+- **Exclusions:** Do not contact App Store Connect, run a build/upload, claim exact in-app build confirmation or road evidence, import tester identity or credential metadata, or retain superseded protocol copies merely for history.
+- **Risk:** Medium. The documents govern a safety-sensitive physical test, and a stale build identity or transferred result could authorise the wrong binary for external beta.
+- **Acceptance criteria:** One build-agnostic canonical ride protocol points to the evidence record for the selected build; retained headset/test documents remain accurate and non-private; `PROJECT.md` and field evidence agree on the latest verified receipt and remaining human gate; obsolete protocol and continuation duplicates have explicit retirement rationale; document links and `git diff --check` pass.
+- **Receipt verification — 2026-08-17:** The local protected receipt for `0.12.4 (20260806.221234)` and its SHA-256 companion match. It records `VALID`, `INTERNAL_ONLY`, `IN_BETA_TESTING`, `ready_for_internal_tester`, 182-test unchanged-input evidence and a 203-second deployment. No receipt identity field or credential value was copied into repository documentation, and no live Apple request was made.
+- **Retained material:** One build-agnostic `RIDE_UAT_PROTOCOL.md`; the X-COM2 setup/principles documents and their non-private iOS Control Centre screenshot; the seven-document test system; and the later field/UAT evidence reconciled against the current receipt. The historical 2026-08-06 UAT remains explicitly provisional to its earlier build and its results are not transferred to `20260806.221234`.
+- **Retired duplication:** The compatibility-only protocol pointer and superseded V2 were not retained; V3 became the single canonical protocol. `FIELD_UAT_CONTINUATION_2026-08-06.md` was not retained because its resolved evidence is now in the canonical field record. The distribution continuation and cloud-permission history were not imported because RH-019A retained the current tool/security boundary without obsolete credential identifiers or operator steps.
+- **Verification:** The latest receipt hash matched; document searches find no live `Backlog.md`, `RIDE_UAT_PROTOCOL_V3.md` or current release-gate reference to the superseded candidate outside explicitly historical evidence; the retained screenshot contains only the intended iOS Control Centre UI and no personal content; local Markdown links and `git diff --check` pass.
+- **Owner judgement:** Operational, not documentary: Rob must confirm `0.12.4 (20260806.221234)` in RideHorizon Settings while stopped before any physical result is attributed to it, then decide the RH-002 release gate from the recorded stationary/road evidence.
+- **Status:** Review-ready — reconciliation complete; exact-build human evidence remains open under RH-002.
 
 ## Completed repository maintenance
 

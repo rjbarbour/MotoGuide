@@ -23,7 +23,8 @@ This directory contains durable supporting documentation for the private RideHor
 | `product/strategy/` | Record market-validation and product-strategy work. | Business validation, PMF review and validation sprint. |
 | `operations/app-store/` | Prepare App Store Connect and public listing material. | Submission readiness, test information and attribution. |
 | `operations/privacy/` | Record privacy requirements, audits and publication work. | Privacy audit and policy publishing plan. |
-| `operations/testflight/` | Operate the private beta and retain test evidence. | Beta pack, field-test evidence and temporary proxy-access plan. |
+| `operations/testflight/` | Operate the private beta and retain test evidence. | Beta pack, owner ride-UAT protocol, field-test evidence and temporary proxy-access plan. |
+| `testing/` | Govern product-wide test strategy, policy, coverage, stationary physical testing, simulated rides and release-quality gates. | Test system, risk coverage model, stationary protocol, GPX-derived simulation plan and release gates. |
 | `research/` | Preserve dated, source-based investigation. | App Store, privacy, TestFlight and market diligence research. |
 | `evidence/fact-quality/` | Preserve reviewed factual-output samples and findings. | Fact and fact-sequence quality reviews. |
 

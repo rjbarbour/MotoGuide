@@ -1,6 +1,6 @@
 # RideHorizon Project State
 
-Last verified: 2026-08-05
+Last verified: 2026-08-17
 
 ## Current commitment
 
@@ -8,7 +8,7 @@ Prepare a private external TestFlight beta for 3–5 named iPhone testers. This 
 
 ## Last verified result
 
-RideHorizon `0.12.4 (20260804.0246)` is the current private-TestFlight release candidate. All 177 iOS tests passed on the physical iPhone, the fact-proxy suite passed, and the live Fly health, automatic-session, fact and Premium Voice paths returned HTTP 200. The exact Release archive passed Apple Distribution signing, server-side validation, strict IPA signature and entitlement checks, privacy-manifest validation and binary/dSYM UUID matching. It is iPhone-only, contains no test or calibration artefacts, is installed and launches on the target iPhone, and App Store Connect reports its upload **Complete** and the build **Ready to Submit**. Exact-Internal-TestFlight human evidence remains outstanding under RH-002.
+The latest locally verified Internal TestFlight receipt is for RideHorizon `0.12.4 (20260806.221234)`. Its SHA-256-protected record reports `VALID`, permanently `INTERNAL_ONLY`, `IN_BETA_TESTING`, internal-group readiness and `ready_for_internal_tester`, using unchanged-input evidence from 182 passing simulator tests. The tester state does not prove which binary is installed on the phone. Exact Settings build confirmation and build-specific stationary/road evidence remain outstanding under RH-002. The build-identity source change and deployment tooling are being recovered separately under RH-053 and RH-019A; do not treat this receipt as proof that current `main` can yet reproduce the binary.
 
 The public support page now displays and links to `support@digitalmercenaries.ai`. Cloudflare Pages deployment `https://8511db66.ridehorizon-edge.pages.dev` and the canonical `https://ridehorizon.digitalmercenaries.ai/support` page were verified on 2026-08-04.
 
@@ -22,7 +22,7 @@ The on-device place model now retains the supported Apple placemark fields and d
 
 ## Current gate
 
-**VERIFY — RH-002 exact-Internal-TestFlight evidence.** Add processed build `0.12.4 (20260804.0246)` to the internal group, install that exact TestFlight binary, then run the mandatory stationary and field checks. Do not invite external testers until the release gate is satisfied.
+**VERIFY — RH-002 exact-Internal-TestFlight evidence.** Install or update to `0.12.4 (20260806.221234)`, confirm that exact identity in RideHorizon Settings while stopped, then run the mandatory stationary and field checks. Do not transfer evidence from earlier builds or invite external testers until the release gate is satisfied.
 
 ## Residual risks
 
@@ -37,6 +37,6 @@ The on-device place model now retains the supported Apple placemark fields and d
 
 ## Next outcomes
 
-1. Add build `0.12.4 (20260804.0246)` to the internal group and install the exact TestFlight binary.
+1. Install or update to `0.12.4 (20260806.221234)` and confirm the exact identity in Settings while stopped.
 2. Complete the stationary, road, background, inactivity, audio, network and power evidence.
 3. Submit the accepted build for external TestFlight review only after the mandatory evidence gate passes.
