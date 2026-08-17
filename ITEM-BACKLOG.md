@@ -24,6 +24,20 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Controller checkpoint — 2026-08-17:** Branch `codex/rh-050-adjudicate-preserved-streams` was created from verified current `main` at `977374a`. RH-049 was moved from Active to Completed, and its obsolete claim that `.ios-testflight.json` remained uninspected and local-only was corrected against the later `2a1a31e` preservation checkpoint. No preserved stream content has yet been transferred.
 - **Status:** Active — controller prepared; ST-01 is next.
 
+### RH-051 — Recover the Apple place-label audit corpus
+
+- **Type:** Verification tooling and dated evidence recovery.
+- **Claimed by:** Codex on branch `codex/rh-051-apple-place-audit`.
+- **Outcome:** The public-synthetic Apple placemark corpus, its isolated probe and its deterministic report tooling are independently reachable from current `main` as supporting evidence for device/locale comparison and the future MapKit migration.
+- **Scope:** Transfer `tools/apple-place-audit`, `fixtures/geography/apple-place-audit` and the three 2026-08-05 research records from RH-045 commit `2a1a31e`; verify that the corpus contains public synthetic coordinates only; run the focused Python tests and dry-run without calling Apple services.
+- **Exclusions:** Do not change application code, rerun live Apple geocoding, promote candidates to official boundary fixtures, import personal GPX/location history, or claim the dated macOS responses are current iPhone behaviour.
+- **Risk:** Low. Coordinates are deliberately public and synthetic, but the retained Apple responses are dated observations and the underlying `CLGeocoder` API is deprecated on the installed SDK.
+- **Acceptance criteria:** The tool/tests/data/research form one coherent reproducible corpus; privacy and evidence-age boundaries remain explicit; focused tests and dry-run pass; no app, Xcode, release or private data changes are included.
+- **Privacy and value decision — 2026-08-17:** The tool README expressly limits the corpus to public synthetic coordinates and forbids personal GPX traces or precise personal locations. The retained 19-sample manifest and 27 cached Apple requests are dated service observations, not journey history. The corpus remains useful because it provides a repeatable baseline for the separately deferred physical-iPhone/locale comparison and `CLGeocoder` to MapKit migration; PR 8 integrated app behaviour but did not replace that verification need.
+- **Verification — 2026-08-17:** All six focused Python tests passed under `uv` with Python 3.13. The isolated Swift probe compiled against the current `RideHorizon/Address.swift`. The dry-run parsed the complete cache and reported zero pending requests without calling Apple. Regenerating the comparison report produced a byte-for-byte match with the retained fixture. `git diff --check` passed.
+- **Disposition:** Retain and integrate as supporting verification tooling and dated evidence. No owner judgement is required unless Rob wants to fund the deferred live iPhone/locale or MapKit comparison now.
+- **Status:** Review-ready — offline evidence complete; no live service or app change.
+
 ## Completed repository maintenance
 
 ### RH-049 — Reconcile preservation checkpoint and hygiene ledger

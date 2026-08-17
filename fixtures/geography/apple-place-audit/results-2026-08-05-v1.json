@@ -1,0 +1,2754 @@
+{
+  "createdAt": "2026-08-05T18:05:10Z",
+  "manifestVersion": "2026-08-05-v1",
+  "requests": {
+    "claygate-forward:forward": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:19:40Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3602881,
+                  "longitude": -0.3408548
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Esher",
+                "name": "Claygate",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "N/A",
+                  "town": "Claygate"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Claygate"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "forward",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:19:40Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:19:40Z",
+      "coordinate": null,
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "forward",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3602881,
+              "longitude": -0.3408548
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Esher",
+            "name": "Claygate",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "N/A",
+              "town": "Claygate"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Claygate"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "forward",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:19:40Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Claygate, Surrey, United Kingdom",
+      "requestID": "claygate-forward:forward",
+      "requestedLocale": "en_GB",
+      "sampleID": "claygate-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "claygate-forward:reverse-returned-1": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:20:40Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3602881,
+                  "longitude": -0.3408548
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Esher",
+                "name": "195\u2013199 Hare Lane, Claygate",
+                "postalCode": "KT10",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "Hare Lane",
+                  "town": "Claygate"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Claygate",
+                "subThoroughfare": "195\u2013199",
+                "thoroughfare": "Hare Lane"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:20:40Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:20:40Z",
+      "coordinate": {
+        "latitude": 51.3602881,
+        "longitude": -0.3408548
+      },
+      "derivedFrom": "claygate-forward:forward",
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3602881,
+              "longitude": -0.3408548
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Esher",
+            "name": "195\u2013199 Hare Lane, Claygate",
+            "postalCode": "KT10",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "Hare Lane",
+              "town": "Claygate"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Claygate",
+            "subThoroughfare": "195\u2013199",
+            "thoroughfare": "Hare Lane"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:20:40Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Claygate, Surrey, United Kingdom",
+      "requestID": "claygate-forward:reverse-returned-1",
+      "requestedLocale": "en_GB",
+      "sampleID": "claygate-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "east-molesey-forward:forward": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:21:41Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.4002538,
+                  "longitude": -0.3550295
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "East Molesey",
+                "name": "East Molesey",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "N/A",
+                  "town": "East Molesey"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "East Molesey"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "forward",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:21:41Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:21:41Z",
+      "coordinate": null,
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "forward",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.4002538,
+              "longitude": -0.3550295
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "East Molesey",
+            "name": "East Molesey",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "N/A",
+              "town": "East Molesey"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "East Molesey"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "forward",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:21:41Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "East Molesey, Surrey, United Kingdom",
+      "requestID": "east-molesey-forward:forward",
+      "requestedLocale": "en_GB",
+      "sampleID": "east-molesey-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "east-molesey-forward:reverse-returned-1": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:22:41Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.4002538,
+                  "longitude": -0.3550295
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "East Molesey",
+                "name": "4\u201320 Manor Road",
+                "postalCode": "KT8",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "Manor Road",
+                  "town": "Molesey East"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Molesey East",
+                "subThoroughfare": "4\u201320",
+                "thoroughfare": "Manor Road"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:22:41Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:22:41Z",
+      "coordinate": {
+        "latitude": 51.4002538,
+        "longitude": -0.3550295
+      },
+      "derivedFrom": "east-molesey-forward:forward",
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.4002538,
+              "longitude": -0.3550295
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "East Molesey",
+            "name": "4\u201320 Manor Road",
+            "postalCode": "KT8",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "Manor Road",
+              "town": "Molesey East"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Molesey East",
+            "subThoroughfare": "4\u201320",
+            "thoroughfare": "Manor Road"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:22:41Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "East Molesey, Surrey, United Kingdom",
+      "requestID": "east-molesey-forward:reverse-returned-1",
+      "requestedLocale": "en_GB",
+      "sampleID": "east-molesey-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "england-wales-england-side:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:27:42Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.6093,
+                  "longitude": -2.6102
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Bristol",
+                "name": "BS35",
+                "postalCode": "BS35",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "South Gloucestershire",
+                  "street": "N/A",
+                  "town": "Aust"
+                },
+                "subAdministrativeArea": "South Gloucestershire",
+                "subLocality": "Aust"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:27:42Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "nation",
+      "completedAt": "2026-08-05T18:27:42Z",
+      "coordinate": {
+        "latitude": 51.6093,
+        "longitude": -2.6102
+      },
+      "officialGeography": {
+        "sideA": {
+          "name": "England"
+        },
+        "sideB": {
+          "name": "Wales"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.6093,
+              "longitude": -2.6102
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Bristol",
+            "name": "BS35",
+            "postalCode": "BS35",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "South Gloucestershire",
+              "street": "N/A",
+              "town": "Aust"
+            },
+            "subAdministrativeArea": "South Gloucestershire",
+            "subLocality": "Aust"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:27:42Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "england-wales-england-side:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "england-wales-england-side",
+      "samplePosition": "side-a",
+      "samplePurpose": "Higher-level public synthetic nation comparison point in England; not a route recommendation.",
+      "source": {
+        "dataset": "OS Boundary-Line (planned validation source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Public synthetic national comparison candidate."
+      }
+    },
+    "england-wales-wales-side-replacement:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:32:10Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "Wales",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.64,
+                  "longitude": -2.676
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Chepstow",
+                "name": "Restway Wall, Garden City Way",
+                "postalCode": "NP16 5EF",
+                "rideHorizonAddress": {
+                  "administrativeArea": "Wales",
+                  "country": "United Kingdom",
+                  "county": "Monmouthshire",
+                  "street": "Restway Wall",
+                  "town": "Chepstow"
+                },
+                "subAdministrativeArea": "Monmouthshire",
+                "subLocality": "Chepstow",
+                "thoroughfare": "Restway Wall"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:32:10Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "nation",
+      "completedAt": "2026-08-05T18:32:10Z",
+      "coordinate": {
+        "latitude": 51.64,
+        "longitude": -2.676
+      },
+      "officialGeography": {
+        "qualification": "Promote only after a dated OS Boundary-Line polygon confirms the selected side.",
+        "sideA": {
+          "name": "England"
+        },
+        "sideB": {
+          "name": "Wales"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "Wales",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.64,
+              "longitude": -2.676
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Chepstow",
+            "name": "Restway Wall, Garden City Way",
+            "postalCode": "NP16 5EF",
+            "rideHorizonAddress": {
+              "administrativeArea": "Wales",
+              "country": "United Kingdom",
+              "county": "Monmouthshire",
+              "street": "Restway Wall",
+              "town": "Chepstow"
+            },
+            "subAdministrativeArea": "Monmouthshire",
+            "subLocality": "Chepstow",
+            "thoroughfare": "Restway Wall"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:32:10Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "england-wales-wales-side-replacement:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "england-wales-wales-side-replacement",
+      "samplePosition": "side-b-replacement",
+      "samplePurpose": "Replacement Wales-side public synthetic comparison point after the original candidate resolved to England; not a route recommendation.",
+      "source": {
+        "dataset": "OS Boundary-Line (planned validation source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Bounded replacement after the first candidate showed the wrong side; public synthetic point only."
+      }
+    },
+    "england-wales-wales-side:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:28:42Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.6093,
+                  "longitude": -2.6502
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Chepstow",
+                "name": "River Severn",
+                "postalCode": "NP16",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Gloucestershire",
+                  "street": "N/A",
+                  "town": "Tidenham"
+                },
+                "subAdministrativeArea": "Gloucestershire",
+                "subLocality": "Tidenham"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:28:42Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "nation",
+      "completedAt": "2026-08-05T18:28:42Z",
+      "coordinate": {
+        "latitude": 51.6093,
+        "longitude": -2.6502
+      },
+      "officialGeography": {
+        "sideA": {
+          "name": "England"
+        },
+        "sideB": {
+          "name": "Wales"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.6093,
+              "longitude": -2.6502
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Chepstow",
+            "name": "River Severn",
+            "postalCode": "NP16",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Gloucestershire",
+              "street": "N/A",
+              "town": "Tidenham"
+            },
+            "subAdministrativeArea": "Gloucestershire",
+            "subLocality": "Tidenham"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:28:42Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "england-wales-wales-side:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "england-wales-wales-side",
+      "samplePosition": "side-b",
+      "samplePurpose": "Higher-level public synthetic nation comparison point in Wales; not a route recommendation.",
+      "source": {
+        "dataset": "OS Boundary-Line (planned validation source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Public synthetic national comparison candidate."
+      }
+    },
+    "esher-forward:forward": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:17:40Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3694139,
+                  "longitude": -0.3656727
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Esher",
+                "name": "Esher",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "N/A",
+                  "town": "Esher"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Esher"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "forward",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:17:40Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:17:40Z",
+      "coordinate": null,
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "forward",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3694139,
+              "longitude": -0.3656727
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Esher",
+            "name": "Esher",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "N/A",
+              "town": "Esher"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Esher"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "forward",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:17:40Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Esher, Surrey, United Kingdom",
+      "requestID": "esher-forward:forward",
+      "requestedLocale": "en_GB",
+      "sampleID": "esher-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "esher-forward:reverse-returned-1": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:18:40Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3694139,
+                  "longitude": -0.3656727
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Esher",
+                "name": "Claremont Lane",
+                "postalCode": "KT10",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "Claremont Lane",
+                  "town": "Esher"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Esher",
+                "thoroughfare": "Claremont Lane"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:18:40Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:18:40Z",
+      "coordinate": {
+        "latitude": 51.3694139,
+        "longitude": -0.3656727
+      },
+      "derivedFrom": "esher-forward:forward",
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3694139,
+              "longitude": -0.3656727
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Esher",
+            "name": "Claremont Lane",
+            "postalCode": "KT10",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "Claremont Lane",
+              "town": "Esher"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Esher",
+            "thoroughfare": "Claremont Lane"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:18:40Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Esher, Surrey, United Kingdom",
+      "requestID": "esher-forward:reverse-returned-1",
+      "requestedLocale": "en_GB",
+      "sampleID": "esher-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "france-country-side:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:30:42Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "Hauts-de-France",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 50.951,
+                  "longitude": 1.858
+                },
+                "country": "France",
+                "isoCountryCode": "FR",
+                "locality": "Calais",
+                "name": "31 Rue des Communes",
+                "postalCode": "62100",
+                "rideHorizonAddress": {
+                  "administrativeArea": "Hauts-de-France",
+                  "country": "France",
+                  "county": "Pas-de-Calais",
+                  "street": "Rue des Communes",
+                  "town": "Calais"
+                },
+                "subAdministrativeArea": "Pas-de-Calais",
+                "subThoroughfare": "31",
+                "thoroughfare": "Rue des Communes"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:30:42Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "country",
+      "completedAt": "2026-08-05T18:30:42Z",
+      "coordinate": {
+        "latitude": 50.951,
+        "longitude": 1.858
+      },
+      "officialGeography": {
+        "sideA": {
+          "isoCountryCode": "GB",
+          "name": "United Kingdom"
+        },
+        "sideB": {
+          "isoCountryCode": "FR",
+          "name": "France"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "Hauts-de-France",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 50.951,
+              "longitude": 1.858
+            },
+            "country": "France",
+            "isoCountryCode": "FR",
+            "locality": "Calais",
+            "name": "31 Rue des Communes",
+            "postalCode": "62100",
+            "rideHorizonAddress": {
+              "administrativeArea": "Hauts-de-France",
+              "country": "France",
+              "county": "Pas-de-Calais",
+              "street": "Rue des Communes",
+              "town": "Calais"
+            },
+            "subAdministrativeArea": "Pas-de-Calais",
+            "subThoroughfare": "31",
+            "thoroughfare": "Rue des Communes"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:30:42Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "france-country-side:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "france-country-side",
+      "samplePosition": "side-b",
+      "samplePurpose": "Higher-level public synthetic country comparison point in France; not a route recommendation.",
+      "source": {
+        "dataset": "ONS and OS official geography (planned validation source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Public country-side comparison candidate, not a maritime-boundary assertion."
+      }
+    },
+    "hampton-court-bridge-boundary-candidate:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:08:51Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.40307,
+                  "longitude": -0.34106
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "East Molesey",
+                "name": "Barge Walk",
+                "postalCode": "KT8",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "Barge Walk",
+                  "town": "Molesey East"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Molesey East",
+                "thoroughfare": "Barge Walk"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:08:50Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "local-authority",
+      "completedAt": "2026-08-05T18:08:51Z",
+      "coordinate": {
+        "latitude": 51.40307,
+        "longitude": -0.34106
+      },
+      "officialGeography": {
+        "sideA": {
+          "code": "E07000207",
+          "name": "Elmbridge"
+        },
+        "sideB": {
+          "code": "E09000027",
+          "name": "Richmond upon Thames"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.40307,
+              "longitude": -0.34106
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "East Molesey",
+            "name": "Barge Walk",
+            "postalCode": "KT8",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "Barge Walk",
+              "town": "Molesey East"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Molesey East",
+            "thoroughfare": "Barge Walk"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:08:50Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "hampton-court-bridge-boundary-candidate:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "hampton-court-bridge-boundary-candidate",
+      "samplePosition": "boundary",
+      "samplePurpose": "Candidate near the Elmbridge/Richmond boundary on Hampton Court Bridge; use only to bracket Apple-label change.",
+      "source": {
+        "dataset": "Elmbridge\u2013Richmond statement of common ground",
+        "licence": "See source document",
+        "selectionMethod": "Public synthetic candidate awaiting Boundary-Line verification."
+      }
+    },
+    "hampton-court-elmbridge-side:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:07:50Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [
+                  "Cigarette Island Park"
+                ],
+                "coordinate": {
+                  "latitude": 51.40241,
+                  "longitude": -0.34186
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "East Molesey",
+                "name": "Cigarette Island Park",
+                "postalCode": "KT8",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "N/A",
+                  "town": "Molesey East"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Molesey East"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:07:50Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "local-authority",
+      "completedAt": "2026-08-05T18:07:50Z",
+      "coordinate": {
+        "latitude": 51.40241,
+        "longitude": -0.34186
+      },
+      "officialGeography": {
+        "qualification": "Candidate point must be validated against a dated OS Boundary-Line polygon before becoming a deterministic administrative fixture.",
+        "sideA": {
+          "code": "E07000207",
+          "name": "Elmbridge"
+        },
+        "sideB": {
+          "code": "E09000027",
+          "name": "Richmond upon Thames"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [
+              "Cigarette Island Park"
+            ],
+            "coordinate": {
+              "latitude": 51.40241,
+              "longitude": -0.34186
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "East Molesey",
+            "name": "Cigarette Island Park",
+            "postalCode": "KT8",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "N/A",
+              "town": "Molesey East"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Molesey East"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:07:50Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "hampton-court-elmbridge-side:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "hampton-court-elmbridge-side",
+      "samplePosition": "side-a",
+      "samplePurpose": "Candidate Elmbridge/Richmond local-authority transition; public synthetic point on the Surrey side of Hampton Court Bridge.",
+      "source": {
+        "dataset": "Elmbridge\u2013Richmond statement of common ground",
+        "licence": "See source document",
+        "selectionMethod": "Public synthetic candidate based on the councils' documented bridge relationship."
+      }
+    },
+    "hampton-court-richmond-side:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:09:51Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [
+                  "Hampton Court Palace"
+                ],
+                "coordinate": {
+                  "latitude": 51.40369,
+                  "longitude": -0.34019
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "East Molesey",
+                "name": "Hampton Court Palace",
+                "postalCode": "KT8",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "London",
+                  "street": "Barge Walk",
+                  "town": "Richmond upon Thames"
+                },
+                "subAdministrativeArea": "London",
+                "subLocality": "Richmond upon Thames",
+                "thoroughfare": "Barge Walk"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:09:51Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "local-authority",
+      "completedAt": "2026-08-05T18:09:51Z",
+      "coordinate": {
+        "latitude": 51.40369,
+        "longitude": -0.34019
+      },
+      "officialGeography": {
+        "sideA": {
+          "code": "E07000207",
+          "name": "Elmbridge"
+        },
+        "sideB": {
+          "code": "E09000027",
+          "name": "Richmond upon Thames"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [
+              "Hampton Court Palace"
+            ],
+            "coordinate": {
+              "latitude": 51.40369,
+              "longitude": -0.34019
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "East Molesey",
+            "name": "Hampton Court Palace",
+            "postalCode": "KT8",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "London",
+              "street": "Barge Walk",
+              "town": "Richmond upon Thames"
+            },
+            "subAdministrativeArea": "London",
+            "subLocality": "Richmond upon Thames",
+            "thoroughfare": "Barge Walk"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:09:51Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "hampton-court-richmond-side:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "hampton-court-richmond-side",
+      "samplePosition": "side-b",
+      "samplePurpose": "Candidate Elmbridge/Richmond local-authority transition; public synthetic point on the Richmond/London side of Hampton Court Bridge.",
+      "source": {
+        "dataset": "Elmbridge\u2013Richmond statement of common ground",
+        "licence": "See source document",
+        "selectionMethod": "Public synthetic candidate awaiting Boundary-Line verification."
+      }
+    },
+    "hinchley-wood-forward:forward": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:14:39Z",
+          "attempt": 1,
+          "failureClass": "transient",
+          "probe": {
+            "candidateCount": 0,
+            "candidates": [],
+            "deviceClass": "macOS command-line",
+            "errorCode": "kCLErrorDomain:2",
+            "errorMessage": "The operation couldn\u2019t be completed. (kCLErrorDomain error 2.)",
+            "operation": "forward",
+            "outcome": "failure",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:14:39Z",
+            "requestedLocale": "en_GB"
+          }
+        },
+        {
+          "at": "2026-08-05T18:15:39Z",
+          "attempt": 2,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3744281,
+                  "longitude": -0.338553
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Esher",
+                "name": "Hinchley Wood",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "N/A",
+                  "town": "Hinchley Wood"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Hinchley Wood"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "forward",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:15:39Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:15:39Z",
+      "coordinate": null,
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "forward",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3744281,
+              "longitude": -0.338553
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Esher",
+            "name": "Hinchley Wood",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "N/A",
+              "town": "Hinchley Wood"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Hinchley Wood"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "forward",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:15:39Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Hinchley Wood, Surrey, United Kingdom",
+      "requestID": "hinchley-wood-forward:forward",
+      "requestedLocale": "en_GB",
+      "sampleID": "hinchley-wood-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "hinchley-wood-forward:reverse-returned-1": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:16:40Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [
+                  "Hinchley Wood Memorial Garden"
+                ],
+                "coordinate": {
+                  "latitude": 51.3744281,
+                  "longitude": -0.338553
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Esher",
+                "name": "Hinchley Wood Memorial Garden",
+                "postalCode": "KT10",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "Manor Road North",
+                  "town": "Hinchley Wood"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Hinchley Wood",
+                "subThoroughfare": "3\u20135",
+                "thoroughfare": "Manor Road North"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:16:40Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:16:40Z",
+      "coordinate": {
+        "latitude": 51.3744281,
+        "longitude": -0.338553
+      },
+      "derivedFrom": "hinchley-wood-forward:forward",
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [
+              "Hinchley Wood Memorial Garden"
+            ],
+            "coordinate": {
+              "latitude": 51.3744281,
+              "longitude": -0.338553
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Esher",
+            "name": "Hinchley Wood Memorial Garden",
+            "postalCode": "KT10",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "Manor Road North",
+              "town": "Hinchley Wood"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Hinchley Wood",
+            "subThoroughfare": "3\u20135",
+            "thoroughfare": "Manor Road North"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:16:40Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Hinchley Wood, Surrey, United Kingdom",
+      "requestID": "hinchley-wood-forward:reverse-returned-1",
+      "requestedLocale": "en_GB",
+      "sampleID": "hinchley-wood-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "kingston-upon-thames-forward:forward": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:25:42Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.4086841,
+                  "longitude": -0.3066223
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Kingston Upon Thames",
+                "name": "Kingston upon Thames",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "London",
+                  "street": "N/A",
+                  "town": "Kingston upon Thames"
+                },
+                "subAdministrativeArea": "London",
+                "subLocality": "Kingston upon Thames"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "forward",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:25:42Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:25:42Z",
+      "coordinate": null,
+      "officialGeography": {
+        "context": "Kingston upon Thames, E09000021"
+      },
+      "operation": "forward",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.4086841,
+              "longitude": -0.3066223
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Kingston Upon Thames",
+            "name": "Kingston upon Thames",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "London",
+              "street": "N/A",
+              "town": "Kingston upon Thames"
+            },
+            "subAdministrativeArea": "London",
+            "subLocality": "Kingston upon Thames"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "forward",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:25:42Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Kingston upon Thames, London, United Kingdom",
+      "requestID": "kingston-upon-thames-forward:forward",
+      "requestedLocale": "en_GB",
+      "sampleID": "kingston-upon-thames-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "kingston-upon-thames-forward:reverse-returned-1": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:26:42Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.4086841,
+                  "longitude": -0.3066223
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Kingston Upon Thames",
+                "name": "6\u20138 High Street",
+                "postalCode": "KT1",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "London",
+                  "street": "High Street",
+                  "town": "Kingston upon Thames"
+                },
+                "subAdministrativeArea": "London",
+                "subLocality": "Kingston upon Thames",
+                "subThoroughfare": "6\u20138",
+                "thoroughfare": "High Street"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:26:42Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:26:42Z",
+      "coordinate": {
+        "latitude": 51.4086841,
+        "longitude": -0.3066223
+      },
+      "derivedFrom": "kingston-upon-thames-forward:forward",
+      "officialGeography": {
+        "context": "Kingston upon Thames, E09000021"
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.4086841,
+              "longitude": -0.3066223
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Kingston Upon Thames",
+            "name": "6\u20138 High Street",
+            "postalCode": "KT1",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "London",
+              "street": "High Street",
+              "town": "Kingston upon Thames"
+            },
+            "subAdministrativeArea": "London",
+            "subLocality": "Kingston upon Thames",
+            "subThoroughfare": "6\u20138",
+            "thoroughfare": "High Street"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:26:42Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Kingston upon Thames, London, United Kingdom",
+      "requestID": "kingston-upon-thames-forward:reverse-returned-1",
+      "requestedLocale": "en_GB",
+      "sampleID": "kingston-upon-thames-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "long-ditton-forward:forward": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:10:34Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3843639,
+                  "longitude": -0.3195691
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Surbiton",
+                "name": "Long Ditton",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "N/A",
+                  "town": "Long Ditton"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Long Ditton"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "forward",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:10:34Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:10:34Z",
+      "coordinate": null,
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "forward",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3843639,
+              "longitude": -0.3195691
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Surbiton",
+            "name": "Long Ditton",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "N/A",
+              "town": "Long Ditton"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Long Ditton"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "forward",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:10:34Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Long Ditton, Surrey, United Kingdom",
+      "requestID": "long-ditton-forward:forward",
+      "requestedLocale": "en_GB",
+      "sampleID": "long-ditton-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "long-ditton-forward:reverse-returned-1": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:11:34Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3843639,
+                  "longitude": -0.3195691
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Surbiton",
+                "name": "2\u20138 Ditton Hill Road, Long Ditton",
+                "postalCode": "KT6",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "Ditton Hill Road",
+                  "town": "Long Ditton"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Long Ditton",
+                "subThoroughfare": "2\u20138",
+                "thoroughfare": "Ditton Hill Road"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:11:34Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:11:34Z",
+      "coordinate": {
+        "latitude": 51.3843639,
+        "longitude": -0.3195691
+      },
+      "derivedFrom": "long-ditton-forward:forward",
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3843639,
+              "longitude": -0.3195691
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Surbiton",
+            "name": "2\u20138 Ditton Hill Road, Long Ditton",
+            "postalCode": "KT6",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "Ditton Hill Road",
+              "town": "Long Ditton"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Long Ditton",
+            "subThoroughfare": "2\u20138",
+            "thoroughfare": "Ditton Hill Road"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:11:34Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Long Ditton, Surrey, United Kingdom",
+      "requestID": "long-ditton-forward:reverse-returned-1",
+      "requestedLocale": "en_GB",
+      "sampleID": "long-ditton-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "lovelace-road-boundary-candidate:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:05:50Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.38643,
+                  "longitude": -0.29325
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Surbiton",
+                "name": "School Cottage, Hollyfield Road",
+                "postalCode": "KT5 9AL",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "London",
+                  "street": "School Cottage",
+                  "town": "Kingston upon Thames"
+                },
+                "subAdministrativeArea": "London",
+                "subLocality": "Kingston upon Thames",
+                "thoroughfare": "School Cottage"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:05:50Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "local-authority",
+      "completedAt": "2026-08-05T18:05:50Z",
+      "coordinate": {
+        "latitude": 51.38643,
+        "longitude": -0.29325
+      },
+      "officialGeography": {
+        "sideA": {
+          "code": "E09000021",
+          "name": "Kingston upon Thames"
+        },
+        "sideB": {
+          "code": "E07000207",
+          "name": "Elmbridge"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.38643,
+              "longitude": -0.29325
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Surbiton",
+            "name": "School Cottage, Hollyfield Road",
+            "postalCode": "KT5 9AL",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "London",
+              "street": "School Cottage",
+              "town": "Kingston upon Thames"
+            },
+            "subAdministrativeArea": "London",
+            "subLocality": "Kingston upon Thames",
+            "thoroughfare": "School Cottage"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:05:50Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "lovelace-road-boundary-candidate:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "lovelace-road-boundary-candidate",
+      "samplePosition": "boundary",
+      "samplePurpose": "Candidate near the Lovelace Road Kingston/Elmbridge boundary; use only to bracket Apple-label change, not to claim the legal boundary location.",
+      "source": {
+        "dataset": "ONS local-area profiles and Surrey County Council Elmbridge Local Committee report",
+        "licence": "See source records",
+        "selectionMethod": "Public synthetic candidate awaiting Boundary-Line verification."
+      }
+    },
+    "lovelace-road-elmbridge-side:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:06:50Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [
+                  "Fishponds Park"
+                ],
+                "coordinate": {
+                  "latitude": 51.38692,
+                  "longitude": -0.29461
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Surbiton",
+                "name": "Fishponds Park",
+                "postalCode": "KT6",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "London",
+                  "street": "N/A",
+                  "town": "Kingston upon Thames"
+                },
+                "subAdministrativeArea": "London",
+                "subLocality": "Kingston upon Thames"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:06:50Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "local-authority",
+      "completedAt": "2026-08-05T18:06:50Z",
+      "coordinate": {
+        "latitude": 51.38692,
+        "longitude": -0.29461
+      },
+      "officialGeography": {
+        "sideA": {
+          "code": "E09000021",
+          "name": "Kingston upon Thames"
+        },
+        "sideB": {
+          "code": "E07000207",
+          "name": "Elmbridge"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [
+              "Fishponds Park"
+            ],
+            "coordinate": {
+              "latitude": 51.38692,
+              "longitude": -0.29461
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Surbiton",
+            "name": "Fishponds Park",
+            "postalCode": "KT6",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "London",
+              "street": "N/A",
+              "town": "Kingston upon Thames"
+            },
+            "subAdministrativeArea": "London",
+            "subLocality": "Kingston upon Thames"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:06:50Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "lovelace-road-elmbridge-side:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "lovelace-road-elmbridge-side",
+      "samplePosition": "side-b",
+      "samplePurpose": "Candidate Kingston/Elmbridge local-authority transition; public synthetic point on the Elmbridge/Surrey side.",
+      "source": {
+        "dataset": "ONS local-area profiles and Surrey County Council Elmbridge Local Committee report",
+        "licence": "See source records",
+        "selectionMethod": "Public synthetic candidate awaiting Boundary-Line verification."
+      }
+    },
+    "lovelace-road-kingston-side:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:05:10Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.38591,
+                  "longitude": -0.29189
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Surbiton",
+                "name": "72 Beaconsfield Road",
+                "postalCode": "KT5 9AP",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "London",
+                  "street": "Beaconsfield Road",
+                  "town": "Kingston upon Thames"
+                },
+                "subAdministrativeArea": "London",
+                "subLocality": "Kingston upon Thames",
+                "subThoroughfare": "72",
+                "thoroughfare": "Beaconsfield Road"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "errorCode": null,
+            "errorMessage": null,
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:05:10Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "local-authority",
+      "completedAt": "2026-08-05T18:05:10Z",
+      "coordinate": {
+        "latitude": 51.38591,
+        "longitude": -0.29189
+      },
+      "officialGeography": {
+        "qualification": "Candidate point must be validated against a dated OS Boundary-Line polygon before becoming a deterministic administrative fixture.",
+        "sideA": {
+          "code": "E09000021",
+          "name": "Kingston upon Thames"
+        },
+        "sideB": {
+          "code": "E07000207",
+          "name": "Elmbridge"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.38591,
+              "longitude": -0.29189
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Surbiton",
+            "name": "72 Beaconsfield Road",
+            "postalCode": "KT5 9AP",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "London",
+              "street": "Beaconsfield Road",
+              "town": "Kingston upon Thames"
+            },
+            "subAdministrativeArea": "London",
+            "subLocality": "Kingston upon Thames",
+            "subThoroughfare": "72",
+            "thoroughfare": "Beaconsfield Road"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "errorCode": null,
+        "errorMessage": null,
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:05:10Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "lovelace-road-kingston-side:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "lovelace-road-kingston-side",
+      "samplePosition": "side-a",
+      "samplePurpose": "Candidate Kingston/Elmbridge local-authority transition; public synthetic point on the Kingston/London side.",
+      "source": {
+        "dataset": "ONS local-area profiles and Surrey County Council Elmbridge Local Committee report",
+        "licence": "See source records",
+        "selectionMethod": "Public synthetic candidate based on the documented Lovelace Road crossing class."
+      }
+    },
+    "surbiton-forward:forward": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:23:41Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3932989,
+                  "longitude": -0.2986712
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Surbiton",
+                "name": "Surbiton",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "London",
+                  "street": "N/A",
+                  "town": "Kingston upon Thames"
+                },
+                "subAdministrativeArea": "London",
+                "subLocality": "Kingston upon Thames"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "forward",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:23:41Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:23:41Z",
+      "coordinate": null,
+      "officialGeography": {
+        "context": "Kingston upon Thames, E09000021"
+      },
+      "operation": "forward",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3932989,
+              "longitude": -0.2986712
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Surbiton",
+            "name": "Surbiton",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "London",
+              "street": "N/A",
+              "town": "Kingston upon Thames"
+            },
+            "subAdministrativeArea": "London",
+            "subLocality": "Kingston upon Thames"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "forward",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:23:41Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Surbiton, London, United Kingdom",
+      "requestID": "surbiton-forward:forward",
+      "requestedLocale": "en_GB",
+      "sampleID": "surbiton-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "surbiton-forward:reverse-returned-1": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:24:41Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3932989,
+                  "longitude": -0.2986712
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Surbiton",
+                "name": "10 Bramley Mansions, Ewell Road",
+                "postalCode": "KT6 6AE",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "London",
+                  "street": "Bramley Mansions",
+                  "town": "Kingston upon Thames"
+                },
+                "subAdministrativeArea": "London",
+                "subLocality": "Kingston upon Thames",
+                "subThoroughfare": "10",
+                "thoroughfare": "Bramley Mansions"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:24:41Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:24:41Z",
+      "coordinate": {
+        "latitude": 51.3932989,
+        "longitude": -0.2986712
+      },
+      "derivedFrom": "surbiton-forward:forward",
+      "officialGeography": {
+        "context": "Kingston upon Thames, E09000021"
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3932989,
+              "longitude": -0.2986712
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Surbiton",
+            "name": "10 Bramley Mansions, Ewell Road",
+            "postalCode": "KT6 6AE",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "London",
+              "street": "Bramley Mansions",
+              "town": "Kingston upon Thames"
+            },
+            "subAdministrativeArea": "London",
+            "subLocality": "Kingston upon Thames",
+            "subThoroughfare": "10",
+            "thoroughfare": "Bramley Mansions"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:24:41Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Surbiton, London, United Kingdom",
+      "requestID": "surbiton-forward:reverse-returned-1",
+      "requestedLocale": "en_GB",
+      "sampleID": "surbiton-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "thames-ditton-forward:forward": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:12:35Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3910832,
+                  "longitude": -0.332274
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Thames Ditton",
+                "name": "Thames Ditton",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "N/A",
+                  "town": "Thames Ditton"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Thames Ditton"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "forward",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:12:35Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:12:35Z",
+      "coordinate": null,
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "forward",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3910832,
+              "longitude": -0.332274
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Thames Ditton",
+            "name": "Thames Ditton",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "N/A",
+              "town": "Thames Ditton"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Thames Ditton"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "forward",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:12:35Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Thames Ditton, Surrey, United Kingdom",
+      "requestID": "thames-ditton-forward:forward",
+      "requestedLocale": "en_GB",
+      "sampleID": "thames-ditton-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "thames-ditton-forward:reverse-returned-1": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:13:35Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.3910832,
+                  "longitude": -0.332274
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Thames Ditton",
+                "name": "53B High Street",
+                "postalCode": "KT7 0SF",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Surrey",
+                  "street": "High Street",
+                  "town": "Thames Ditton"
+                },
+                "subAdministrativeArea": "Surrey",
+                "subLocality": "Thames Ditton",
+                "subThoroughfare": "53B",
+                "thoroughfare": "High Street"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:13:35Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "locality",
+      "completedAt": "2026-08-05T18:13:35Z",
+      "coordinate": {
+        "latitude": 51.3910832,
+        "longitude": -0.332274
+      },
+      "derivedFrom": "thames-ditton-forward:forward",
+      "officialGeography": {
+        "context": "Elmbridge, E07000207"
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.3910832,
+              "longitude": -0.332274
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Thames Ditton",
+            "name": "53B High Street",
+            "postalCode": "KT7 0SF",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Surrey",
+              "street": "High Street",
+              "town": "Thames Ditton"
+            },
+            "subAdministrativeArea": "Surrey",
+            "subLocality": "Thames Ditton",
+            "subThoroughfare": "53B",
+            "thoroughfare": "High Street"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:13:35Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": "Thames Ditton, Surrey, United Kingdom",
+      "requestID": "thames-ditton-forward:reverse-returned-1",
+      "requestedLocale": "en_GB",
+      "sampleID": "thames-ditton-forward",
+      "samplePosition": "settlement-centre",
+      "samplePurpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "source": {
+        "dataset": "OS Open Names (planned seed source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."
+      }
+    },
+    "united-kingdom-country-side:reverse": {
+      "attempts": [
+        {
+          "at": "2026-08-05T18:29:42Z",
+          "attempt": 1,
+          "failureClass": "none",
+          "probe": {
+            "candidateCount": 1,
+            "candidates": [
+              {
+                "administrativeArea": "England",
+                "areasOfInterest": [],
+                "coordinate": {
+                  "latitude": 51.129,
+                  "longitude": 1.313
+                },
+                "country": "United Kingdom",
+                "isoCountryCode": "GB",
+                "locality": "Dover",
+                "name": "95 Maison Dieu Road",
+                "postalCode": "CT16 1RU",
+                "rideHorizonAddress": {
+                  "administrativeArea": "England",
+                  "country": "United Kingdom",
+                  "county": "Kent",
+                  "street": "Maison Dieu Road",
+                  "town": "Dover"
+                },
+                "subAdministrativeArea": "Kent",
+                "subLocality": "Dover",
+                "subThoroughfare": "95",
+                "thoroughfare": "Maison Dieu Road"
+              }
+            ],
+            "deviceClass": "macOS command-line",
+            "operation": "reverse",
+            "outcome": "success",
+            "platform": "Version 15.7.8 (Build 24G824)",
+            "requestedAt": "2026-08-05T18:29:42Z",
+            "requestedLocale": "en_GB"
+          }
+        }
+      ],
+      "boundaryLevel": "country",
+      "completedAt": "2026-08-05T18:29:42Z",
+      "coordinate": {
+        "latitude": 51.129,
+        "longitude": 1.313
+      },
+      "officialGeography": {
+        "sideA": {
+          "isoCountryCode": "GB",
+          "name": "United Kingdom"
+        },
+        "sideB": {
+          "isoCountryCode": "FR",
+          "name": "France"
+        }
+      },
+      "operation": "reverse",
+      "outcome": "success",
+      "probe": {
+        "candidateCount": 1,
+        "candidates": [
+          {
+            "administrativeArea": "England",
+            "areasOfInterest": [],
+            "coordinate": {
+              "latitude": 51.129,
+              "longitude": 1.313
+            },
+            "country": "United Kingdom",
+            "isoCountryCode": "GB",
+            "locality": "Dover",
+            "name": "95 Maison Dieu Road",
+            "postalCode": "CT16 1RU",
+            "rideHorizonAddress": {
+              "administrativeArea": "England",
+              "country": "United Kingdom",
+              "county": "Kent",
+              "street": "Maison Dieu Road",
+              "town": "Dover"
+            },
+            "subAdministrativeArea": "Kent",
+            "subLocality": "Dover",
+            "subThoroughfare": "95",
+            "thoroughfare": "Maison Dieu Road"
+          }
+        ],
+        "deviceClass": "macOS command-line",
+        "operation": "reverse",
+        "outcome": "success",
+        "platform": "Version 15.7.8 (Build 24G824)",
+        "requestedAt": "2026-08-05T18:29:42Z",
+        "requestedLocale": "en_GB"
+      },
+      "query": null,
+      "requestID": "united-kingdom-country-side:reverse",
+      "requestedLocale": "en_GB",
+      "sampleID": "united-kingdom-country-side",
+      "samplePosition": "side-a",
+      "samplePurpose": "Higher-level public synthetic country comparison point in the United Kingdom; not a route recommendation.",
+      "source": {
+        "dataset": "ONS and OS official geography (planned validation source)",
+        "licence": "Open Government Licence",
+        "selectionMethod": "Public country-side comparison candidate, not a maritime-boundary assertion."
+      }
+    }
+  },
+  "schemaVersion": "apple-place-audit-results-v1",
+  "updatedAt": "2026-08-05T18:32:10Z"
+}

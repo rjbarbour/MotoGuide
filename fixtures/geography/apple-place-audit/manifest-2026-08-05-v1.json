@@ -1,0 +1,240 @@
+{
+  "schemaVersion": "apple-place-audit-manifest-v1",
+  "manifestVersion": "2026-08-05-v1",
+  "createdAt": "2026-08-05",
+  "purpose": "Public synthetic Apple place-label audit. Coordinates are not personal ride history and are not a recommended riding route.",
+  "datasetRegister": [
+    {
+      "name": "OS Boundary-Line",
+      "version": "not downloaded for this spike; current source checked 2026-08-05",
+      "licence": "Open Government Licence",
+      "use": "Authoritative administrative-boundary source to validate a candidate before promotion to a deterministic boundary fixture.",
+      "url": "https://www.ordnancesurvey.co.uk/products/boundary-line"
+    },
+    {
+      "name": "ONS local-area profiles",
+      "version": "accessed 2026-08-05",
+      "licence": "Open Government Licence where applicable",
+      "use": "Official geography names and codes for Elmbridge, Kingston upon Thames and Richmond upon Thames.",
+      "url": "https://www.ons.gov.uk/explore-local-statistics"
+    },
+    {
+      "name": "Elmbridge and Richmond council boundary material",
+      "version": "accessed 2026-08-05",
+      "licence": "See source documents",
+      "use": "Confirms the selected Lovelace Road and Hampton Court Bridge crossing classes; it is not used as a substitute for a Boundary-Line polygon.",
+      "url": "https://www.elmbridge.gov.uk/sites/default/files/2023-08/CD021%20-%20Statement%20of%20Common%20Ground%20with%20London%20Borough%20of%20Richmond%20upon%20Thames%20-%20July%202023_0.pdf"
+    }
+  ],
+  "samples": [
+    {
+      "id": "lovelace-road-kingston-side",
+      "purpose": "Candidate Kingston/Elmbridge local-authority transition; public synthetic point on the Kingston/London side.",
+      "boundaryLevel": "local-authority",
+      "position": "side-a",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.38591, "longitude": -0.29189},
+      "officialGeography": {"sideA": {"name": "Kingston upon Thames", "code": "E09000021"}, "sideB": {"name": "Elmbridge", "code": "E07000207"}, "qualification": "Candidate point must be validated against a dated OS Boundary-Line polygon before becoming a deterministic administrative fixture."},
+      "source": {"dataset": "ONS local-area profiles and Surrey County Council Elmbridge Local Committee report", "licence": "See source records", "selectionMethod": "Public synthetic candidate based on the documented Lovelace Road crossing class."}
+    },
+    {
+      "id": "lovelace-road-boundary-candidate",
+      "purpose": "Candidate near the Lovelace Road Kingston/Elmbridge boundary; use only to bracket Apple-label change, not to claim the legal boundary location.",
+      "boundaryLevel": "local-authority",
+      "position": "boundary",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.38643, "longitude": -0.29325},
+      "officialGeography": {"sideA": {"name": "Kingston upon Thames", "code": "E09000021"}, "sideB": {"name": "Elmbridge", "code": "E07000207"}},
+      "source": {"dataset": "ONS local-area profiles and Surrey County Council Elmbridge Local Committee report", "licence": "See source records", "selectionMethod": "Public synthetic candidate awaiting Boundary-Line verification."}
+    },
+    {
+      "id": "lovelace-road-elmbridge-side",
+      "purpose": "Candidate Kingston/Elmbridge local-authority transition; public synthetic point on the Elmbridge/Surrey side.",
+      "boundaryLevel": "local-authority",
+      "position": "side-b",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.38692, "longitude": -0.29461},
+      "officialGeography": {"sideA": {"name": "Kingston upon Thames", "code": "E09000021"}, "sideB": {"name": "Elmbridge", "code": "E07000207"}},
+      "source": {"dataset": "ONS local-area profiles and Surrey County Council Elmbridge Local Committee report", "licence": "See source records", "selectionMethod": "Public synthetic candidate awaiting Boundary-Line verification."}
+    },
+    {
+      "id": "hampton-court-elmbridge-side",
+      "purpose": "Candidate Elmbridge/Richmond local-authority transition; public synthetic point on the Surrey side of Hampton Court Bridge.",
+      "boundaryLevel": "local-authority",
+      "position": "side-a",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.40241, "longitude": -0.34186},
+      "officialGeography": {"sideA": {"name": "Elmbridge", "code": "E07000207"}, "sideB": {"name": "Richmond upon Thames", "code": "E09000027"}, "qualification": "Candidate point must be validated against a dated OS Boundary-Line polygon before becoming a deterministic administrative fixture."},
+      "source": {"dataset": "Elmbridge–Richmond statement of common ground", "licence": "See source document", "selectionMethod": "Public synthetic candidate based on the councils' documented bridge relationship."}
+    },
+    {
+      "id": "hampton-court-bridge-boundary-candidate",
+      "purpose": "Candidate near the Elmbridge/Richmond boundary on Hampton Court Bridge; use only to bracket Apple-label change.",
+      "boundaryLevel": "local-authority",
+      "position": "boundary",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.40307, "longitude": -0.34106},
+      "officialGeography": {"sideA": {"name": "Elmbridge", "code": "E07000207"}, "sideB": {"name": "Richmond upon Thames", "code": "E09000027"}},
+      "source": {"dataset": "Elmbridge–Richmond statement of common ground", "licence": "See source document", "selectionMethod": "Public synthetic candidate awaiting Boundary-Line verification."}
+    },
+    {
+      "id": "hampton-court-richmond-side",
+      "purpose": "Candidate Elmbridge/Richmond local-authority transition; public synthetic point on the Richmond/London side of Hampton Court Bridge.",
+      "boundaryLevel": "local-authority",
+      "position": "side-b",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.40369, "longitude": -0.34019},
+      "officialGeography": {"sideA": {"name": "Elmbridge", "code": "E07000207"}, "sideB": {"name": "Richmond upon Thames", "code": "E09000027"}},
+      "source": {"dataset": "Elmbridge–Richmond statement of common ground", "licence": "See source document", "selectionMethod": "Public synthetic candidate awaiting Boundary-Line verification."}
+    },
+    {
+      "id": "long-ditton-forward",
+      "purpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "boundaryLevel": "locality",
+      "position": "settlement-centre",
+      "locale": "en_GB",
+      "operation": "forward-reverse",
+      "query": "Long Ditton, Surrey, United Kingdom",
+      "officialGeography": {"context": "Elmbridge, E07000207"},
+      "source": {"dataset": "OS Open Names (planned seed source)", "licence": "Open Government Licence", "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."}
+    },
+    {
+      "id": "thames-ditton-forward",
+      "purpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "boundaryLevel": "locality",
+      "position": "settlement-centre",
+      "locale": "en_GB",
+      "operation": "forward-reverse",
+      "query": "Thames Ditton, Surrey, United Kingdom",
+      "officialGeography": {"context": "Elmbridge, E07000207"},
+      "source": {"dataset": "OS Open Names (planned seed source)", "licence": "Open Government Licence", "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."}
+    },
+    {
+      "id": "hinchley-wood-forward",
+      "purpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "boundaryLevel": "locality",
+      "position": "settlement-centre",
+      "locale": "en_GB",
+      "operation": "forward-reverse",
+      "query": "Hinchley Wood, Surrey, United Kingdom",
+      "officialGeography": {"context": "Elmbridge, E07000207"},
+      "source": {"dataset": "OS Open Names (planned seed source)", "licence": "Open Government Licence", "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."}
+    },
+    {
+      "id": "esher-forward",
+      "purpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "boundaryLevel": "locality",
+      "position": "settlement-centre",
+      "locale": "en_GB",
+      "operation": "forward-reverse",
+      "query": "Esher, Surrey, United Kingdom",
+      "officialGeography": {"context": "Elmbridge, E07000207"},
+      "source": {"dataset": "OS Open Names (planned seed source)", "licence": "Open Government Licence", "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."}
+    },
+    {
+      "id": "claygate-forward",
+      "purpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "boundaryLevel": "locality",
+      "position": "settlement-centre",
+      "locale": "en_GB",
+      "operation": "forward-reverse",
+      "query": "Claygate, Surrey, United Kingdom",
+      "officialGeography": {"context": "Elmbridge, E07000207"},
+      "source": {"dataset": "OS Open Names (planned seed source)", "licence": "Open Government Licence", "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."}
+    },
+    {
+      "id": "east-molesey-forward",
+      "purpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "boundaryLevel": "locality",
+      "position": "settlement-centre",
+      "locale": "en_GB",
+      "operation": "forward-reverse",
+      "query": "East Molesey, Surrey, United Kingdom",
+      "officialGeography": {"context": "Elmbridge, E07000207"},
+      "source": {"dataset": "OS Open Names (planned seed source)", "licence": "Open Government Licence", "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."}
+    },
+    {
+      "id": "surbiton-forward",
+      "purpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "boundaryLevel": "locality",
+      "position": "settlement-centre",
+      "locale": "en_GB",
+      "operation": "forward-reverse",
+      "query": "Surbiton, London, United Kingdom",
+      "officialGeography": {"context": "Kingston upon Thames, E09000021"},
+      "source": {"dataset": "OS Open Names (planned seed source)", "licence": "Open Government Licence", "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."}
+    },
+    {
+      "id": "kingston-upon-thames-forward",
+      "purpose": "Settlement candidate forward-geocoded then reverse-geocoded at Apple's first returned coordinate.",
+      "boundaryLevel": "locality",
+      "position": "settlement-centre",
+      "locale": "en_GB",
+      "operation": "forward-reverse",
+      "query": "Kingston upon Thames, London, United Kingdom",
+      "officialGeography": {"context": "Kingston upon Thames, E09000021"},
+      "source": {"dataset": "OS Open Names (planned seed source)", "licence": "Open Government Licence", "selectionMethod": "Named settlement candidate; no OS dataset was downloaded in this spike."}
+    },
+    {
+      "id": "england-wales-england-side",
+      "purpose": "Higher-level public synthetic nation comparison point in England; not a route recommendation.",
+      "boundaryLevel": "nation",
+      "position": "side-a",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.60930, "longitude": -2.61020},
+      "officialGeography": {"sideA": {"name": "England"}, "sideB": {"name": "Wales"}},
+      "source": {"dataset": "OS Boundary-Line (planned validation source)", "licence": "Open Government Licence", "selectionMethod": "Public synthetic national comparison candidate."}
+    },
+    {
+      "id": "england-wales-wales-side",
+      "purpose": "Higher-level public synthetic nation comparison point in Wales; not a route recommendation.",
+      "boundaryLevel": "nation",
+      "position": "side-b",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.60930, "longitude": -2.65020},
+      "officialGeography": {"sideA": {"name": "England"}, "sideB": {"name": "Wales"}},
+      "source": {"dataset": "OS Boundary-Line (planned validation source)", "licence": "Open Government Licence", "selectionMethod": "Public synthetic national comparison candidate."}
+    },
+    {
+      "id": "england-wales-wales-side-replacement",
+      "purpose": "Replacement Wales-side public synthetic comparison point after the original candidate resolved to England; not a route recommendation.",
+      "boundaryLevel": "nation",
+      "position": "side-b-replacement",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.64000, "longitude": -2.67600},
+      "officialGeography": {"sideA": {"name": "England"}, "sideB": {"name": "Wales"}, "qualification": "Promote only after a dated OS Boundary-Line polygon confirms the selected side."},
+      "source": {"dataset": "OS Boundary-Line (planned validation source)", "licence": "Open Government Licence", "selectionMethod": "Bounded replacement after the first candidate showed the wrong side; public synthetic point only."}
+    },
+    {
+      "id": "united-kingdom-country-side",
+      "purpose": "Higher-level public synthetic country comparison point in the United Kingdom; not a route recommendation.",
+      "boundaryLevel": "country",
+      "position": "side-a",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 51.12900, "longitude": 1.31300},
+      "officialGeography": {"sideA": {"name": "United Kingdom", "isoCountryCode": "GB"}, "sideB": {"name": "France", "isoCountryCode": "FR"}},
+      "source": {"dataset": "ONS and OS official geography (planned validation source)", "licence": "Open Government Licence", "selectionMethod": "Public country-side comparison candidate, not a maritime-boundary assertion."}
+    },
+    {
+      "id": "france-country-side",
+      "purpose": "Higher-level public synthetic country comparison point in France; not a route recommendation.",
+      "boundaryLevel": "country",
+      "position": "side-b",
+      "locale": "en_GB",
+      "operation": "reverse",
+      "coordinate": {"latitude": 50.95100, "longitude": 1.85800},
+      "officialGeography": {"sideA": {"name": "United Kingdom", "isoCountryCode": "GB"}, "sideB": {"name": "France", "isoCountryCode": "FR"}},
+      "source": {"dataset": "ONS and OS official geography (planned validation source)", "licence": "Open Government Licence", "selectionMethod": "Public country-side comparison candidate, not a maritime-boundary assertion."}
+    }
+  ]
+}
