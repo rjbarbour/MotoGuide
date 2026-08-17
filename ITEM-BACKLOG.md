@@ -64,8 +64,8 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Exclusions:** Do not import RH-045 build-number changes, shared-scheme formatting churn, TestFlight tooling, release evidence or unrelated Settings changes; do not archive, upload or alter signing.
 - **Risk:** Low. The UI is read-only and derives values from packaged metadata. The main risk is displaying a stale hard-coded value or disrupting the Settings layout.
 - **Acceptance criteria:** Settings visibly labels both the packaged version and build; no release identity is duplicated in source; the normal RideHorizon scheme/project semantics are unchanged; relevant automated checks and an unsigned generic-iPhone compile pass.
-- **Verification — 2026-08-17:** `git diff --check` passed. A cached unsigned Release build for generic iOS hardware completed with exit status 0 and `** BUILD SUCCEEDED **`. No focused `AppBuildMetadata` test exists; no broad simulator suite was run for this static presentation-only change. No physical iPhone was available in the scheme destinations, so no device install was attempted.
-- **Status:** Review-ready — implementation and proportionate verification complete; independent review pending.
+- **Verification — 2026-08-17:** `git diff --check` passed. A cached unsigned Release build for generic iOS hardware completed with exit status 0 and `** BUILD SUCCEEDED **`. Independent reviews identified that the friendly timestamp truncated build seconds; follow-up commit `e4880fd` now displays the full packaged `CFBundleVersion`, and both reviews passed on recheck. No focused `AppBuildMetadata` test exists; no broad simulator suite was run for this static presentation-only change. No physical iPhone was available in the scheme destinations, so no device install was attempted.
+- **Status:** PR-ready — implementation, proportionate verification and independent review complete.
 
 ## Completed repository maintenance
 
