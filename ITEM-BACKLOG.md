@@ -67,6 +67,17 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Verification — 2026-08-17:** `git diff --check` passed. A cached unsigned Release build for generic iOS hardware completed with exit status 0 and `** BUILD SUCCEEDED **`. Independent reviews identified that the friendly timestamp truncated build seconds; follow-up commit `e4880fd` now displays the full packaged `CFBundleVersion`, and both reviews passed on recheck. No focused `AppBuildMetadata` test exists; no broad simulator suite was run for this static presentation-only change. No physical iPhone was available in the scheme destinations, so no device install was attempted.
 - **Status:** PR-ready — implementation, proportionate verification and independent review complete.
 
+### RH-054 — Reconcile family-product sequence and name research
+
+- **Type:** Product-planning and dated research reconciliation.
+- **Claimed by:** Codex on branch `codex/rh-054-product-planning-reconciliation`.
+- **Outcome:** Current `main` retains the genuinely new product-family delivery decisions and preliminary name evidence from RH-045 without duplicating the integrated family framework or treating a provisional name as adopted.
+- **Scope:** Compare the RH-045 BackseatGuider sequence and 2026-08-10 to 2026-08-11 name/IP screen with the integrated family journey framework and PR 9 priority overlay; retain durable delivery boundaries, sequencing and dated evidence; update stale repository authority references.
+- **Exclusions:** Do not implement a second app or target, expand the live ledger into a future programme, adopt or register a product name, buy domains, repeat live availability searches, or restore deprecated `Backlog.md` material.
+- **Risk:** Low for documentation. The material becomes misleading if dated name signals are presented as current clearance or if a planning sequence is mistaken for implementation authority.
+- **Acceptance criteria:** The family framework remains product inspiration; the retained sequence adds only delivery decisions and phase gates; the name screen remains explicitly dated and preliminary; current `ITEM-BACKLOG.md` is the sole live ledger; stale branch, PR and checkout claims are removed; local links and `git diff --check` pass.
+- **Status:** Active — source comparison and reconciliation in progress.
+
 ## Completed repository maintenance
 
 ### RH-049 — Reconcile preservation checkpoint and hygiene ledger
