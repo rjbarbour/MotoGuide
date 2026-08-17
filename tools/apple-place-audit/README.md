@@ -30,7 +30,9 @@ Inspect the pending request plan without touching Apple services:
 uv run --python 3.13 tools/apple-place-audit/apple_place_audit.py --manifest fixtures/geography/apple-place-audit/manifest-2026-08-05-v1.json --results fixtures/geography/apple-place-audit/results-2026-08-05-v1.json --probe tools/apple-place-audit/.build/apple-place-probe --dry-run
 ```
 
-Expected result: JSON lists the initial public samples and no results file is written.
+Expected result for the retained completed cache: JSON contains `"pendingRequests": []` and no results file is written. To inspect the initial public request plan, supply a path for a nonexistent temporary results file rather than the retained cache.
+
+This command is an operator-only empirical probe, not an LLM-safe diagnostic collector. Do not paste raw live-run output into an AI session. If future evidence is intended for LLM-assisted diagnosis, use the repository's Diagnostic Script Standards, including collection-time redaction and the required output markers.
 
 Run the six-request Lovelace Road and Hampton Court pilot before the broader corpus:
 
