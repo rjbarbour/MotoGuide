@@ -13,7 +13,7 @@
 
 | Rank | Candidate | Rating | Decision |
 | --- | --- | --- | --- |
-| 1 | **Backseat Guider** | **AMBER** | Retain only as the leading candidate for solicitor-led clearance and a spoken-name test. Exact composite searches are clear, but live UK marks for `BACKSEAT` and `GUIDER` overlap with software, entertainment, education and SaaS. |
+| 1 | **Backseat Guider** | **AMBER** | Retain only as the leading candidate for solicitor-led clearance and a spoken-name test. Exact composite searches returned zero results when checked, but UK marks observed live for `BACKSEAT` and `GUIDER` overlap with software, entertainment, education and SaaS. |
 | 2 | **Backseat Guide** | **AMBER** | Do not prefer it over Backseat Guider. It is generic/descriptive in the travel context, and a live collective `GUIDE` mark covers tourist guiding, travel information and geographic/historical-site information. |
 | 3 | **Backseat Driver** | **RED** | Reject for this product. It has an extant iOS travel app, historic children’s road-trip app use by Toyota, crowded public signals and weak inherent distinctiveness as a common phrase. |
 
@@ -23,7 +23,7 @@ The ratings are comparative judgements, not legal conclusions. All three need so
 
 | Criterion | Backseat Guide | Backseat Guider | Backseat Driver |
 | --- | --- | --- | --- |
-| Direct competitor collision | AMBER — no exact app/web collision, but `GUIDE` is live for closely adjacent travel/guiding services | AMBER — no exact composite result, but live `BACKSEAT` and `GUIDER` component marks overlap relevant classes | RED — current iOS travel app and prior Toyota kids road-trip app |
+| Direct competitor collision | AMBER — no exact app/web collision, but `GUIDE` was observed live for closely adjacent travel/guiding services | AMBER — no exact composite result, but `BACKSEAT` and `GUIDER` component marks were observed live in relevant classes | RED — iOS travel app observed on 2026-08-10 and prior Toyota kids road-trip app |
 | Broader trade-mark/IP risk | AMBER — descriptive combination; UKIPO returned 417 live filtered `GUIDE` results | AMBER — unusual whole, but two live relevant component marks require a confusion assessment | RED — common phrase; numerous commercial, software and entertainment uses |
 | Domain practicality | GREEN — principal no-space forms returned RDAP 404 | GREEN — principal no-space forms returned RDAP 404, including `.ai` | RED — `.com` and several close forms are already resolved/registered |
 | Search/discoverability | AMBER — generic search phrase | AMBER — rarer phrase, though users may initially hear or spell `guide`, and `Guider` is already a software/services mark | RED — dominated by idiom, automotive commentary, music and existing apps |
@@ -44,9 +44,9 @@ The first in-sandbox runs could not reach RDAP or public-search providers, so th
 
 | Candidate | Strongest positive signal | Important limit |
 | --- | --- | --- |
-| Backseat Guide | `backseatguide.com`, `.app`, `.co.uk`, `.co`, `.travel` and `.ai` returned no DNS record and RDAP 404/available. The analogous hyphenated forms were mostly the same. | `backseat-guide.ai`, `.io` and `.uk` forms were not confirmed by RDAP. Availability is not a reservation and can change immediately. |
-| Backseat Guider | `backseatguider.com`, `.app`, `.co.uk`, `.co`, `.travel`, `.ai` and `backseat-guider.com` returned no DNS record and RDAP 404/available. | Most hyphenated variants and `.io`/`.uk` forms were not confirmed by RDAP. |
-| Backseat Driver | `backseatdriver.ai` and `backseat-driver.co.uk`, `.co`, `.travel` and `.ai` returned RDAP availability signals. | `backseatdriver.com`, `backseatdriver.co.uk`, `backseat-driver.com`, `backseat-driver.app`, `backseatdriver.io` and `backseatdriver.uk` resolved or were registered. Several others were not confirmed. |
+| Backseat Guide | `backseatguide.com`, `.app`, `.co.uk`, `.co`, `.travel` and `.ai` returned no DNS record and RDAP 404/no public registration found when checked. The analogous hyphenated forms were mostly the same. | `backseat-guide.ai`, `.io` and `.uk` forms were not confirmed by RDAP. A missing record is not a reservation or guarantee that registration is permitted. |
+| Backseat Guider | `backseatguider.com`, `.app`, `.co.uk`, `.co`, `.travel`, `.ai` and `backseat-guider.com` returned no DNS record and RDAP 404/no public registration found when checked. | Most hyphenated variants and `.io`/`.uk` forms were not confirmed by RDAP. A missing record is not a reservation or guarantee that registration is permitted. |
+| Backseat Driver | `backseatdriver.ai` and `backseat-driver.co.uk`, `.co`, `.travel` and `.ai` returned no public registration record when checked. | `backseatdriver.com`, `backseatdriver.co.uk`, `backseat-driver.com`, `backseat-driver.app`, `backseatdriver.io` and `backseatdriver.uk` resolved or were registered. Several others were not confirmed. |
 
 Spaces cannot appear in a domain. Treat the spaced name as the product wordmark, the compact form as the primary domain, and the hyphenated form only as a defensive redirect where worthwhile.
 
@@ -88,15 +88,15 @@ The deliberate echo of **backseat driver** is a strength: it makes the role imme
 
 ### Backseat Driver — RED
 
-**Exact commercial collision.** Apple currently lists **Back Seat Driver** by Cedros Software LLC in the Travel category. Its description covers city distance, POIs, GPS route plotting, map viewing and trip planning: adjacent travel/location functionality, notwithstanding its age and modest review footprint. Google Play in the UK also currently lists **Backseat Driver** by Backseat Media, a motorsport session-schedule hub, updated 2026-08-06. Apple lists the same more recent motorsport product. Toyota’s ToyToyota also launched **Backseat Driver** as a children’s road-trip app. This is far too close to the proposed family-car audience to treat as an unrelated use.
+**Exact commercial collision.** On 2026-08-10, Apple listed **Back Seat Driver** by Cedros Software LLC in the Travel category. Its description covered city distance, POIs, GPS route plotting, map viewing and trip planning: adjacent travel/location functionality, notwithstanding its age and modest review footprint. Google Play in the UK also listed **Backseat Driver** by Backseat Media, a motorsport session-schedule hub, updated 2026-08-06; Apple listed the same more recent motorsport product. Toyota’s ToyToyota also launched **Backseat Driver** as a children’s road-trip app. This was far too close to the proposed family-car audience to treat as an unrelated use in the dated screen.
 
 **Phrase and distinctiveness.** `backseat driver` is a well-established English idiom for an unwanted passenger who tells a driver what to do. That makes it memorable but weakens inherent distinctiveness and creates a negative/controlling reading. It also makes it hard to own in search. Replacing `Driver` with `Guider` is precisely what supplies the leading candidate’s differentiated agent meaning.
 
 **Trade-mark screen.** Exact USPTO `CM:"BACKSEAT DRIVER"` returned six results. The exact Class 9 navigation-system records (serials 77464097 and 85564333) are dead/abandoned; the earlier Class 9 computer-operating-program registration (73833657) is dead/cancelled. Those are not present exclusive rights, but are highly relevant evidence of prior software/navigation use. EUIPO returned zero exact results. The historic US registrations and EUIPO result do not answer UKIPO, WIPO, unregistered rights or the existing-app position.
 
-**Company and general-brand use.** Companies House shows an active **BACKSEAT DRIVERS LTD** (company 16423040, incorporated 2025-05-01) with SIC 93290, “Other amusement and recreation activities not elsewhere classified”. That filed category is not a direct travel-app conflict, although a company name alone does not establish trade-mark rights or rule out broader brand use.
+**Company and general-brand use.** On 2026-08-11, Companies House showed **BACKSEAT DRIVERS LTD** (company 16423040, incorporated 2025-05-01) as active with SIC 93290, “Other amusement and recreation activities not elsewhere classified”. That filed category was not a direct travel-app conflict, although a company name alone does not establish trade-mark rights or rule out broader brand use.
 
-**Strongest potential killer:** already met — the current iOS Travel app with materially adjacent place/trip functionality, reinforced by the Toyota children’s road-trip use and a crowded phrase/search space.
+**Strongest potential killer:** already met in the dated screen — the iOS Travel app observed on 2026-08-10 had materially adjacent place/trip functionality, reinforced by the Toyota children’s road-trip use and a crowded phrase/search space.
 
 ## Preliminary register and company screen
 
