@@ -32,7 +32,7 @@ This policy sets the non-negotiable rules for testing RideHorizon. It prevents a
 
 ## Defect policy
 
-Create a defect or bounded follow-up in `ITEM-BACKLOG.md` when a failure is credible and actionable. Include: build/run ID, expected and observed behaviour, conditions, impact, evidence location, reproducibility, test dimension, severity and retest result.
+Create a defect or bounded follow-up through the Backlog.md CLI when a failure is credible and actionable. Include: build/run ID, expected and observed behaviour, conditions, impact, evidence location, reproducibility, test dimension, severity and retest result.
 
 | Severity | Examples | Release disposition |
 | --- | --- | --- |

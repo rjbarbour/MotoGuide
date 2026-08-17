@@ -151,7 +151,7 @@ The file already exists in RideHorizon’s private caches area. It retains at mo
 
 ## Post-ride evidence and SEERS handling
 
-For today, record all results and findings only in [`TESTFLIGHT_FIELD_TEST_EVIDENCE.md`](TESTFLIGHT_FIELD_TEST_EVIDENCE.md). Do not create GitHub issues or edit `ITEM-BACKLOG.md` during the session.
+For today, record all results and findings only in [`TESTFLIGHT_FIELD_TEST_EVIDENCE.md`](TESTFLIGHT_FIELD_TEST_EVIDENCE.md). Do not create GitHub issues or mutate Backlog.md tasks during the session.
 
 Record each anomaly with:
 

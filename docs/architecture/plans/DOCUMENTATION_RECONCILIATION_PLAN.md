@@ -72,7 +72,7 @@ For RideHorizon, begin with the repository's existing control model:
 1. applicable project and agent instructions;
 2. owner-approved intent, decisions, specifications and contracts;
 3. shipped interfaces, tests and operational configuration;
-4. current delivery state in `Backlog.md` and `PROJECT.md` according to their declared roles;
+4. current delivery state in the Backlog.md CLI records and `PROJECT.md` according to their declared roles;
 5. maintained supporting documentation;
 6. research, history and evidence records;
 7. filenames or inferred structure.
@@ -148,7 +148,7 @@ At minimum, escalate to **R1** when any maintained documentation changes.
 
 Escalate to at least **R2** when a change touches:
 
-- `README.md`, `AGENTS.md`, `PROJECT.md`, `Backlog.md` or `MILESTONES.md` in a way that changes claims or routing;
+- `README.md`, `AGENTS.md`, `PROJECT.md`, `backlog.config.yml`, CLI-managed `backlog/` records or `MILESTONES.md` in a way that changes claims or routing;
 - an ADR, architecture contract or bounded specification;
 - public API or OpenAPI contracts;
 - persistent settings keys, migrations or schemas;
@@ -177,7 +177,7 @@ canonical:
   README.md: orientation
   AGENTS.md: runtime-instructions
   PROJECT.md: verified-project-state
-  Backlog.md: delivery-ledger
+  backlog/: delivery-ledger
 
 impact_rules:
   - paths:

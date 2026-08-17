@@ -1,3 +1,14 @@
+---
+id: doc-001
+title: 2026-08-17 migration from ITEM-BACKLOG.md
+type: other
+created_date: '2026-08-17 22:33'
+updated_date: '2026-08-17 22:33'
+tags:
+  - history
+  - migration
+  - ITEM-BACKLOG
+---
 # RideHorizon Delivery Ledger
 
 This file is the canonical delivery ledger. Trello remains intake, Notion holds reusable SOPs, and `PROJECT.md` records only the last verified project state and current gate.

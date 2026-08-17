@@ -8,7 +8,7 @@ This directory is the durable test-management system for RideHorizon. It explain
 
 | Need | Authoritative record |
 | --- | --- |
-| Understand the product, current commitment and release gate | [`../../AGENTS.md`](../../AGENTS.md), [`../../PROJECT.md`](../../PROJECT.md) and [`../../ITEM-BACKLOG.md`](../../ITEM-BACKLOG.md) |
+| Understand the product, current commitment and release gate | [`../../AGENTS.md`](../../AGENTS.md), [`../../PROJECT.md`](../../PROJECT.md) and the Backlog.md CLI (`backlog task list --plain`) |
 | Select proportionate test evidence for an increment | [Test strategy](TEST_STRATEGY.md) |
 | Apply test principles, result definitions, defect severity and risk acceptance | [Test policy](TEST_POLICY.md) |
 | Design coverage, find gaps or choose the correct test level | [Quality-risk coverage model](QUALITY_RISK_COVERAGE_MODEL.md) |
@@ -25,7 +25,7 @@ This directory is the durable test-management system for RideHorizon. It explain
 
 ## Rules of use
 
-- `ITEM-BACKLOG.md` remains the only delivery-status authority. A test result may create or close evidence for a work item; it does not independently change delivery status.
+- Backlog.md CLI records under `../../backlog/` remain the only delivery-status authority. A test result may create or close evidence for a work item; it does not independently change delivery status.
 - `TESTFLIGHT_FIELD_TEST_EVIDENCE.md` remains the run record and TestFlight coverage matrix. Put observed results, build identities and retained evidence there, not here.
 - Test work is evidence-led. A passing automated test does not prove real Bluetooth, background-location, perceived loudness, rider distraction or live-provider behaviour.
 - Preserve privacy: do not commit personal ride routes, precise coordinates, raw diagnostics, credentials, generated speech audio, or tester identifiers beyond the minimum necessary run reference.

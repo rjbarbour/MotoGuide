@@ -1,6 +1,6 @@
 # Audio speech calibration follow-up research
 
-> **Superseded implementation snapshot:** The Current A descriptions below record the peak-only production pipeline inspected before RH-004G was authorised later on 2026-08-04. RH-004G in `ITEM-BACKLOG.md` is authoritative for the subsequently implemented phase-one production baseline.
+> **Superseded implementation snapshot:** The Current A descriptions below record the peak-only production pipeline inspected before legacy RH-004G was authorised later on 2026-08-04. Backlog.md task RH-004.07 preserves the subsequently implemented phase-one production baseline; doc-001 preserves the original detailed evidence.
 
 Date: 2026-08-04
 
