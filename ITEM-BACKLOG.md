@@ -2,15 +2,15 @@
 
 This file is the canonical delivery ledger. Trello remains intake, Notion holds reusable SOPs, and `PROJECT.md` records only the last verified project state and current gate.
 
-## Active repository maintenance
+## Preservation-stream adjudication
 
 ### RH-050 — Adjudicate the RH-045 preservation streams
 
 - **Type:** Repository recovery and stream disposition.
 - **Requested by owner:** 2026-08-17. The owner authorised working through every preserved stream, creating or switching branches as appropriate, and reporting any judgement that cannot be resolved from evidence.
-- **Execution branch:** Create `codex/rh-050-adjudicate-preserved-streams` from current `main` before changing repository state. Keep `/Users/rob_dev/DocsLocal/motoguide/repo` on `codex/rh-045-preserve-local-state` as a read-only source shelf; use `/Users/rob_dev/DocsLocal/motoguide/integration` as the clean `main` integration checkout and create separate task worktrees from it.
+- **Execution branches:** The controller used `codex/rh-050-adjudicate-preserved-streams`. After its PR 15 integration and completion of the five independent stream tasks, `codex/rh-050-close-preservation-adjudication` carries the serialized closeout proof. The second branch is deliberate because the path-disposition record must be integrated before the RH-045 source shelf can be deleted; a final documentation-only follow-up will record the post-deletion topology. Keep `/Users/rob_dev/DocsLocal/motoguide/repo` on `codex/rh-045-preserve-local-state` as a read-only source shelf until that gate passes; use `/Users/rob_dev/DocsLocal/motoguide/integration` as the integration checkout.
 - **Outcome:** Every unique path preserved at RH-045 commit `2a1a31e` is either transferred into a coherent tracked task, retained on an explicitly named work-in-progress branch, reconciled and integrated through review, or deliberately retired with rationale. The mixed RH-045 branch is never merged or rebased as a whole.
-- **Current topology — 2026-08-17:** `/Users/rob_dev/DocsLocal/motoguide/repo` is clean at `2a1a31e` on `codex/rh-045-preserve-local-state`; `/Users/rob_dev/DocsLocal/motoguide/integration` is clean at `977374a` on `main`, aligned with `origin/main`. Those are the only local worktrees and the only remote branches are `origin/main` and `origin/codex/rh-045-preserve-local-state`.
+- **Initial topology — 2026-08-17:** `/Users/rob_dev/DocsLocal/motoguide/repo` was clean at `2a1a31e` on `codex/rh-045-preserve-local-state`; `/Users/rob_dev/DocsLocal/motoguide/integration` was clean at `977374a` on `main`, aligned with `origin/main`. Those were the only local worktrees and the only remote branches were `origin/main` and `origin/codex/rh-045-preserve-local-state`.
 - **Preserved delta:** Compared with current `main`, RH-045 changes 55 paths with 8,880 insertions and 68 deletions. The delta includes real tools and app/project changes as well as operational evidence and planning. Historical `Backlog.md`, `PROJECT.md`, `AGENTS.md`, address/geodata and family-framework differences must not be transferred blindly because their current equivalents have since changed or merged.
 - **Stream ST-01 — TestFlight automation:** `tools/ios-testflight`, `.ios-testflight.json`, `tools/tests/test-ios-testflight.sh`, fixture executables, TestFlight automation continuation/research and signing-hardening records. Process under RH-019A from clean `main`. Preserve the script/configuration pair together, reconcile the blank App Store Connect app ID and runtime-key custody, apply the secret-management and iOS deployment SOPs before authenticated or release operations, run the 27-fixture harness, and integrate only after security and operational review. Do not run an upload merely to assess the stream.
 - **Stream ST-02 — Apple place audit:** `tools/apple-place-audit`, `fixtures/geography/apple-place-audit` and the three 2026-08-05 research records. PR 8 already integrated the rider-facing Apple placemark behaviour, so this stream is supporting audit tooling/evidence rather than required application code. Create a separate decision task from `main`; inspect the retained result data for location/privacy suitability, confirm whether the tool still answers a live verification need, then retain, reduce or retire it explicitly.
@@ -22,7 +22,8 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Verification:** For every stream, record source paths, destination work item/branch, retained and retired material, rationale, tests or document checks, PR/commit evidence and remaining owner decisions. Before closing RH-050, prove that all unique RH-045 paths have an explicit disposition, `main` and all retained worktrees are clean, and the RH-045 branch is still remotely reachable or is deleted only after all retained work is independently reachable.
 - **Stop condition:** Stop before merging RH-045 wholesale, deleting its last reachable copy, exposing credentials or private ride/location data, performing a TestFlight upload without a separately authorised release task, or making an unresolved product-direction choice for the owner.
 - **Controller checkpoint — 2026-08-17:** Branch `codex/rh-050-adjudicate-preserved-streams` was created from verified current `main` at `977374a`. RH-049 was moved from Active to Completed, and its obsolete claim that `.ios-testflight.json` remained uninspected and local-only was corrected against the later `2a1a31e` preservation checkpoint. No preserved stream content has yet been transferred.
-- **Status:** Active — controller prepared; ST-01 is next.
+- **Closeout evidence — 2026-08-17:** ST-02 to ST-05 integrated through PRs 16–19 at `82e5cb5`, `67c72d1`, `f148845` and `7d50042`. ST-01 remains independently reachable as the clean published RH-019A WIP branch at `ee4686d`. The path-by-path retained, reconciled and retired dispositions are recorded in `docs/project/status/RH-050_CONTINUATION_2026-08-17.md`.
+- **Status:** Closeout checkpoint prepared — publish this record, retire the proved-redundant branches/worktrees, restore the canonical checkout to clean `main`, then record the final topology.
 
 ### RH-051 — Recover the Apple place-label audit corpus
 
@@ -37,7 +38,8 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Verification — 2026-08-17:** All six focused Python tests passed under `uv` with Python 3.13. The isolated Swift probe compiled against the current `RideHorizon/Address.swift`. The dry-run parsed the complete cache and reported zero pending requests without calling Apple. Regenerating the comparison report produced a byte-for-byte match with the retained fixture. `git diff --check` passed.
 - **Review — 2026-08-17:** Independent standards and specification reviews found no implementation or scope defect. The retained README was corrected to describe the completed-cache dry-run accurately and to classify the live runner as an operator-only empirical probe rather than an LLM-safe diagnostic collector.
 - **Disposition:** Retain and integrate as supporting verification tooling and dated evidence. No owner judgement is required unless Rob wants to fund the deferred live iPhone/locale or MapKit comparison now.
-- **Status:** Review-ready — offline evidence complete; no live service or app change.
+- **Integration — 2026-08-17:** PR 16 merged at `82e5cb5`; all four GitHub checks passed.
+- **Status:** Done — corpus and tooling integrated; live comparison remains separately deferred.
 
 ### RH-052 — Reconcile beta UAT, headset and test-system records
 
@@ -54,7 +56,9 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Verification:** The latest receipt hash matched; document searches find no live `Backlog.md`, `RIDE_UAT_PROTOCOL_V3.md` or current release-gate reference to the superseded candidate outside explicitly historical evidence; the retained screenshot contains only the intended iOS Control Centre UI and no personal content; local Markdown links and `git diff --check` pass.
 - **Review — 2026-08-17:** Independent standards and specification reviews found no app/release scope creep. Corrections removed unnecessary home-location context from historical UAT evidence, selected `20260806.221234` in the active run template, relabelled `20260804.0246` as an earlier candidate, and reconciled the live private-beta pack to the same no-evidence-transfer gate.
 - **Owner judgement:** Operational, not documentary: Rob must confirm `0.12.4 (20260806.221234)` in RideHorizon Settings while stopped before any physical result is attributed to it, then decide the RH-002 release gate from the recorded stationary/road evidence.
-- **Status:** Review-ready — reconciliation complete; exact-build human evidence remains open under RH-002.
+- **Integration — 2026-08-17:** PR 17 merged at `67c72d1`. The documentation-only rebase preserved RH-051 and RH-052 ledger intents; irrelevant restarted app/proxy CI was bypassed under the owner's documentation-only instruction.
+- **Status:** Done — documentation integrated; exact-build human evidence remains open under RH-002.
+
 ### RH-053 — Show the packaged build identity in Settings
 
 - **Type:** Small iOS observability feature.
@@ -65,7 +69,8 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Risk:** Low. The UI is read-only and derives values from packaged metadata. The main risk is displaying a stale hard-coded value or disrupting the Settings layout.
 - **Acceptance criteria:** Settings visibly labels both the packaged version and build; no release identity is duplicated in source; the normal RideHorizon scheme/project semantics are unchanged; relevant automated checks and an unsigned generic-iPhone compile pass.
 - **Verification — 2026-08-17:** `git diff --check` passed. A cached unsigned Release build for generic iOS hardware completed with exit status 0 and `** BUILD SUCCEEDED **`. Independent reviews identified that the friendly timestamp truncated build seconds; follow-up commit `e4880fd` now displays the full packaged `CFBundleVersion`, and both reviews passed on recheck. No focused `AppBuildMetadata` test exists; no broad simulator suite was run for this static presentation-only change. No physical iPhone was available in the scheme destinations, so no device install was attempted.
-- **Status:** PR-ready — implementation, proportionate verification and independent review complete.
+- **Integration — 2026-08-17:** PR 18 merged at `f148845` after all four GitHub checks passed.
+- **Status:** Done — exact packaged build identity is integrated in Settings.
 
 ### RH-054 — Reconcile family-product sequence and name research
 
@@ -79,7 +84,8 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Disposition — 2026-08-17:** Retain both RH-045 ST-05 source files. The sequence adds delivery boundaries, data/compliance gates, an incremental product-split route and phase exits that the inspirational framework and priority overlay do not supply. Stale branch, PR, checkout and ledger-migration state was removed. The name screen remains useful as dated preliminary evidence; its contradictory GREEN subsection was corrected to the document's final AMBER judgement, and unrelated plugin follow-up was retired.
 - **Verification — 2026-08-17:** `git diff --check`, both local cross-document link checks and the secret scan passed. Searches found no stale RH-045 branch/worktree claims, in-flight ledger migration, provisional-name adoption or deprecated live-ledger instruction in the retained documents. Independent standards and task-contract reviews passed after present-tense marketplace claims, RDAP wording and ambiguous clearance language were corrected. No app build or test was run because this stream changes documentation only.
 - **Owner judgement:** None is required to retain these documents. Before implementation, Rob must separately choose whether the family passenger experiment outranks current RideHorizon work. Before adopting **Backseat Guider**, commission the documented solicitor-led clearance; before involving an under-13 tester, complete the explicit data/compliance gate.
-- **Status:** PR-ready — reconciliation and independent review complete; product activation, name adoption and under-13 testing remain separate owner gates.
+- **Integration — 2026-08-17:** PR 19 merged at `7d50042`; its applicable documentation/security checks passed and no app build was required.
+- **Status:** Done — planning evidence integrated; product activation, name adoption and under-13 testing remain separate owner gates.
 
 ## Completed repository maintenance
 
