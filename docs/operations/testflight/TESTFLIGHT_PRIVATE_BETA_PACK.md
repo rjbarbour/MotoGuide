@@ -1,8 +1,8 @@
 # RideHorizon Private TestFlight Beta Pack
 
-Date: 2026-08-04
+Date: 2026-08-17
 
-Status: Release candidate `0.12.4 (20260804.0246)` passed 177/177 iOS tests on the physical iPhone, the proxy suite, and live automatic-session, fact and Premium Voice checks. Its exact iPhone-only Release archive passed cloud-managed Apple Distribution signing, Apple server-side validation, strict IPA signature and entitlement checks, privacy-manifest validation and binary/dSYM UUID matching. App Store Connect reports the upload **Complete** and the build **Ready to Submit**. Earlier candidates must not be assigned to testers. External invitations remain blocked until the exact Internal TestFlight binary passes the mandatory evidence gate.
+Status: The selected Internal TestFlight candidate is `0.12.4 (20260806.221234)`. Its SHA-256-protected local receipt records `VALID`, permanently `INTERNAL_ONLY`, `IN_BETA_TESTING`, internal-group readiness and unchanged-input evidence from 182 passing simulator tests. Exact in-app build confirmation and all build-specific physical evidence remain open. Earlier-build results must not be transferred to this candidate, and external invitations remain blocked until the mandatory evidence gate passes.
 
 ## Release Decisions — 2026-07-31
 
@@ -25,7 +25,7 @@ Status: Release candidate `0.12.4 (20260804.0246)` passed 177/177 iOS tests on t
 - Optional AI and Premium Voice disclosures are presented before provider sharing; names-only announcements and Apple Voice remain available when sharing is declined.
 - A clean launch does not contact the RideHorizon proxy until the rider enables optional AI features and a proxy-backed feature first needs access.
 - Onboarding tells the rider to complete setup while stopped, avoid interacting with the phone while moving, and stop using RideHorizon if it becomes distracting.
-- Candidate `20260804.0246` installs and launches on the target physical iPhone, passes 177 physical-device unit tests, is distribution-signed, Apple-validated and uploaded, and uses the production proxy whose live `/v1/fact` and `/v1/speech` routes returned HTTP 200 with valid MP3 audio. Confirm processing, then run the full location, background and Bluetooth evidence on the exact Internal TestFlight binary.
+- Candidate `20260806.221234` has the locally verified Internal TestFlight receipt described above and unchanged-input evidence from 182 passing simulator tests. Before any physical result is attributed to it, confirm the exact version/build in RideHorizon Settings while stopped, then run the full location, background and Bluetooth evidence on that binary.
 
 ## Purpose
 
@@ -101,7 +101,7 @@ Do not invite external testers until all items are true:
 
 ## Operator Checklist
 
-1. Add the processed build to `RideHorizon Internal` and test it before external submission.
+1. Confirm the selected processed build is available to the configured internal beta group and test that exact binary before external submission.
 2. Create the external group only when it is available in App Store Connect.
 3. Submit the first external build for TestFlight App Review.
 4. Add named testers by email after approval. Keep automatic notification off until the invitation and feedback form are ready.
