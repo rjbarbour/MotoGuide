@@ -18,7 +18,7 @@ Long-term vision: RideHorizon can range from silent display-only geographic awar
 
 The existing GitHub prototype is an iOS SwiftUI app:
 
-- Repository: `https://github.com/rjbarbour/RideHorizon.git`
+- Repository: `https://github.com/rjbarbour/MotoGuide.git`
 - Local checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`
 - Main app: `/Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon/`
 - Core modules: `LocationManager.swift`, `AnnouncementPolicy.swift`, `Address.swift`, `ProxyFactGenerator.swift`, `FirstRunState.swift`
@@ -185,6 +185,7 @@ Notion operating references read on 2026-07-02:
 ## Working Rules
 
 - Treat questions, musings, and hypotheticals as read-only. Do not edit files, run tests or builds, deploy, delegate, or commit unless the user explicitly requests implementation or another state-changing action. A question asked during an active implementation task does not expand that task's scope.
+- Rob is not familiar with the Xcode interface. When an Xcode action is needed, give click-by-click guidance using the control's visible label; do not assume knowledge of schemes, destinations, archives or build configurations.
 - Preserve rider safety as a first-order requirement.
 - Keep speech short, sparse, and interruptible.
 - Prefer deterministic location logic before AI-generated content.
@@ -196,11 +197,13 @@ Notion operating references read on 2026-07-02:
 
 ## Development Workflow
 
+Before building, archiving, signing, uploading or diagnosing an iOS/TestFlight release, fetch and follow [SOP: iOS Build and TestFlight Deployment v1.0](https://app.notion.com/p/3b4a4c502b1781e18977d4e2d9b75c74). Treat it as the canonical operating procedure; retain this project's stricter release, safety, privacy and exact-build evidence gates.
+
 ## Adaptive agentic delivery
 
-For planning and software delivery, fetch and follow [SOP: Adaptive Agentic Software Delivery v1.4](https://app.notion.com/p/3aea4c502b1781a888b1f8e851697813). Treat it as binding for this personal project unless an explicit project requirement conflicts.
+For planning and software delivery, fetch and follow [SOP: Adaptive Agentic Software Delivery v1.6](https://app.notion.com/p/3aea4c502b1781a888b1f8e851697813). Treat it as binding for this personal project unless an explicit project requirement conflicts.
 
-Before substantive repository changes, fetch and follow [SOP: Tracked Work and Git Change Integration v0.3](https://app.notion.com/p/3b5a4c502b17815ea525d3c91dc65cf0). Route dirty, mixed-task or legacy state through the linked repository-hygiene procedure before normal delivery.
+Before substantive repository changes, fetch and follow [SOP: Tracked Work and Git Change Integration v0.6](https://app.notion.com/p/3b5a4c502b17815ea525d3c91dc65cf0). Route dirty, mixed-task or legacy state through the linked repository-hygiene procedure before normal delivery.
 
 `ITEM-BACKLOG.md` is the canonical delivery ledger. Keep the long-range plan shallow and revisable, with only the next one to three work items **Ready**. Give the active item a Goal that references its ID and evidence contract. Use independent evaluation, link evidence before **Done**, update `PROJECT.md` without duplicating ledger status, and stop at every milestone health and replenishment gate.
 
@@ -289,7 +292,7 @@ If the phone is not connected, say so briefly and continue. Do not block the tas
 Clone the GitHub project into the permanent working-copy subfolder:
 
 ```bash
-git clone https://github.com/rjbarbour/RideHorizon.git /Users/rob_dev/DocsLocal/motoguide/repo
+git clone https://github.com/rjbarbour/MotoGuide.git /Users/rob_dev/DocsLocal/motoguide/repo
 ```
 
 Expected result: `/Users/rob_dev/DocsLocal/motoguide/repo` contains `.git`, `RideHorizon.xcodeproj`, `RideHorizon/`, `RideHorizonTests/`, and `RideHorizonUITests/`.
