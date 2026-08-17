@@ -57,6 +57,18 @@ This closeout record must be merged and verified on `origin/main` before the RH-
 
 Record the resulting topology in a final RH-050 documentation-only follow-up. This two-phase closeout is deliberate: the first integration makes the deletion proof durable; the second records the post-deletion state without weakening that gate.
 
+## Post-cleanup result — 2026-08-17
+
+- RH-050 closeout PR 20 was verified merged on `origin/main` at `7851e5d` before any source-shelf deletion.
+- PRs 16–20 were verified merged, and RH-019A commit `ee4686d` was verified at `origin/codex/rh-019a-testflight-tooling-recovery`.
+- The clean RH-051 to RH-054 worktrees and their local squash-source branches were removed. Their remote branches had already been deleted by the merged pull requests.
+- The RH-045 checkout was moved to detached verified `origin/main`; the remote and local `codex/rh-045-preserve-local-state` refs were then deleted. The mixed branch is no longer needed as a recovery source.
+- `/Users/rob_dev/DocsLocal/motoguide/repo` is restored as the clean canonical `main` checkout at `7851e5d`, aligned with `origin/main`.
+- The only retained task worktree is `/Users/rob_dev/DocsLocal/motoguide/rh-019a-testflight-tooling`, clean at published WIP commit `ee4686d`.
+- The only remote branches are `origin/main` and `origin/codex/rh-019a-testflight-tooling-recovery`.
+
+The temporary `/Users/rob_dev/DocsLocal/motoguide/integration` worktree carries only this final documentation update. Remove it and its local branch after this record is merged and the canonical checkout is fast-forwarded and verified.
+
 ## Pre-compaction continuation checkpoint — 2026-08-17
 
 The closeout preparation and first review corrections are committed on `codex/rh-050-close-preservation-adjudication` at `25e8898`. Relative to integrated `main` at `7d50042`, the branch changes only `AGENTS.md`, `ITEM-BACKLOG.md` and this continuation record. It has no upstream branch yet and has not been pushed or opened as a pull request.
