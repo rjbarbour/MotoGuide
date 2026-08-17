@@ -20,6 +20,23 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Verification — 2026-08-17:** PR 9 merged at `91f708b`; PR 8 merged at `02aca86`. After an authenticated fetch/prune, the source refs `origin/agent/family-trip-validation-priorities`, `origin/feat/sub-locality-geodata` (at `4aea1ef`) and `origin/codex/rh-045-repository-hygiene` each proved ancestors of `origin/main`. Their clean worktrees, local branches and remote branches were then retired. `origin/codex/rh-045-preserve-local-state` remains the deliberate recovery checkpoint. `origin/agent/family-journey-product-framework` remains unmerged and has no PR; its 510-line `FAMILY_JOURNEY_PRODUCT_FRAMEWORK.md` covers wider product-shaping material than the merged priority ledger, so it is retained pending an explicit product decision.
 - **Status:** Review-ready — branch-retirement evidence recorded; merge this documentation-only closeout before updating the clean integration checkout — Codex, 2026-08-17.
 
+## Completed repository maintenance
+
+### RH-044 — Migrate the tactical ledger to ITEM-BACKLOG.md
+
+- **Type:** Repository hygiene and control-plane alignment.
+- **Claimed by:** Codex on branch `codex/rh-044-item-backlog-migration` during execution.
+- **Outcome:** The canonical tactical ledger is named `ITEM-BACKLOG.md`, every live repository reference uses that filename, and historically accurate references retain their original filename with clarification where needed.
+- **Scope:** Rename the root tactical ledger without changing existing work-item content; update live Markdown links and operational references; verify no live `Backlog.md` or `BACKLOG.md` authority remains.
+- **Exclusions:** Do not implement backlog items, resolve existing work-item ID collisions, alter product or release state, modify the dirty `feat/sub-locality-geodata` checkout, merge existing pull requests, or initialise the strategic Backlog.md project-management system.
+- **Risk:** Low. The main risks are a broken relative link, rewriting historical provenance, or creating a competing ledger.
+- **Branch:** `codex/rh-044-item-backlog-migration`.
+- **Acceptance criteria:** `Backlog.md` is a Git-tracked rename to `ITEM-BACKLOG.md`; live references resolve to the new path; historical references remain accurate; repository-wide search finds no deprecated live authority; `git diff --check` passes; the original dirty checkout is unchanged.
+- **Done when:** The focused pull request is integrated, remote `main` contains the renamed ledger and aligned references, and temporary branch/worktree cleanup is complete.
+- **Verification — 2026-08-10:** Byte comparison confirms the pre-existing ledger content is unchanged apart from this RH-044 record. `git diff --check` passes. Repository-wide negative search finds no deprecated tactical filename outside this migration record. Updated relative ledger paths resolve to `ITEM-BACKLOG.md`. The original `feat/sub-locality-geodata` checkout retains its pre-existing branch and dirty paths.
+- **Integration — 2026-08-17:** PR 10 merged as `303794d`. Local `main` fast-forwarded to `origin/main`; the local task branch was deleted and its clean worktree was retained as the repository's integration checkout. Remote branch deletion was attempted after merge but is blocked by the selected Git CLI profile's GitHub `403`; the merged remote ref remains reachable and is harmless pending an authorised credential-route correction.
+- **Status:** DONE — all repository-state changes are integrated and verified; remote-ref retirement is an explicitly recorded credential follow-up, not a delivery blocker.
+
 ### RH-045 — Classify and preserve mixed local work
 
 - **Type:** Repository hygiene recovery.
@@ -40,23 +57,6 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Integration — 2026-08-17:** PR 11 merged into `main` at `e48e0f1`. The hygiene controller branch is fully integrated; `59f58ce` remains as the deliberate preservation checkpoint. PR 8 and PR 9 subsequently merged through `origin/main` at `02aca86`.
 - **Next action:** Reconcile the exact TestFlight build identity across `PROJECT.md`, `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and the active UAT protocol, then split the preserved streams into separately tracked work before integration.
 - **Status:** Done — recovery state is integrated and the remaining checkpoint is deliberately retained — Codex, 2026-08-17.
-
-## Completed repository maintenance
-
-### RH-044 — Migrate the tactical ledger to ITEM-BACKLOG.md
-
-- **Type:** Repository hygiene and control-plane alignment.
-- **Claimed by:** Codex on branch `codex/rh-044-item-backlog-migration` during execution.
-- **Outcome:** The canonical tactical ledger is named `ITEM-BACKLOG.md`, every live repository reference uses that filename, and historically accurate references retain their original filename with clarification where needed.
-- **Scope:** Rename the root tactical ledger without changing existing work-item content; update live Markdown links and operational references; verify no live `Backlog.md` or `BACKLOG.md` authority remains.
-- **Exclusions:** Do not implement backlog items, resolve existing work-item ID collisions, alter product or release state, modify the dirty `feat/sub-locality-geodata` checkout, merge existing pull requests, or initialise the strategic Backlog.md project-management system.
-- **Risk:** Low. The main risks are a broken relative link, rewriting historical provenance, or creating a competing ledger.
-- **Branch:** `codex/rh-044-item-backlog-migration`.
-- **Acceptance criteria:** `Backlog.md` is a Git-tracked rename to `ITEM-BACKLOG.md`; live references resolve to the new path; historical references remain accurate; repository-wide search finds no deprecated live authority; `git diff --check` passes; the original dirty checkout is unchanged.
-- **Done when:** The focused pull request is integrated, remote `main` contains the renamed ledger and aligned references, and temporary branch/worktree cleanup is complete.
-- **Verification — 2026-08-10:** Byte comparison confirms the pre-existing ledger content is unchanged apart from this RH-044 record. `git diff --check` passes. Repository-wide negative search finds no deprecated tactical filename outside this migration record. Updated relative ledger paths resolve to `ITEM-BACKLOG.md`. The original `feat/sub-locality-geodata` checkout retains its pre-existing branch and dirty paths.
-- **Integration — 2026-08-17:** PR 10 merged as `303794d`. Local `main` fast-forwarded to `origin/main`; the local task branch was deleted and its clean worktree was retained as the repository's integration checkout. Remote branch deletion was attempted after merge but is blocked by the selected Git CLI profile's GitHub `403`; the merged remote ref remains reachable and is harmless pending an authorised credential-route correction.
-- **Status:** DONE — all repository-state changes are integrated and verified; remote-ref retirement is an explicitly recorded credential follow-up, not a delivery blocker.
 
 ## Completed release increments
 
