@@ -37,13 +37,22 @@ The pre-closeout comparison from `main` at `7d50042` to RH-045 contained 48 diff
 - No live Apple geocoding, App Store Connect operation, archive or TestFlight upload was used to adjudicate the streams.
 - No future family-product feature or name was authorised by preserving its planning evidence.
 
-## Remaining owner gates
+## Owner gates presented at closeout
 
 1. **RH-019A security gate:** choose either RAM-backed App Store Connect key materialisation or an explicit temporary exception accepting the documented mode-0600 disk-backed temporary-file risk for private-beta uploads.
 2. **RH-002 physical evidence gate:** install or update to RideHorizon `0.12.4 (20260806.221234)`, confirm that exact build in Settings while stopped, then decide the release gate from build-specific stationary and road evidence.
 3. **Future family-product gates:** decide whether the passenger experiment outranks current RideHorizon work; obtain solicitor-led clearance before adopting **Backseat Guider**; complete the data/compliance gate before involving an under-13 tester.
 
-Only the first gate blocks the retained RH-019A branch from becoming a merge candidate. The other gates do not block repository-hygiene closeout.
+At closeout, only the first gate blocked the retained RH-019A branch from becoming a merge candidate. The decisions below resolve or park all three gates without changing the completed repository-hygiene outcome.
+
+## Owner decisions after closeout — 2026-08-17
+
+- **Decision DE-01 — accepted temporary exception:** Accept RH-019A's documented mode-0600 disk-backed temporary-file handling of App Store Connect API key material for the private-beta workflow. Keep the risk outstanding in `ITEM-BACKLOG.md` and review it periodically. This removes RAM-backed materialisation as an immediate merge prerequisite; it does not authorise an upload or establish the exception as the permanent production design.
+- **Decision DE-02 — parked operational gate:** The `0.12.4 (20260806.221234)` check is not a new product choice. It means confirming the exact installed build in Settings while stopped before later physical results are attributed to that build. No decision or action is required now; RH-002 remains parked until TestFlight release work resumes.
+- **Decision DE-03 — family experiment parked:** The family-passenger experiment is parked. Its framework, sequence and dated name research remain reference material only. Do not advance family-priority items, adopt **Backseat Guider**, or involve an under-13 tester unless the owner explicitly reactivates that stream and its existing gates are met.
+- **Active direction:** Return to the main RideHorizon product. After a read-only reground, Rob authorised RH-024 Tier 1 as the next core increment: bounded same-day ride context that reduces repetitive facts and handles genuine place returns coherently. RH-055 reconciles the control plane only; RH-024 implementation requires its own branch and evidence.
+
+Verified repository state immediately before this documentation refresh: `/Users/rob_dev/DocsLocal/motoguide/repo` was clean on `main` at `59e8755`, aligned with `origin/main`; `/Users/rob_dev/DocsLocal/motoguide/rh-019a-testflight-tooling` was the only additional worktree, clean at published WIP commit `ee4686d`. The only local branches were `main` and `codex/rh-019a-testflight-tooling-recovery`. These checks were read-only; no fetch or authenticated remote operation was required.
 
 ## Cleanup gate
 

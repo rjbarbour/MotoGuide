@@ -4,6 +4,13 @@ Date: 2026-07-03
 
 Product capability ladder refined: 2026-08-04
 
+Current delivery focus: 2026-08-17
+
+- Return to the core RideHorizon motorcycle product.
+- RH-024 Tier 1 is the next Ready increment: bounded same-day ride context, coherent place returns and less repetitive fact generation.
+- RH-002 TestFlight evidence, RH-019A release tooling and the family-passenger experiment are parked until deliberately resumed.
+- This focus update supersedes the dated `Immediate Next Steps` sequence at the end of this document; it does not erase the retained milestone history or release evidence.
+
 ## 2026-07-17 Identity Migration
 
 The prototype is being cleanly renamed from RideHorizon to RideHorizon before the first App Store Connect build upload. See `docs/product/plans/REBRANDING_PLAN.md` for the binding identity map, acceptance criteria, and deployment constraint. This migration changes the app's bundle identifier, source namespaces, proxy contract names, and current documentation; it does not change the rider-safety product scope.
@@ -545,8 +552,8 @@ Decision criteria:
 
 ## Immediate Next Steps
 
-1. Finish Milestone 6 Location screen completion.
-2. Finish Milestone 6.5 first-time rider polish and review-readiness notes.
-3. Build, install, and launch RideHorizon on Robert's iPhone.
-4. Run the first MVP1 field trial on 2026-07-03.
-5. Record the ride result, then decide whether to continue with more field rides or fix blockers first.
+1. Integrate RH-055's documentation-only focus reconciliation.
+2. Claim RH-024 Tier 1 on its own implementation branch.
+3. Add bounded same-day delivered-fact context and coherent revisit behaviour without changing the stable cache into a rolling-history key.
+4. Update and verify the app/proxy/OpenAPI contract with focused tests, then run one complete implementation checkpoint.
+5. Return to the milestone health gate before selecting RH-025, RH-027 or any parked stream.
