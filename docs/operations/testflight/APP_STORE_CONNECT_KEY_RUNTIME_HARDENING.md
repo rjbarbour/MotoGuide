@@ -37,7 +37,16 @@ The temporary path remains an explicit migration exception only. Rotate the API 
 
 ## Governing SOP
 
-[SOP: Xcode App Store Connect API Key Runtime Handling v1.0](https://app.notion.com/p/3b4a4c502b1781d5addefb4f28e5fa8e) is the generic design and operating authority. It is governed by the general Secret Management, macOS Keychain and CLOAKD standards. This project note contains only the RideHorizon adoption gap and acceptance evidence.
+Before any authenticated check, archive or upload, fetch and follow all of these sources:
+
+- [SOP: iOS Build and TestFlight Deployment v1.0](https://app.notion.com/p/3b4a4c502b1781e18977d4e2d9b75c74);
+- [SOP: Xcode App Store Connect API Key Runtime Handling v1.0](https://app.notion.com/p/3b4a4c502b1781d5addefb4f28e5fa8e);
+- [SOP: Secret Management in Agentic AI Development v3.0](https://www.notion.so/320a4c502b1781d9ab34c4abf6d44152); and
+- [SOP: macOS Keychain Credential Discovery and Access v1.0](https://app.notion.com/p/3aea4c502b17811bb795c545f601bd6f).
+
+The runtime-key SOP is the generic design and operating authority for temporary key materialisation. This project note contains only the RideHorizon adoption gap and acceptance evidence.
+
+`./tools/ios-testflight doctor` is a local operator preflight, not an LLM-safe diagnostic collector. Do not paste its raw output into an AI session. If a diagnostic evidence script is needed, build and run it under [SOP: Diagnostic Script Standards for LLM-Assisted Debugging v1.0](https://app.notion.com/p/324a4c502b1781298a2cc9cd702fb31b), including collection-time redaction and the required output markers.
 
 ## RideHorizon acceptance evidence
 
