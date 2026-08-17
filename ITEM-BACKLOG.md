@@ -7,7 +7,7 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 ### RH-055 — Return delivery focus to core RideHorizon
 
 - **Type:** Product-direction and delivery-control reconciliation.
-- **State:** Review — Codex on `codex/rh-055-reorient-core-ridehorizon`; Done only after pull-request integration and clean-main verification.
+- **State:** Done on integration of [PR 22](https://github.com/rjbarbour/MotoGuide/pull/22), subject to clean-main verification; until then Review.
 - **Pull request:** [PR 22](https://github.com/rjbarbour/MotoGuide/pull/22).
 - **Outcome:** The project control plane records the accepted RH-019A temporary risk exception, parks RH-002 and the family-passenger experiment, and selects one bounded core RideHorizon increment as the next Ready work.
 - **User/operator:** Rob and the next RideHorizon delivery agent can resume product development without silently restarting release tooling, TestFlight evidence or the family derivative.
