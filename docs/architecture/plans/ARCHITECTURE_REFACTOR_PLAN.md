@@ -4,7 +4,7 @@ Date: 2026-08-04
 
 Status: Approved direction; execution is gated by the current private-beta work.
 
-Status authority: `../../../Backlog.md`
+Status authority: `../../../ITEM-BACKLOG.md`
 
 ## Bottom line
 
@@ -189,7 +189,7 @@ Gate: complete concurrency checking is clean; no unchecked sendability is added 
 
 ## First unattended increment: RH-013A
 
-RH-013A is the only increment authorised for an initial overnight implementation run. Its detailed delivery contract is in `../../../Backlog.md`.
+RH-013A is the only increment authorised for an initial overnight implementation run. Its detailed delivery contract is in `../../../ITEM-BACKLOG.md`.
 
 Suggested commit sequence:
 

@@ -67,4 +67,4 @@ Expected result: the command reports `PASS` with the number of validated pack fi
 
 ## Implementation boundary
 
-No file in this pack is referenced by the application, Xcode project or website. Implementation is tracked separately in `Backlog.md`.
+No file in this pack is referenced by the application, Xcode project or website. Implementation is tracked separately in `ITEM-BACKLOG.md`.

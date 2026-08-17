@@ -5,7 +5,7 @@ RideHorizon is an iPhone audio companion for motorcyclists. It gives short, usef
 ## Start here
 
 - [Project state](PROJECT.md): the last verified state and the current decision gate.
-- [Delivery ledger](Backlog.md): active work, dependencies and evidence requirements.
+- [Delivery ledger](ITEM-BACKLOG.md): active work, dependencies and evidence requirements.
 - [Milestones](MILESTONES.md): the forward product plan.
 - [Documentation index](docs/README.md): where every supporting record belongs and when to use it.
 - [Agent instructions](AGENTS.md): mandatory operating rules for people and coding agents.

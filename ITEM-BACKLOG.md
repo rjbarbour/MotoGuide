@@ -2,6 +2,22 @@
 
 This file is the canonical delivery ledger. Trello remains intake, Notion holds reusable SOPs, and `PROJECT.md` records only the last verified project state and current gate.
 
+## Active repository maintenance
+
+### RH-044 — Migrate the tactical ledger to ITEM-BACKLOG.md
+
+- **Type:** Repository hygiene and control-plane alignment.
+- **Claimed by:** Codex on branch `codex/rh-044-item-backlog-migration` in an isolated worktree.
+- **Outcome:** The canonical tactical ledger is named `ITEM-BACKLOG.md`, every live repository reference uses that filename, and historically accurate references retain their original filename with clarification where needed.
+- **Scope:** Rename the root tactical ledger without changing existing work-item content; update live Markdown links and operational references; verify no live `Backlog.md` or `BACKLOG.md` authority remains.
+- **Exclusions:** Do not implement backlog items, resolve existing work-item ID collisions, alter product or release state, modify the dirty `feat/sub-locality-geodata` checkout, merge existing pull requests, or initialise the strategic Backlog.md project-management system.
+- **Risk:** Low. The main risks are a broken relative link, rewriting historical provenance, or creating a competing ledger.
+- **Branch and worktree:** `codex/rh-044-item-backlog-migration` at `/Users/rob_dev/DocsLocal/motoguide/rh-044-item-backlog-migration`.
+- **Acceptance criteria:** `Backlog.md` is a Git-tracked rename to `ITEM-BACKLOG.md`; live references resolve to the new path; historical references remain accurate; repository-wide search finds no deprecated live authority; `git diff --check` passes; the original dirty checkout is unchanged.
+- **Done when:** The focused pull request is integrated, remote `main` contains the renamed ledger and aligned references, and temporary branch/worktree cleanup is complete.
+- **Verification — 2026-08-10:** Byte comparison confirms the pre-existing ledger content is unchanged apart from this RH-044 record. `git diff --check` passes. Repository-wide negative search finds no deprecated tactical filename outside this migration record. Updated relative ledger paths resolve to `ITEM-BACKLOG.md`. The original `feat/sub-locality-geodata` checkout retains its pre-existing branch and dirty paths.
+- **Status:** Review-ready — Codex, 2026-08-10. Integration and post-merge cleanup remain open.
+
 ## Completed release increments
 
 ### RH-023 — Publish the support email correction

@@ -6,7 +6,7 @@ Status: **Ready for delta assessment and a bounded calibration probe. This docum
 
 Related authority:
 
-- `Backlog.md`, work item `RH-004`.
+- `ITEM-BACKLOG.md`, work item `RH-004`.
 - `docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md`, Increment 1.
 - `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md`, especially `TF-AUDIO-01`, `TF-AUDIO-02` and `TF-AUDIO-05`.
 
@@ -369,7 +369,7 @@ xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xc
 
 Expected result: `** BUILD SUCCEEDED **`, and inspection finds no calibration fixtures, manifest, UI entry or calibration-only strings in the Release app bundle.
 
-If implementation chooses a Calibration configuration on the existing scheme rather than a separate `RideHorizonCalibration` scheme, update the second command to match the accepted project structure and record the exact command and result in `Backlog.md`.
+If implementation chooses a Calibration configuration on the existing scheme rather than a separate `RideHorizonCalibration` scheme, update the second command to match the accepted project structure and record the exact command and result in `ITEM-BACKLOG.md`.
 
 ## Implementation evidence — 2026-08-03
 
@@ -414,5 +414,5 @@ Rob is the sole acceptance authority for helmet intelligibility, stopped-conditi
 ## Paste-ready implementation instruction
 
 ```text
-Implement SPEECH_INTELLIGIBILITY_CALIBRATION_SPEC.md as a bounded RH-004 calibration probe. Follow AGENTS.md, Backlog.md and docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md. First audit the existing Premium Voice peak normalisation and audio-engine work and record the delta; do not recreate working components. Generate and bundle the three fixed Premium Voice fixtures through the existing authenticated Fly proxy, with no caching dependency. Add the internal-only Speech Calibration Lab, shared reusable processing boundary, focused tests and Release-exclusion proof. Build and install it on the physical iPhone, then stop at the human calibration gate. Do not promote a new production profile, tune Google Maps, change the proxy contract, archive or upload to TestFlight until Rob selects a candidate.
+Implement SPEECH_INTELLIGIBILITY_CALIBRATION_SPEC.md as a bounded RH-004 calibration probe. Follow AGENTS.md, ITEM-BACKLOG.md and docs/architecture/plans/AUDIO_INTEROPERABILITY_VALIDATION_PLAN.md. First audit the existing Premium Voice peak normalisation and audio-engine work and record the delta; do not recreate working components. Generate and bundle the three fixed Premium Voice fixtures through the existing authenticated Fly proxy, with no caching dependency. Add the internal-only Speech Calibration Lab, shared reusable processing boundary, focused tests and Release-exclusion proof. Build and install it on the physical iPhone, then stop at the human calibration gate. Do not promote a new production profile, tune Google Maps, change the proxy contract, archive or upload to TestFlight until Rob selects a candidate.
 ```
