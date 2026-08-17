@@ -4,6 +4,21 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 
 ## Active repository maintenance
 
+### RH-048 — Complete post-merge repository cleanup
+
+- **Type:** Repository hygiene closeout.
+- **Claimed by:** Codex on branch `codex/rh-048-post-merge-cleanup`.
+- **Outcome:** `main` has an accurate post-merge ledger record, redundant merged branches and worktrees are retired only after reachability is proved, and the remaining recovery and product-framework branches have explicit dispositions.
+- **Scope:** Record PR 8 and PR 9 integration; retire the merged `feat/sub-locality-geodata`, `agent/family-trip-validation-priorities` and `codex/rh-045-repository-hygiene` branches/worktrees after verification; retain the RH-045 preservation checkpoint; and inspect and classify the unmerged family-framework branch.
+- **Exclusions:** Do not read, stage, move or publish `/Users/rob_dev/DocsLocal/motoguide/repo/.ios-testflight.json`; split or integrate the preserved mixed state; implement RH-046 or RH-047; alter application, proxy, TestFlight or product behaviour; or merge/delete the family-framework branch without a product decision.
+- **Risk:** Low for verified merged-ref retirement; medium for any unproven preservation or product-framework disposition.
+- **Decision impact:** No architectural decision. Stop for Rob if the family-framework material is not clearly covered by the merged product-priority direction.
+- **Delivery Risk Cube movement:** Raises production-quality depth through recovery and delivery control; functional breadth and implementation fidelity are unchanged.
+- **Acceptance criteria:** The ledger records the two merged PRs and current branch dispositions; each retired ref/worktree is proved reachable through `origin/main` first; the preservation checkpoint remains remote and explicitly local-only for TestFlight configuration; and the framework branch is retained pending product adjudication unless redundancy is proved.
+- **Verification:** Fetch/prune `origin`; prove each retirement candidate is an ancestor of `origin/main`; confirm the remaining remote branches and worktrees; run `git diff --check`; and confirm the integration checkout is clean and aligned after merge.
+- **Stop condition:** Stop before deleting unmerged work, changing product intent, accessing local configuration, or treating the framework branch as redundant without comparison evidence.
+- **Status:** In progress — Codex, 2026-08-17.
+
 ### RH-045 — Classify and preserve mixed local work
 
 - **Type:** Repository hygiene recovery.
@@ -21,9 +36,9 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Preservation checkpoint — 2026-08-17:** Local commit `59f58ce` on `codex/rh-045-preserve-local-state` preserves all non-secret paths exactly as found. The root local TestFlight configuration remains deliberately uninspected, uncommitted and local-only.
 - **Credential recovery — 2026-08-17:** Rob confirmed the designated personal Keychain PAT. A single value-suppressed process-local capability check verified `ADMIN` access to `rjbarbour/MotoGuide`; the standard request-local GitHub CLI credential helper then published both RH-045 recovery branches. No credential value was printed, persisted or copied into repository configuration.
 - **Remote recovery — 2026-08-17:** Commit `59f58ce` is reachable at `origin/codex/rh-045-preserve-local-state`; commit `2b750d8` is reachable at `origin/codex/rh-045-repository-hygiene`; and the already merged remote ref `codex/rh-044-item-backlog-migration` was deleted after reachability was proved. The root `.ios-testflight.json` remains deliberately uninspected, uncommitted and local-only in `/Users/rob_dev/DocsLocal/motoguide/repo`.
-- **Next action:** Review and merge the narrow RH-045 hygiene PR. Do not read, stage or publish `.ios-testflight.json`; keep PR 8 and PR 9 isolated; then split the preserved streams into separately tracked work before integration.
-- **After remote recovery:** Reconcile the exact TestFlight build identity across `PROJECT.md`, `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and the active UAT protocol; keep PR 8 and PR 9 isolated; then split the preserved streams into separately tracked work before integrating or closing RH-045.
-- **Status:** Review-ready — recovery branches published and the obsolete RH-044 remote ref retired — Codex, 2026-08-17.
+- **Integration — 2026-08-17:** PR 11 merged into `main` at `e48e0f1`. The hygiene controller branch is fully integrated; `59f58ce` remains as the deliberate preservation checkpoint. PR 8 and PR 9 subsequently merged through `origin/main` at `02aca86`.
+- **Next action:** Reconcile the exact TestFlight build identity across `PROJECT.md`, `docs/operations/testflight/TESTFLIGHT_FIELD_TEST_EVIDENCE.md` and the active UAT protocol, then split the preserved streams into separately tracked work before integration.
+- **Status:** Done — recovery state is integrated and the remaining checkpoint is deliberately retained — Codex, 2026-08-17.
 
 ## Completed repository maintenance
 
