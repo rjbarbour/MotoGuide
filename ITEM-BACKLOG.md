@@ -25,7 +25,8 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Closeout evidence — 2026-08-17:** ST-02 to ST-05 integrated through PRs 16–19 at `82e5cb5`, `67c72d1`, `f148845` and `7d50042`. ST-01 remains independently reachable as the clean published RH-019A WIP branch at `ee4686d`. The path-by-path retained, reconciled and retired dispositions are recorded in `docs/project/status/RH-050_CONTINUATION_2026-08-17.md`.
 - **Closeout integration — 2026-08-17:** PR 20 merged at `7851e5d`. Only after that merge was verified were the merged task worktrees, their local branches and both RH-045 refs removed.
 - **Final topology — 2026-08-17:** `/Users/rob_dev/DocsLocal/motoguide/repo` is restored to clean `main` at `7851e5d`; RH-019A is the only retained task worktree and remote task branch, clean at `ee4686d`. `origin/main` and `origin/codex/rh-019a-testflight-tooling-recovery` are the only remote branches.
-- **Status:** Post-cleanup verification complete — final topology record pending documentation-only integration.
+- **Final integration:** PR 21 carries only this verified post-cleanup record. After it merges, fast-forward the canonical checkout, remove the temporary integration worktree and delete its local branch.
+- **Status:** Done on integration of PR 21 — all preserved paths are adjudicated and only the explicitly gated RH-019A WIP stream remains.
 
 ### RH-051 — Recover the Apple place-label audit corpus
 

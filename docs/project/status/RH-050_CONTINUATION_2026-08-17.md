@@ -67,7 +67,7 @@ Record the resulting topology in a final RH-050 documentation-only follow-up. Th
 - The only retained task worktree is `/Users/rob_dev/DocsLocal/motoguide/rh-019a-testflight-tooling`, clean at published WIP commit `ee4686d`.
 - The only remote branches are `origin/main` and `origin/codex/rh-019a-testflight-tooling-recovery`.
 
-The temporary `/Users/rob_dev/DocsLocal/motoguide/integration` worktree carries only this final documentation update. Remove it and its local branch after this record is merged and the canonical checkout is fast-forwarded and verified.
+The temporary `/Users/rob_dev/DocsLocal/motoguide/integration` worktree carries only this final documentation update in PR 21. Remove it and its local branch after PR 21 is merged and the canonical checkout is fast-forwarded and verified.
 
 ## Pre-compaction continuation checkpoint — 2026-08-17
 
