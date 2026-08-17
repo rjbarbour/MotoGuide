@@ -17,7 +17,10 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Acceptance criteria:** The feature checkout has no unexplained material state; every retained branch/worktree has a task ID, purpose and recovery path; the private configuration is explicitly local-only and excluded from commits; PR 8 and PR 9 remain unchanged; and `main` remains clean and current.
 - **Verification:** Record branch/worktree topology, preservation commit IDs and path classification; verify each checkpoint is clean, its branch is reachable remotely where publication is authorised, and `git diff --check` passes for hygiene-only changes.
 - **Stop condition:** Stop before a semantic merge, product/release decision, secret access, or deletion without reachability proof.
-- **Status:** In progress — Codex, 2026-08-17.
+- **Classification — 2026-08-17:** `RH-037` build identity is represented by the Settings/Xcode/project-state changes; `RH-002` owner UAT and headset/test-system evidence is represented by the field-test, protocol, headset and testing paths; `RH-019A` release-tool hardening is represented by the distribution tooling and its operational/research records; Apple place-audit tooling/evidence is related to PR 8 but requires a separate task-boundary decision before integration; and BackseatGuider planning is product-direction material awaiting a decision on PR 9 and the product-family route. The modified agent/ledger/index files are supporting control-plane material, not a standalone feature.
+- **Preservation checkpoint — 2026-08-17:** Local commit `59f58ce` on `codex/rh-045-preserve-local-state` preserves all non-secret paths exactly as found. The root local TestFlight configuration remains deliberately uninspected, uncommitted and local-only.
+- **Blocker:** The selected `GH-PERSONAL` Git CLI route can fetch but receives GitHub `403` for push and merged-branch deletion. No alternate credential source has been attempted. Remote recovery and the remaining hygiene merge therefore require Rob to authorise the GH-01 fallback route.
+- **Status:** Blocked on authorised GitHub credential-route recovery — Codex, 2026-08-17.
 
 ## Completed repository maintenance
 
