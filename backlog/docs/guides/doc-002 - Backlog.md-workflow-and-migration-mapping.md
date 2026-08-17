@@ -3,7 +3,7 @@ id: doc-002
 title: Backlog.md workflow and migration mapping
 type: guide
 created_date: '2026-08-17 22:44'
-updated_date: '2026-08-17 22:44'
+updated_date: '2026-08-17 22:57'
 tags:
   - guide
   - workflow
@@ -24,13 +24,19 @@ Before creating, claiming, executing or closing work, run:
 
 Use supported public `backlog` CLI commands for every task, document and decision mutation. Do not edit generated records directly. One RH work-item ID binds the task, branch, worktree, commits, pull request and evidence.
 
+## Decision records
+
+Backlog.md v1.50.1 provides supported public commands to create and list decisions, but not to populate or update their Context, Decision and Consequences sections. The generated decision files are therefore index stubs and must not be hand-edited.
+
+Use `backlog decision list --plain` to discover decision IDs. Use `backlog doc view doc-003 --plain` for the complete accepted Context, Decision and Consequences. doc-001 retains the original historical evidence.
+
 ## Migration status mapping
 
 - Legacy completed or integrated work maps to `Done`, with completion evidence preserved in doc-001.
-- Legacy ready work maps to `To Do` plus the `ready` label. RH-024 is the current `ready,core` next increment.
+- Legacy ready work maps to `To Do` plus the `ready` label.
 - Legacy shaping work maps to `To Do` plus the `shaping` label.
-- Parked work maps to `To Do` plus the `parked` label. This includes RH-002, RH-019.01 and the family-product stream.
-- RH-056 is `In Progress` until this migration is integrated and verified.
+- Parked work maps to `To Do` plus the `parked` label.
+- Narrative project documents preserve dated direction and route live task state to the CLI rather than duplicating it.
 
 ## Legacy identifier mapping
 
@@ -54,7 +60,7 @@ doc-001 contains the complete former `ITEM-BACKLOG.md` ledger as it stood at the
 
 ## Project routing
 
-Trello remains the intake surface. Accepted delivery work is represented here before implementation. Notion holds binding cross-project SOPs. `PROJECT.md` describes current product direction and points to the CLI for live status rather than duplicating the board.
+Trello remains the intake surface. Accepted delivery work is represented here before implementation. Notion holds binding cross-project SOPs. `PROJECT.md` preserves dated verified product direction and points to the CLI for live status rather than duplicating the board.
 
 ## Terms
 

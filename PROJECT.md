@@ -2,11 +2,9 @@
 
 Last verified: 2026-08-17
 
-## Current commitment
+## Current product direction
 
-Return to core RideHorizon feature development through RH-024 Tier 1: bounded same-day ride context that reduces repeated facts and makes genuine place returns coherent without destroying useful caching. This is a **Build** commitment focused on the Level 3 passive contextual guide.
-
-RH-002 TestFlight evidence, RH-019.01 release tooling (legacy RH-019A) and the family-passenger experiment are parked. They remain recorded work and may be resumed deliberately, but they are not current dependencies for RH-024.
+The owner decision recorded on 2026-08-17 returned attention to core RideHorizon feature development and nominated bounded same-day ride context as the next intended product increment. This is dated product direction, not a duplicate assertion of current task status. Run `backlog task list --plain` and inspect the selected task through the CLI before claiming work.
 
 ## Last verified result
 
@@ -24,7 +22,7 @@ The on-device place model now retains the supported Apple placemark fields and d
 
 ## Current gate
 
-**READY — RH-024 Tier 1 sequence-aware ride facts.** Run `backlog instructions overview`, inspect `backlog task view RH-024 --plain`, then claim RH-024 on a separate implementation branch and deliver only its bounded same-day context slice. Stop before persistent cross-trip memory, server-side rider history, multiple cached variants or live-service deployment.
+Delivery selection is controlled by the Backlog.md CLI. The 2026-08-17 decision nominated RH-024 Tier 1 sequence-aware ride facts; confirm its current status with `backlog task view RH-024 --plain` before claiming it. If it remains the selected task, deliver only its bounded same-day context slice and stop before persistent cross-trip memory, server-side rider history, multiple cached variants or live-service deployment.
 
 ## Residual risks
 
@@ -40,5 +38,5 @@ The on-device place model now retains the supported Apple placemark fields and d
 
 ## Next outcomes
 
-1. Claim and implement RH-024 Tier 1 as one app/proxy/OpenAPI increment.
-2. Evaluate the bounded context behaviour independently, then return to the milestone health gate before selecting further guide work.
+1. Confirm the selected core task through the Backlog.md CLI and claim only that task.
+2. Evaluate its bounded behaviour independently, then return to the milestone health gate before selecting further guide work.

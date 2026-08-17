@@ -4,13 +4,9 @@ Date: 2026-07-03
 
 Product capability ladder refined: 2026-08-04
 
-Current delivery focus: 2026-08-17
+Product-direction decision: 2026-08-17
 
-- Return to the core RideHorizon motorcycle product.
-- RH-024 Tier 1 is the next Ready increment: bounded same-day ride context, coherent place returns and less repetitive fact generation.
-- RH-002 TestFlight evidence, RH-019.01 release tooling (legacy RH-019A) and the family-passenger experiment are parked until deliberately resumed.
-- This focus update supersedes the dated `Immediate Next Steps` sequence at the end of this document; it does not erase the retained milestone history or release evidence.
-- Use `backlog task view RH-024 --plain` for the live task contract and `backlog task list --plain` for current delivery status; this plan does not duplicate the ledger.
+On 2026-08-17, product direction returned to the core RideHorizon motorcycle experience. This dated decision supersedes the dated `Immediate Next Steps` sequence at the end of this document; it does not assert current task status or erase retained milestone history and release evidence. Use `backlog task list --plain` for live delivery status and inspect the selected task through the CLI before claiming it.
 
 ## 2026-07-17 Identity Migration
 
