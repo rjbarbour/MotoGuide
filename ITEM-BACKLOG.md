@@ -16,7 +16,8 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Acceptance criteria:** The configuration is reachable remotely on the deliberate recovery branch; the ledger no longer calls it local-only; RH-048 is recorded as merged and complete; `main` is clean/current; and every remaining branch/worktree has a named purpose.
 - **Verification:** Confirm clean status for each worktree, fetch/prune `origin`, inspect unmerged remote refs, run `git diff --check`, and verify the merged PR 12 revision.
 - **Stop condition:** Stop before any TestFlight operation, secret access, deletion of preserved state, or product-framework disposition.
-- **Status:** In progress — Codex, 2026-08-17.
+- **Integration — 2026-08-17:** PR 13 merged at `575b0e4`. This integration-checkout closeout records the required canonical completion after the reviewed documentation change.
+- **Status:** Done — ledger reconciliation integrated and verified — Codex, 2026-08-17.
 
 ## Completed repository maintenance
 
