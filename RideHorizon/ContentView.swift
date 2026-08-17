@@ -1939,7 +1939,7 @@ private enum AppBuildMetadata {
 
     static var titleTimestampLabel: String {
         let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
-        return formattedBuildTimestamp(buildNumber) ?? "build \(buildNumber)"
+        return "Build \(buildNumber)"
     }
 
     static func shouldShow(testMode: Bool) -> Bool {
