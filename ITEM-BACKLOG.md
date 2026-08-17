@@ -38,6 +38,7 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Review — 2026-08-17:** Independent standards and specification reviews found no implementation or scope defect. The retained README was corrected to describe the completed-cache dry-run accurately and to classify the live runner as an operator-only empirical probe rather than an LLM-safe diagnostic collector.
 - **Disposition:** Retain and integrate as supporting verification tooling and dated evidence. No owner judgement is required unless Rob wants to fund the deferred live iPhone/locale or MapKit comparison now.
 - **Status:** Review-ready — offline evidence complete; no live service or app change.
+
 ### RH-052 — Reconcile beta UAT, headset and test-system records
 
 - **Type:** Release-evidence and test-documentation reconciliation.
@@ -54,6 +55,17 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Review — 2026-08-17:** Independent standards and specification reviews found no app/release scope creep. Corrections removed unnecessary home-location context from historical UAT evidence, selected `20260806.221234` in the active run template, relabelled `20260804.0246` as an earlier candidate, and reconciled the live private-beta pack to the same no-evidence-transfer gate.
 - **Owner judgement:** Operational, not documentary: Rob must confirm `0.12.4 (20260806.221234)` in RideHorizon Settings while stopped before any physical result is attributed to it, then decide the RH-002 release gate from the recorded stationary/road evidence.
 - **Status:** Review-ready — reconciliation complete; exact-build human evidence remains open under RH-002.
+### RH-053 — Show the packaged build identity in Settings
+
+- **Type:** Small iOS observability feature.
+- **Claimed by:** Codex on branch `codex/rh-053-settings-build-identity`.
+- **Outcome:** A stationary tester can read the app's packaged marketing version and bundle build directly in Settings and report the exact binary under test.
+- **Scope:** Transfer only the Settings Build card from RH-045 commit `2a1a31e`, using the existing `AppBuildMetadata` helper. Add focused testability only where needed and run proportionate compile/test verification.
+- **Exclusions:** Do not import RH-045 build-number changes, shared-scheme formatting churn, TestFlight tooling, release evidence or unrelated Settings changes; do not archive, upload or alter signing.
+- **Risk:** Low. The UI is read-only and derives values from packaged metadata. The main risk is displaying a stale hard-coded value or disrupting the Settings layout.
+- **Acceptance criteria:** Settings visibly labels both the packaged version and build; no release identity is duplicated in source; the normal RideHorizon scheme/project semantics are unchanged; relevant automated checks and an unsigned generic-iPhone compile pass.
+- **Verification — 2026-08-17:** `git diff --check` passed. A cached unsigned Release build for generic iOS hardware completed with exit status 0 and `** BUILD SUCCEEDED **`. Independent reviews identified that the friendly timestamp truncated build seconds; follow-up commit `e4880fd` now displays the full packaged `CFBundleVersion`, and both reviews passed on recheck. No focused `AppBuildMetadata` test exists; no broad simulator suite was run for this static presentation-only change. No physical iPhone was available in the scheme destinations, so no device install was attempted.
+- **Status:** PR-ready — implementation, proportionate verification and independent review complete.
 
 ## Completed repository maintenance
 
