@@ -66,8 +66,9 @@ This file is the canonical delivery ledger. Trello remains intake, Notion holds 
 - **Scope:** Record PR 8 and PR 9 integration; retire the merged `feat/sub-locality-geodata`, `agent/family-trip-validation-priorities` and `codex/rh-045-repository-hygiene` branches/worktrees after verification; retain the RH-045 preservation checkpoint; and inspect and classify the unmerged family-framework branch.
 - **Exclusions:** Do not read, stage, move or publish `/Users/rob_dev/DocsLocal/motoguide/repo/.ios-testflight.json`; split or integrate the preserved mixed state; implement RH-046 or RH-047; alter application, proxy, TestFlight or product behaviour; or merge/delete the family-framework branch without a product decision.
 - **Risk:** Low for verified merged-ref retirement; medium for any unproven preservation or product-framework disposition.
-- **Verification — 2026-08-17:** PR 9 merged at `91f708b`; PR 8 merged at `02aca86`. The three merged source refs proved ancestors of `origin/main` before their clean worktrees, local branches and remote branches were retired. `origin/codex/rh-045-preserve-local-state` and `origin/agent/family-journey-product-framework` were deliberately retained.
+- **Verification — 2026-08-17:** PR 9 merged at `91f708b`; PR 8 merged at `02aca86`. The three merged source refs proved ancestors of `origin/main` before their clean worktrees, local branches and remote branches were retired. `origin/codex/rh-045-preserve-local-state` was deliberately retained.
 - **Integration — 2026-08-17:** PR 12 merged at `3cf403c`; its review comment was resolved, its source worktree and branch were retired, and the integration checkout fast-forwarded cleanly.
+- **Post-closeout — 2026-08-17:** The previously retained family-framework material was integrated into `main` at `76f35b7`; its source branch was then proved reachable and retired.
 - **Status:** Done — post-merge cleanup integrated and verified — Codex, 2026-08-17.
 
 ## Completed release increments
