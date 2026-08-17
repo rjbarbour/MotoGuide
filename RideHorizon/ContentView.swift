@@ -1073,6 +1073,20 @@ private struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    SettingsCard(title: "Build", palette: palette) {
+                        Text(AppBuildMetadata.titlePrimaryLabel)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(palette.primaryText)
+
+                        Text(AppBuildMetadata.titleTimestampLabel)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(palette.secondaryText)
+
+                        Text("Use this version and build when reporting beta feedback.")
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(palette.secondaryText)
+                    }
+
                     SettingsCard(title: "Announcements", palette: palette) {
                     Text("Choose when and how \(ProductIdentity.displayName) should speak while you ride.")
                         .font(.title3)
