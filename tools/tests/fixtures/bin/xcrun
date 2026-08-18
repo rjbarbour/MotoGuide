@@ -1,0 +1,35 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$' \n\t'
+printf 'xcrun %s\n' "$*" >> "${FAKE_LOG:?}"
+if [[ "${1:-}" == "--sdk" && "${2:-}" == "iphoneos" && "${3:-}" == "--show-sdk-build-version" ]]; then
+    printf '23D125\n'
+    exit 0
+fi
+case "${1:-}" in
+    lipo)
+        if [[ "${FAKE_MODE:-success}" == "wrong_executable_arch" ]]; then
+            printf 'x86_64\n'
+        else
+            printf 'arm64\n'
+        fi
+        ;;
+    swift)
+        printf 'fixture.jwt.token\n'
+        ;;
+    xcresulttool)
+        if [[ "${FAKE_MODE:-success}" == "xcresult_failure" ]]; then
+            printf '{"result":"Failed","totalTestCount":182,"failedTests":1,"skippedTests":0}\n'
+        else
+            printf '{"result":"Passed","totalTestCount":182,"failedTests":0,"skippedTests":0}\n'
+        fi
+        ;;
+    altool)
+        if [[ "${FAKE_MODE:-success}" == "processing_failure" ]]; then
+            printf '{"errors":[{"code":"PROCESSING_FAILED","message":"fixture failure"}]}\n'
+        else
+            printf '{"status":"COMPLETE","errors":[]}\n'
+        fi
+        ;;
+    *) exit 46 ;;
+esac

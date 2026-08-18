@@ -1,0 +1,23 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$' \n\t'
+printf 'security %s\n' "$*" >> "${FAKE_LOG:?}"
+if [[ "${1:-}" == "find-generic-password" ]]; then
+    [[ "${FAKE_MODE:-success}" != "auth_missing" ]] || exit 44
+    if [[ " $* " == *" -w "* ]]; then
+        printf '%s\n' '-----BEGIN PRIVATE KEY-----' 'fixture-only' '-----END PRIVATE KEY-----'
+    fi
+    exit 0
+fi
+if [[ "${1:-}" == "cms" ]]; then
+    expiration='2030-01-01T00:00:00Z'
+    [[ "${FAKE_MODE:-success}" != "expired_profile" ]] || expiration='2020-01-01T00:00:00Z'
+    profile_team='TEAM123456'
+    profile_app='TEAM123456.example.app'
+    debugger='true'
+    [[ "${FAKE_MODE:-success}" != "profile_team_mismatch" ]] || profile_team='WRONGTEAM'
+    [[ "${FAKE_MODE:-success}" != "profile_app_mismatch" ]] || profile_app='TEAM123456.wrong.app'
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' "<plist version=\"1.0\"><dict><key>Name</key><string>Fixture App Profile</string><key>ExpirationDate</key><date>$expiration</date><key>TeamIdentifier</key><array><string>$profile_team</string></array><key>Entitlements</key><dict><key>application-identifier</key><string>$profile_app</string><key>com.apple.developer.team-identifier</key><string>$profile_team</string><key>get-task-allow</key><$debugger/></dict></dict></plist>"
+    exit 0
+fi
+exit 45

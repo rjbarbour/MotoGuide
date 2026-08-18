@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$' \n\t'
+printf 'codesign %s\n' "$*" >> "${FAKE_LOG:?}"
+if [[ " $* " == *" --verify "* ]]; then
+    [[ "${FAKE_MODE:-success}" != "codesign_verify_failure" ]] || exit 51
+    exit 0
+fi
+team='TEAM123456'
+[[ "${FAKE_MODE:-success}" != "signed_entitlement_mismatch" ]] || team='WRONGTEAM'
+unexpected=''
+[[ "${FAKE_MODE:-success}" != "unexpected_signed_entitlement" ]] || unexpected='<key>com.apple.developer.unexpected</key><true/>'
+printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' "<plist version=\"1.0\"><dict><key>application-identifier</key><string>$team.example.app</string><key>com.apple.developer.team-identifier</key><string>$team</string><key>get-task-allow</key><true/><key>beta-reports-active</key><true/>$unexpected</dict></plist>"

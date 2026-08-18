@@ -1,0 +1,888 @@
+#!/bin/bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+readonly DEFAULT_REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+readonly REPO_ROOT="${IOS_TESTFLIGHT_REPO_ROOT:-$DEFAULT_REPO_ROOT}"
+readonly CONFIG_PATH="${IOS_TESTFLIGHT_CONFIG_PATH:-$REPO_ROOT/.ios-testflight.json}"
+readonly AUTH_ROOT="${IOS_TESTFLIGHT_AUTH_ROOT:-$HOME/Library/Application Support/ios-testflight/auth}"
+readonly TOOL_PATH="${IOS_TESTFLIGHT_TOOL_PATH:-$SCRIPT_DIR/ios-testflight}"
+readonly ASC_API_BASE="${IOS_TESTFLIGHT_ASC_API_BASE:-https://api.appstoreconnect.apple.com}"
+readonly ASC_CONNECT_TIMEOUT_SECONDS=15
+readonly ASC_REQUEST_TIMEOUT_SECONDS=60
+RUN_DIR=""
+LOCK_DIR=""
+LOCK_ACQUIRED=false
+ASC_TOKEN=""
+ASC_TOKEN_CREATED=0
+
+cleanup() {
+    if [[ -n "$RUN_DIR" && -d "$RUN_DIR" ]]; then
+        rm -rf -- "$RUN_DIR"
+    fi
+    if [[ "$LOCK_ACQUIRED" == "true" && -n "$LOCK_DIR" && -d "$LOCK_DIR" ]]; then
+        rm -rf -- "$LOCK_DIR"
+    fi
+}
+
+acquire_lock() {
+    mkdir -p "$STATE_DIR"
+    LOCK_DIR="$STATE_DIR/$SCHEME.lock"
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        printf '%s\n' "$$" > "$LOCK_DIR/pid"
+        LOCK_ACQUIRED=true
+        return
+    fi
+    local holder=""
+    [[ -f "$LOCK_DIR/pid" ]] && holder="$(sed -n '1p' "$LOCK_DIR/pid")"
+    if [[ "$holder" =~ ^[0-9]+$ ]] && kill -0 "$holder" 2>/dev/null; then
+        die "A TestFlight deployment is already running (PID $holder)"
+    fi
+    die "A stale deployment lock exists at $LOCK_DIR; inspect it before removal"
+}
+
+recover_stale_run_dirs() {
+    local candidate marker owner pid format marker_repo marker_run marker_scheme basename
+    for candidate in "${TMPDIR:-/private/tmp}"/ios-testflight.*; do
+        [[ -d "$candidate" && ! -L "$candidate" ]] || continue
+        basename="${candidate##*/}"
+        [[ "$basename" =~ ^ios-testflight\.[A-Za-z0-9]{6}$ ]] || continue
+        marker="$candidate/.ios-testflight-run"
+        [[ -f "$marker" ]] || continue
+        owner="$(stat -f '%u' "$candidate" 2>/dev/null || true)"
+        [[ "$owner" == "$(id -u)" ]] || continue
+        format="$(sed -n 's/^format=//p' "$marker")"
+        pid="$(sed -n 's/^pid=//p' "$marker")"
+        marker_repo="$(sed -n 's/^repo=//p' "$marker")"
+        marker_run="$(sed -n 's/^runDir=//p' "$marker")"
+        marker_scheme="$(sed -n 's/^scheme=//p' "$marker")"
+        [[ "$format" == "ios-testflight-private-run-v1" ]] || continue
+        [[ "$pid" =~ ^[0-9]+$ ]] || continue
+        [[ "$marker_repo" == "$REPO_ROOT" && "$marker_run" == "$candidate" && "$marker_scheme" == "$SCHEME" ]] || continue
+        if ! kill -0 "$pid" 2>/dev/null; then
+            rm -rf -- "$candidate"
+            note "Recovered stale private deployment directory from dead PID $pid"
+        fi
+    done
+}
+
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+die() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+note() {
+    printf '[%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"
+}
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
+}
+
+config_value() {
+    local value
+    if value="$(/usr/bin/plutil -extract "$1" raw -o - "$CONFIG_PATH" 2>/dev/null)"; then
+        printf '%s' "$value"
+    fi
+}
+
+auth_value() {
+    local value
+    if value="$(/usr/bin/plutil -extract "$1" raw -o - "$AUTH_PATH" 2>/dev/null)"; then
+        printf '%s' "$value"
+    fi
+}
+
+require_config() {
+    [[ -f "$CONFIG_PATH" ]] || die "Missing project configuration: $CONFIG_PATH"
+    PROJECT="$(config_value project)"
+    SCHEMA_VERSION="$(config_value schemaVersion)"
+    SCHEME="$(config_value scheme)"
+    PRODUCT_NAME="$(config_value productName)"
+    CONFIGURATION="$(config_value configuration)"
+    BUNDLE_ID="$(config_value bundleIdentifier)"
+    TEAM_ID="$(config_value teamID)"
+    AUTH_PROFILE="$(config_value authProfile)"
+    APP_ID="$(config_value appStoreConnectAppID)"
+    GROUP_NAME="$(config_value internalBetaGroupName)"
+    EVIDENCE_MAX_AGE_HOURS="$(config_value evidenceMaxAgeHours)"
+    PROCESSING_TIMEOUT_SECONDS="$(config_value processingTimeoutSeconds)"
+    PROCESSING_POLL_SECONDS="$(config_value processingPollSeconds)"
+    READINESS_TIMEOUT_SECONDS="$(config_value readinessTimeoutSeconds)"
+    [[ "$SCHEMA_VERSION" == "2" ]] || die "Unsupported ios-testflight configuration schemaVersion: ${SCHEMA_VERSION:-missing}"
+    [[ -n "$PROJECT" && -n "$SCHEME" && -n "$PRODUCT_NAME" && -n "$CONFIGURATION" ]] || die "Project, scheme, product name and configuration are required"
+    [[ -n "$BUNDLE_ID" && -n "$TEAM_ID" && -n "$AUTH_PROFILE" ]] || die "Bundle identifier, team ID and auth profile are required"
+    AUTH_PATH="$AUTH_ROOT/$AUTH_PROFILE.json"
+    [[ "$EVIDENCE_MAX_AGE_HOURS" =~ ^[0-9]+$ ]] || die "evidenceMaxAgeHours must be a non-negative integer"
+    [[ "$PROCESSING_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || die "processingTimeoutSeconds must be a positive integer"
+    [[ "$PROCESSING_POLL_SECONDS" =~ ^[1-9][0-9]*$ ]] || die "processingPollSeconds must be a positive integer"
+    [[ "$READINESS_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || die "readinessTimeoutSeconds must be a positive integer"
+    STATE_DIR="${IOS_TESTFLIGHT_STATE_DIR:-$REPO_ROOT/.git/ios-testflight}"
+    TRUST_PATH="$STATE_DIR/$SCHEME.trusted-inputs"
+    DERIVED_DATA_PATH="${IOS_TESTFLIGHT_DERIVED_DATA_PATH:-$REPO_ROOT/DerivedData-TestFlight}"
+    RECEIPT_DIR="${IOS_TESTFLIGHT_RECEIPT_DIR:-$STATE_DIR/receipts}"
+}
+
+plist_value() {
+    local path="$1"
+    local key="$2"
+    local value
+    if value="$(/usr/bin/plutil -extract "$key" raw -o - "$path" 2>/dev/null)"; then
+        printf '%s' "$value"
+    fi
+}
+
+release_entitlement_is_allowed() {
+    local requested="$1"
+    local index=0 configured
+    while configured="$(config_value "allowedReleaseEntitlements.$index")" && [[ -n "$configured" ]]; do
+        [[ "$configured" == "$requested" ]] && return 0
+        index=$((index + 1))
+    done
+    return 1
+}
+
+verify_archive() {
+    local archive_path="$1"
+    local marketing_version="$2"
+    local build_number="$3"
+    local archive_info="$archive_path/Info.plist"
+    local app_path="$archive_path/Products/Applications/$PRODUCT_NAME.app"
+    [[ -f "$archive_info" ]] || die "Archive Info.plist is missing"
+    [[ -d "$app_path" ]] || die "Expected app is missing from archive: $PRODUCT_NAME.app"
+
+    local archived_bundle archived_version archived_build archived_team signing_identity architecture
+    archived_bundle="$(plist_value "$archive_info" ApplicationProperties.CFBundleIdentifier)"
+    archived_version="$(plist_value "$archive_info" ApplicationProperties.CFBundleShortVersionString)"
+    archived_build="$(plist_value "$archive_info" ApplicationProperties.CFBundleVersion)"
+    archived_team="$(plist_value "$archive_info" ApplicationProperties.Team)"
+    signing_identity="$(plist_value "$archive_info" ApplicationProperties.SigningIdentity)"
+    architecture="$(plist_value "$archive_info" ApplicationProperties.Architectures.0)"
+    [[ "$archived_bundle" == "$BUNDLE_ID" ]] || die "Archive bundle mismatch: $archived_bundle"
+    [[ "$archived_version" == "$marketing_version" ]] || die "Archive marketing-version mismatch: $archived_version"
+    [[ "$archived_build" == "$build_number" ]] || die "Archive build-number mismatch: $archived_build"
+    [[ "$archived_team" == "$TEAM_ID" ]] || die "Archive team mismatch: $archived_team"
+    [[ "$architecture" == "arm64" ]] || die "Archive does not contain the required arm64 architecture"
+    [[ "$signing_identity" == Apple\ Development:* || "$signing_identity" == Apple\ Distribution:* || "$signing_identity" == iPhone\ Distribution:* ]] || die "Archive is not signed by a recognised Apple app identity"
+
+    local executable
+    executable="$(plist_value "$app_path/Info.plist" CFBundleExecutable)"
+    [[ -n "$executable" && -f "$app_path/$executable" ]] || die "Archived executable is missing"
+    local executable_architectures
+    executable_architectures="$(xcrun lipo -archs "$app_path/$executable" 2>/dev/null)" || die "Archived executable architecture could not be inspected"
+    [[ " $executable_architectures " == *" arm64 "* ]] || die "Archived executable does not contain arm64"
+    codesign --verify --deep --strict "$app_path" >/dev/null 2>&1 || die "Archived app code signature verification failed"
+    local entitlements="$RUN_DIR/archive-entitlements.plist"
+    codesign -d --entitlements :- "$app_path" > "$entitlements" 2>/dev/null || die "Archived app signature could not be inspected"
+    local entitlement_team
+    entitlement_team="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.team-identifier' "$entitlements" 2>/dev/null || true)"
+    [[ "$entitlement_team" == "$TEAM_ID" ]] || die "Archive signing team entitlement mismatch"
+    [[ "$(plist_value "$entitlements" application-identifier)" == "$TEAM_ID.$BUNDLE_ID" ]] || die "Archive application identifier entitlement mismatch"
+    # An .xcarchive may still carry development signing. Xcode applies the
+    # App Store distribution signature during -exportArchive, so debugger
+    # entitlement policy cannot be inferred from this pre-export archive.
+    [[ -n "$(config_value allowedReleaseEntitlements.0)" ]] || die "No Release entitlement allowlist is configured"
+    local entitlement_dump="$RUN_DIR/archive-entitlements.txt"
+    /usr/libexec/PlistBuddy -c Print "$entitlements" > "$entitlement_dump" 2>/dev/null || die "Archived app entitlement keys could not be enumerated"
+    local entitlement_key
+    while IFS= read -r entitlement_key; do
+        [[ -n "$entitlement_key" ]] || continue
+        release_entitlement_is_allowed "$entitlement_key" || die "Archive contains an unexpected Release entitlement: $entitlement_key"
+    done < <(sed -n 's/^    \([^ =][^ =]*\) = .*/\1/p' "$entitlement_dump")
+
+    [[ -f "$app_path/embedded.mobileprovision" ]] || die "Archive provisioning profile is missing"
+    local profile="$RUN_DIR/archive-profile.plist"
+    security cms -D -i "$app_path/embedded.mobileprovision" > "$profile" 2>/dev/null || die "Archive provisioning profile could not be decoded"
+    [[ "$(plist_value "$profile" TeamIdentifier.0)" == "$TEAM_ID" ]] || die "Archive provisioning team mismatch"
+    [[ "$(plist_value "$profile" Entitlements.application-identifier)" == "$TEAM_ID.$BUNDLE_ID" ]] || die "Archive provisioning application identifier mismatch"
+    local profile_name profile_expiration profile_expiration_epoch
+    profile_name="$(plist_value "$profile" Name)"
+    profile_expiration="$(plist_value "$profile" ExpirationDate)"
+    [[ -n "$profile_name" && -n "$profile_expiration" ]] || die "Archive provisioning profile identity or expiry is missing"
+    profile_expiration_epoch="$(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$profile_expiration" '+%s' 2>/dev/null || true)"
+    [[ "$profile_expiration_epoch" =~ ^[0-9]+$ ]] || die "Archive provisioning profile expiry could not be parsed"
+    (( profile_expiration_epoch > $(date -u '+%s') )) || die "Archive provisioning profile is expired"
+
+    local index=0 forbidden
+    while forbidden="$(config_value "forbiddenArchivePaths.$index")" && [[ -n "$forbidden" ]]; do
+        if find "$app_path" -name "$forbidden" -print -quit | grep -q .; then
+            die "Forbidden release resource found in archive: $forbidden"
+        fi
+        index=$((index + 1))
+    done
+    note "Archive verified: bundle, version, team, executable arm64, Apple signature, provisioning and release resources"
+}
+
+archive_input_files() {
+    local index=0
+    local root
+    while root="$(config_value "archiveInputRoots.$index")" && [[ -n "$root" ]]; do
+        [[ -e "$REPO_ROOT/$root" ]] || die "Configured archive input does not exist: $root"
+        [[ -r "$REPO_ROOT/$root" ]] || die "Configured archive input is unreadable: $root"
+        if [[ -d "$REPO_ROOT/$root" ]]; then
+            if ! find "$REPO_ROOT/$root" -type f \
+                ! -path '*/xcuserdata/*' \
+                ! -name '*.xcuserstate' \
+                ! -name '.DS_Store' \
+                -print0; then
+                die "Could not enumerate every file under configured archive input: $root"
+            fi
+        else
+            printf '%s\0' "$REPO_ROOT/$root"
+        fi
+        index=$((index + 1))
+    done
+}
+
+toolchain_identity() {
+    require_command xcodebuild
+    require_command xcrun
+    local developer_dir
+    if [[ -n "${DEVELOPER_DIR:-}" ]]; then
+        developer_dir="$DEVELOPER_DIR"
+    else
+        developer_dir="$(xcode-select -p 2>/dev/null)" || die "Could not resolve the selected Xcode developer directory"
+    fi
+    [[ -n "$developer_dir" ]] || die "Selected Xcode developer directory is empty"
+    printf 'developerDir=%s\n' "$developer_dir"
+    xcodebuild -version || die "Could not identify the selected Xcode version"
+    printf 'iphoneosSDKBuild='
+    xcrun --sdk iphoneos --show-sdk-build-version || die "Could not identify the selected iPhoneOS SDK build"
+}
+
+fingerprint() {
+    local file
+    local relative
+    local input_list
+    local sorted_list
+    local toolchain_file
+    input_list="$(mktemp "${TMPDIR:-/private/tmp}/ios-testflight-inputs.XXXXXX")"
+    sorted_list="$(mktemp "${TMPDIR:-/private/tmp}/ios-testflight-inputs-sorted.XXXXXX")"
+    toolchain_file="$(mktemp "${TMPDIR:-/private/tmp}/ios-testflight-toolchain.XXXXXX")"
+    toolchain_identity > "$toolchain_file" || {
+        rm -f -- "$input_list" "$sorted_list" "$toolchain_file"
+        die "Could not capture the complete Xcode toolchain identity"
+    }
+    {
+        printf '%s\0' "$CONFIG_PATH"
+        printf '%s\0' "$TOOL_PATH"
+        archive_input_files
+    } > "$input_list" || {
+        rm -f -- "$input_list" "$sorted_list" "$toolchain_file"
+        die "Could not enumerate every configured archive input"
+    }
+    sort -zu "$input_list" > "$sorted_list" || {
+        rm -f -- "$input_list" "$sorted_list" "$toolchain_file"
+        die "Could not sort archive inputs"
+    }
+    local digest
+    digest="$({
+        while IFS= read -r -d '' file; do
+            [[ -f "$file" && -r "$file" ]] || die "Archive input is not a readable file: $file"
+            relative="${file#"$REPO_ROOT/"}"
+            printf '%s\0' "$relative"
+            /usr/bin/shasum -a 256 "$file"
+        done < "$sorted_list"
+        printf '%s\0' '<selected-xcode-toolchain>'
+        /usr/bin/shasum -a 256 "$toolchain_file" | awk '{print $1}'
+    } | /usr/bin/shasum -a 256 | awk '{print $1}')"
+    rm -f -- "$input_list" "$sorted_list" "$toolchain_file"
+    [[ -n "$digest" ]] || die "Could not fingerprint archive inputs"
+    printf '%s\n' "$digest"
+}
+
+current_marketing_version() {
+    xcodebuild -project "$REPO_ROOT/$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" -showBuildSettings 2>/dev/null \
+        | awk -F ' = ' '/^[[:space:]]*MARKETING_VERSION = / {print $2; exit}'
+}
+
+verify_trusted_inputs() {
+    [[ -f "$TRUST_PATH" ]] || die "No tested-input record. Use 'test-and-trust PROFILE' to run configured tests or 'trust-current --owner-override REASON' for an explicit no-test decision."
+    local expected
+    local actual
+    local recorded_epoch
+    local evidence_type
+    expected="$(sed -n '1p' "$TRUST_PATH")"
+    recorded_epoch="$(sed -n 's/^recordedEpoch=//p' "$TRUST_PATH")"
+    evidence_type="$(sed -n 's/^evidenceType=//p' "$TRUST_PATH")"
+    [[ "$recorded_epoch" =~ ^[0-9]+$ ]] || die "Tested-input record has no valid timestamp"
+    [[ "$evidence_type" == "xcresult" || "$evidence_type" == "owner-override" ]] || die "Tested-input record has no recognised evidence type"
+    local age_seconds=$(( $(date -u '+%s') - recorded_epoch ))
+    (( age_seconds >= 0 && age_seconds <= EVIDENCE_MAX_AGE_HOURS * 3600 )) || die "Tested-input evidence is older than ${EVIDENCE_MAX_AGE_HOURS} hours"
+    actual="$(fingerprint)"
+    [[ "$actual" == "$expected" ]] || die "Archive inputs changed since the recorded test evidence. Run the applicable tests, then record the new tested state."
+    VERIFIED_EVIDENCE_TYPE="$evidence_type"
+    VERIFIED_EVIDENCE_PROFILE="$(sed -n 's/^profile=//p' "$TRUST_PATH")"
+    VERIFIED_EVIDENCE_FINGERPRINT="$actual"
+    VERIFIED_EVIDENCE_RECORDED_AT="$(sed -n 's/^recordedAt=//p' "$TRUST_PATH")"
+    VERIFIED_EVIDENCE_TEST_COUNT="$(sed -n 's/^testCount=//p' "$TRUST_PATH")"
+    VERIFIED_EVIDENCE_SUMMARY_SHA256="$(sed -n 's/^summarySha256=//p' "$TRUST_PATH")"
+    VERIFIED_EVIDENCE_OVERRIDE_REASON="$(sed -n 's/^reason=//p' "$TRUST_PATH")"
+    [[ -n "$VERIFIED_EVIDENCE_PROFILE" ]] || die "Tested-input record has no evidence profile"
+    [[ -n "$VERIFIED_EVIDENCE_RECORDED_AT" ]] || die "Tested-input record has no evidence timestamp"
+    if [[ "$VERIFIED_EVIDENCE_TYPE" == "xcresult" ]]; then
+        [[ "$VERIFIED_EVIDENCE_TEST_COUNT" =~ ^[1-9][0-9]*$ && "$VERIFIED_EVIDENCE_SUMMARY_SHA256" =~ ^[0-9a-f]{64}$ ]] || die "Test evidence record is incomplete"
+    else
+        [[ ${#VERIFIED_EVIDENCE_OVERRIDE_REASON} -ge 12 ]] || die "Owner-override evidence record is incomplete"
+    fi
+    note "Archive inputs match tested fingerprint ${actual:0:12}"
+}
+
+verify_auth_metadata() {
+    [[ -f "$AUTH_PATH" ]] || die "Missing local auth profile: $AUTH_PATH"
+    KEY_ID="$(auth_value keyID)"
+    ISSUER_ID="$(auth_value issuerID)"
+    KEYCHAIN_PATH="$(auth_value keychainPath)"
+    KEYCHAIN_SERVICE="$(auth_value keychainService)"
+    KEYCHAIN_ACCOUNT="$(auth_value keychainAccount)"
+    KEYCHAIN_PREAUTHORISED="$(auth_value keychainReadPreauthorised)"
+    PRIVATE_KEY_PATH="$(auth_value privateKeyPath)"
+    ALLOW_TEMPORARY_PRIVATE_KEY_FILE="$(auth_value allowTemporaryPrivateKeyFile)"
+    TESTER_ACCOUNT="$(auth_value testerAccount)"
+    [[ -n "$KEY_ID" && -n "$ISSUER_ID" ]] || die "Auth profile must contain keyID and issuerID"
+    [[ -n "$TESTER_ACCOUNT" ]] || die "Auth profile must identify the intended testerAccount"
+    if [[ -n "$PRIVATE_KEY_PATH" ]]; then
+        [[ "$ALLOW_TEMPORARY_PRIVATE_KEY_FILE" == "true" ]] || die "Temporary private-key file use is not explicitly enabled in the auth profile"
+        [[ -f "$PRIVATE_KEY_PATH" && -r "$PRIVATE_KEY_PATH" ]] || die "Configured temporary private-key file is unavailable"
+        [[ "$(stat -f '%u' "$PRIVATE_KEY_PATH")" == "$(id -u)" ]] || die "Configured temporary private-key file is not owned by the current user"
+        local private_key_mode
+        private_key_mode="$(stat -f '%Lp' "$PRIVATE_KEY_PATH")"
+        [[ "$private_key_mode" == "400" || "$private_key_mode" == "600" ]] || die "Configured temporary private-key file permissions must be 400 or 600"
+        note "Using explicitly authorised temporary private-key file; rotation remains required"
+    else
+        [[ -n "$KEYCHAIN_PATH" && -n "$KEYCHAIN_SERVICE" && -n "$KEYCHAIN_ACCOUNT" ]] || die "Auth profile must contain privateKeyPath or the exact Keychain path, service and account"
+        security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" "$KEYCHAIN_PATH" >/dev/null 2>&1 \
+            || die "The configured Keychain item was not found. No credential value was read."
+    fi
+}
+
+read_private_key() {
+    local destination="$1"
+    if [[ -n "$PRIVATE_KEY_PATH" ]]; then
+        cp "$PRIVATE_KEY_PATH" "$destination"
+        chmod 600 "$destination"
+        [[ -s "$destination" ]] || die "Configured temporary private-key file is empty"
+        return
+    fi
+    if [[ "$KEYCHAIN_PREAUTHORISED" != "true" ]]; then
+        [[ -t 0 ]] || die "Keychain value access is not pre-authorised and this run is non-interactive"
+        printf 'This will read the configured App Store Connect private key. Is the Mac unlocked and are you ready for a Keychain prompt? [y/N] ' >&2
+        local answer
+        read -r answer
+        [[ "$answer" == "y" || "$answer" == "Y" ]] || die "Keychain read cancelled"
+    fi
+    umask 077
+    security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w "$KEYCHAIN_PATH" > "$destination"
+    [[ -s "$destination" ]] || die "Keychain returned an empty private key"
+}
+
+generate_asc_token() {
+    local private_key="$1"
+    xcrun swift - "$KEY_ID" "$ISSUER_ID" "$private_key" <<'SWIFT'
+import CryptoKit
+import Foundation
+
+func base64URL(_ data: Data) -> String {
+    data.base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
+}
+
+guard CommandLine.arguments.count == 4 else { exit(64) }
+let keyID = CommandLine.arguments[1]
+let issuerID = CommandLine.arguments[2]
+let keyPath = CommandLine.arguments[3]
+let now = Int(Date().timeIntervalSince1970)
+let header = ["alg": "ES256", "kid": keyID, "typ": "JWT"]
+let payload: [String: Any] = ["iss": issuerID, "iat": now, "exp": now + 1200, "aud": "appstoreconnect-v1"]
+let headerData = try JSONSerialization.data(withJSONObject: header, options: [.sortedKeys])
+let payloadData = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+let signingInput = "\(base64URL(headerData)).\(base64URL(payloadData))"
+let pem = try String(contentsOfFile: keyPath, encoding: .utf8)
+let key = try P256.Signing.PrivateKey(pemRepresentation: pem)
+let signature = try key.signature(for: Data(signingInput.utf8))
+print("\(signingInput).\(base64URL(signature.rawRepresentation))")
+SWIFT
+}
+
+refresh_asc_token() {
+    local private_key="$1"
+    local now
+    now="$(date -u '+%s')"
+    if [[ -z "$ASC_TOKEN" ]] || (( now - ASC_TOKEN_CREATED >= 900 )); then
+        ASC_TOKEN="$(generate_asc_token "$private_key")" || die "Could not create an App Store Connect token"
+        [[ -n "$ASC_TOKEN" ]] || die "App Store Connect token generation returned no token"
+        ASC_TOKEN_CREATED="$now"
+    fi
+}
+
+asc_get() {
+    local token="$1"
+    local destination="$2"
+    local endpoint="$3"
+    shift 3
+    local status
+    status="$(printf 'header = "Authorization: Bearer %s"\n' "$token" | curl --config - --silent --show-error --globoff --connect-timeout "$ASC_CONNECT_TIMEOUT_SECONDS" --max-time "$ASC_REQUEST_TIMEOUT_SECONDS" --output "$destination" --write-out '%{http_code}' --get "$ASC_API_BASE$endpoint" "$@")" \
+        || die "App Store Connect API request failed"
+    [[ "$status" == "200" ]] || die "App Store Connect API returned HTTP $status"
+    /usr/bin/plutil -convert json -o /dev/null "$destination" >/dev/null 2>&1 || die "App Store Connect API returned invalid JSON"
+}
+
+unique_resource_id() {
+    local path="$1"
+    local description="$2"
+    local first second
+    first="$(plist_value "$path" data.0.id)"
+    second="$(plist_value "$path" data.1.id)"
+    [[ -n "$first" ]] || die "App Store Connect returned no $description"
+    [[ -z "$second" ]] || die "App Store Connect returned multiple $description resources"
+    printf '%s\n' "$first"
+}
+
+find_resource_index() {
+    local path="$1"
+    local attribute="$2"
+    local expected="$3"
+    local index=0 value
+    while value="$(plist_value "$path" "data.$index.attributes.$attribute")" && [[ -n "$value" ]]; do
+        if [[ "$value" == "$expected" ]]; then
+            printf '%s\n' "$index"
+            return 0
+        fi
+        index=$((index + 1))
+    done
+    return 1
+}
+
+resource_id_is_present() {
+    local path="$1"
+    local expected="$2"
+    local index=0 value
+    while value="$(plist_value "$path" "data.$index.id")" && [[ -n "$value" ]]; do
+        [[ "$value" == "$expected" ]] && return 0
+        index=$((index + 1))
+    done
+    return 1
+}
+
+preflight_asc_auth() {
+    local private_key="$1"
+    refresh_asc_token "$private_key"
+    local apps_json="$RUN_DIR/asc-apps-preflight.json"
+    asc_get "$ASC_TOKEN" "$apps_json" /v1/apps --data-urlencode "filter[bundleId]=$BUNDLE_ID" --data-urlencode 'fields[apps]=bundleId' --data-urlencode 'limit=2'
+    local resolved_app_id
+    resolved_app_id="$(unique_resource_id "$apps_json" "app for bundle $BUNDLE_ID")"
+    [[ -z "$APP_ID" || "$APP_ID" == "$resolved_app_id" ]] || die "Configured App Store Connect app ID does not match the bundle identifier"
+    APP_ID="$resolved_app_id"
+    note "App Store Connect authentication and app access verified"
+}
+
+wait_for_asc_build() {
+    local private_key="$1"
+    local build_number="$2"
+    local deadline=$(( $(date -u '+%s') + PROCESSING_TIMEOUT_SECONDS ))
+    local builds_json="$RUN_DIR/asc-builds.json"
+    while (( $(date -u '+%s') <= deadline )); do
+        refresh_asc_token "$private_key"
+        asc_get "$ASC_TOKEN" "$builds_json" /v1/builds --data-urlencode "filter[app]=$APP_ID" --data-urlencode "filter[version]=$build_number" --data-urlencode 'fields[builds]=version,processingState,buildAudienceType,expired' --data-urlencode 'limit=2'
+        local build_id state
+        build_id="$(plist_value "$builds_json" data.0.id)"
+        if [[ -z "$build_id" ]]; then
+            sleep "$PROCESSING_POLL_SECONDS"
+            continue
+        fi
+        [[ -z "$(plist_value "$builds_json" data.1.id)" ]] || die "App Store Connect returned multiple exact-build resources"
+        [[ "$(plist_value "$builds_json" data.0.attributes.version)" == "$build_number" ]] || die "App Store Connect returned the wrong build number"
+        state="$(plist_value "$builds_json" data.0.attributes.processingState)"
+        if [[ "$state" == "VALID" ]]; then
+            [[ "$(plist_value "$builds_json" data.0.attributes.buildAudienceType)" == "INTERNAL_ONLY" ]] || die "App Store Connect build audience is not INTERNAL_ONLY"
+            [[ "$(plist_value "$builds_json" data.0.attributes.expired)" == "false" ]] || die "App Store Connect build is expired"
+            ASC_BUILD_ID="$build_id"
+            ASC_PROCESSING_STATE="$state"
+            ASC_BUILD_AUDIENCE="INTERNAL_ONLY"
+            note "Apple processing completed with VALID, INTERNAL_ONLY status"
+            return
+        fi
+        [[ "$state" == "PROCESSING" ]] || die "Apple processing failed with state: ${state:-unknown}"
+        sleep "$PROCESSING_POLL_SECONDS"
+    done
+    die "Apple processing did not complete within ${PROCESSING_TIMEOUT_SECONDS} seconds"
+}
+
+verify_internal_beta_state() {
+    local private_key="$1"
+    local detail_json="$RUN_DIR/asc-build-beta-detail.json"
+    local deadline=$(( $(date -u '+%s') + READINESS_TIMEOUT_SECONDS ))
+    while true; do
+        refresh_asc_token "$private_key"
+        asc_get "$ASC_TOKEN" "$detail_json" "/v1/builds/$ASC_BUILD_ID/buildBetaDetail" --data-urlencode 'fields[buildBetaDetails]=internalBuildState'
+        local internal_state
+        internal_state="$(plist_value "$detail_json" data.attributes.internalBuildState)"
+        case "$internal_state" in
+            READY_FOR_BETA_TESTING|IN_BETA_TESTING)
+                ASC_INTERNAL_BETA_STATE="$internal_state"
+                note "Apple internal beta state is $internal_state"
+                return
+                ;;
+            PROCESSING|IN_EXPORT_COMPLIANCE_REVIEW)
+                (( $(date -u '+%s') < deadline )) || die "Apple internal beta state did not become ready within ${READINESS_TIMEOUT_SECONDS} seconds (state: $internal_state)"
+                sleep "$PROCESSING_POLL_SECONDS"
+                ;;
+            MISSING_EXPORT_COMPLIANCE|PROCESSING_EXCEPTION|EXPIRED)
+                die "Apple internal beta state blocks tester readiness: $internal_state"
+                ;;
+            *)
+                die "Apple returned an unrecognised internal beta state: ${internal_state:-missing}"
+                ;;
+        esac
+    done
+}
+
+verify_group_readiness() {
+    local private_key="$1"
+    local build_number="$2"
+    refresh_asc_token "$private_key"
+
+    local groups_json="$RUN_DIR/asc-groups.json"
+    asc_get "$ASC_TOKEN" "$groups_json" "/v1/apps/$APP_ID/betaGroups" --data-urlencode 'fields[betaGroups]=name,isInternalGroup,hasAccessToAllBuilds' --data-urlencode 'limit=200'
+    local group_index
+    group_index="$(find_resource_index "$groups_json" name "$GROUP_NAME")" || die "Configured TestFlight group was not found: $GROUP_NAME"
+    [[ "$(plist_value "$groups_json" "data.$group_index.attributes.isInternalGroup")" == "true" ]] || die "Configured TestFlight group is not internal"
+    local group_id
+    group_id="$(plist_value "$groups_json" "data.$group_index.id")"
+    ASC_GROUP_ID="$group_id"
+
+    local group_builds_json="$RUN_DIR/asc-group-builds.json"
+    local readiness_deadline=$(( $(date -u '+%s') + READINESS_TIMEOUT_SECONDS ))
+    while true; do
+        refresh_asc_token "$private_key"
+        asc_get "$ASC_TOKEN" "$group_builds_json" "/v1/betaGroups/$group_id/builds" --data-urlencode 'fields[builds]=version,processingState,buildAudienceType' --data-urlencode 'limit=200'
+        ! resource_id_is_present "$group_builds_json" "$ASC_BUILD_ID" || break
+        (( $(date -u '+%s') < readiness_deadline )) || die "Exact build is not available to the configured internal TestFlight group after ${READINESS_TIMEOUT_SECONDS} seconds"
+        sleep "$PROCESSING_POLL_SECONDS"
+    done
+
+    local testers_json="$RUN_DIR/asc-testers.json"
+    asc_get "$ASC_TOKEN" "$testers_json" "/v1/betaGroups/$group_id/betaTesters" --data-urlencode 'fields[betaTesters]=email,state' --data-urlencode 'limit=200'
+    local tester_index
+    tester_index="$(find_resource_index "$testers_json" email "$TESTER_ACCOUNT")" || die "Intended tester account is not in the configured TestFlight group"
+    local tester_state
+    tester_state="$(plist_value "$testers_json" "data.$tester_index.attributes.state")"
+    [[ "$tester_state" == "ACCEPTED" || "$tester_state" == "INSTALLED" ]] || die "Intended tester account is not active in the configured TestFlight group (state: ${tester_state:-unknown})"
+    ASC_TESTER_ID="$(plist_value "$testers_json" "data.$tester_index.id")"
+    ASC_TESTER_STATE="$tester_state"
+    note "App Store Connect verified: group assigned and intended tester present"
+}
+
+write_receipt() {
+    local marketing_version="$1"
+    local build_number="$2"
+    local fingerprint_value="$3"
+    local archive_seconds="$4"
+    local upload_seconds="$5"
+    local processing_seconds="$6"
+    local readiness_seconds="$7"
+    local total_seconds="$8"
+    mkdir -p "$RECEIPT_DIR"
+    local receipt="$RECEIPT_DIR/$SCHEME-$marketing_version-$build_number.json"
+    local receipt_hash="$receipt.sha256"
+    [[ ! -e "$receipt" && ! -e "$receipt_hash" ]] || die "Evidence receipt already exists and will not be overwritten: $receipt"
+    local receipt_temp
+    receipt_temp="$(mktemp "$RECEIPT_DIR/.ios-testflight-receipt.XXXXXX")"
+    /usr/bin/plutil -create xml1 "$receipt_temp"
+    /usr/bin/plutil -insert status -string ready_for_internal_tester "$receipt_temp"
+    /usr/bin/plutil -insert readyAt -string "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$receipt_temp"
+    /usr/bin/plutil -insert scheme -string "$SCHEME" "$receipt_temp"
+    /usr/bin/plutil -insert bundleIdentifier -string "$BUNDLE_ID" "$receipt_temp"
+    /usr/bin/plutil -insert marketingVersion -string "$marketing_version" "$receipt_temp"
+    /usr/bin/plutil -insert buildNumber -string "$build_number" "$receipt_temp"
+    /usr/bin/plutil -insert appStoreConnectBuildID -string "$ASC_BUILD_ID" "$receipt_temp"
+    /usr/bin/plutil -insert processingState -string "$ASC_PROCESSING_STATE" "$receipt_temp"
+    /usr/bin/plutil -insert audience -string "$ASC_BUILD_AUDIENCE" "$receipt_temp"
+    /usr/bin/plutil -insert internalBetaState -string "$ASC_INTERNAL_BETA_STATE" "$receipt_temp"
+    /usr/bin/plutil -insert betaGroup -string "$GROUP_NAME" "$receipt_temp"
+    /usr/bin/plutil -insert betaGroupID -string "$ASC_GROUP_ID" "$receipt_temp"
+    /usr/bin/plutil -insert testerAccount -string "$TESTER_ACCOUNT" "$receipt_temp"
+    /usr/bin/plutil -insert testerID -string "$ASC_TESTER_ID" "$receipt_temp"
+    /usr/bin/plutil -insert testerState -string "$ASC_TESTER_STATE" "$receipt_temp"
+    /usr/bin/plutil -insert archiveInputFingerprint -string "$fingerprint_value" "$receipt_temp"
+    /usr/bin/plutil -insert evidenceType -string "$VERIFIED_EVIDENCE_TYPE" "$receipt_temp"
+    /usr/bin/plutil -insert evidenceProfile -string "$VERIFIED_EVIDENCE_PROFILE" "$receipt_temp"
+    /usr/bin/plutil -insert evidenceRecordedAt -string "$VERIFIED_EVIDENCE_RECORDED_AT" "$receipt_temp"
+    [[ -z "$VERIFIED_EVIDENCE_TEST_COUNT" ]] || /usr/bin/plutil -insert evidenceTestCount -integer "$VERIFIED_EVIDENCE_TEST_COUNT" "$receipt_temp"
+    [[ -z "$VERIFIED_EVIDENCE_SUMMARY_SHA256" ]] || /usr/bin/plutil -insert evidenceSummarySha256 -string "$VERIFIED_EVIDENCE_SUMMARY_SHA256" "$receipt_temp"
+    [[ -z "$VERIFIED_EVIDENCE_OVERRIDE_REASON" ]] || /usr/bin/plutil -insert evidenceOwnerOverrideReason -string "$VERIFIED_EVIDENCE_OVERRIDE_REASON" "$receipt_temp"
+    /usr/bin/plutil -insert timings -dictionary "$receipt_temp"
+    /usr/bin/plutil -insert timings.archiveSeconds -integer "$archive_seconds" "$receipt_temp"
+    /usr/bin/plutil -insert timings.uploadSeconds -integer "$upload_seconds" "$receipt_temp"
+    /usr/bin/plutil -insert timings.processingSeconds -integer "$processing_seconds" "$receipt_temp"
+    /usr/bin/plutil -insert timings.readinessSeconds -integer "$readiness_seconds" "$receipt_temp"
+    /usr/bin/plutil -insert timings.totalSeconds -integer "$total_seconds" "$receipt_temp"
+    /usr/bin/plutil -convert json "$receipt_temp"
+    chmod 400 "$receipt_temp"
+    ln "$receipt_temp" "$receipt" || die "Could not create immutable evidence receipt without overwriting"
+    rm -f -- "$receipt_temp"
+    local hash_temp
+    hash_temp="$(mktemp "$RECEIPT_DIR/.ios-testflight-receipt-hash.XXXXXX")"
+    /usr/bin/shasum -a 256 "$receipt" | awk '{print $1}' > "$hash_temp"
+    chmod 400 "$hash_temp"
+    ln "$hash_temp" "$receipt_hash" || die "Could not create evidence receipt integrity hash without overwriting"
+    rm -f -- "$hash_temp"
+    chmod 400 "$receipt"
+    note "Evidence receipt: $receipt"
+}
+
+write_export_options() {
+    local destination="$1"
+    /usr/bin/plutil -create xml1 "$destination"
+    /usr/bin/plutil -insert method -string app-store-connect "$destination"
+    /usr/bin/plutil -insert destination -string upload "$destination"
+    /usr/bin/plutil -insert distributionBundleIdentifier -string "$BUNDLE_ID" "$destination"
+    /usr/bin/plutil -insert teamID -string "$TEAM_ID" "$destination"
+    /usr/bin/plutil -insert signingStyle -string automatic "$destination"
+    /usr/bin/plutil -insert manageAppVersionAndBuildNumber -bool false "$destination"
+    /usr/bin/plutil -insert testFlightInternalTestingOnly -bool true "$destination"
+    /usr/bin/plutil -insert uploadSymbols -bool true "$destination"
+}
+
+doctor() {
+    require_command xcodebuild
+    require_command xcrun
+    require_command security
+    require_command curl
+    require_config
+    [[ -d "$REPO_ROOT/$PROJECT" ]] || die "Xcode project not found: $PROJECT"
+    xcodebuild -list -project "$REPO_ROOT/$PROJECT" 2>/dev/null | grep -Fx "        $SCHEME" >/dev/null \
+        || die "Production scheme not found: $SCHEME"
+    verify_auth_metadata
+    note "Doctor passed for $SCHEME ($BUNDLE_ID); no secret value was read"
+}
+
+trust_current() {
+    require_config
+    local mode="${1:-}"
+    local reason="${2:-}"
+    [[ "$mode" == "--owner-override" && ${#reason} -ge 12 ]] || die "Usage: $0 trust-current --owner-override 'REASON (at least 12 characters)'; otherwise use test-and-trust PROFILE"
+    [[ "$reason" != *$'\n'* ]] || die "Owner-override reason must be one line"
+    recover_stale_run_dirs
+    acquire_lock
+    mkdir -p "$STATE_DIR"
+    local current
+    current="$(fingerprint)"
+    {
+        printf '%s\n' "$current"
+        printf 'recordedAt=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        printf 'recordedEpoch=%s\n' "$(date -u '+%s')"
+        printf 'evidenceType=owner-override\n'
+        printf 'profile=no-tests-owner-override\n'
+        printf 'reason=%s\n' "$reason"
+    } > "$TRUST_PATH"
+    note "Recorded explicit owner override for archive-input fingerprint ${current:0:12}"
+}
+
+evidence_profile_is_allowed() {
+    local requested="$1"
+    local index=0 configured
+    while configured="$(config_value "evidenceProfiles.$index")" && [[ -n "$configured" ]]; do
+        [[ "$configured" == "$requested" ]] && return 0
+        index=$((index + 1))
+    done
+    return 1
+}
+
+test_and_trust() {
+    require_config
+    require_command xcrun
+    require_command xcodebuild
+    local profile="${1:-}"
+    [[ "$profile" =~ ^[A-Za-z0-9._-]+$ ]] || die "Evidence profile must contain only letters, numbers, dot, underscore or hyphen"
+    evidence_profile_is_allowed "$profile" || die "Evidence profile is not configured for this project: $profile"
+    local test_destination test_target
+    test_destination="$(config_value testDestination)"
+    test_target="$(config_value testTarget)"
+    [[ -n "$test_destination" && -n "$test_target" ]] || die "testDestination and testTarget are required for test-and-trust"
+    recover_stale_run_dirs
+    acquire_lock
+    local before after
+    before="$(fingerprint)"
+    local evidence_dir="$STATE_DIR/evidence"
+    mkdir -p "$evidence_dir"
+    local result_path="$evidence_dir/$SCHEME-$(date -u '+%Y%m%d.%H%M%S').xcresult"
+    local test_derived_data="${IOS_TESTFLIGHT_TEST_DERIVED_DATA_PATH:-$REPO_ROOT/DerivedData}"
+    note "Running configured test evidence profile: $profile"
+    xcodebuild test -project "$REPO_ROOT/$PROJECT" -scheme "$SCHEME" -destination "$test_destination" -derivedDataPath "$test_derived_data" -resultBundlePath "$result_path" "-only-testing:$test_target"
+    after="$(fingerprint)"
+    [[ "$after" == "$before" ]] || die "Archive inputs changed while tests were running; evidence was not trusted"
+
+    local summary
+    summary="$(mktemp "${TMPDIR:-/private/tmp}/ios-testflight-xcresult.XXXXXX.json")"
+    if ! xcrun xcresulttool get test-results summary --path "$result_path" --format json > "$summary"; then
+        rm -f -- "$summary"
+        die "Could not read xcresult test summary"
+    fi
+    local result total failed
+    result="$(plist_value "$summary" result)"
+    total="$(plist_value "$summary" totalTestCount)"
+    failed="$(plist_value "$summary" failedTests)"
+    [[ "$result" == "Passed" && "$total" =~ ^[1-9][0-9]*$ && "$failed" == "0" ]] || {
+        rm -f -- "$summary"
+        die "xcresult test profile did not pass with at least one executed test"
+    }
+    local summary_hash
+    summary_hash="$(/usr/bin/shasum -a 256 "$summary" | awk '{print $1}')"
+    rm -f -- "$summary"
+
+    mkdir -p "$STATE_DIR"
+    local current
+    current="$after"
+    {
+        printf '%s\n' "$current"
+        printf 'recordedAt=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        printf 'recordedEpoch=%s\n' "$(date -u '+%s')"
+        printf 'evidenceType=xcresult\n'
+        printf 'profile=%s\n' "$profile"
+        printf 'testCount=%s\n' "$total"
+        printf 'summarySha256=%s\n' "$summary_hash"
+        printf 'xcresultPath=%s\n' "$result_path"
+    } > "$TRUST_PATH"
+    note "Tests passed and were atomically bound to archive-input fingerprint ${current:0:12}"
+}
+
+deploy() {
+    local total_started
+    total_started="$(date -u '+%s')"
+    require_config
+    recover_stale_run_dirs
+    acquire_lock
+    require_command xcodebuild
+    require_command xcrun
+    require_command security
+    require_command codesign
+    require_command curl
+    verify_trusted_inputs
+    local archive_input_fingerprint
+    archive_input_fingerprint="$VERIFIED_EVIDENCE_FINGERPRINT"
+    verify_auth_metadata
+
+    local build_number
+    local marketing_version
+    local archive_path
+    local export_options
+    local private_key
+    build_number="$(date -u '+%Y%m%d.%H%M%S')"
+    marketing_version="$(current_marketing_version)"
+    [[ -n "$marketing_version" ]] || die "Could not resolve MARKETING_VERSION"
+    RUN_DIR="$(mktemp -d "${TMPDIR:-/private/tmp}/ios-testflight.XXXXXX")"
+    {
+        printf 'format=ios-testflight-private-run-v1\n'
+        printf 'pid=%s\n' "$$"
+        printf 'repo=%s\n' "$REPO_ROOT"
+        printf 'runDir=%s\n' "$RUN_DIR"
+        printf 'scheme=%s\n' "$SCHEME"
+    } > "$RUN_DIR/.ios-testflight-run"
+    archive_path="$RUN_DIR/$SCHEME.xcarchive"
+    export_options="$RUN_DIR/ExportOptions.plist"
+    private_key="$RUN_DIR/AuthKey_$KEY_ID.p8"
+
+    read_private_key "$private_key"
+    preflight_asc_auth "$private_key"
+
+    note "Archiving $SCHEME $marketing_version ($build_number)"
+    local archive_started archive_finished
+    archive_started="$(date -u '+%s')"
+    xcodebuild archive \
+        -project "$REPO_ROOT/$PROJECT" \
+        -scheme "$SCHEME" \
+        -configuration "$CONFIGURATION" \
+        -destination 'generic/platform=iOS' \
+        -derivedDataPath "$DERIVED_DATA_PATH" \
+        -archivePath "$archive_path" \
+        -quiet \
+        -showBuildTimingSummary \
+        CURRENT_PROJECT_VERSION="$build_number"
+    archive_finished="$(date -u '+%s')"
+
+    local post_archive_fingerprint
+    post_archive_fingerprint="$(fingerprint)"
+    [[ "$post_archive_fingerprint" == "$archive_input_fingerprint" ]] || die "Archive inputs changed during archive creation; upload was stopped"
+
+    verify_archive "$archive_path" "$marketing_version" "$build_number"
+
+    write_export_options "$export_options"
+    note "Uploading as permanently TestFlight Internal Only"
+    local upload_started upload_finished
+    upload_started="$(date -u '+%s')"
+    xcodebuild -exportArchive \
+        -archivePath "$archive_path" \
+        -exportPath "$RUN_DIR/export" \
+        -exportOptionsPlist "$export_options" \
+        -authenticationKeyPath "$private_key" \
+        -authenticationKeyID "$KEY_ID" \
+        -authenticationKeyIssuerID "$ISSUER_ID" \
+        -allowProvisioningUpdates \
+        -quiet
+    upload_finished="$(date -u '+%s')"
+
+    note "Upload accepted; waiting for Apple processing through the App Store Connect API"
+    local processing_started processing_finished
+    processing_started="$(date -u '+%s')"
+    wait_for_asc_build "$private_key" "$build_number"
+    processing_finished="$(date -u '+%s')"
+
+    local readiness_started readiness_finished total_finished
+    readiness_started="$(date -u '+%s')"
+    verify_internal_beta_state "$private_key"
+    verify_group_readiness "$private_key" "$build_number"
+    readiness_finished="$(date -u '+%s')"
+    total_finished="$readiness_finished"
+    write_receipt "$marketing_version" "$build_number" "$archive_input_fingerprint" \
+        "$((archive_finished - archive_started))" \
+        "$((upload_finished - upload_started))" \
+        "$((processing_finished - processing_started))" \
+        "$((readiness_finished - readiness_started))" \
+        "$((total_finished - total_started))"
+
+    note "Ready for internal tester: $SCHEME $marketing_version ($build_number)"
+    note "Installation on the iPhone and in-app build confirmation remain separate device evidence"
+}
+
+usage() {
+    printf "Usage: %s doctor | fingerprint | test-and-trust PROFILE | trust-current --owner-override 'REASON' | deploy\n" "$0"
+}
+
+main() {
+    local command="${1:-}"
+    case "$command" in
+        doctor)
+            doctor
+            ;;
+        fingerprint)
+            require_config
+            fingerprint
+            ;;
+        trust-current)
+            shift
+            trust_current "${1:-}" "${2:-}"
+            ;;
+        test-and-trust)
+            shift
+            test_and_trust "${1:-}"
+            ;;
+        deploy)
+            deploy
+            ;;
+        *)
+            usage
+            exit 2
+            ;;
+    esac
+}
+
+main "$@"

@@ -1,0 +1,75 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$' \n\t'
+authorised=false
+while IFS= read -r line; do
+    [[ "$line" == 'header = "Authorization: Bearer fixture.jwt.token"' ]] && authorised=true
+done
+printf 'curl %s\n' "$*" >> "${FAKE_LOG:?}"
+output=""
+url=""
+previous=""
+for argument in "$@"; do
+    [[ "$previous" == "--output" ]] && output="$argument"
+    [[ "$argument" == http* ]] && url="$argument"
+    previous="$argument"
+done
+[[ -n "$output" && -n "$url" ]]
+[[ "$authorised" == "true" ]]
+[[ " $* " == *" --connect-timeout 15 "* ]]
+[[ " $* " == *" --max-time 60 "* ]]
+if [[ "${FAKE_MODE:-success}" == "api_auth_failure" ]]; then
+    printf '{"errors":[{"status":"401"}]}\n' > "$output"
+    printf '401'
+    exit 0
+fi
+if [[ "${FAKE_MODE:-success}" == "malformed_api" ]]; then
+    printf 'not-json\n' > "$output"
+    printf '200'
+    exit 0
+fi
+build_number="$(sed -n 's/.*CURRENT_PROJECT_VERSION=\([^ ]*\).*/\1/p' "${FAKE_LOG:?}" | tail -1)"
+case "$url" in
+    */v1/apps)
+        [[ " $* " == *" filter[bundleId]=example.app "* ]]
+        printf '{"data":[{"type":"apps","id":"1234567890","attributes":{"bundleId":"example.app"}}]}\n' > "$output"
+        ;;
+    */v1/builds)
+        [[ " $* " == *" filter[app]=1234567890 "* && " $* " == *" filter[version]="* ]]
+        audience="INTERNAL_ONLY"
+        state="VALID"
+        [[ "${FAKE_MODE:-success}" != "wrong_audience" ]] || audience="APP_STORE_ELIGIBLE"
+        [[ "${FAKE_MODE:-success}" != "api_processing_failure" && "${FAKE_MODE:-success}" != "processing_failure" ]] || state="FAILED"
+        if [[ "${FAKE_MODE:-success}" == "processing_timeout" ]]; then
+            printf '{"data":[]}\n' > "$output"
+        else
+            printf '{"data":[{"type":"builds","id":"BUILD123","attributes":{"version":"%s","processingState":"%s","buildAudienceType":"%s","expired":false}}]}\n' "$build_number" "$state" "$audience" > "$output"
+        fi
+        ;;
+    */v1/builds/BUILD123/buildBetaDetail)
+        internal_state='READY_FOR_BETA_TESTING'
+        [[ "${FAKE_MODE:-success}" != "missing_compliance" ]] || internal_state='MISSING_EXPORT_COMPLIANCE'
+        printf '{"data":{"type":"buildBetaDetails","id":"DETAIL123","attributes":{"internalBuildState":"%s"}}}\n' "$internal_state" > "$output"
+        ;;
+    */v1/apps/1234567890/betaGroups)
+        printf '{"data":[{"type":"betaGroups","id":"GROUP123","attributes":{"name":"Internal","isInternalGroup":true,"hasAccessToAllBuilds":true}}]}\n' > "$output"
+        ;;
+    */v1/betaGroups/GROUP123/builds)
+        if [[ "${FAKE_MODE:-success}" == "missing_group_build" ]]; then
+            printf '{"data":[]}\n' > "$output"
+        else
+            printf '{"data":[{"type":"builds","id":"BUILD123","attributes":{"version":"%s","processingState":"VALID","buildAudienceType":"INTERNAL_ONLY"}}]}\n' "$build_number" > "$output"
+        fi
+        ;;
+    */v1/betaGroups/GROUP123/betaTesters)
+        if [[ "${FAKE_MODE:-success}" == "missing_tester" ]]; then
+            printf '{"data":[]}\n' > "$output"
+        else
+            tester_state='ACCEPTED'
+            [[ "${FAKE_MODE:-success}" != "inactive_tester" ]] || tester_state='INVITED'
+            printf '{"data":[{"type":"betaTesters","id":"TESTER123","attributes":{"email":"tester@example.com","state":"%s"}}]}\n' "$tester_state" > "$output"
+        fi
+        ;;
+    *) exit 47 ;;
+esac
+printf '200'

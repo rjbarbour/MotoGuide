@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "project": "RideHorizon.xcodeproj",
+  "scheme": "RideHorizon",
+  "productName": "RideHorizon",
+  "configuration": "Release",
+  "bundleIdentifier": "ai.digitalmercenaries.ridehorizon",
+  "teamID": "W64ZN45B4A",
+  "authProfile": "digital-mercenaries-app-store-connect",
+  "appStoreConnectAppID": "",
+  "internalBetaGroupName": "RideHorizon team",
+  "evidenceMaxAgeHours": 168,
+  "evidenceProfiles": ["ridehorizon-unit"],
+  "testDestination": "platform=iOS Simulator,name=iPhone 17,OS=26.3.1",
+  "testTarget": "RideHorizonTests",
+  "processingTimeoutSeconds": 900,
+  "processingPollSeconds": 5,
+  "readinessTimeoutSeconds": 180,
+  "archiveInputRoots": [
+    "RideHorizon.xcodeproj/project.pbxproj",
+    "RideHorizon.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
+    "RideHorizon.xcodeproj/project.xcworkspace/xcshareddata",
+    "RideHorizon.xcodeproj/xcshareddata",
+    "RideHorizon",
+    "RideHorizonTests"
+  ],
+  "forbiddenArchivePaths": [
+    "premium-place-name.mp3",
+    "premium-boundary.mp3",
+    "premium-short-fact.mp3",
+    "speech-calibration-manifest.json"
+  ],
+  "allowedReleaseEntitlements": [
+    "application-identifier",
+    "beta-reports-active",
+    "com.apple.developer.team-identifier",
+    "get-task-allow",
+    "keychain-access-groups"
+  ]
+}

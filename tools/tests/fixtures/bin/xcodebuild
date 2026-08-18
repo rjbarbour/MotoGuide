@@ -1,0 +1,97 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$' \n\t'
+printf 'xcodebuild %s\n' "$*" >> "${FAKE_LOG:?}"
+
+if [[ "${1:-}" == "-version" ]]; then
+    if [[ "${FAKE_MODE:-success}" == "evidence_baseline_race" ]]; then
+        counter_file="${TMPDIR:?}/toolchain-fingerprint-count"
+        count=0
+        [[ ! -f "$counter_file" ]] || count="$(cat "$counter_file")"
+        count=$((count + 1))
+        printf '%s\n' "$count" > "$counter_file"
+        [[ "$count" != "2" ]] || printf 'changed between evidence verification and archive baseline\n' >> "${FAKE_REPO_ROOT:?}/App/App.swift"
+    fi
+    printf '%s\nBuild version 17D204\n' "${FAKE_XCODE_VERSION:-Xcode 26.3.1 fixture}"
+    exit 0
+fi
+
+if [[ " $* " == *" -list "* ]]; then
+    printf 'Schemes:\n        App\n'
+    exit 0
+fi
+if [[ " $* " == *" -showBuildSettings "* ]]; then
+    printf '    MARKETING_VERSION = 0.12.4\n'
+    exit 0
+fi
+if [[ " $* " == *" test "* ]]; then
+    result_path=""
+    previous=""
+    for argument in "$@"; do
+        [[ "$previous" == "-resultBundlePath" ]] && result_path="$argument"
+        previous="$argument"
+    done
+    [[ -n "$result_path" ]]
+    mkdir -p "$result_path"
+    [[ "${FAKE_MODE:-success}" != "test_input_change" ]] || printf 'changed during test\n' >> "${FAKE_REPO_ROOT:?}/App/App.swift"
+    [[ "${FAKE_MODE:-success}" != "xcresult_failure" ]] || exit 65
+    exit 0
+fi
+if [[ " $* " == *" archive "* ]]; then
+    [[ "${FAKE_MODE:-success}" != "archive_failure" ]] || exit 64
+    archive_path=""
+    build_number=""
+    previous=""
+    for argument in "$@"; do
+        [[ "$previous" == "-archivePath" ]] && archive_path="$argument"
+        [[ "$argument" == CURRENT_PROJECT_VERSION=* ]] && build_number="${argument#CURRENT_PROJECT_VERSION=}"
+        previous="$argument"
+    done
+    [[ -n "$archive_path" && -n "$build_number" ]]
+    if [[ "${FAKE_MODE:-success}" == "term_during_archive" ]]; then
+        kill -TERM "$PPID"
+        sleep 1
+    fi
+    app_path="$archive_path/Products/Applications/App.app"
+    mkdir -p "$app_path"
+    /usr/bin/plutil -create xml1 "$archive_path/Info.plist"
+    /usr/bin/plutil -insert ApplicationProperties -dictionary "$archive_path/Info.plist"
+    /usr/bin/plutil -insert ApplicationProperties.CFBundleIdentifier -string "${FAKE_ARCHIVE_BUNDLE:-example.app}" "$archive_path/Info.plist"
+    /usr/bin/plutil -insert ApplicationProperties.CFBundleShortVersionString -string 0.12.4 "$archive_path/Info.plist"
+    /usr/bin/plutil -insert ApplicationProperties.CFBundleVersion -string "$build_number" "$archive_path/Info.plist"
+    /usr/bin/plutil -insert ApplicationProperties.Team -string "${FAKE_ARCHIVE_TEAM:-TEAM123456}" "$archive_path/Info.plist"
+    signing_identity='Apple Development: Fixture'
+    [[ "${FAKE_MODE:-success}" != "unknown_signing_identity" ]] || signing_identity='Fixture Signer'
+    /usr/bin/plutil -insert ApplicationProperties.SigningIdentity -string "$signing_identity" "$archive_path/Info.plist"
+    /usr/bin/plutil -insert ApplicationProperties.Architectures -json '["arm64"]' "$archive_path/Info.plist"
+    /usr/bin/plutil -create xml1 "$app_path/Info.plist"
+    /usr/bin/plutil -insert CFBundleExecutable -string App "$app_path/Info.plist"
+    /usr/bin/plutil -insert CFBundleIdentifier -string "${FAKE_ARCHIVE_BUNDLE:-example.app}" "$app_path/Info.plist"
+    printf 'fixture executable\n' > "$app_path/App"
+    printf 'fixture profile\n' > "$app_path/embedded.mobileprovision"
+    [[ "${FAKE_MODE:-success}" != "forbidden_resource" ]] || printf 'internal\n' > "$app_path/internal-only.dat"
+    [[ "${FAKE_MODE:-success}" != "input_change" ]] || printf 'changed during archive\n' >> "${FAKE_REPO_ROOT:?}/App/App.swift"
+    exit 0
+fi
+if [[ " $* " == *" -exportArchive "* ]]; then
+    [[ "${FAKE_MODE:-success}" != "upload_failure" ]] || exit 65
+    export_options=""
+    key_path=""
+    key_id=""
+    issuer_id=""
+    previous=""
+    for argument in "$@"; do
+        [[ "$previous" == "-exportOptionsPlist" ]] && export_options="$argument"
+        [[ "$previous" == "-authenticationKeyPath" ]] && key_path="$argument"
+        [[ "$previous" == "-authenticationKeyID" ]] && key_id="$argument"
+        [[ "$previous" == "-authenticationKeyIssuerID" ]] && issuer_id="$argument"
+        previous="$argument"
+    done
+    [[ -f "$export_options" && -s "$key_path" && -n "$key_id" && -n "$issuer_id" ]]
+    [[ " $* " == *" -allowProvisioningUpdates "* ]]
+    [[ "$(/usr/bin/plutil -extract method raw -o - "$export_options")" == "app-store-connect" ]]
+    [[ "$(/usr/bin/plutil -extract destination raw -o - "$export_options")" == "upload" ]]
+    [[ "$(/usr/bin/plutil -extract testFlightInternalTestingOnly raw -o - "$export_options")" == "true" ]]
+    exit 0
+fi
+exit 66
