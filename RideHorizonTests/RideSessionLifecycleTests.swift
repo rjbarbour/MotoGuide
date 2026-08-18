@@ -181,3 +181,119 @@ final class RideSessionLifecycleTests: XCTestCase {
         )
     }
 }
+
+@MainActor
+final class RideSessionControllerTests: XCTestCase {
+    func testStartSchedulesEvaluationAndEndInvalidatesGeneration() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let scheduler = RecordingRideSessionScheduler()
+        let controller = RideSessionController(
+            clock: FixedRideClock(now: now),
+            scheduler: scheduler
+        )
+        var scheduledTransitions: [RideSessionTransition] = []
+
+        let start = controller.start(wantsLocationInput: true) {
+            scheduledTransitions.append($0)
+        }
+
+        XCTAssertEqual(start?.startedAt, now)
+        XCTAssertEqual(controller.state, .riding)
+        XCTAssertEqual(scheduler.interval, 15)
+        scheduler.fire()
+        XCTAssertEqual(scheduledTransitions, [.none])
+
+        let originalGeneration = controller.generation
+        let end = controller.end()
+        XCTAssertTrue(end.wasActive)
+        XCTAssertNotEqual(controller.generation, originalGeneration)
+        XCTAssertEqual(controller.state, .idle)
+        XCTAssertTrue(scheduler.didCancel)
+    }
+
+    func testAcceptedLocationAndInactivityRemainDeterministic() {
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+        let controller = RideSessionController(
+            clock: FixedRideClock(now: startedAt),
+            scheduler: RecordingRideSessionScheduler(),
+            lifecycle: RideSessionLifecycle(inactivityInterval: 30, confirmationGracePeriod: 30)
+        )
+        _ = controller.start(wantsLocationInput: true) { _ in }
+
+        let transition = controller.accept(
+            AcceptedRideLocation(
+                location: location(timestamp: startedAt),
+                acceptedAt: startedAt
+            )
+        )
+
+        XCTAssertEqual(transition, .none)
+        XCTAssertEqual(
+            controller.evaluate(at: startedAt.addingTimeInterval(30)),
+            .inactivityPrompt(deadline: startedAt.addingTimeInterval(60))
+        )
+        XCTAssertTrue(controller.continueRide(at: startedAt.addingTimeInterval(45)))
+        XCTAssertEqual(controller.state, .riding)
+    }
+
+    func testStaleRequestIsRejectedAfterEndAndRestart() {
+        let scheduler = RecordingRideSessionScheduler()
+        let controller = RideSessionController(scheduler: scheduler)
+        _ = controller.start(wantsLocationInput: true) { _ in }
+        let staleGeneration = controller.generation
+        let requestGeneration = UUID()
+
+        XCTAssertTrue(controller.accepts(
+            rideGeneration: staleGeneration,
+            requestGeneration: requestGeneration,
+            currentRequestGeneration: requestGeneration
+        ))
+
+        _ = controller.end()
+        _ = controller.start(wantsLocationInput: true) { _ in }
+
+        XCTAssertFalse(controller.accepts(
+            rideGeneration: staleGeneration,
+            requestGeneration: requestGeneration,
+            currentRequestGeneration: requestGeneration
+        ))
+    }
+
+    private func location(timestamp: Date) -> CLLocation {
+        CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 51, longitude: 0),
+            altitude: 0,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 5,
+            course: 0,
+            speed: 0,
+            timestamp: timestamp
+        )
+    }
+}
+
+private struct FixedRideClock: RideClock {
+    let now: Date
+}
+
+@MainActor
+private final class RecordingRideSessionScheduler: RideSessionScheduling {
+    private var action: (@MainActor () -> Void)?
+    private(set) var interval: TimeInterval?
+    private(set) var didCancel = false
+
+    func scheduleRepeating(every interval: TimeInterval, _ action: @escaping @MainActor () -> Void) {
+        self.interval = interval
+        self.action = action
+        didCancel = false
+    }
+
+    func cancel() {
+        action = nil
+        didCancel = true
+    }
+
+    func fire() {
+        action?()
+    }
+}

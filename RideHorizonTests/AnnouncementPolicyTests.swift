@@ -275,3 +275,57 @@ final class AnnouncementQueueTests: XCTestCase {
         XCTAssertNil(queue.pending)
     }
 }
+
+final class AnnouncementCoordinatorTests: XCTestCase {
+    func testEnqueueKeepsOneSupersedablePendingAnnouncement() {
+        var coordinator = AnnouncementCoordinator()
+        let town = coordinator.enqueue(text: "Stroud", boundary: .town)
+        let county = coordinator.enqueue(text: "Gloucestershire", boundary: .county)
+
+        XCTAssertEqual(coordinator.pending, county)
+        XCTAssertNotEqual(town.id, county.id)
+        coordinator.cancelPending(id: town.id)
+        XCTAssertEqual(coordinator.pending, county)
+        coordinator.cancelPending(id: county.id)
+        XCTAssertNil(coordinator.pending)
+    }
+
+    func testLowerPriorityContextCannotSupersedeHigherPriorityWork() {
+        XCTAssertEqual(
+            AnnouncementCoordinator.supersession(
+                newBoundary: .town,
+                activeBoundaries: [.county],
+                activeAnnouncementIDs: [UUID()]
+            ),
+            .rejectLowerPriority
+        )
+    }
+
+    func testHigherPriorityContextReturnsEveryWorkItemToCancel() {
+        let factID = UUID()
+        let speechID = UUID()
+
+        XCTAssertEqual(
+            AnnouncementCoordinator.supersession(
+                newBoundary: .country,
+                activeBoundaries: [.town, .county],
+                activeAnnouncementIDs: [factID, speechID, factID]
+            ),
+            .supersede(announcementIDs: [factID, speechID])
+        )
+    }
+
+
+    func testCancelledFactWorkCannotCompleteAfterSupersession() {
+        var coordinator = AnnouncementCoordinator()
+        let work = coordinator.beginFact(
+            for: AnnouncementPlan(text: "Stroud", boundary: .town)
+        )
+        XCTAssertTrue(coordinator.acceptsFactCompletion(token: work.token))
+
+        coordinator.invalidateAll()
+
+        XCTAssertFalse(coordinator.acceptsFactCompletion(token: work.token))
+        XCTAssertNil(coordinator.factWork)
+    }
+}

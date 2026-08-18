@@ -261,3 +261,69 @@ struct AnnouncementQueue {
         newBoundary < currentlySpeaking
     }
 }
+
+enum AnnouncementSupersession: Equatable {
+    case rejectLowerPriority
+    case supersede(announcementIDs: Set<UUID>)
+}
+
+struct AnnouncementFactWork: Equatable {
+    let token: UUID
+    let announcementID: UUID
+    let boundary: BoundaryType
+}
+
+/// Owns deterministic announcement queue and supersession sequencing. Provider,
+/// audio-session and diagnostic adapters remain at the application composition edge.
+struct AnnouncementCoordinator {
+    private var queue = AnnouncementQueue()
+    private(set) var factWork: AnnouncementFactWork?
+
+    var pending: AnnouncementRequest? { queue.pending }
+
+    mutating func enqueue(id: UUID = UUID(), text: String, boundary: BoundaryType) -> AnnouncementRequest {
+        queue.replacePending(id: id, text: text, boundary: boundary)
+    }
+
+    mutating func cancelPending(id: UUID) {
+        queue.clearPending(id: id)
+    }
+
+    mutating func cancelPending() {
+        queue.clearPending()
+    }
+
+    mutating func beginFact(for plan: AnnouncementPlan) -> AnnouncementFactWork {
+        let work = AnnouncementFactWork(
+            token: UUID(),
+            announcementID: plan.id,
+            boundary: plan.boundary
+        )
+        factWork = work
+        return work
+    }
+
+    func acceptsFactCompletion(token: UUID) -> Bool {
+        factWork?.token == token
+    }
+
+    mutating func finishFact(token: UUID) {
+        guard factWork?.token == token else { return }
+        factWork = nil
+    }
+
+    mutating func invalidateAll() {
+        factWork = nil
+    }
+
+    static func supersession(
+        newBoundary: BoundaryType,
+        activeBoundaries: [BoundaryType],
+        activeAnnouncementIDs: [UUID]
+    ) -> AnnouncementSupersession {
+        if let highestPriorityBoundary = activeBoundaries.min(), newBoundary > highestPriorityBoundary {
+            return .rejectLowerPriority
+        }
+        return .supersede(announcementIDs: Set(activeAnnouncementIDs))
+    }
+}

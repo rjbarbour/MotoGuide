@@ -222,7 +222,7 @@ final class SystemAudioSessionManager: AudioSessionManaging {
 }
 
 @MainActor
-protocol SpeechOutputEngine: AnyObject {
+protocol SpeechOutput: AnyObject {
     var isSpeaking: Bool { get }
     var isPlayingAudio: Bool { get }
     var onPlaybackWillStart: ((SpeechProvider) -> Bool)? { get set }
@@ -242,6 +242,8 @@ protocol SpeechOutputEngine: AnyObject {
     func cancelPendingPreparation()
     func stop()
 }
+
+typealias SpeechOutputEngine = SpeechOutput
 
 enum SpeechOutputPipelineStage: Equatable {
     case ttsRequested
@@ -769,7 +771,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var lastLocationDiagnosticTime: Date?
     private var lastBoundaryAnnouncementTime: Date?
     private var testIndex = 0
-    private var announcementQueue = AnnouncementQueue()
+    private var announcementCoordinator = AnnouncementCoordinator()
     private var delayWorkItem: DispatchWorkItem?
     private var currentlySpeakingBoundary: BoundaryType?
     private var activeSpeechPlan: AnnouncementPlan?
@@ -779,15 +781,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private let aiSharingAllowed: () -> Bool
     private let inactivityNotifier: RideInactivityNotifying
     private var inFlightFactTask: Task<Void, Never>?
-    private var inFlightFactBoundary: BoundaryType?
-    private var inFlightFactAnnouncementID: UUID?
-    private var activeAnnouncementToken = UUID()
-    private var wantsRideTracking = false
+    private var wantsRideTracking: Bool { rideSessionController.wantsLocationInput }
     private var hasSeededTestRoute = false
-    private var rideSessionLifecycle = RideSessionLifecycle()
-    private var inactivityTimer: DispatchSourceTimer?
-    private var rideStartedAt: Date?
-    private var rideSessionGeneration = UUID()
+    private let rideSessionController: RideSessionController
     private var geocodeRequestGeneration = UUID()
     private var activePlaceLookupID: UUID?
     private var hasAppliedDebugTestModeCampaignDefaults = false
@@ -913,6 +909,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         audioSession: AudioSessionManaging? = nil,
         diagnostics: RideDiagnosticsStore? = nil,
         rideSettingsStore: RideSettingsStore? = nil,
+        rideSessionController: RideSessionController? = nil,
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let resolvedSettingsStore = rideSettingsStore ?? UserDefaultsRideSettingsStore()
@@ -938,6 +935,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         self.inactivityNotifier = inactivityNotifier ?? UserNotificationRideInactivityNotifier()
         self.audioSession = audioSession ?? SystemAudioSessionManager()
         self.diagnostics = diagnostics ?? .shared
+        self.rideSessionController = rideSessionController ?? RideSessionController()
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
         if testMode {
@@ -1106,21 +1104,22 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private func startRide(at date: Date, startsLocationInput: Bool) {
         guard rideSessionState == .idle else { return }
 #if DEBUG
-        rideSessionLifecycle = shortInactivityTimeout
+        let lifecycle = shortInactivityTimeout
             ? RideSessionLifecycle(inactivityInterval: 30, confirmationGracePeriod: 30)
             : RideSessionLifecycle()
 #else
-        rideSessionLifecycle = RideSessionLifecycle()
+        let lifecycle = RideSessionLifecycle()
 #endif
-        rideSessionGeneration = UUID()
-        activeRideSessionID = UUID()
-        rideSessionLifecycle.start(at: date)
-        rideStartedAt = date
-        rideSessionState = rideSessionLifecycle.state
-        wantsRideTracking = true
+        guard let start = rideSessionController.start(
+            at: date,
+            wantsLocationInput: true,
+            lifecycle: lifecycle,
+            onScheduledEvaluation: { [weak self] transition in self?.handleRideSessionTransition(transition) }
+        ) else { return }
+        activeRideSessionID = start.sessionID
+        rideSessionState = rideSessionController.state
         locationStatus = .checking
         inactivityNotifier.requestAuthorizationIfNeeded()
-        startInactivityTimer()
         if startsLocationInput {
             startTestRouteIfNeeded()
             startRideTrackingIfAuthorized()
@@ -1139,11 +1138,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     func continueRide(at date: Date = Date()) {
         guard case .awaitingConfirmation = rideSessionState else { return }
-        guard rideSessionLifecycle.continueRide(at: date) else {
+        guard rideSessionController.continueRide(at: date) else {
             finishRideSession()
             return
         }
-        rideSessionState = rideSessionLifecycle.state
+        rideSessionState = rideSessionController.state
         inactivityNotifier.cancelInactivityPrompt()
         recordDiagnostic(.rideContinued, at: date)
         AppDiagnostics.log("Ride continued after inactivity prompt.")
@@ -1154,11 +1153,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func finishRideSession() {
-        let wasActive = wantsRideTracking || rideSessionState.isActive
-        rideSessionGeneration = UUID()
-        rideSessionLifecycle.end()
-        rideSessionState = rideSessionLifecycle.state
-        wantsRideTracking = false
+        let end = rideSessionController.end()
+        rideSessionState = rideSessionController.state
         locationManager.stopUpdatingLocation()
         locationManager.allowsBackgroundLocationUpdates = false
         isTracking = false
@@ -1167,11 +1163,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         currentSpeedMetersPerSecond = nil
         lastUpdateTime = nil
         lastLocationDiagnosticTime = nil
-        inactivityTimer?.cancel()
-        inactivityTimer = nil
         inactivityNotifier.cancelInactivityPrompt()
 
-        if let announcementID = inFlightFactAnnouncementID {
+        if let announcementID = announcementCoordinator.factWork?.announcementID {
             recordDiagnostic(
                 .announcementCancelled,
                 announcementID: announcementID,
@@ -1187,9 +1181,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
         inFlightFactTask?.cancel()
         inFlightFactTask = nil
-        inFlightFactBoundary = nil
-        inFlightFactAnnouncementID = nil
-        activeAnnouncementToken = UUID()
+        announcementCoordinator.invalidateAll()
         observedAudioPauseSources.removeAll()
         interruptedSpeechPlan = nil
         cancelPendingAnnouncement(reason: .rideEnded)
@@ -1199,19 +1191,16 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         hasSeededTestRoute = false
         testIndex = 0
         AppDiagnostics.log("Ride session ended and background work stopped.")
-        if wasActive {
+        if end.wasActive {
             recordDiagnostic(.rideEnded)
         }
         activeRideSessionID = nil
-        rideStartedAt = nil
     }
 
     func applyAISharingDecision(isGranted: Bool) {
         inFlightFactTask?.cancel()
         inFlightFactTask = nil
-        inFlightFactBoundary = nil
-        inFlightFactAnnouncementID = nil
-        activeAnnouncementToken = UUID()
+        announcementCoordinator.invalidateAll()
         cancelPendingAnnouncement(reason: .settingsChanged)
         stopSpeechOutput()
 
@@ -1292,22 +1281,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     func evaluateRideSession(at date: Date = Date()) {
-        handleRideSessionTransition(rideSessionLifecycle.advanceTime(to: date))
-    }
-
-    private func startInactivityTimer() {
-        inactivityTimer?.cancel()
-        let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + 15, repeating: 15)
-        timer.setEventHandler { [weak self] in
-            self?.evaluateRideSession()
-        }
-        inactivityTimer = timer
-        timer.resume()
+        handleRideSessionTransition(rideSessionController.evaluate(at: date))
     }
 
     private func handleRideSessionTransition(_ transition: RideSessionTransition) {
-        rideSessionState = rideSessionLifecycle.state
+        rideSessionState = rideSessionController.state
         switch transition {
         case .none:
             return
@@ -1317,9 +1295,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             geocoder.cancelGeocode()
             inFlightFactTask?.cancel()
             inFlightFactTask = nil
-            inFlightFactBoundary = nil
-            inFlightFactAnnouncementID = nil
-            activeAnnouncementToken = UUID()
+            announcementCoordinator.invalidateAll()
             cancelPendingAnnouncement(reason: .inactivityPrompted)
             stopSpeechOutput()
             inactivityNotifier.showInactivityPrompt(deadline: deadline)
@@ -1414,7 +1390,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     func previewSelectedVoice() {
         stopSpeechOutput()
-        announcementQueue.clearPending()
+        announcementCoordinator.cancelPending()
         speak(
             text: "\(ProductIdentity.displayName) can speak in this voice. Keep the road in front of you, rider.",
             shouldRecordTestLog: false,
@@ -1769,36 +1745,37 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @discardableResult
     private func supersedeUndeliveredAnnouncementWork(with newBoundary: BoundaryType) -> Bool {
         let activeBoundaries = [
-            inFlightFactBoundary,
-            announcementQueue.pending?.boundary,
+            announcementCoordinator.factWork?.boundary,
+            announcementCoordinator.pending?.boundary,
             interruptedSpeechPlan?.boundary,
             isSpeechOutputActive ? activeSpeechPlan?.boundary : nil
         ].compactMap { $0 }
 
-        if let highestPriorityBoundary = activeBoundaries.min(),
-           newBoundary > highestPriorityBoundary {
+        let supersession = AnnouncementCoordinator.supersession(
+            newBoundary: newBoundary,
+            activeBoundaries: activeBoundaries,
+            activeAnnouncementIDs: [
+                announcementCoordinator.factWork?.announcementID,
+                announcementCoordinator.pending?.id,
+                interruptedSpeechPlan?.id,
+                isSpeechOutputActive ? activeSpeechPlan?.id : nil
+            ].compactMap { $0 }
+        )
+        guard case .supersede(let supersededAnnouncementIDs) = supersession else {
             return false
         }
 
         guard !activeBoundaries.isEmpty else { return true }
-        let supersededAnnouncementIDs = [
-            inFlightFactAnnouncementID,
-            announcementQueue.pending?.id,
-            interruptedSpeechPlan?.id,
-            isSpeechOutputActive ? activeSpeechPlan?.id : nil
-        ].compactMap { $0 }
-        for announcementID in Set(supersededAnnouncementIDs) {
+        for announcementID in supersededAnnouncementIDs {
             recordDiagnostic(
                 .announcementSuperseded,
                 announcementID: announcementID,
                 reason: .supersededByNewerContext
             )
         }
-        activeAnnouncementToken = UUID()
+        announcementCoordinator.invalidateAll()
         inFlightFactTask?.cancel()
         inFlightFactTask = nil
-        inFlightFactBoundary = nil
-        inFlightFactAnnouncementID = nil
         interruptedSpeechPlan = nil
         cancelPendingAnnouncement(reason: .supersededByNewerContext)
         if speechOutput.isPlayingAudio {
@@ -1815,11 +1792,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         mode: FactMode,
         placeLookupID: UUID? = nil
     ) {
-        let token = UUID()
-        activeAnnouncementToken = token
+        let factWork = announcementCoordinator.beginFact(for: plan)
         inFlightFactTask?.cancel()
-        inFlightFactBoundary = plan.boundary
-        inFlightFactAnnouncementID = plan.id
         cancelPendingAnnouncement(reason: .supersededByNewerContext)
         announcementStatus = .retrievingContent
         recordDiagnostic(.factGenerationStarted, announcementID: plan.id)
@@ -1836,10 +1810,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         inFlightFactTask = Task { [weak self] in
             let fact = await PlaceFactFetcher.fact(for: request, using: generator)
             await MainActor.run {
-                guard let self, !Task.isCancelled, self.activeAnnouncementToken == token else { return }
+                guard let self,
+                      !Task.isCancelled,
+                      self.announcementCoordinator.acceptsFactCompletion(token: factWork.token) else { return }
                 self.inFlightFactTask = nil
-                self.inFlightFactBoundary = nil
-                self.inFlightFactAnnouncementID = nil
+                self.announcementCoordinator.finishFact(token: factWork.token)
                 guard aiSharingAllowed() else {
                     self.recordDiagnostic(
                         .factGenerationFinished,
@@ -1908,7 +1883,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             }
         }
 
-        let request = announcementQueue.replacePending(
+        let request = announcementCoordinator.enqueue(
             id: plan.id,
             text: plan.text,
             boundary: plan.boundary
@@ -1938,11 +1913,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func cancelPendingAnnouncement(reason: RideDiagnosticReason) {
-        let pendingID = announcementQueue.pending?.id
-        let hadPendingAnnouncement = delayWorkItem != nil || announcementQueue.pending != nil
+        let pendingID = announcementCoordinator.pending?.id
+        let hadPendingAnnouncement = delayWorkItem != nil || announcementCoordinator.pending != nil
         delayWorkItem?.cancel()
         delayWorkItem = nil
-        announcementQueue.clearPending()
+        announcementCoordinator.cancelPending()
         if hadPendingAnnouncement {
             announcementStatus = .idle
             recordDiagnostic(
@@ -1954,7 +1929,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func deliverAnnouncement(id: UUID) {
-        guard let pending = announcementQueue.pending, pending.id == id else {
+        guard let pending = announcementCoordinator.pending, pending.id == id else {
             AppDiagnostics.log("Skipped stale announcement.")
             return
         }
@@ -1964,7 +1939,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 newBoundary: pending.boundary,
                 currentlySpeaking: speakingBoundary
             ) {
-                announcementQueue.clearPending(id: id)
+                announcementCoordinator.cancelPending(id: id)
                 AppDiagnostics.log("Dropped stale lower-priority announcement at delivery.")
                 return
             }
@@ -1977,7 +1952,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             }
         }
 
-        announcementQueue.clearPending(id: id)
+        announcementCoordinator.cancelPending(id: id)
         speak(
             announcementID: pending.id,
             text: pending.text,
@@ -1994,7 +1969,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
 
         delayWorkItem?.cancel()
-        announcementQueue.clearPending()
+        announcementCoordinator.cancelPending()
         stopSpeechOutput()
         speak(text: text, boundary: currentlySpeakingBoundary, shouldRecordTestLog: false)
     }
@@ -2011,7 +1986,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
         if let location = locations.last {
             let currentTime = Date()
-            let transition = rideSessionLifecycle.observe(location, at: currentTime)
+            let transition = rideSessionController.accept(
+                AcceptedRideLocation(location: location, acceptedAt: currentTime)
+            )
             let shouldRecordLocationSample = lastLocationDiagnosticTime.map {
                 currentTime.timeIntervalSince($0) >= 10
             } ?? true
@@ -2053,7 +2030,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func reverseGeocode(location: CLLocation, completion: (@MainActor () -> Void)? = nil) {
-        let rideGeneration = rideSessionGeneration
+        let rideGeneration = rideSessionController.generation
         let requestGeneration = UUID()
         cancelActivePlaceLookup(reason: .supersededByNewerContext)
         geocoder.cancelGeocode()
@@ -2123,9 +2100,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         rideGeneration: UUID,
         requestGeneration: UUID
     ) -> Bool {
-        rideSessionState == .riding
-            && rideSessionGeneration == rideGeneration
-            && geocodeRequestGeneration == requestGeneration
+        rideSessionController.accepts(
+            rideGeneration: rideGeneration,
+            requestGeneration: requestGeneration,
+            currentRequestGeneration: geocodeRequestGeneration
+        )
     }
 
     private func recordDiagnostic(
@@ -2160,7 +2139,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             appState: diagnosticAppState,
             audio: audioSession.snapshot,
             audioPolicy: audioPolicy,
-            elapsedRideSeconds: rideStartedAt.map { max(0, timestamp.timeIntervalSince($0)) },
+            elapsedRideSeconds: rideSessionController.startedAt.map { max(0, timestamp.timeIntervalSince($0)) },
             rideState: diagnosticState,
             isLocationTracking: isTracking,
             playbackPath: playbackPath,
@@ -2319,7 +2298,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             recordDiagnostic(
                 .primaryAudioBegan,
                 announcementID: activeSpeechPlan?.id
-                    ?? announcementQueue.pending?.id
+                    ?? announcementCoordinator.pending?.id
                     ?? interruptedSpeechPlan?.id,
                 reason: .primaryAudioActive
             )
@@ -2355,13 +2334,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private func pauseForObservedExternalAudio() {
         if let activeSpeechPlan {
             interruptedSpeechPlan = activeSpeechPlan
-        } else if let pending = announcementQueue.pending {
+        } else if let pending = announcementCoordinator.pending {
             interruptedSpeechPlan = AnnouncementPlan(
                 id: pending.id,
                 text: pending.text,
                 boundary: pending.boundary
             )
-            announcementQueue.clearPending(id: pending.id)
+            announcementCoordinator.cancelPending(id: pending.id)
             delayWorkItem?.cancel()
             delayWorkItem = nil
         }
@@ -2477,7 +2456,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     var rideSessionGenerationForTesting: UUID {
-        rideSessionGeneration
+        rideSessionController.generation
     }
 
     var geocodeRequestGenerationForTesting: UUID {
@@ -2570,7 +2549,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             speed: 0,
             timestamp: sampleDate
         )
-        handleRideSessionTransition(rideSessionLifecycle.observe(sampleLocation, at: sampleDate))
+        handleRideSessionTransition(
+            rideSessionController.accept(AcceptedRideLocation(location: sampleLocation, acceptedAt: sampleDate))
+        )
         guard rideSessionState == .riding else { return }
 
         lastKnownLocation = waypoint.coordinate

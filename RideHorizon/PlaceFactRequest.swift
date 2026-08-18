@@ -273,6 +273,8 @@ enum PlaceNameNormalizer {
     }
 }
 
-protocol PlaceFactGenerating {
+protocol FactClient {
     func fact(for request: PlaceFactRequest) async throws -> String
 }
+
+typealias PlaceFactGenerating = FactClient

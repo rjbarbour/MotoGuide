@@ -2,6 +2,57 @@ import Foundation
 import CoreLocation
 @preconcurrency import UserNotifications
 
+protocol RideClock {
+    var now: Date { get }
+}
+
+struct SystemRideClock: RideClock {
+    var now: Date { Date() }
+}
+
+@MainActor
+protocol RideSessionScheduling: AnyObject {
+    func scheduleRepeating(every interval: TimeInterval, _ action: @escaping @MainActor () -> Void)
+    func cancel()
+}
+
+@MainActor
+final class DispatchRideSessionScheduler: RideSessionScheduling {
+    private var timer: DispatchSourceTimer?
+
+    func scheduleRepeating(every interval: TimeInterval, _ action: @escaping @MainActor () -> Void) {
+        cancel()
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + interval, repeating: interval)
+        timer.setEventHandler(handler: action)
+        self.timer = timer
+        timer.resume()
+    }
+
+    func cancel() {
+        timer?.cancel()
+        timer = nil
+    }
+}
+
+/// Platform input owned by the Core Location adapter. The ride controller consumes
+/// accepted samples without taking responsibility for CLLocationManager callbacks.
+struct AcceptedRideLocation {
+    let location: CLLocation
+    let acceptedAt: Date
+}
+
+struct RideSessionStart: Equatable {
+    let sessionID: UUID
+    let generation: UUID
+    let startedAt: Date
+}
+
+struct RideSessionEnd: Equatable {
+    let wasActive: Bool
+    let invalidatedGeneration: UUID
+}
+
 enum RideSessionState: Equatable {
     case idle
     case riding
@@ -125,6 +176,83 @@ struct RideSessionLifecycle {
         let deadline = date.addingTimeInterval(confirmationGracePeriod)
         state = .awaitingConfirmation(deadline: deadline)
         return .inactivityPrompt(deadline: deadline)
+    }
+}
+
+/// Owns ride use-case state and sequencing. Platform adapters execute the concrete
+/// Core Location, geocoder, notification and audio cleanup requested by its results.
+@MainActor
+final class RideSessionController {
+    private let clock: RideClock
+    private let scheduler: RideSessionScheduling
+    private var lifecycle: RideSessionLifecycle
+
+    private(set) var sessionID: UUID?
+    private(set) var generation = UUID()
+    private(set) var startedAt: Date?
+    private(set) var wantsLocationInput = false
+
+    var state: RideSessionState { lifecycle.state }
+
+    init(
+        clock: RideClock = SystemRideClock(),
+        scheduler: RideSessionScheduling = DispatchRideSessionScheduler(),
+        lifecycle: RideSessionLifecycle = RideSessionLifecycle()
+    ) {
+        self.clock = clock
+        self.scheduler = scheduler
+        self.lifecycle = lifecycle
+    }
+
+    func start(
+        at date: Date? = nil,
+        wantsLocationInput: Bool,
+        lifecycle replacement: RideSessionLifecycle? = nil,
+        onScheduledEvaluation: @escaping @MainActor (RideSessionTransition) -> Void
+    ) -> RideSessionStart? {
+        guard state == .idle else { return nil }
+        if let replacement { lifecycle = replacement }
+        let startDate = date ?? clock.now
+        generation = UUID()
+        sessionID = UUID()
+        startedAt = startDate
+        self.wantsLocationInput = wantsLocationInput
+        lifecycle.start(at: startDate)
+        scheduler.scheduleRepeating(every: 15) { [weak self] in
+            guard let self else { return }
+            onScheduledEvaluation(self.evaluate())
+        }
+        return RideSessionStart(sessionID: sessionID!, generation: generation, startedAt: startDate)
+    }
+
+    func accept(_ sample: AcceptedRideLocation) -> RideSessionTransition {
+        guard state.isActive else { return .none }
+        return lifecycle.observe(sample.location, at: sample.acceptedAt)
+    }
+
+    func evaluate(at date: Date? = nil) -> RideSessionTransition {
+        lifecycle.advanceTime(to: date ?? clock.now)
+    }
+
+    func continueRide(at date: Date? = nil) -> Bool {
+        lifecycle.continueRide(at: date ?? clock.now)
+    }
+
+    func end() -> RideSessionEnd {
+        let wasActive = wantsLocationInput || state.isActive
+        generation = UUID()
+        lifecycle.end()
+        wantsLocationInput = false
+        scheduler.cancel()
+        sessionID = nil
+        startedAt = nil
+        return RideSessionEnd(wasActive: wasActive, invalidatedGeneration: generation)
+    }
+
+    func accepts(rideGeneration: UUID, requestGeneration: UUID, currentRequestGeneration: UUID) -> Bool {
+        state == .riding
+            && generation == rideGeneration
+            && currentRequestGeneration == requestGeneration
     }
 }
 
