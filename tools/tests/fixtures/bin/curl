@@ -16,6 +16,8 @@ for argument in "$@"; do
 done
 [[ -n "$output" && -n "$url" ]]
 [[ "$authorised" == "true" ]]
+[[ " $* " == *" --connect-timeout 15 "* ]]
+[[ " $* " == *" --max-time 60 "* ]]
 if [[ "${FAKE_MODE:-success}" == "api_auth_failure" ]]; then
     printf '{"errors":[{"status":"401"}]}\n' > "$output"
     printf '401'

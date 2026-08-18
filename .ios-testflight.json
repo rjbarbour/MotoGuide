@@ -21,7 +21,8 @@
     "RideHorizon.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
     "RideHorizon.xcodeproj/project.xcworkspace/xcshareddata",
     "RideHorizon.xcodeproj/xcshareddata",
-    "RideHorizon"
+    "RideHorizon",
+    "RideHorizonTests"
   ],
   "forbiddenArchivePaths": [
     "premium-place-name.mp3",

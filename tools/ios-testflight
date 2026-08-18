@@ -10,6 +10,8 @@ readonly CONFIG_PATH="${IOS_TESTFLIGHT_CONFIG_PATH:-$REPO_ROOT/.ios-testflight.j
 readonly AUTH_ROOT="${IOS_TESTFLIGHT_AUTH_ROOT:-$HOME/Library/Application Support/ios-testflight/auth}"
 readonly TOOL_PATH="${IOS_TESTFLIGHT_TOOL_PATH:-$SCRIPT_DIR/ios-testflight}"
 readonly ASC_API_BASE="${IOS_TESTFLIGHT_ASC_API_BASE:-https://api.appstoreconnect.apple.com}"
+readonly ASC_CONNECT_TIMEOUT_SECONDS=15
+readonly ASC_REQUEST_TIMEOUT_SECONDS=60
 RUN_DIR=""
 LOCK_DIR=""
 LOCK_ACQUIRED=false
@@ -427,7 +429,7 @@ asc_get() {
     local endpoint="$3"
     shift 3
     local status
-    status="$(printf 'header = "Authorization: Bearer %s"\n' "$token" | curl --config - --silent --show-error --globoff --output "$destination" --write-out '%{http_code}' --get "$ASC_API_BASE$endpoint" "$@")" \
+    status="$(printf 'header = "Authorization: Bearer %s"\n' "$token" | curl --config - --silent --show-error --globoff --connect-timeout "$ASC_CONNECT_TIMEOUT_SECONDS" --max-time "$ASC_REQUEST_TIMEOUT_SECONDS" --output "$destination" --write-out '%{http_code}' --get "$ASC_API_BASE$endpoint" "$@")" \
         || die "App Store Connect API request failed"
     [[ "$status" == "200" ]] || die "App Store Connect API returned HTTP $status"
     /usr/bin/plutil -convert json -o /dev/null "$destination" >/dev/null 2>&1 || die "App Store Connect API returned invalid JSON"

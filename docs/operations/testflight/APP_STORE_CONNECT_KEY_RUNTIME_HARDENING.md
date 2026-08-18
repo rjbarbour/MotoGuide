@@ -19,7 +19,7 @@ On 2026-08-17, the owner accepted the existing short-lived, mode-`0600`, disk-ba
 
 - The retained branch was rebased onto current `main`; the obsolete manual-ledger change was excluded.
 - Xcode's destination inventory confirmed the configured `iPhone 17` simulator on iOS `26.3.1` is available.
-- Shell syntax passed and all 27 fixture cases passed after adding regression coverage that proves `TERM` stops deployment with status `143`, removes the temporary key and prevents upload.
+- Shell syntax passed and all 27 fixture cases passed after adding regression coverage that proves `TERM` stops deployment with status `143`, removes the temporary key and prevents upload. Review follow-up also proves every App Store Connect request has connection and transfer deadlines, and changes to `RideHorizonTests` invalidate trusted release evidence.
 - A focused secret scan reported only the known private-key wording in the tool and the deliberately fake key fixture; it found no credential value in the project configuration or implementation.
 - No app build, credential-value read, authentication, archive, signing operation, upload or App Store Connect operation was run.
 

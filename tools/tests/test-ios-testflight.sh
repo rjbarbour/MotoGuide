@@ -30,7 +30,7 @@ new_fixture() {
     cleanup
     unset FAKE_XCODE_VERSION
     TEST_ROOT="$(mktemp -d "${TMPDIR:-/private/tmp}/ios-testflight-test.XXXXXX")"
-    mkdir -p "$TEST_ROOT/repo/.git" "$TEST_ROOT/repo/tools" "$TEST_ROOT/repo/App.xcodeproj/xcshareddata/xcschemes" "$TEST_ROOT/repo/App" "$TEST_ROOT/auth" "$TEST_ROOT/bin" "$TEST_ROOT/tmp"
+    mkdir -p "$TEST_ROOT/repo/.git" "$TEST_ROOT/repo/tools" "$TEST_ROOT/repo/App.xcodeproj/xcshareddata/xcschemes" "$TEST_ROOT/repo/App" "$TEST_ROOT/repo/AppTests" "$TEST_ROOT/auth" "$TEST_ROOT/bin" "$TEST_ROOT/tmp"
     cp "$TOOLS_ROOT/ios-testflight" "$TEST_ROOT/repo/tools/ios-testflight"
     cp "$TOOLS_ROOT/tests/fixtures/bin/"* "$TEST_ROOT/bin/"
     chmod +x "$TEST_ROOT/bin/"*
@@ -38,6 +38,7 @@ new_fixture() {
     printf 'project\n' > "$TEST_ROOT/repo/App.xcodeproj/project.pbxproj"
     printf 'scheme\n' > "$TEST_ROOT/repo/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme"
     printf 'source\n' > "$TEST_ROOT/repo/App/App.swift"
+    printf 'test source\n' > "$TEST_ROOT/repo/AppTests/AppTests.swift"
     cat > "$TEST_ROOT/repo/.ios-testflight.json" <<'JSON'
 {
   "schemaVersion": 2,
@@ -57,7 +58,7 @@ new_fixture() {
   "processingTimeoutSeconds": 30,
   "processingPollSeconds": 1,
   "readinessTimeoutSeconds": 3,
-  "archiveInputRoots": ["App.xcodeproj", "App"],
+  "archiveInputRoots": ["App.xcodeproj", "App", "AppTests"],
   "forbiddenArchivePaths": ["internal-only.dat"],
   "allowedReleaseEntitlements": ["application-identifier", "beta-reports-active", "com.apple.developer.team-identifier", "get-task-allow"]
 }
@@ -102,7 +103,11 @@ test_configuration_changes_invalidate_fingerprint() {
     /usr/bin/plutil -replace configuration -string Debug "$TEST_ROOT/repo/.ios-testflight.json"
     after="$(run_tool fingerprint)"
     [[ "$before" != "$after" ]] || fail "configuration change retained the same fingerprint"
-    pass "configuration changes invalidate tested inputs"
+    before="$after"
+    printf 'changed test source\n' >> "$TEST_ROOT/repo/AppTests/AppTests.swift"
+    after="$(run_tool fingerprint)"
+    [[ "$before" != "$after" ]] || fail "test-suite change retained the same fingerprint"
+    pass "configuration and test-suite changes invalidate tested inputs"
 }
 
 test_tool_changes_and_schema_are_fail_closed() {
