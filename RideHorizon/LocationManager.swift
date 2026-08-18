@@ -222,7 +222,7 @@ final class SystemAudioSessionManager: AudioSessionManaging {
 }
 
 @MainActor
-protocol SpeechOutputEngine: AnyObject {
+protocol SpeechOutput: AnyObject {
     var isSpeaking: Bool { get }
     var isPlayingAudio: Bool { get }
     var onPlaybackWillStart: ((SpeechProvider) -> Bool)? { get set }
@@ -235,7 +235,7 @@ protocol SpeechOutputEngine: AnyObject {
         text: String,
         boundary: BoundaryType?,
         provider: SpeechProvider,
-        appleVoice: AVSpeechSynthesisVoice?,
+        appleVoice: SpeechVoiceSelection?,
         allowAppleFallback: Bool,
         announcementID: UUID
     )
@@ -243,9 +243,13 @@ protocol SpeechOutputEngine: AnyObject {
     func stop()
 }
 
+protocol SpeechOutputEngine: SpeechOutput {}
+
 enum SpeechOutputPipelineStage: Equatable {
     case ttsRequested
     case speechAudioReady
+    case retryScheduled
+    case fallbackStarted
 }
 
 struct SpeechOutputPipelineEvent: Equatable {
@@ -433,7 +437,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
     private var playbackToken = UUID()
     private var currentProxyFallbackText = ""
     private var currentProxyFallbackBoundary: BoundaryType?
-    private var currentProxyFallbackAppleVoice: AVSpeechSynthesisVoice?
+    private var currentProxyFallbackAppleVoice: SpeechVoiceSelection?
     private var currentProxyAllowsAppleFallback = false
     private var currentAnnouncementID: UUID?
     private var hasStartedCurrentPlayback = false
@@ -489,7 +493,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
         text: String,
         boundary: BoundaryType?,
         provider: SpeechProvider,
-        appleVoice: AVSpeechSynthesisVoice?,
+        appleVoice: SpeechVoiceSelection?,
         allowAppleFallback: Bool,
         announcementID: UUID = UUID()
     ) {
@@ -531,7 +535,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
     private func speakWithProxy(
         text: String,
         boundary: BoundaryType?,
-        appleVoice: AVSpeechSynthesisVoice?,
+        appleVoice: SpeechVoiceSelection?,
         allowAppleFallback: Bool
     ) {
         if let announcementID = currentAnnouncementID {
@@ -557,12 +561,31 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
         let proxySpeechGenerator = proxySpeechGenerator
         proxyRequestTask = Task { [weak self] in
             do {
-                let audioDataSegments = try await proxySpeechGenerator.speechAudios(for: text)
-                guard !audioDataSegments.isEmpty else {
+                let speechAudioSegments: [Data]
+                if let retryReportingGenerator = proxySpeechGenerator as? RetryReportingProxySpeechGenerating {
+                    speechAudioSegments = try await retryReportingGenerator.speechAudios(
+                        for: text,
+                        onRetry: { [weak self] _ in
+                            Task { @MainActor [weak self] in
+                                guard let self,
+                                      self.playbackToken == token,
+                                      let announcementID = self.currentAnnouncementID else { return }
+                                self.onPipelineEvent?(SpeechOutputPipelineEvent(
+                                    announcementID: announcementID,
+                                    provider: .proxyElevenLabs,
+                                    stage: .retryScheduled
+                                ))
+                            }
+                        }
+                    )
+                } else {
+                    speechAudioSegments = try await proxySpeechGenerator.speechAudios(for: text)
+                }
+                guard !speechAudioSegments.isEmpty else {
                     throw PremiumAudioPlaybackError.emptyAudio
                 }
                 let preparedAudio = try await PremiumAudioPreparer.prepare(
-                    dataSegments: audioDataSegments
+                    dataSegments: speechAudioSegments
                 )
                 await MainActor.run {
                     guard let self, !Task.isCancelled, self.playbackToken == token else { return }
@@ -617,11 +640,18 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
         message: String,
         text: String,
         boundary: BoundaryType?,
-        appleVoice: AVSpeechSynthesisVoice?,
+        appleVoice: SpeechVoiceSelection?,
         allowAppleFallback: Bool
     ) {
         if allowAppleFallback {
             ProxyDiagnostics.log("Speech", message)
+            if let announcementID = currentAnnouncementID {
+                onPipelineEvent?(SpeechOutputPipelineEvent(
+                    announcementID: announcementID,
+                    provider: .proxyElevenLabs,
+                    stage: .fallbackStarted
+                ))
+            }
             onDiagnosticNote?(message)
             clearProxyFallbackContext()
             speakWithApple(text: text, boundary: boundary, appleVoice: appleVoice)
@@ -635,7 +665,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
         onFinish?()
     }
 
-    private func speakWithApple(text: String, boundary: BoundaryType?, appleVoice: AVSpeechSynthesisVoice?) {
+    private func speakWithApple(text: String, boundary: BoundaryType?, appleVoice: SpeechVoiceSelection?) {
         if let announcementID = currentAnnouncementID {
             onPipelineEvent?(SpeechOutputPipelineEvent(
                 announcementID: announcementID,
@@ -645,7 +675,8 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
         }
         let requestID = UUID()
         playbackToken = requestID
-        appleSpeechOutput.speak(text: text, boundary: boundary, voice: appleVoice, requestID: requestID)
+        let resolvedVoice = appleVoice.flatMap { AVSpeechSynthesisVoice(identifier: $0.identifier) }
+        appleSpeechOutput.speak(text: text, boundary: boundary, voice: resolvedVoice, requestID: requestID)
     }
 
     private static func diagnosticDescription(for error: Error) -> String {
@@ -659,7 +690,7 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
     private func playNextProxyChunk(
         token: UUID,
         boundary: BoundaryType?,
-        appleVoice: AVSpeechSynthesisVoice?,
+        appleVoice: SpeechVoiceSelection?,
         originalText: String,
         allowAppleFallback: Bool
     ) {
@@ -746,11 +777,6 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
         )
     }
 
-}
-
-private enum ObservedAudioPauseSource: Hashable {
-    case interruption
-    case primaryAudio
 }
 
 enum PlaceResolutionResult {
@@ -841,7 +867,6 @@ class LocationManager: NSObject, ObservableObject {
     private let locationSource: LocationSource
     private let placeResolver: PlaceResolver
     private let rideDistanceMeasurer: RideDistanceMeasuring
-    private let speechOutput: SpeechOutputEngine
     private let audioSession: AudioSessionManaging
     private let diagnostics: RideDiagnosticsStore
     private let rideSettingsStore: RideSettingsStore
@@ -851,19 +876,11 @@ class LocationManager: NSObject, ObservableObject {
     private var lastLocationDiagnosticTime: Date?
     private var lastBoundaryAnnouncementTime: Date?
     private var testIndex = 0
-    private var announcementQueue = AnnouncementQueue()
-    private var delayWorkItem: DispatchWorkItem?
+    private let announcementCoordinator: AnnouncementCoordinator
     private var currentlySpeakingBoundary: BoundaryType?
     private var activeSpeechPlan: AnnouncementPlan?
-    private var interruptedSpeechPlan: AnnouncementPlan?
-    private var observedAudioPauseSources: Set<ObservedAudioPauseSource> = []
-    private let factGenerator: PlaceFactGenerating
     private let aiSharingAllowed: () -> Bool
     private let inactivityNotifier: RideInactivityNotifying
-    private var inFlightFactTask: Task<Void, Never>?
-    private var inFlightFactBoundary: BoundaryType?
-    private var inFlightFactAnnouncementID: UUID?
-    private var activeAnnouncementToken = UUID()
     private var wantsRideTracking: Bool { rideSessionController.wantsLocationInput }
     private var hasSeededTestRoute = false
     private let rideSessionController: RideSessionController
@@ -975,7 +992,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     private var isSpeechOutputActive: Bool {
-        speechOutput.isSpeaking
+        announcementCoordinator.isSpeaking
     }
 
     private var audioCoexistencePolicy: AudioCoexistencePolicy {
@@ -986,10 +1003,9 @@ class LocationManager: NSObject, ObservableObject {
     var onRideLog: ((CLLocationCoordinate2D, Address, String?) -> Void)?
 
     init(
-        factGenerator: PlaceFactGenerating? = nil,
-        speechOutput: SpeechOutputEngine? = nil,
+        announcementCoordinator: AnnouncementCoordinator,
         inactivityNotifier: RideInactivityNotifying? = nil,
-        audioSession: AudioSessionManaging? = nil,
+        audioSession: AudioSessionManaging,
         diagnostics: RideDiagnosticsStore? = nil,
         rideSettingsStore: RideSettingsStore? = nil,
         rideSessionController: RideSessionController? = nil,
@@ -1019,68 +1035,16 @@ class LocationManager: NSObject, ObservableObject {
         self.locationSource = locationSource
         self.placeResolver = placeResolver
         self.rideDistanceMeasurer = rideDistanceMeasurer
-        self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
-        self.speechOutput = speechOutput ?? DefaultSpeechOutputEngine()
+        self.announcementCoordinator = announcementCoordinator
         self.inactivityNotifier = inactivityNotifier ?? UserNotificationRideInactivityNotifier()
-        self.audioSession = audioSession ?? SystemAudioSessionManager()
+        self.audioSession = audioSession
         self.diagnostics = diagnostics ?? .shared
         self.rideSessionController = rideSessionController ?? RideSessionController()
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
+        configureAnnouncementCoordinator()
         if testMode {
             applyDebugTestModeCampaignDefaults()
-        }
-        self.speechOutput.onPlaybackWillStart = { [weak self] provider in
-            guard let self else { return false }
-            return self.acquireAudioSessionForSpeech(
-                provider: provider,
-                announcementID: self.activeSpeechPlan?.id
-            )
-        }
-        self.speechOutput.onFinish = { [weak self] in
-            let announcementID = self?.activeSpeechPlan?.id
-            self?.activeSpeechPlan = nil
-            self?.currentlySpeakingBoundary = nil
-            self?.announcementStatus = .idle
-            self?.recordDiagnostic(
-                .audioPlaybackFinished,
-                announcementID: announcementID,
-                reason: .playbackCompleted
-            )
-            self?.releaseAudioSessionAfterSpeech(announcementID: announcementID)
-        }
-        self.speechOutput.onCancel = { [weak self] in
-            let announcementID = self?.activeSpeechPlan?.id
-            self?.activeSpeechPlan = nil
-            self?.currentlySpeakingBoundary = nil
-            self?.announcementStatus = .idle
-            self?.recordDiagnostic(
-                .audioPlaybackCancelled,
-                announcementID: announcementID,
-                reason: .playbackCancelled
-            )
-            self?.releaseAudioSessionAfterSpeech(announcementID: announcementID)
-        }
-        self.speechOutput.onDiagnosticNote = { [weak self] note in
-            self?.lastSpeechDiagnosticNote = note
-            self?.announcementStatus = .idle
-            self?.recordDiagnostic(
-                .announcementFailed,
-                announcementID: self?.activeSpeechPlan?.id,
-                reason: .playbackFailed,
-                playbackPath: .premiumVoice
-            )
-        }
-        self.speechOutput.onPipelineEvent = { [weak self] event in
-            let diagnosticEvent: RideDiagnosticEvent = switch event.stage {
-            case .ttsRequested: .ttsRequested
-            case .speechAudioReady: .speechAudioReady
-            }
-            self?.recordDiagnostic(
-                diagnosticEvent,
-                announcementID: event.announcementID,
-                playbackPath: event.provider == .apple ? .apple : .premiumVoice
-            )
         }
 #if INTERNAL_AUDIO_CALIBRATION
         self.calibrationAppleSpeechOutput.onPlaybackWillStart = { [weak self] requestID in
@@ -1150,10 +1114,19 @@ class LocationManager: NSObject, ObservableObject {
 #endif
     }
 
+    private func configureAnnouncementCoordinator() {
+        announcementCoordinator.onResult = { [weak self] result in
+            self?.handleAnnouncementWorkflowResult(result)
+        }
+        announcementCoordinator.onDiagnosticNote = { [weak self] note in
+            self?.lastSpeechDiagnosticNote = note
+        }
+    }
+
 #if DEBUG
     convenience init(
-        factGenerator: PlaceFactGenerating? = nil,
-        speechOutput: SpeechOutputEngine? = nil,
+        factGenerator: FactClient? = nil,
+        speechOutput: SpeechOutput? = nil,
         inactivityNotifier: RideInactivityNotifying? = nil,
         audioSession: AudioSessionManaging? = nil,
         diagnostics: RideDiagnosticsStore? = nil,
@@ -1162,11 +1135,22 @@ class LocationManager: NSObject, ObservableObject {
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let locationAdapter = CoreLocationAdapter()
+        let resolvedFactGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
+        let resolvedSpeechOutput = speechOutput ?? DefaultSpeechOutputEngine()
+        let resolvedAudioSession = audioSession ?? SystemAudioSessionManager()
+        let diagnosticsRelay = AnnouncementDiagnosticsRelay()
+        let coordinator = AnnouncementCoordinator(
+            scheduler: DispatchAnnouncementScheduler(),
+            audioReleaseScheduler: DispatchAnnouncementScheduler(),
+            factClient: resolvedFactGenerator,
+            speechOutput: resolvedSpeechOutput,
+            audioSession: resolvedAudioSession,
+            diagnostics: diagnosticsRelay
+        )
         self.init(
-            factGenerator: factGenerator,
-            speechOutput: speechOutput,
+            announcementCoordinator: coordinator,
             inactivityNotifier: inactivityNotifier,
-            audioSession: audioSession,
+            audioSession: resolvedAudioSession,
             diagnostics: diagnostics,
             rideSettingsStore: rideSettingsStore,
             rideSessionController: rideSessionController,
@@ -1175,6 +1159,38 @@ class LocationManager: NSObject, ObservableObject {
             rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
             aiSharingAllowed: aiSharingAllowed
         )
+        diagnosticsRelay.connect { [weak self] signal in
+            self?.recordAnnouncementDiagnostic(signal)
+        }
+    }
+
+    convenience init(
+        locationSource: LocationSource,
+        placeResolver: PlaceResolver,
+        rideDistanceMeasurer: RideDistanceMeasuring,
+        aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
+    ) {
+        let audioSession = SystemAudioSessionManager()
+        let diagnosticsRelay = AnnouncementDiagnosticsRelay()
+        let coordinator = AnnouncementCoordinator(
+            scheduler: DispatchAnnouncementScheduler(),
+            audioReleaseScheduler: DispatchAnnouncementScheduler(),
+            factClient: Self.makeDefaultFactGenerator(),
+            speechOutput: DefaultSpeechOutputEngine(),
+            audioSession: audioSession,
+            diagnostics: diagnosticsRelay
+        )
+        self.init(
+            announcementCoordinator: coordinator,
+            audioSession: audioSession,
+            locationSource: locationSource,
+            placeResolver: placeResolver,
+            rideDistanceMeasurer: rideDistanceMeasurer,
+            aiSharingAllowed: aiSharingAllowed
+        )
+        diagnosticsRelay.connect { [weak self] signal in
+            self?.recordAnnouncementDiagnostic(signal)
+        }
     }
 #endif
 
@@ -1289,33 +1305,10 @@ class LocationManager: NSObject, ObservableObject {
             reason = .rideEnded
         }
 
-        if case .rideEnded = intent {
-            if let announcementID = inFlightFactAnnouncementID {
-                recordDiagnostic(
-                    .announcementCancelled,
-                    announcementID: announcementID,
-                    reason: .rideEnded
-                )
-            }
-            if let announcementID = interruptedSpeechPlan?.id {
-                recordDiagnostic(
-                    .announcementCancelled,
-                    announcementID: announcementID,
-                    reason: .rideEnded
-                )
-            }
-        }
-
         cancelActivePlaceLookup(reason: reason)
         geocodeRequestGeneration = UUID()
         placeResolver.cancel()
-        inFlightFactTask?.cancel()
-        inFlightFactTask = nil
-        inFlightFactBoundary = nil
-        inFlightFactAnnouncementID = nil
-        activeAnnouncementToken = UUID()
-        cancelPendingAnnouncement(reason: reason)
-        stopSpeechOutput()
+        _ = announcementCoordinator.cancelAll(reason: reason)
 
         guard case .rideEnded(let wasActive) = intent else { return }
         locationSource.stop()
@@ -1327,8 +1320,6 @@ class LocationManager: NSObject, ObservableObject {
         lastLocationDiagnosticTime = nil
         inactivityNotifier.cancelInactivityPrompt()
 
-        observedAudioPauseSources.removeAll()
-        interruptedSpeechPlan = nil
         hasSeededTestRoute = false
         testIndex = 0
         AppDiagnostics.log("Ride session ended and background work stopped.")
@@ -1340,13 +1331,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     func applyAISharingDecision(isGranted: Bool) {
-        inFlightFactTask?.cancel()
-        inFlightFactTask = nil
-        inFlightFactBoundary = nil
-        inFlightFactAnnouncementID = nil
-        activeAnnouncementToken = UUID()
-        cancelPendingAnnouncement(reason: .settingsChanged)
-        stopSpeechOutput()
+        _ = announcementCoordinator.cancelAll(reason: .settingsChanged)
 
         if !isGranted {
             contentMode = .namesOnly
@@ -1374,7 +1359,6 @@ class LocationManager: NSObject, ObservableObject {
         previousAddress = nil
         lastUpdateTime = nil
         lastBoundaryAnnouncementTime = nil
-        interruptedSpeechPlan = nil
 
         homeCountry = ""
         homeRegion = ""
@@ -1525,7 +1509,7 @@ class LocationManager: NSObject, ObservableObject {
 
     func previewSelectedVoice() {
         stopSpeechOutput()
-        announcementQueue.clearPending()
+        announcementCoordinator.cancelPending()
         speak(
             text: "\(ProductIdentity.displayName) can speak in this voice. Keep the road in front of you, rider.",
             shouldRecordTestLog: false,
@@ -1823,7 +1807,7 @@ class LocationManager: NSObject, ObservableObject {
         }
 
         if shouldSuppressBoundarySpeech() {
-            _ = supersedeUndeliveredAnnouncementWork(with: plan.boundary)
+            _ = supersedeUndeliveredAnnouncementWork(with: plan)
             if previousAddress != address {
                 previousAddress = address
             }
@@ -1834,7 +1818,7 @@ class LocationManager: NSObject, ObservableObject {
             return
         }
 
-        guard supersedeUndeliveredAnnouncementWork(with: plan.boundary) else {
+        guard supersedeUndeliveredAnnouncementWork(with: plan) else {
             previousAddress = address
             if testMode {
                 recordTestLog(utteredPhrase: nil)
@@ -1878,45 +1862,21 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     @discardableResult
-    private func supersedeUndeliveredAnnouncementWork(with newBoundary: BoundaryType) -> Bool {
-        let activeBoundaries = [
-            inFlightFactBoundary,
-            announcementQueue.pending?.boundary,
-            interruptedSpeechPlan?.boundary,
-            isSpeechOutputActive ? activeSpeechPlan?.boundary : nil
-        ].compactMap { $0 }
-
-        if let highestPriorityBoundary = activeBoundaries.min(),
-           newBoundary > highestPriorityBoundary {
+    private func supersedeUndeliveredAnnouncementWork(with plan: AnnouncementPlan) -> Bool {
+        let result = announcementCoordinator.acceptBoundary(plan)
+        guard case .boundaryAccepted(_, let supersededAnnouncementIDs) = result else {
             return false
         }
 
-        guard !activeBoundaries.isEmpty else { return true }
-        let supersededAnnouncementIDs = [
-            inFlightFactAnnouncementID,
-            announcementQueue.pending?.id,
-            interruptedSpeechPlan?.id,
-            isSpeechOutputActive ? activeSpeechPlan?.id : nil
-        ].compactMap { $0 }
-        for announcementID in Set(supersededAnnouncementIDs) {
+        guard !supersededAnnouncementIDs.isEmpty else { return true }
+        for announcementID in supersededAnnouncementIDs {
             recordDiagnostic(
                 .announcementSuperseded,
                 announcementID: announcementID,
                 reason: .supersededByNewerContext
             )
         }
-        activeAnnouncementToken = UUID()
-        inFlightFactTask?.cancel()
-        inFlightFactTask = nil
-        inFlightFactBoundary = nil
-        inFlightFactAnnouncementID = nil
-        interruptedSpeechPlan = nil
-        cancelPendingAnnouncement(reason: .supersededByNewerContext)
-        if speechOutput.isPlayingAudio {
-            stopSpeechOutput()
-        } else {
-            speechOutput.cancelPendingPreparation()
-        }
+        _ = announcementCoordinator.cancelAll(reason: .supersededByNewerContext)
         return true
     }
 
@@ -1926,14 +1886,8 @@ class LocationManager: NSObject, ObservableObject {
         mode: FactMode,
         placeLookupID: UUID? = nil
     ) {
-        let token = UUID()
-        activeAnnouncementToken = token
-        inFlightFactTask?.cancel()
-        inFlightFactBoundary = plan.boundary
-        inFlightFactAnnouncementID = plan.id
         cancelPendingAnnouncement(reason: .supersededByNewerContext)
         announcementStatus = .retrievingContent
-        recordDiagnostic(.factGenerationStarted, announcementID: plan.id)
 
         let request = AnnouncementPolicy.factRequest(
             for: plan,
@@ -1941,44 +1895,14 @@ class LocationManager: NSObject, ObservableObject {
             mode: mode,
             riderContext: riderContext
         )
-        let generator = factGenerator
         let aiSharingAllowed = aiSharingAllowed
-
-        inFlightFactTask = Task { [weak self] in
-            let fact = await PlaceFactFetcher.fact(for: request, using: generator)
-            await MainActor.run {
-                guard let self, !Task.isCancelled, self.activeAnnouncementToken == token else { return }
-                self.inFlightFactTask = nil
-                self.inFlightFactBoundary = nil
-                self.inFlightFactAnnouncementID = nil
-                guard aiSharingAllowed() else {
-                    self.recordDiagnostic(
-                        .factGenerationFinished,
-                        announcementID: plan.id,
-                        reason: .factUnavailable
-                    )
-                    self.enqueueAnnouncement(plan, placeLookupID: placeLookupID)
-                    return
-                }
-                self.recordDiagnostic(
-                    .factGenerationFinished,
-                    announcementID: plan.id,
-                    reason: fact == nil ? .factUnavailable : .factAvailable
-                )
-                if fact == nil {
-                    self.recordDiagnostic(
-                        .announcementFailed,
-                        announcementID: plan.id,
-                        reason: .factUnavailable
-                    )
-                    ProxyDiagnostics.log("Facts", "No proxy fact available. Speaking base phrase for \(request.cacheKey).")
-                }
-                let text = FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact, mode: mode)
-                self.enqueueAnnouncement(
-                    AnnouncementPlan(id: plan.id, text: text, boundary: plan.boundary),
-                    placeLookupID: placeLookupID
-                )
-            }
+        announcementCoordinator.requestFact(
+            for: plan,
+            request: request,
+            mode: mode,
+            aiSharingAllowed: aiSharingAllowed
+        ) { [weak self] resolvedPlan in
+            self?.enqueueAnnouncement(resolvedPlan, placeLookupID: placeLookupID)
         }
     }
 
@@ -1994,36 +1918,32 @@ class LocationManager: NSObject, ObservableObject {
             return
         }
 
-        guard supersedeUndeliveredAnnouncementWork(with: .town) else { return }
+        let plan = AnnouncementPlan(text: speechText, boundary: .town)
+        guard supersedeUndeliveredAnnouncementWork(with: plan) else { return }
         previousAddress = address
         lastBoundaryAnnouncementTime = Date()
-        let plan = AnnouncementPlan(text: speechText, boundary: .town)
         enqueueAnnouncement(plan, placeLookupID: placeLookupID)
     }
 
     private func enqueueAnnouncement(_ plan: AnnouncementPlan, placeLookupID: UUID? = nil) {
-        if isSpeechOutputActive, let speakingBoundary = currentlySpeakingBoundary {
-            if AnnouncementQueue.shouldDropWhileSpeaking(
+        if isSpeechOutputActive {
+            switch AnnouncementCoordinator.deliveryDecision(
                 newBoundary: plan.boundary,
-                currentlySpeaking: speakingBoundary
+                activeBoundary: currentlySpeakingBoundary
             ) {
+            case .drop:
                 AppDiagnostics.log("Dropped lower-priority announcement.")
                 return
-            }
-
-            if AnnouncementQueue.shouldInterrupt(
-                newBoundary: plan.boundary,
-                currentlySpeaking: speakingBoundary
-            ) {
+            case .interruptThenDeliver:
                 stopSpeechOutput()
+            case .deliver:
+                break
             }
         }
 
-        let request = announcementQueue.replacePending(
-            id: plan.id,
-            text: plan.text,
-            boundary: plan.boundary
-        )
+        announcementCoordinator.schedule(plan, after: bluetoothDelaySeconds) { [weak self] id in
+            self?.deliverAnnouncement(id: id)
+        }
         announcementStatus = .phraseReady
         recordDiagnostic(
             .announcementTextReady,
@@ -2035,25 +1955,13 @@ class LocationManager: NSObject, ObservableObject {
             placeLookupID: placeLookupID,
             announcementID: plan.id
         )
-        delayWorkItem?.cancel()
-
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.deliverAnnouncement(id: request.id)
-        }
-        delayWorkItem = workItem
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + bluetoothDelaySeconds,
-            execute: workItem
-        )
         AppDiagnostics.log("Queued announcement after configured Bluetooth delay.")
     }
 
     private func cancelPendingAnnouncement(reason: RideDiagnosticReason) {
-        let pendingID = announcementQueue.pending?.id
-        let hadPendingAnnouncement = delayWorkItem != nil || announcementQueue.pending != nil
-        delayWorkItem?.cancel()
-        delayWorkItem = nil
-        announcementQueue.clearPending()
+        let pendingID = announcementCoordinator.pending?.id
+        let hadPendingAnnouncement = announcementCoordinator.pending != nil
+        announcementCoordinator.cancelPending()
         if hadPendingAnnouncement {
             announcementStatus = .idle
             recordDiagnostic(
@@ -2065,30 +1973,28 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     private func deliverAnnouncement(id: UUID) {
-        guard let pending = announcementQueue.pending, pending.id == id else {
+        guard let pending = announcementCoordinator.pending, pending.id == id else {
             AppDiagnostics.log("Skipped stale announcement.")
             return
         }
 
-        if isSpeechOutputActive, let speakingBoundary = currentlySpeakingBoundary {
-            if AnnouncementQueue.shouldDropWhileSpeaking(
+        if isSpeechOutputActive {
+            switch AnnouncementCoordinator.deliveryDecision(
                 newBoundary: pending.boundary,
-                currentlySpeaking: speakingBoundary
+                activeBoundary: currentlySpeakingBoundary
             ) {
-                announcementQueue.clearPending(id: id)
+            case .drop:
+                announcementCoordinator.cancelPending(id: id)
                 AppDiagnostics.log("Dropped stale lower-priority announcement at delivery.")
                 return
-            }
-
-            if AnnouncementQueue.shouldInterrupt(
-                newBoundary: pending.boundary,
-                currentlySpeaking: speakingBoundary
-            ) {
+            case .interruptThenDeliver:
                 stopSpeechOutput()
+            case .deliver:
+                break
             }
         }
 
-        announcementQueue.clearPending(id: id)
+        announcementCoordinator.cancelPending(id: id)
         speak(
             announcementID: pending.id,
             text: pending.text,
@@ -2104,8 +2010,7 @@ class LocationManager: NSObject, ObservableObject {
             return
         }
 
-        delayWorkItem?.cancel()
-        announcementQueue.clearPending()
+        announcementCoordinator.cancelPending()
         stopSpeechOutput()
         speak(text: text, boundary: currentlySpeakingBoundary, shouldRecordTestLog: false)
     }
@@ -2258,6 +2163,16 @@ class LocationManager: NSObject, ObservableObject {
         )
     }
 
+    func recordAnnouncementDiagnostic(_ signal: AnnouncementDiagnosticSignal) {
+        recordDiagnostic(
+            signal.event,
+            announcementID: signal.announcementID,
+            reason: signal.reason,
+            audioPolicy: signal.audioPolicy,
+            playbackPath: signal.playbackPath
+        )
+    }
+
     private func recordDiagnostic(
         _ event: RideDiagnosticEvent,
         at timestamp: Date = Date(),
@@ -2402,36 +2317,36 @@ class LocationManager: NSObject, ObservableObject {
         let interruptionReason = (userInfo[AVAudioSessionInterruptionReasonKey] as? NSNumber)?.uintValue
 
         if interruptionType == .began {
-            observedAudioPauseSources.insert(.interruption)
             recordDiagnostic(
                 .audioInterruptionBegan,
-                announcementID: activeSpeechPlan?.id ?? interruptedSpeechPlan?.id,
+                announcementID: announcementCoordinator.activePlan?.id
+                    ?? announcementCoordinator.interruptedPlan?.id,
                 reason: .interruptionBegan,
                 interruptionReason: interruptionReason
             )
-            pauseForObservedExternalAudio()
+            _ = announcementCoordinator.externalAudioBegan(.interruption)
         } else if interruptionType == .ended {
             let optionsValue = (userInfo[AVAudioSessionInterruptionOptionKey] as? NSNumber)?.uintValue ?? 0
             let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
             let shouldResume = options.contains(.shouldResume)
-            observedAudioPauseSources.remove(.interruption)
             recordDiagnostic(
                 .audioInterruptionEnded,
-                announcementID: interruptedSpeechPlan?.id,
+                announcementID: announcementCoordinator.interruptedPlan?.id,
                 reason: shouldResume ? .interruptionShouldResume : .interruptionMustNotResume,
                 interruptionReason: interruptionReason,
                 shouldResume: shouldResume
             )
-            if shouldResume {
-                resumeInterruptedSpeech(reason: .interruptionShouldResume)
-            } else {
-                recordDiagnostic(
-                    .announcementCancelled,
-                    announcementID: interruptedSpeechPlan?.id,
-                    reason: .interruptionMustNotResume
+            let outcome = announcementCoordinator.externalAudioEnded(
+                .interruption,
+                shouldResume: shouldResume
+            )
+            if let plan = outcome.plan, rideSessionState == .riding {
+                speak(
+                    announcementID: plan.id,
+                    text: plan.text,
+                    boundary: plan.boundary,
+                    shouldRecordTestLog: false
                 )
-                interruptedSpeechPlan = nil
-                announcementStatus = .idle
             }
         }
     }
@@ -2445,23 +2360,32 @@ class LocationManager: NSObject, ObservableObject {
 
         switch hintType {
         case .begin:
-            observedAudioPauseSources.insert(.primaryAudio)
             recordDiagnostic(
                 .primaryAudioBegan,
-                announcementID: activeSpeechPlan?.id
-                    ?? announcementQueue.pending?.id
-                    ?? interruptedSpeechPlan?.id,
+                announcementID: announcementCoordinator.activePlan?.id
+                    ?? announcementCoordinator.pending?.id
+                    ?? announcementCoordinator.interruptedPlan?.id,
                 reason: .primaryAudioActive
             )
-            pauseForObservedExternalAudio()
+            _ = announcementCoordinator.externalAudioBegan(.primaryAudio)
         case .end:
-            observedAudioPauseSources.remove(.primaryAudio)
             recordDiagnostic(
                 .primaryAudioEnded,
-                announcementID: interruptedSpeechPlan?.id,
+                announcementID: announcementCoordinator.interruptedPlan?.id,
                 reason: .primaryAudioEnded
             )
-            resumeInterruptedSpeech(reason: .primaryAudioEnded)
+            let outcome = announcementCoordinator.externalAudioEnded(
+                .primaryAudio,
+                shouldResume: true
+            )
+            if let plan = outcome.plan, rideSessionState == .riding {
+                speak(
+                    announcementID: plan.id,
+                    text: plan.text,
+                    boundary: plan.boundary,
+                    shouldRecordTestLog: false
+                )
+            }
         @unknown default:
             return
         }
@@ -2477,50 +2401,44 @@ class LocationManager: NSObject, ObservableObject {
         audioSessionReleaseRetryWorkItem = nil
         audioSessionReleaseRetryAttempts = 0
         ownsAudioSession = false
-        observedAudioPauseSources.removeAll()
+        announcementCoordinator.handleMediaServicesReset()
         recordDiagnostic(.audioMediaServicesReset)
-        resumeInterruptedSpeech(reason: .mediaServicesReset)
-    }
-
-    private func pauseForObservedExternalAudio() {
-        if let activeSpeechPlan {
-            interruptedSpeechPlan = activeSpeechPlan
-        } else if let pending = announcementQueue.pending {
-            interruptedSpeechPlan = AnnouncementPlan(
-                id: pending.id,
-                text: pending.text,
-                boundary: pending.boundary
+        let outcome = announcementCoordinator.resumeAfterMediaServicesReset()
+        if let plan = outcome.plan, rideSessionState == .riding {
+            speak(
+                announcementID: plan.id,
+                text: plan.text,
+                boundary: plan.boundary,
+                shouldRecordTestLog: false
             )
-            announcementQueue.clearPending(id: pending.id)
-            delayWorkItem?.cancel()
-            delayWorkItem = nil
         }
-
-        if isSpeechOutputActive {
-            AppDiagnostics.log("RideHorizon speech stopped for primary audio.")
-            stopSpeechOutput()
-        }
-
-        guard interruptedSpeechPlan != nil else { return }
-        announcementStatus = .waitingForAudio
     }
 
-    private func resumeInterruptedSpeech(reason: RideDiagnosticReason) {
-        guard observedAudioPauseSources.isEmpty,
-              rideSessionState == .riding,
-              let plan = interruptedSpeechPlan else { return }
-        interruptedSpeechPlan = nil
-        recordDiagnostic(
-            .announcementRestarted,
-            announcementID: plan.id,
-            reason: reason
-        )
-        speak(
-            announcementID: plan.id,
-            text: plan.text,
-            boundary: plan.boundary,
-            shouldRecordTestLog: false
-        )
+    private func handleAnnouncementWorkflowResult(_ result: AnnouncementWorkflowResult) {
+        switch result {
+        case .boundaryAccepted, .boundaryRejected:
+            break
+        case .factRequested:
+            announcementStatus = .retrievingContent
+        case .factResolved:
+            announcementStatus = .phraseReady
+        case .factCancelled:
+            if !isSpeechOutputActive { announcementStatus = .idle }
+        case .speechRequested, .retryScheduled, .fallbackStarted:
+            announcementStatus = .preparingVoice
+        case .playbackStarted:
+            announcementStatus = .speaking
+        case .deferred, .interrupted:
+            activeSpeechPlan = nil
+            currentlySpeakingBoundary = nil
+            announcementStatus = .waitingForAudio
+        case .resumed:
+            announcementStatus = .preparingVoice
+        case .completed, .cancelled, .failed:
+            activeSpeechPlan = nil
+            currentlySpeakingBoundary = nil
+            announcementStatus = .idle
+        }
     }
 
     private func speak(
@@ -2531,28 +2449,14 @@ class LocationManager: NSObject, ObservableObject {
         ignoreQuietMode: Bool = false
     ) {
         guard ignoreQuietMode || contentMode != .quiet else { return }
-        if !observedAudioPauseSources.isEmpty {
-            interruptedSpeechPlan = AnnouncementPlan(
-                id: announcementID,
-                text: text,
-                boundary: boundary ?? .street
-            )
-            announcementStatus = .waitingForAudio
-            recordDiagnostic(
-                .announcementDeferred,
-                announcementID: announcementID,
-                reason: observedAudioPauseSources.contains(.interruption)
-                    ? .interruptionBegan
-                    : .primaryAudioActive
-            )
-            return
-        }
-        currentlySpeakingBoundary = boundary
-        activeSpeechPlan = AnnouncementPlan(
+        let plan = AnnouncementPlan(
             id: announcementID,
             text: text,
             boundary: boundary ?? .street
         )
+        if announcementCoordinator.deferIfPaused(plan) != nil { return }
+        currentlySpeakingBoundary = boundary
+        activeSpeechPlan = plan
         AppDiagnostics.log("Speaking an announcement.")
         lastSpokenPhrase = text
         lastSpokenAt = Date()
@@ -2561,22 +2465,19 @@ class LocationManager: NSObject, ObservableObject {
             recordTestLog(utteredPhrase: text)
         }
 
-        let provider = aiSharingAllowed() ? speechProvider : .apple
         announcementStatus = .preparingVoice
-        speechOutput.speak(
-            text: text,
-            boundary: boundary,
-            provider: provider,
-            appleVoice: resolveSpeechVoice(),
-            allowAppleFallback: aiSharingAllowed() ? premiumVoiceAppleFallbackEnabled : false,
-            announcementID: announcementID
+        announcementCoordinator.speak(
+            plan,
+            selectedProvider: speechProvider,
+            aiSharingAllowed: aiSharingAllowed(),
+            appleVoice: resolveSpeechVoice().map { SpeechVoiceSelection(identifier: $0.identifier) },
+            allowAppleFallback: premiumVoiceAppleFallbackEnabled,
+            audioPolicy: audioCoexistencePolicy
         )
     }
 
     private func stopSpeechOutput() {
-        let announcementID = activeSpeechPlan?.id
-        speechOutput.stop()
-        releaseAudioSessionAfterSpeech(announcementID: announcementID)
+        _ = announcementCoordinator.stop(reason: .playbackCancelled)
         activeSpeechPlan = nil
         currentlySpeakingBoundary = nil
     }
@@ -2603,7 +2504,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     var hasInterruptedSpeechPlanForTesting: Bool {
-        interruptedSpeechPlan != nil
+        announcementCoordinator.interruptedPlan != nil
     }
 
     var rideSessionGenerationForTesting: UUID {

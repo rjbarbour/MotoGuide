@@ -1,4 +1,5 @@
 import XCTest
+import AVFoundation
 @testable import RideHorizon
 
 final class AnnouncementPolicyTests: XCTestCase {
@@ -274,4 +275,663 @@ final class AnnouncementQueueTests: XCTestCase {
         queue.clearPending(id: request.id)
         XCTAssertNil(queue.pending)
     }
+}
+
+@MainActor
+final class AnnouncementCoordinatorTests: XCTestCase {
+    private func makeCoordinator(
+        scheduler: AnnouncementScheduling? = nil,
+        audioReleaseScheduler: AnnouncementScheduling? = nil,
+        factClient: FactClient? = nil,
+        speechOutput: SpeechOutput? = nil,
+        audioSession: AudioSessionManaging? = nil,
+        diagnostics: DiagnosticsSink? = nil
+    ) -> AnnouncementCoordinator {
+        AnnouncementCoordinator(
+            scheduler: scheduler ?? RecordingAnnouncementScheduler(),
+            audioReleaseScheduler: audioReleaseScheduler ?? RecordingAnnouncementScheduler(),
+            factClient: factClient ?? StubFactClient(result: nil),
+            speechOutput: speechOutput ?? RecordingCoordinatorSpeechOutput(),
+            audioSession: audioSession ?? RecordingCoordinatorAudioSession(),
+            diagnostics: diagnostics ?? RecordingDiagnosticsSink()
+        )
+    }
+
+    func testEnqueueKeepsOneSupersedablePendingAnnouncement() {
+        let coordinator = makeCoordinator()
+        let town = coordinator.enqueue(text: "Stroud", boundary: .town)
+        let county = coordinator.enqueue(text: "Gloucestershire", boundary: .county)
+
+        XCTAssertEqual(coordinator.pending, county)
+        XCTAssertNotEqual(town.id, county.id)
+        coordinator.cancelPending(id: town.id)
+        XCTAssertEqual(coordinator.pending, county)
+        coordinator.cancelPending(id: county.id)
+        XCTAssertNil(coordinator.pending)
+    }
+
+    func testLowerPriorityContextCannotSupersedeHigherPriorityWork() {
+        XCTAssertEqual(
+            AnnouncementCoordinator.supersession(
+                newBoundary: .town,
+                activeBoundaries: [.county],
+                activeAnnouncementIDs: [UUID()]
+            ),
+            .rejectLowerPriority
+        )
+    }
+
+    func testHigherPriorityContextReturnsEveryWorkItemToCancel() {
+        let factID = UUID()
+        let speechID = UUID()
+
+        XCTAssertEqual(
+            AnnouncementCoordinator.supersession(
+                newBoundary: .country,
+                activeBoundaries: [.town, .county],
+                activeAnnouncementIDs: [factID, speechID, factID]
+            ),
+            .supersede(announcementIDs: [factID, speechID])
+        )
+    }
+
+
+    func testCancelledFactWorkCannotCompleteAfterSupersession() {
+        let coordinator = makeCoordinator()
+        let work = coordinator.beginFact(
+            for: AnnouncementPlan(text: "Stroud", boundary: .town)
+        )
+        XCTAssertTrue(coordinator.acceptsFactCompletion(token: work.token))
+
+        coordinator.invalidateAll()
+
+        XCTAssertFalse(coordinator.acceptsFactCompletion(token: work.token))
+        XCTAssertNil(coordinator.factWork)
+    }
+
+    func testScheduledReplacementDeliversOnlyLatestAnnouncement() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let coordinator = makeCoordinator(scheduler: scheduler)
+        var delivered: [UUID] = []
+        let first = AnnouncementPlan(text: "Stroud", boundary: .town)
+        let second = AnnouncementPlan(text: "Gloucestershire", boundary: .county)
+
+        coordinator.schedule(first, after: 0.5) { delivered.append($0) }
+        coordinator.schedule(second, after: 0.5) { delivered.append($0) }
+        scheduler.fire()
+
+        XCTAssertEqual(delivered, [second.id])
+        XCTAssertEqual(coordinator.pending?.id, second.id)
+    }
+
+    func testCancellationPreventsScheduledDelivery() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let coordinator = makeCoordinator(scheduler: scheduler)
+        var delivered: [UUID] = []
+        coordinator.schedule(
+            AnnouncementPlan(text: "Stroud", boundary: .town),
+            after: 0.5
+        ) { delivered.append($0) }
+
+        coordinator.cancelPending()
+        scheduler.fire()
+
+        XCTAssertTrue(delivered.isEmpty)
+        XCTAssertTrue(scheduler.didCancel)
+    }
+
+    func testDeliveryDecisionMakesInterruptionExplicit() {
+        XCTAssertEqual(
+            AnnouncementCoordinator.deliveryDecision(newBoundary: .country, activeBoundary: .town),
+            .interruptThenDeliver
+        )
+        XCTAssertEqual(
+            AnnouncementCoordinator.deliveryDecision(newBoundary: .town, activeBoundary: .country),
+            .drop
+        )
+        XCTAssertEqual(
+            AnnouncementCoordinator.deliveryDecision(newBoundary: .town, activeBoundary: nil),
+            .deliver
+        )
+    }
+
+    func testFactClientIsOwnedByCoordinatorAndProducesResolvedPlan() async {
+        let factClient = StubFactClient(result: "Stroud grew around its woollen mills")
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let audioSession = RecordingCoordinatorAudioSession()
+        let diagnostics = RecordingDiagnosticsSink()
+        let coordinator = makeCoordinator(
+            factClient: factClient,
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics
+        )
+        let plan = AnnouncementPlan(text: "You are in Stroud", boundary: .town)
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom"
+        )
+
+        let resolved = await withCheckedContinuation { continuation in
+            coordinator.requestFact(
+                for: plan,
+                request: request,
+                mode: .shortFacts,
+                aiSharingAllowed: { true }
+            ) { continuation.resume(returning: $0) }
+        }
+
+        XCTAssertEqual(factClient.requests, [request])
+        XCTAssertEqual(resolved.id, plan.id)
+        XCTAssertTrue(resolved.text.contains("woollen mills"))
+        XCTAssertTrue(diagnostics.signals.contains {
+            $0.event == .factGenerationFinished && $0.reason == .factAvailable
+        })
+    }
+
+    func testSpeechSelectionAudioOwnershipAndCompletionAreCoordinatorResults() {
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let audioSession = RecordingCoordinatorAudioSession()
+        let diagnostics = RecordingDiagnosticsSink()
+        let coordinator = makeCoordinator(
+            factClient: StubFactClient(result: nil),
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics
+        )
+        var results: [AnnouncementWorkflowResult] = []
+        coordinator.onResult = { results.append($0) }
+        let plan = AnnouncementPlan(text: "Welcome to Wales", boundary: .nation)
+
+        coordinator.speak(
+            plan,
+            selectedProvider: .proxyElevenLabs,
+            aiSharingAllowed: true,
+            appleVoice: nil,
+            allowAppleFallback: true,
+            audioPolicy: .mix
+        )
+        XCTAssertEqual(speechOutput.requests.last?.provider, .proxyElevenLabs)
+        XCTAssertTrue(speechOutput.beginPlayback(provider: .proxyElevenLabs))
+        XCTAssertEqual(audioSession.activatedPolicies, [.mix])
+        speechOutput.finish()
+
+        XCTAssertEqual(audioSession.deactivateCount, 1)
+        XCTAssertTrue(results.contains(.speechRequested(
+            announcementID: plan.id,
+            provider: .proxyElevenLabs
+        )))
+        XCTAssertTrue(results.contains(.playbackStarted(
+            announcementID: plan.id,
+            provider: .proxyElevenLabs
+        )))
+        XCTAssertTrue(results.contains(.completed(announcementID: plan.id)))
+    }
+
+    func testPrivacyFallbackRetryAndEndRideAreExplicitCoordinatorOutcomes() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let audioSession = RecordingCoordinatorAudioSession()
+        let diagnostics = RecordingDiagnosticsSink()
+        let coordinator = makeCoordinator(
+            scheduler: scheduler,
+            audioReleaseScheduler: RecordingAnnouncementScheduler(),
+            factClient: StubFactClient(result: nil),
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics
+        )
+        var results: [AnnouncementWorkflowResult] = []
+        coordinator.onResult = { results.append($0) }
+        let plan = AnnouncementPlan(text: "You are in Stroud", boundary: .town)
+
+        coordinator.schedule(plan, after: 0.5) { _ in }
+        coordinator.speak(
+            plan,
+            selectedProvider: .proxyElevenLabs,
+            aiSharingAllowed: false,
+            appleVoice: nil,
+            allowAppleFallback: true,
+            audioPolicy: .mix
+        )
+        XCTAssertEqual(speechOutput.requests.last?.provider, .apple)
+        speechOutput.emitPipeline(
+            announcementID: plan.id,
+            provider: .proxyElevenLabs,
+            stage: .retryScheduled
+        )
+        speechOutput.emitPipeline(
+            announcementID: plan.id,
+            provider: .proxyElevenLabs,
+            stage: .fallbackStarted
+        )
+        _ = coordinator.cancelAll(reason: .rideEnded)
+
+        XCTAssertNil(coordinator.pending)
+        XCTAssertTrue(speechOutput.stopCount > 0)
+        XCTAssertTrue(results.contains(.retryScheduled(
+            announcementID: plan.id,
+            provider: .proxyElevenLabs
+        )))
+        XCTAssertTrue(results.contains(.fallbackStarted(
+            announcementID: plan.id,
+            provider: .apple
+        )))
+        XCTAssertTrue(results.contains(.cancelled(
+            announcementID: plan.id,
+            reason: .rideEnded
+        )))
+    }
+
+    func testRealFallbackOrderingDoesNotProduceTerminalFailureBeforeAppleStarts() {
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(
+            factClient: StubFactClient(result: nil),
+            speechOutput: speechOutput,
+            audioSession: RecordingCoordinatorAudioSession(),
+            diagnostics: RecordingDiagnosticsSink()
+        )
+        var results: [AnnouncementWorkflowResult] = []
+        coordinator.onResult = { results.append($0) }
+        let plan = AnnouncementPlan(text: "Welcome to Wales", boundary: .nation)
+        coordinator.speak(
+            plan,
+            selectedProvider: .proxyElevenLabs,
+            aiSharingAllowed: true,
+            appleVoice: nil,
+            allowAppleFallback: true,
+            audioPolicy: .mix
+        )
+
+        speechOutput.emitFallbackWithDiagnostic(announcementID: plan.id)
+
+        XCTAssertTrue(results.contains(.fallbackStarted(
+            announcementID: plan.id,
+            provider: .apple
+        )))
+        XCTAssertFalse(results.contains(.failed(
+            announcementID: plan.id,
+            reason: .playbackFailed
+        )))
+        XCTAssertEqual(coordinator.activePlan, plan)
+    }
+
+    func testBoundaryAcceptanceAndInterruptionResumeAreCoordinatorOwned() {
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(
+            factClient: StubFactClient(result: nil),
+            speechOutput: speechOutput,
+            audioSession: RecordingCoordinatorAudioSession(),
+            diagnostics: RecordingDiagnosticsSink()
+        )
+        let town = AnnouncementPlan(text: "Stroud", boundary: .town)
+        let country = AnnouncementPlan(text: "Welcome to Wales", boundary: .country)
+        coordinator.schedule(town, after: 1) { _ in }
+
+        XCTAssertEqual(
+            coordinator.acceptBoundary(country),
+            .boundaryAccepted(
+                announcementID: country.id,
+                supersededAnnouncementIDs: [town.id]
+            )
+        )
+        coordinator.speak(
+            country,
+            selectedProvider: .apple,
+            aiSharingAllowed: true,
+            appleVoice: nil,
+            allowAppleFallback: false,
+            audioPolicy: .mix
+        )
+        XCTAssertEqual(
+            coordinator.externalAudioBegan(.interruption),
+            .interrupted(announcementID: country.id, reason: .interruptionBegan)
+        )
+        let resumed = coordinator.externalAudioEnded(.interruption, shouldResume: true)
+        XCTAssertEqual(resumed.plan, country)
+        XCTAssertEqual(resumed.result, .resumed(announcementID: country.id))
+    }
+
+    func testAudioReleaseRetryIsOwnedAndDiagnosedByCoordinator() {
+        let retryScheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let audioSession = RecordingCoordinatorAudioSession()
+        audioSession.deactivationFailuresRemaining = 1
+        let diagnostics = RecordingDiagnosticsSink()
+        let coordinator = makeCoordinator(
+            audioReleaseScheduler: retryScheduler,
+            factClient: StubFactClient(result: nil),
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics
+        )
+        let plan = AnnouncementPlan(text: "Stroud", boundary: .town)
+        coordinator.speak(
+            plan,
+            selectedProvider: .apple,
+            aiSharingAllowed: true,
+            appleVoice: nil,
+            allowAppleFallback: false,
+            audioPolicy: .mix
+        )
+        XCTAssertTrue(speechOutput.beginPlayback(provider: .apple))
+
+        speechOutput.finish()
+        XCTAssertEqual(audioSession.deactivateCount, 1)
+        retryScheduler.fire()
+
+        XCTAssertEqual(audioSession.deactivateCount, 2)
+        XCTAssertTrue(diagnostics.signals.contains { $0.event == .audioSessionReleaseFailed })
+        XCTAssertTrue(diagnostics.signals.contains { $0.event == .audioSessionReleased })
+    }
+
+    func testFallbackDisabledFailureHasOnlyFailedTerminalResult() {
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(
+            factClient: StubFactClient(result: nil),
+            speechOutput: speechOutput,
+            audioSession: RecordingCoordinatorAudioSession(),
+            diagnostics: RecordingDiagnosticsSink()
+        )
+        var results: [AnnouncementWorkflowResult] = []
+        coordinator.onResult = { results.append($0) }
+        let plan = AnnouncementPlan(text: "Stroud", boundary: .town)
+        coordinator.speak(
+            plan,
+            selectedProvider: .proxyElevenLabs,
+            aiSharingAllowed: true,
+            appleVoice: nil,
+            allowAppleFallback: false,
+            audioPolicy: .mix
+        )
+
+        speechOutput.emitFailureWithoutFallback()
+
+        XCTAssertTrue(results.contains(.failed(
+            announcementID: plan.id,
+            reason: .playbackFailed
+        )))
+        XCTAssertFalse(results.contains(.completed(announcementID: plan.id)))
+    }
+
+    func testMustNotResumeInterruptionCancelsAcrossOverlappingPauseSources() {
+        let coordinator = makeCoordinator(
+            factClient: StubFactClient(result: nil),
+            speechOutput: RecordingCoordinatorSpeechOutput(),
+            audioSession: RecordingCoordinatorAudioSession(),
+            diagnostics: RecordingDiagnosticsSink()
+        )
+        let plan = AnnouncementPlan(text: "Welcome to Wales", boundary: .nation)
+        coordinator.speak(
+            plan,
+            selectedProvider: .apple,
+            aiSharingAllowed: true,
+            appleVoice: nil,
+            allowAppleFallback: false,
+            audioPolicy: .mix
+        )
+        _ = coordinator.externalAudioBegan(.primaryAudio)
+        _ = coordinator.externalAudioBegan(.interruption)
+
+        let interruptionEnd = coordinator.externalAudioEnded(
+            .interruption,
+            shouldResume: false
+        )
+        let primaryAudioEnd = coordinator.externalAudioEnded(
+            .primaryAudio,
+            shouldResume: true
+        )
+
+        XCTAssertEqual(
+            interruptionEnd.result,
+            .cancelled(announcementID: plan.id, reason: .interruptionMustNotResume)
+        )
+        XCTAssertNil(primaryAudioEnd.plan)
+        XCTAssertNil(coordinator.interruptedPlan)
+    }
+
+    func testDeferredReasonPrefersInterruptionWhenPauseSourcesOverlap() {
+        let coordinator = makeCoordinator(
+            factClient: StubFactClient(result: nil),
+            speechOutput: RecordingCoordinatorSpeechOutput(),
+            audioSession: RecordingCoordinatorAudioSession(),
+            diagnostics: RecordingDiagnosticsSink()
+        )
+        _ = coordinator.externalAudioBegan(.primaryAudio)
+        _ = coordinator.externalAudioBegan(.interruption)
+        let plan = AnnouncementPlan(text: "Stroud", boundary: .town)
+
+        XCTAssertEqual(
+            coordinator.deferIfPaused(plan),
+            .deferred(announcementID: plan.id, reason: .interruptionBegan)
+        )
+    }
+
+    func testRepeatedAudioReleaseFailureUsesNeutralisation() {
+        let retryScheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let audioSession = RecordingCoordinatorAudioSession()
+        audioSession.deactivationFailuresRemaining = 3
+        let diagnostics = RecordingDiagnosticsSink()
+        let coordinator = makeCoordinator(
+            audioReleaseScheduler: retryScheduler,
+            factClient: StubFactClient(result: nil),
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: diagnostics
+        )
+        let plan = AnnouncementPlan(text: "Stroud", boundary: .town)
+        coordinator.speak(
+            plan,
+            selectedProvider: .apple,
+            aiSharingAllowed: true,
+            appleVoice: nil,
+            allowAppleFallback: false,
+            audioPolicy: .interrupt
+        )
+        XCTAssertTrue(speechOutput.beginPlayback(provider: .apple))
+        speechOutput.finish()
+        retryScheduler.fire()
+        retryScheduler.fire()
+
+        XCTAssertEqual(audioSession.neutralizeCount, 1)
+        XCTAssertTrue(diagnostics.signals.contains { $0.event == .audioSessionNeutralized })
+    }
+
+    func testFactCancellationDiagnosticsRemainTerminalOnly() {
+        let diagnostics = RecordingDiagnosticsSink()
+        let coordinator = makeCoordinator(diagnostics: diagnostics)
+        let plan = AnnouncementPlan(text: "Stroud", boundary: .town)
+
+        _ = coordinator.beginFact(for: plan)
+        _ = coordinator.cancelAll(reason: .supersededByNewerContext)
+        XCTAssertFalse(diagnostics.signals.contains { $0.event == .announcementCancelled })
+
+        _ = coordinator.beginFact(for: plan)
+        _ = coordinator.cancelAll(reason: .inactivityPrompted)
+        XCTAssertFalse(diagnostics.signals.contains { $0.event == .announcementCancelled })
+
+        _ = coordinator.beginFact(for: plan)
+        _ = coordinator.cancelAll(reason: .rideEnded)
+        XCTAssertTrue(diagnostics.signals.contains {
+            $0.event == .announcementCancelled
+                && $0.announcementID == plan.id
+                && $0.reason == .rideEnded
+        })
+    }
+
+    func testPendingCancellationDiagnosticsRemainTerminalOnly() {
+        let diagnostics = RecordingDiagnosticsSink()
+        let coordinator = makeCoordinator(diagnostics: diagnostics)
+
+        let superseded = coordinator.enqueue(text: "Stroud", boundary: .town)
+        _ = coordinator.cancelAll(reason: .supersededByNewerContext)
+        XCTAssertFalse(diagnostics.signals.contains {
+            $0.event == .announcementCancelled && $0.announcementID == superseded.id
+        })
+
+        let inactive = coordinator.enqueue(text: "Gloucestershire", boundary: .county)
+        _ = coordinator.cancelAll(reason: .inactivityPrompted)
+        XCTAssertFalse(diagnostics.signals.contains {
+            $0.event == .announcementCancelled && $0.announcementID == inactive.id
+        })
+
+        let ended = coordinator.enqueue(text: "Wales", boundary: .nation)
+        _ = coordinator.cancelAll(reason: .rideEnded)
+        XCTAssertTrue(diagnostics.signals.contains {
+            $0.event == .announcementCancelled
+                && $0.announcementID == ended.id
+                && $0.reason == .rideEnded
+        })
+    }
+}
+
+@MainActor
+private final class RecordingAnnouncementScheduler: AnnouncementScheduling {
+    private var action: (@MainActor () -> Void)?
+    private(set) var didCancel = false
+
+    func schedule(after delay: TimeInterval, _ action: @escaping @MainActor () -> Void) {
+        self.action = action
+        didCancel = false
+    }
+
+    func cancel() {
+        action = nil
+        didCancel = true
+    }
+
+    func fire() { action?() }
+}
+
+private final class StubFactClient: FactClient {
+    private let result: String?
+    private(set) var requests: [PlaceFactRequest] = []
+
+    init(result: String?) {
+        self.result = result
+    }
+
+    func fact(for request: PlaceFactRequest) async throws -> String {
+        requests.append(request)
+        if let result { return result }
+        throw PlaceFactError.invalidResponse
+    }
+}
+
+@MainActor
+private final class RecordingDiagnosticsSink: DiagnosticsSink {
+    private(set) var signals: [AnnouncementDiagnosticSignal] = []
+    func record(_ signal: AnnouncementDiagnosticSignal) { signals.append(signal) }
+}
+
+@MainActor
+private final class RecordingCoordinatorAudioSession: AudioSessionManaging {
+    var shouldYieldToPrimaryAudio = false
+    var snapshot = AudioSessionSnapshot(
+        outputVolume: 1,
+        outputRouteTypes: [],
+        isOtherAudioPlaying: false,
+        shouldYieldToPrimaryAudio: false
+    )
+    private(set) var activatedPolicies: [AudioCoexistencePolicy] = []
+    private(set) var deactivateCount = 0
+    var deactivationFailuresRemaining = 0
+    private(set) var neutralizeCount = 0
+
+    func activate(policy: AudioCoexistencePolicy) throws { activatedPolicies.append(policy) }
+    func deactivate() throws {
+        deactivateCount += 1
+        if deactivationFailuresRemaining > 0 {
+            deactivationFailuresRemaining -= 1
+            throw CoordinatorTestError.deactivationFailed
+        }
+    }
+    func neutralizeAfterDeactivationFailure() -> Bool {
+        neutralizeCount += 1
+        return true
+    }
+}
+
+@MainActor
+private final class RecordingCoordinatorSpeechOutput: SpeechOutput {
+    struct Request {
+        let announcementID: UUID
+        let provider: SpeechProvider
+    }
+
+    var isSpeaking = false
+    var isPlayingAudio = false
+    var onPlaybackWillStart: ((SpeechProvider) -> Bool)?
+    var onFinish: (() -> Void)?
+    var onCancel: (() -> Void)?
+    var onDiagnosticNote: ((String) -> Void)?
+    var onPipelineEvent: ((SpeechOutputPipelineEvent) -> Void)?
+    private(set) var requests: [Request] = []
+    private(set) var stopCount = 0
+
+    func speak(
+        text: String,
+        boundary: BoundaryType?,
+        provider: SpeechProvider,
+        appleVoice: SpeechVoiceSelection?,
+        allowAppleFallback: Bool,
+        announcementID: UUID
+    ) {
+        requests.append(Request(announcementID: announcementID, provider: provider))
+        isSpeaking = true
+    }
+
+    func cancelPendingPreparation() { stop() }
+
+    func stop() {
+        stopCount += 1
+        let wasSpeaking = isSpeaking
+        isSpeaking = false
+        isPlayingAudio = false
+        if wasSpeaking { onCancel?() }
+    }
+
+    func beginPlayback(provider: SpeechProvider) -> Bool {
+        let started = onPlaybackWillStart?(provider) ?? true
+        isPlayingAudio = started
+        return started
+    }
+
+    func finish() {
+        isSpeaking = false
+        isPlayingAudio = false
+        onFinish?()
+    }
+
+    func emitPipeline(
+        announcementID: UUID,
+        provider: SpeechProvider,
+        stage: SpeechOutputPipelineStage
+    ) {
+        onPipelineEvent?(SpeechOutputPipelineEvent(
+            announcementID: announcementID,
+            provider: provider,
+            stage: stage
+        ))
+    }
+
+    func emitFallbackWithDiagnostic(announcementID: UUID) {
+        emitPipeline(
+            announcementID: announcementID,
+            provider: .proxyElevenLabs,
+            stage: .fallbackStarted
+        )
+        onDiagnosticNote?("Premium voice failed. Apple fallback used.")
+    }
+
+    func emitFailureWithoutFallback() {
+        onDiagnosticNote?("Premium voice failed. Apple fallback disabled.")
+        finish()
+    }
+}
+
+private enum CoordinatorTestError: Error {
+    case deactivationFailed
 }

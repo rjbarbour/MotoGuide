@@ -22,11 +22,22 @@ struct RideHorizonApp: App {
         let firstRunState = FirstRunState()
         let aiSharingConsent = AISharingConsentStore()
         let locationAdapter = CoreLocationAdapter()
+        let factClient = CachedPlaceFactGenerator(generator: ProxyFactGenerator())
+        let speechOutput = DefaultSpeechOutputEngine()
+        let audioSession = SystemAudioSessionManager()
+        let announcementDiagnostics = AnnouncementDiagnosticsRelay()
+        let announcementCoordinator = AnnouncementCoordinator(
+            scheduler: DispatchAnnouncementScheduler(),
+            audioReleaseScheduler: DispatchAnnouncementScheduler(),
+            factClient: factClient,
+            speechOutput: speechOutput,
+            audioSession: audioSession,
+            diagnostics: announcementDiagnostics
+        )
         let locationManager = LocationManager(
-            factGenerator: CachedPlaceFactGenerator(generator: ProxyFactGenerator()),
-            speechOutput: DefaultSpeechOutputEngine(),
+            announcementCoordinator: announcementCoordinator,
             inactivityNotifier: UserNotificationRideInactivityNotifier(),
-            audioSession: SystemAudioSessionManager(),
+            audioSession: audioSession,
             diagnostics: rideDiagnostics,
             rideSettingsStore: UserDefaultsRideSettingsStore(),
             locationSource: locationAdapter,
@@ -34,6 +45,9 @@ struct RideHorizonApp: App {
             rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
             aiSharingAllowed: { aiSharingConsent.isGranted }
         )
+        announcementDiagnostics.connect { [weak locationManager] signal in
+            locationManager?.recordAnnouncementDiagnostic(signal)
+        }
 
         _locationManager = StateObject(wrappedValue: locationManager)
         _rideDiagnostics = StateObject(wrappedValue: rideDiagnostics)
