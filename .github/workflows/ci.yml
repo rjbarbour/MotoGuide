@@ -14,8 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  select-tests:
+    name: Select relevant tests
+    runs-on: ubuntu-latest
+    outputs:
+      ios: ${{ steps.selection.outputs.ios }}
+      proxy: ${{ steps.selection.outputs.proxy }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Select changed test suites
+        id: selection
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            ./tools/test-changed --base "$BASE_SHA" --head "$HEAD_SHA" --dry-run --github-output
+          else
+            ./tools/test-changed --all --dry-run --github-output
+          fi
+
   ios-tests:
     name: iOS unit tests
+    needs: select-tests
+    if: needs.select-tests.outputs.ios == 'true'
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -27,6 +53,8 @@ jobs:
 
   proxy-tests:
     name: Fact proxy tests
+    needs: select-tests
+    if: needs.select-tests.outputs.proxy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -45,3 +73,22 @@ jobs:
 
       - name: Run fact proxy tests
         run: ./gradlew test --no-daemon
+
+  pr-validation:
+    name: PR validation
+    needs:
+      - select-tests
+      - ios-tests
+      - proxy-tests
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm required test results
+        env:
+          SELECTION_RESULT: ${{ needs.select-tests.result }}
+          IOS_RESULT: ${{ needs.ios-tests.result }}
+          PROXY_RESULT: ${{ needs.proxy-tests.result }}
+        run: |
+          test "$SELECTION_RESULT" = success
+          test "$IOS_RESULT" = success || test "$IOS_RESULT" = skipped
+          test "$PROXY_RESULT" = success || test "$PROXY_RESULT" = skipped
