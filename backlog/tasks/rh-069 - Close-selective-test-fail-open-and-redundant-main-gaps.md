@@ -5,6 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 13:47'
+updated_date: '2026-08-18 13:49'
 labels:
   - ci
   - local-dev
@@ -41,3 +42,9 @@ Make the merged selective-test framework fail closed locally and stop documentat
 3. Gate fact-proxy deployment with the same classifier.
 4. Verify classification only; do not run product test suites.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Verification on 2026-08-18: shell syntax and diff checks passed; an invalid base exited non-zero; a temporary untracked Swift file selected iOS only; documentation selected neither suite; proxy source selected proxy only. No iOS, Gradle, build, deploy or TestFlight command was run.
+<!-- SECTION:NOTES:END -->
