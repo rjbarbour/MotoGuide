@@ -11,6 +11,8 @@
 		A18D26072026071800000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A18D26072026071800000001 /* PrivacyInfo.xcprivacy */; };
 		B26080210000000000000002 /* RideSessionLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26080210000000000000001 /* RideSessionLifecycle.swift */; };
 		B26080210000000000000004 /* RideSessionLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26080210000000000000003 /* RideSessionLifecycleTests.swift */; };
+		B26080220000000000000004 /* RideSessionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26080220000000000000003 /* RideSessionControllerTests.swift */; };
+		B26080230000000000000004 /* CoreLocationAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26080230000000000000003 /* CoreLocationAdapterTests.swift */; };
 		B26080210000000000000006 /* RideDiagnosticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26080210000000000000005 /* RideDiagnosticsStore.swift */; };
 		C30803010000000000000002 /* PremiumSpeechProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30803010000000000000001 /* PremiumSpeechProcessor.swift */; };
 		C30803010000000000000004 /* SpeechCalibrationLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30803010000000000000003 /* SpeechCalibrationLab.swift */; };
@@ -72,6 +74,8 @@
 		A18D26072026071800000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B26080210000000000000001 /* RideSessionLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSessionLifecycle.swift; sourceTree = "<group>"; };
 		B26080210000000000000003 /* RideSessionLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSessionLifecycleTests.swift; sourceTree = "<group>"; };
+		B26080220000000000000003 /* RideSessionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSessionControllerTests.swift; sourceTree = "<group>"; };
+		B26080230000000000000003 /* CoreLocationAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreLocationAdapterTests.swift; sourceTree = "<group>"; };
 		B26080210000000000000005 /* RideDiagnosticsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideDiagnosticsStore.swift; sourceTree = "<group>"; };
 		C30803010000000000000001 /* PremiumSpeechProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumSpeechProcessor.swift; sourceTree = "<group>"; };
 		C30803010000000000000003 /* SpeechCalibrationLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechCalibrationLab.swift; sourceTree = "<group>"; };
@@ -220,6 +224,8 @@
 			children = (
 				E13E87B72C3EE36400308669 /* RideHorizonTests.swift */,
 				B26080210000000000000003 /* RideSessionLifecycleTests.swift */,
+				B26080220000000000000003 /* RideSessionControllerTests.swift */,
+				B26080230000000000000003 /* CoreLocationAdapterTests.swift */,
 				E13E87D22C3F167800308669 /* LocationManagerTests.swift */,
 				E13E87DD2C3F200300308669 /* AddressTests.swift */,
 				E13E87DE2C3F200400308669 /* AnnouncementDecisionTests.swift */,
@@ -406,6 +412,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				B26080210000000000000004 /* RideSessionLifecycleTests.swift in Sources */,
+				B26080220000000000000004 /* RideSessionControllerTests.swift in Sources */,
+				B26080230000000000000004 /* CoreLocationAdapterTests.swift in Sources */,
 				E13E87D32C3F167800308669 /* LocationManagerTests.swift in Sources */,
 				E13E87D72C3F200300308669 /* AddressTests.swift in Sources */,
 				E13E87D82C3F200400308669 /* AnnouncementDecisionTests.swift in Sources */,

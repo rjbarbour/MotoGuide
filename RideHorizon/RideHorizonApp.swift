@@ -21,6 +21,7 @@ struct RideHorizonApp: App {
         let rideDiagnostics = RideDiagnosticsStore.shared
         let firstRunState = FirstRunState()
         let aiSharingConsent = AISharingConsentStore()
+        let locationAdapter = CoreLocationAdapter()
         let locationManager = LocationManager(
             factGenerator: CachedPlaceFactGenerator(generator: ProxyFactGenerator()),
             speechOutput: DefaultSpeechOutputEngine(),
@@ -28,6 +29,9 @@ struct RideHorizonApp: App {
             audioSession: SystemAudioSessionManager(),
             diagnostics: rideDiagnostics,
             rideSettingsStore: UserDefaultsRideSettingsStore(),
+            locationSource: locationAdapter,
+            placeResolver: locationAdapter,
+            rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
             aiSharingAllowed: { aiSharingConsent.isGranted }
         )
 
