@@ -1,4 +1,3 @@
-import CoreLocation
 import XCTest
 @testable import RideHorizon
 
@@ -60,15 +59,11 @@ final class RideSessionLifecycleTests: XCTestCase {
         let startedAt = Date(timeIntervalSince1970: 1_000)
         var lifecycle = RideSessionLifecycle()
         lifecycle.start(at: startedAt)
-        lifecycle.observe(
-            location(latitude: 51, longitude: 0, accuracy: 5, timestamp: startedAt),
-            at: startedAt
-        )
+        lifecycle.observe(location(latitude: 51, longitude: 0, accuracy: 5, recordedAt: startedAt))
 
         let movementTime = startedAt.addingTimeInterval(599)
         let transition = lifecycle.observe(
-            location(latitude: 51.0007, longitude: 0, accuracy: 5, timestamp: movementTime),
-            at: movementTime
+            location(latitude: 51.0007, longitude: 0, accuracy: 5, recordedAt: movementTime)
         )
 
         XCTAssertEqual(transition, .none)
@@ -123,19 +118,20 @@ final class RideSessionLifecycleTests: XCTestCase {
         let startedAt = Date(timeIntervalSince1970: 1_000)
         var lifecycle = RideSessionLifecycle()
         lifecycle.start(at: startedAt)
-        lifecycle.observe(
-            location(latitude: 51, longitude: 0, accuracy: 5, timestamp: startedAt),
-            at: startedAt
-        )
+        lifecycle.observe(location(latitude: 51, longitude: 0, accuracy: 5, recordedAt: startedAt))
 
         let nearDeadline = startedAt.addingTimeInterval(599)
         lifecycle.observe(
-            location(latitude: 52, longitude: 0, accuracy: 31, timestamp: nearDeadline),
-            at: nearDeadline
+            location(latitude: 52, longitude: 0, accuracy: 31, recordedAt: nearDeadline)
         )
         lifecycle.observe(
-            location(latitude: 52, longitude: 0, accuracy: 5, timestamp: startedAt),
-            at: nearDeadline
+            location(
+                latitude: 52,
+                longitude: 0,
+                accuracy: 5,
+                recordedAt: startedAt,
+                acceptedAt: nearDeadline
+            )
         )
 
         XCTAssertEqual(
@@ -148,16 +144,12 @@ final class RideSessionLifecycleTests: XCTestCase {
         let startedAt = Date(timeIntervalSince1970: 1_000)
         var lifecycle = RideSessionLifecycle()
         lifecycle.start(at: startedAt)
-        lifecycle.observe(
-            location(latitude: 51, longitude: 0, accuracy: 5, timestamp: startedAt),
-            at: startedAt
-        )
+        lifecycle.observe(location(latitude: 51, longitude: 0, accuracy: 5, recordedAt: startedAt))
         _ = lifecycle.advanceTime(to: startedAt.addingTimeInterval(600))
 
         let resumedAt = startedAt.addingTimeInterval(660)
         let transition = lifecycle.observe(
-            location(latitude: 51.0007, longitude: 0, accuracy: 5, timestamp: resumedAt),
-            at: resumedAt
+            location(latitude: 51.0007, longitude: 0, accuracy: 5, recordedAt: resumedAt)
         )
 
         XCTAssertEqual(transition, .movementResumed)
@@ -165,19 +157,18 @@ final class RideSessionLifecycleTests: XCTestCase {
     }
 
     private func location(
-        latitude: CLLocationDegrees,
-        longitude: CLLocationDegrees,
-        accuracy: CLLocationAccuracy,
-        timestamp: Date
-    ) -> CLLocation {
-        CLLocation(
-            coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
-            altitude: 0,
+        latitude: Double,
+        longitude: Double,
+        accuracy: Double,
+        recordedAt: Date,
+        acceptedAt: Date? = nil
+    ) -> AcceptedRideLocation {
+        AcceptedRideLocation(
+            latitude: latitude,
+            longitude: longitude,
             horizontalAccuracy: accuracy,
-            verticalAccuracy: 5,
-            course: 0,
-            speed: 0,
-            timestamp: timestamp
+            recordedAt: recordedAt,
+            acceptedAt: acceptedAt ?? recordedAt
         )
     }
 }

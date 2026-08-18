@@ -753,12 +753,94 @@ private enum ObservedAudioPauseSource: Hashable {
     case primaryAudio
 }
 
+enum PlaceResolutionResult {
+    case resolved(Address)
+    case failed
+    case unavailable
+}
+
 @MainActor
-class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerDelegate {
+protocol LocationSource: AnyObject {
+    var authorizationStatus: CLAuthorizationStatus { get }
+    var onLocations: (([CLLocation]) -> Void)? { get set }
+    var onFailure: ((Error) -> Void)? { get set }
+    var onAuthorizationChange: (() -> Void)? { get set }
+    func requestLocation()
+    func requestAlwaysAuthorization()
+    func start(backgroundUpdates: Bool)
+    func stop()
+}
+
+@MainActor
+protocol PlaceResolver: AnyObject {
+    func resolve(_ location: CLLocation, completion: @escaping (PlaceResolutionResult) -> Void)
+    func cancel()
+}
+
+@MainActor
+final class CoreLocationAdapter: NSObject, LocationSource, PlaceResolver, CLLocationManagerDelegate {
+    private let manager: CLLocationManager
+    private let geocoder: CLGeocoder
+    var onLocations: (([CLLocation]) -> Void)?
+    var onFailure: ((Error) -> Void)?
+    var onAuthorizationChange: (() -> Void)?
+
+    init(manager: CLLocationManager = CLLocationManager(), geocoder: CLGeocoder = CLGeocoder()) {
+        self.manager = manager
+        self.geocoder = geocoder
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyBest
+        manager.pausesLocationUpdatesAutomatically = false
+    }
+
+    var authorizationStatus: CLAuthorizationStatus { manager.authorizationStatus }
+    func requestLocation() { manager.requestLocation() }
+    func requestAlwaysAuthorization() { manager.requestAlwaysAuthorization() }
+
+    func start(backgroundUpdates: Bool) {
+        manager.allowsBackgroundLocationUpdates = backgroundUpdates
+        manager.startUpdatingLocation()
+    }
+
+    func stop() {
+        manager.stopUpdatingLocation()
+        manager.allowsBackgroundLocationUpdates = false
+    }
+
+    func resolve(_ location: CLLocation, completion: @escaping (PlaceResolutionResult) -> Void) {
+        geocoder.reverseGeocodeLocation(location) { placemarks, error in
+            if error != nil {
+                completion(.failed)
+            } else if let placemark = placemarks?.first {
+                completion(.resolved(Address(placemark: placemark)))
+            } else {
+                completion(.unavailable)
+            }
+        }
+    }
+
+    func cancel() { geocoder.cancelGeocode() }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) { onLocations?(locations) }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) { onFailure?(error) }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { onAuthorizationChange?() }
+}
+
+struct CoreLocationRideDistanceMeasurer: RideDistanceMeasuring {
+    func distance(from: AcceptedRideLocation, to: AcceptedRideLocation) -> Double {
+        CLLocation(latitude: from.latitude, longitude: from.longitude).distance(
+            from: CLLocation(latitude: to.latitude, longitude: to.longitude)
+        )
+    }
+}
+
+@MainActor
+class LocationManager: NSObject, ObservableObject {
     static let movingMapInteractionThresholdMetersPerSecond = 8.0 / 3.6
 
-    private let locationManager = CLLocationManager()
-    private let geocoder = CLGeocoder()
+    private let locationSource: LocationSource
+    private let placeResolver: PlaceResolver
+    private let rideDistanceMeasurer: RideDistanceMeasuring
     private let speechOutput: SpeechOutputEngine
     private let audioSession: AudioSessionManaging
     private let diagnostics: RideDiagnosticsStore
@@ -782,12 +864,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private var inFlightFactBoundary: BoundaryType?
     private var inFlightFactAnnouncementID: UUID?
     private var activeAnnouncementToken = UUID()
-    private var wantsRideTracking = false
+    private var wantsRideTracking: Bool { rideSessionController.wantsLocationInput }
     private var hasSeededTestRoute = false
-    private var rideSessionLifecycle = RideSessionLifecycle()
-    private var inactivityTimer: DispatchSourceTimer?
+    private let rideSessionController: RideSessionController
     private var rideStartedAt: Date?
-    private var rideSessionGeneration = UUID()
     private var geocodeRequestGeneration = UUID()
     private var activePlaceLookupID: UUID?
     private var hasAppliedDebugTestModeCampaignDefaults = false
@@ -832,8 +912,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             persistRideSettings(.testMode)
             if testMode {
                 applyDebugTestModeCampaignDefaults()
-                locationManager.stopUpdatingLocation()
-                locationManager.allowsBackgroundLocationUpdates = false
+                locationSource.stop()
                 isTracking = false
                 if rideSessionState.isActive {
                     startTestRouteIfNeeded()
@@ -913,6 +992,10 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         audioSession: AudioSessionManaging? = nil,
         diagnostics: RideDiagnosticsStore? = nil,
         rideSettingsStore: RideSettingsStore? = nil,
+        rideSessionController: RideSessionController? = nil,
+        locationSource: LocationSource,
+        placeResolver: PlaceResolver,
+        rideDistanceMeasurer: RideDistanceMeasuring,
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let resolvedSettingsStore = rideSettingsStore ?? UserDefaultsRideSettingsStore()
@@ -933,11 +1016,15 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         self.familiarRegions = settings.familiarRegions
         self.customFactInstructions = settings.customFactInstructions
         self.factInterestCategories = settings.factInterestCategories
+        self.locationSource = locationSource
+        self.placeResolver = placeResolver
+        self.rideDistanceMeasurer = rideDistanceMeasurer
         self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
         self.speechOutput = speechOutput ?? DefaultSpeechOutputEngine()
         self.inactivityNotifier = inactivityNotifier ?? UserNotificationRideInactivityNotifier()
         self.audioSession = audioSession ?? SystemAudioSessionManager()
         self.diagnostics = diagnostics ?? .shared
+        self.rideSessionController = rideSessionController ?? RideSessionController()
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
         if testMode {
@@ -1022,9 +1109,9 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             )
         }
 #endif
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.pausesLocationUpdatesAutomatically = false
+        self.locationSource.onLocations = { [weak self] locations in self?.handleLocations(locations) }
+        self.locationSource.onFailure = { [weak self] error in self?.handleLocationFailure(error) }
+        self.locationSource.onAuthorizationChange = { [weak self] in self?.startRideTrackingIfAuthorized() }
 
         NotificationCenter.default.addObserver(
             self,
@@ -1063,6 +1150,34 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 #endif
     }
 
+#if DEBUG
+    convenience init(
+        factGenerator: PlaceFactGenerating? = nil,
+        speechOutput: SpeechOutputEngine? = nil,
+        inactivityNotifier: RideInactivityNotifying? = nil,
+        audioSession: AudioSessionManaging? = nil,
+        diagnostics: RideDiagnosticsStore? = nil,
+        rideSettingsStore: RideSettingsStore? = nil,
+        rideSessionController: RideSessionController? = nil,
+        aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
+    ) {
+        let locationAdapter = CoreLocationAdapter()
+        self.init(
+            factGenerator: factGenerator,
+            speechOutput: speechOutput,
+            inactivityNotifier: inactivityNotifier,
+            audioSession: audioSession,
+            diagnostics: diagnostics,
+            rideSettingsStore: rideSettingsStore,
+            rideSessionController: rideSessionController,
+            locationSource: locationAdapter,
+            placeResolver: locationAdapter,
+            rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
+            aiSharingAllowed: aiSharingAllowed
+        )
+    }
+#endif
+
     private static func makeDefaultFactGenerator() -> PlaceFactGenerating {
         CachedPlaceFactGenerator(generator: ProxyFactGenerator())
     }
@@ -1095,7 +1210,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     func requestLocation() {
-        locationManager.requestLocation()
+        locationSource.requestLocation()
     }
 
     /// Starts a rider-controlled session. Continuous and background work must remain inside this boundary.
@@ -1106,21 +1221,27 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private func startRide(at date: Date, startsLocationInput: Bool) {
         guard rideSessionState == .idle else { return }
 #if DEBUG
-        rideSessionLifecycle = shortInactivityTimeout
-            ? RideSessionLifecycle(inactivityInterval: 30, confirmationGracePeriod: 30)
-            : RideSessionLifecycle()
+        let lifecycle = shortInactivityTimeout
+            ? RideSessionLifecycle(
+                inactivityInterval: 30,
+                confirmationGracePeriod: 30,
+                distanceMeasurer: rideDistanceMeasurer
+            )
+            : RideSessionLifecycle(distanceMeasurer: rideDistanceMeasurer)
 #else
-        rideSessionLifecycle = RideSessionLifecycle()
+        let lifecycle = RideSessionLifecycle(distanceMeasurer: rideDistanceMeasurer)
 #endif
-        rideSessionGeneration = UUID()
-        activeRideSessionID = UUID()
-        rideSessionLifecycle.start(at: date)
-        rideStartedAt = date
-        rideSessionState = rideSessionLifecycle.state
-        wantsRideTracking = true
+        guard let start = rideSessionController.start(
+            at: date,
+            wantsLocationInput: true,
+            lifecycle: lifecycle,
+            onScheduledEvaluation: { [weak self] transition in self?.handleRideSessionTransition(transition) }
+        ) else { return }
+        activeRideSessionID = start.sessionID
+        rideStartedAt = start.startedAt
+        rideSessionState = rideSessionController.state
         locationStatus = .checking
         inactivityNotifier.requestAuthorizationIfNeeded()
-        startInactivityTimer()
         if startsLocationInput {
             startTestRouteIfNeeded()
             startRideTrackingIfAuthorized()
@@ -1139,11 +1260,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
 
     func continueRide(at date: Date = Date()) {
         guard case .awaitingConfirmation = rideSessionState else { return }
-        guard rideSessionLifecycle.continueRide(at: date) else {
+        guard rideSessionController.continueRide(at: date) else {
             finishRideSession()
             return
         }
-        rideSessionState = rideSessionLifecycle.state
+        rideSessionState = rideSessionController.state
         inactivityNotifier.cancelInactivityPrompt()
         recordDiagnostic(.rideContinued, at: date)
         AppDiagnostics.log("Ride continued after inactivity prompt.")
@@ -1154,48 +1275,60 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     private func finishRideSession() {
-        let wasActive = wantsRideTracking || rideSessionState.isActive
-        rideSessionGeneration = UUID()
-        rideSessionLifecycle.end()
-        rideSessionState = rideSessionLifecycle.state
-        wantsRideTracking = false
-        locationManager.stopUpdatingLocation()
-        locationManager.allowsBackgroundLocationUpdates = false
+        let end = rideSessionController.end()
+        rideSessionState = rideSessionController.state
+        cancelRideWork(for: end.cancellationIntent)
+    }
+
+    private func cancelRideWork(for intent: RideSessionCancellationIntent) {
+        let reason: RideDiagnosticReason
+        switch intent {
+        case .inactivityPrompted:
+            reason = .inactivityPrompted
+        case .rideEnded:
+            reason = .rideEnded
+        }
+
+        if case .rideEnded = intent {
+            if let announcementID = inFlightFactAnnouncementID {
+                recordDiagnostic(
+                    .announcementCancelled,
+                    announcementID: announcementID,
+                    reason: .rideEnded
+                )
+            }
+            if let announcementID = interruptedSpeechPlan?.id {
+                recordDiagnostic(
+                    .announcementCancelled,
+                    announcementID: announcementID,
+                    reason: .rideEnded
+                )
+            }
+        }
+
+        cancelActivePlaceLookup(reason: reason)
+        geocodeRequestGeneration = UUID()
+        placeResolver.cancel()
+        inFlightFactTask?.cancel()
+        inFlightFactTask = nil
+        inFlightFactBoundary = nil
+        inFlightFactAnnouncementID = nil
+        activeAnnouncementToken = UUID()
+        cancelPendingAnnouncement(reason: reason)
+        stopSpeechOutput()
+
+        guard case .rideEnded(let wasActive) = intent else { return }
+        locationSource.stop()
         isTracking = false
         locationStatus = .idle
         announcementStatus = .idle
         currentSpeedMetersPerSecond = nil
         lastUpdateTime = nil
         lastLocationDiagnosticTime = nil
-        inactivityTimer?.cancel()
-        inactivityTimer = nil
         inactivityNotifier.cancelInactivityPrompt()
 
-        if let announcementID = inFlightFactAnnouncementID {
-            recordDiagnostic(
-                .announcementCancelled,
-                announcementID: announcementID,
-                reason: .rideEnded
-            )
-        }
-        if let announcementID = interruptedSpeechPlan?.id {
-            recordDiagnostic(
-                .announcementCancelled,
-                announcementID: announcementID,
-                reason: .rideEnded
-            )
-        }
-        inFlightFactTask?.cancel()
-        inFlightFactTask = nil
-        inFlightFactBoundary = nil
-        inFlightFactAnnouncementID = nil
-        activeAnnouncementToken = UUID()
         observedAudioPauseSources.removeAll()
         interruptedSpeechPlan = nil
-        cancelPendingAnnouncement(reason: .rideEnded)
-        stopSpeechOutput()
-        cancelActivePlaceLookup(reason: .rideEnded)
-        geocoder.cancelGeocode()
         hasSeededTestRoute = false
         testIndex = 0
         AppDiagnostics.log("Ride session ended and background work stopped.")
@@ -1226,7 +1359,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     func clearLocalPrivacyState() {
         applyAISharingDecision(isGranted: false)
         pauseRideTracking()
-        geocoder.cancelGeocode()
+        placeResolver.cancel()
         onAddressChange = nil
         onRideLog = nil
 
@@ -1257,71 +1390,50 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         guard wantsRideTracking else { return }
 
         if testMode {
-            locationManager.stopUpdatingLocation()
-            locationManager.allowsBackgroundLocationUpdates = false
+            locationSource.stop()
             locationStatus = .active
             isTracking = false
             return
         }
 
-        switch locationManager.authorizationStatus {
+        switch locationSource.authorizationStatus {
         case .notDetermined:
-            locationManager.requestAlwaysAuthorization()
+            locationSource.requestAlwaysAuthorization()
             locationStatus = .waitingForPermission
             isTracking = false
         case .authorizedAlways:
-            locationManager.allowsBackgroundLocationUpdates = true
-            locationManager.startUpdatingLocation()
+            locationSource.start(backgroundUpdates: true)
             locationStatus = .active
             isTracking = true
         case .authorizedWhenInUse:
-            locationManager.requestAlwaysAuthorization()
-            locationManager.allowsBackgroundLocationUpdates = false
-            locationManager.startUpdatingLocation()
+            locationSource.requestAlwaysAuthorization()
+            locationSource.start(backgroundUpdates: false)
             locationStatus = .active
             isTracking = true
         case .denied, .restricted:
-            locationManager.stopUpdatingLocation()
-            locationStatus = locationManager.authorizationStatus == .denied ? .denied : .restricted
+            locationSource.stop()
+            locationStatus = locationSource.authorizationStatus == .denied ? .denied : .restricted
             isTracking = false
         @unknown default:
-            locationManager.stopUpdatingLocation()
+            locationSource.stop()
             locationStatus = .locationUnavailable("Location is unavailable on this device.")
             isTracking = false
         }
     }
 
     func evaluateRideSession(at date: Date = Date()) {
-        handleRideSessionTransition(rideSessionLifecycle.advanceTime(to: date))
+        handleRideSessionTransition(rideSessionController.evaluate(at: date))
     }
 
-    private func startInactivityTimer() {
-        inactivityTimer?.cancel()
-        let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + 15, repeating: 15)
-        timer.setEventHandler { [weak self] in
-            self?.evaluateRideSession()
+    private func handleRideSessionTransition(_ result: RideSessionControllerTransition) {
+        rideSessionState = rideSessionController.state
+        if let cancellationIntent = result.cancellationIntent {
+            cancelRideWork(for: cancellationIntent)
         }
-        inactivityTimer = timer
-        timer.resume()
-    }
-
-    private func handleRideSessionTransition(_ transition: RideSessionTransition) {
-        rideSessionState = rideSessionLifecycle.state
-        switch transition {
+        switch result.transition {
         case .none:
             return
         case .inactivityPrompt(let deadline):
-            cancelActivePlaceLookup(reason: .inactivityPrompted)
-            geocodeRequestGeneration = UUID()
-            geocoder.cancelGeocode()
-            inFlightFactTask?.cancel()
-            inFlightFactTask = nil
-            inFlightFactBoundary = nil
-            inFlightFactAnnouncementID = nil
-            activeAnnouncementToken = UUID()
-            cancelPendingAnnouncement(reason: .inactivityPrompted)
-            stopSpeechOutput()
             inactivityNotifier.showInactivityPrompt(deadline: deadline)
             recordDiagnostic(.rideInactivityPrompted)
             AppDiagnostics.log("Ride paused after the configured inactivity interval without confirmed movement.")
@@ -1330,7 +1442,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             recordDiagnostic(.rideMovementResumed)
             AppDiagnostics.log("Ride resumed after confirmed movement.")
         case .automaticEnd:
-            finishRideSession()
             AppDiagnostics.log("Ride ended after inactivity confirmation expired.")
         }
     }
@@ -2005,17 +2116,25 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         return AnnouncementPhraseBuilder.locationPhrase(in: address, mode: speechMode)
     }
 
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    private func handleLocations(_ locations: [CLLocation]) {
         guard rideSessionState.isActive else { return }
         if testMode { return }
 
         if let location = locations.last {
             let currentTime = Date()
-            let transition = rideSessionLifecycle.observe(location, at: currentTime)
+            let transition = rideSessionController.accept(
+                AcceptedRideLocation(
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude,
+                    horizontalAccuracy: location.horizontalAccuracy,
+                    recordedAt: location.timestamp,
+                    acceptedAt: currentTime
+                )
+            )
             let shouldRecordLocationSample = lastLocationDiagnosticTime.map {
                 currentTime.timeIntervalSince($0) >= 10
             } ?? true
-            if transition != .none || shouldRecordLocationSample {
+            if transition.transition != .none || shouldRecordLocationSample {
                 recordDiagnostic(
                     .locationSampleObserved,
                     at: currentTime,
@@ -2042,7 +2161,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    private func handleLocationFailure(_ error: Error) {
         guard rideSessionState.isActive else { return }
         locationStatus = .locationUnavailable("Location update failed. \(ProductIdentity.displayName) will keep trying.")
         AppDiagnostics.log("Location update failed.")
@@ -2052,16 +2171,26 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         startRideTrackingIfAuthorized()
     }
 
+#if DEBUG
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        handleLocations(locations)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        handleLocationFailure(error)
+    }
+#endif
+
     private func reverseGeocode(location: CLLocation, completion: (@MainActor () -> Void)? = nil) {
-        let rideGeneration = rideSessionGeneration
+        let rideGeneration = rideSessionController.generation
         let requestGeneration = UUID()
         cancelActivePlaceLookup(reason: .supersededByNewerContext)
-        geocoder.cancelGeocode()
+        placeResolver.cancel()
         geocodeRequestGeneration = requestGeneration
         activePlaceLookupID = requestGeneration
         recordDiagnostic(.placeLookupStarted, placeLookupID: requestGeneration)
-        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
-            if error != nil {
+        placeResolver.resolve(location) { [weak self] result in
+            if case .failed = result {
                 Task { @MainActor [weak self] in
                     guard let self,
                           self.canAcceptGeocodeResult(
@@ -2076,7 +2205,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 return
             }
 
-            guard let placemark = placemarks?.first else {
+            guard case .resolved(let address) = result else {
                 Task { @MainActor [weak self] in
                     guard let self,
                           self.canAcceptGeocodeResult(
@@ -2091,7 +2220,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
                 return
             }
 
-            let address = Address(placemark: placemark)
             Task { @MainActor [weak self] in
                 guard let self,
                       self.canAcceptGeocodeResult(
@@ -2123,9 +2251,11 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         rideGeneration: UUID,
         requestGeneration: UUID
     ) -> Bool {
-        rideSessionState == .riding
-            && rideSessionGeneration == rideGeneration
-            && geocodeRequestGeneration == requestGeneration
+        rideSessionController.accepts(
+            rideGeneration: rideGeneration,
+            requestGeneration: requestGeneration,
+            currentRequestGeneration: geocodeRequestGeneration
+        )
     }
 
     private func recordDiagnostic(
@@ -2477,7 +2607,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     }
 
     var rideSessionGenerationForTesting: UUID {
-        rideSessionGeneration
+        rideSessionController.generation
     }
 
     var geocodeRequestGenerationForTesting: UUID {
@@ -2570,7 +2700,15 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             speed: 0,
             timestamp: sampleDate
         )
-        handleRideSessionTransition(rideSessionLifecycle.observe(sampleLocation, at: sampleDate))
+        handleRideSessionTransition(
+            rideSessionController.accept(AcceptedRideLocation(
+                latitude: sampleLocation.coordinate.latitude,
+                longitude: sampleLocation.coordinate.longitude,
+                horizontalAccuracy: sampleLocation.horizontalAccuracy,
+                recordedAt: sampleLocation.timestamp,
+                acceptedAt: sampleDate
+            ))
+        )
         guard rideSessionState == .riding else { return }
 
         lastKnownLocation = waypoint.coordinate

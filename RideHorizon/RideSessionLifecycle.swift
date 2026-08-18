@@ -1,6 +1,83 @@
 import Foundation
-import CoreLocation
 @preconcurrency import UserNotifications
+
+protocol RideClock {
+    var now: Date { get }
+}
+
+struct SystemRideClock: RideClock {
+    var now: Date { Date() }
+}
+
+@MainActor
+protocol RideSessionScheduling: AnyObject {
+    func scheduleRepeating(every interval: TimeInterval, _ action: @escaping @MainActor () -> Void)
+    func cancel()
+}
+
+@MainActor
+final class DispatchRideSessionScheduler: RideSessionScheduling {
+    private var timer: DispatchSourceTimer?
+
+    func scheduleRepeating(every interval: TimeInterval, _ action: @escaping @MainActor () -> Void) {
+        cancel()
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + interval, repeating: interval)
+        timer.setEventHandler(handler: action)
+        self.timer = timer
+        timer.resume()
+    }
+
+    func cancel() {
+        timer?.cancel()
+        timer = nil
+    }
+}
+
+/// Framework-independent location input accepted by the ride use case.
+struct AcceptedRideLocation: Equatable {
+    let latitude: Double
+    let longitude: Double
+    let horizontalAccuracy: Double
+    let recordedAt: Date
+    let acceptedAt: Date
+
+}
+
+protocol RideDistanceMeasuring {
+    func distance(from: AcceptedRideLocation, to: AcceptedRideLocation) -> Double
+}
+
+struct SphericalRideDistanceMeasurer: RideDistanceMeasuring {
+    func distance(from other: AcceptedRideLocation, to location: AcceptedRideLocation) -> Double {
+        let earthRadiusMetres = 6_371_000.0
+        let latitudeDelta = (location.latitude - other.latitude) * .pi / 180
+        let longitudeDelta = (location.longitude - other.longitude) * .pi / 180
+        let firstLatitude = other.latitude * .pi / 180
+        let secondLatitude = location.latitude * .pi / 180
+        let haversine = sin(latitudeDelta / 2) * sin(latitudeDelta / 2)
+            + cos(firstLatitude) * cos(secondLatitude)
+            * sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
+        return earthRadiusMetres * 2 * atan2(sqrt(haversine), sqrt(1 - haversine))
+    }
+}
+
+struct RideSessionStart: Equatable {
+    let sessionID: UUID
+    let generation: UUID
+    let startedAt: Date
+}
+
+struct RideSessionEnd: Equatable {
+    let wasActive: Bool
+    let invalidatedGeneration: UUID
+    let cancellationIntent: RideSessionCancellationIntent
+}
+
+struct RideSessionControllerTransition: Equatable {
+    let transition: RideSessionTransition
+    let cancellationIntent: RideSessionCancellationIntent?
+}
 
 enum RideSessionState: Equatable {
     case idle
@@ -33,16 +110,19 @@ enum RideSessionTransition: Equatable {
 struct RideSessionLifecycle {
     private let inactivityInterval: TimeInterval
     private let confirmationGracePeriod: TimeInterval
+    private let distanceMeasurer: RideDistanceMeasuring
     private(set) var state: RideSessionState = .idle
     private var lastConfirmedMovementAt: Date?
-    private var movementAnchor: CLLocation?
+    private var movementAnchor: AcceptedRideLocation?
 
     init(
         inactivityInterval: TimeInterval = 600,
-        confirmationGracePeriod: TimeInterval = 120
+        confirmationGracePeriod: TimeInterval = 120,
+        distanceMeasurer: RideDistanceMeasuring = SphericalRideDistanceMeasurer()
     ) {
         self.inactivityInterval = inactivityInterval
         self.confirmationGracePeriod = confirmationGracePeriod
+        self.distanceMeasurer = distanceMeasurer
     }
 
     mutating func start(at date: Date) {
@@ -71,7 +151,8 @@ struct RideSessionLifecycle {
     }
 
     @discardableResult
-    mutating func observe(_ location: CLLocation, at date: Date) -> RideSessionTransition {
+    mutating func observe(_ location: AcceptedRideLocation) -> RideSessionTransition {
+        let date = location.acceptedAt
         guard state != .idle else { return .none }
 
         if case .awaitingConfirmation(let deadline) = state, date >= deadline {
@@ -79,7 +160,7 @@ struct RideSessionLifecycle {
             return .automaticEnd
         }
 
-        let age = date.timeIntervalSince(location.timestamp)
+        let age = date.timeIntervalSince(location.recordedAt)
         guard age >= 0,
               age <= 15,
               location.horizontalAccuracy >= 0,
@@ -92,7 +173,7 @@ struct RideSessionLifecycle {
             return advanceTime(to: date)
         }
 
-        let confidenceAdjustedDistance = location.distance(from: movementAnchor)
+        let confidenceAdjustedDistance = distanceMeasurer.distance(from: movementAnchor, to: location)
             - movementAnchor.horizontalAccuracy
             - location.horizontalAccuracy
 
@@ -126,6 +207,116 @@ struct RideSessionLifecycle {
         state = .awaitingConfirmation(deadline: deadline)
         return .inactivityPrompt(deadline: deadline)
     }
+}
+
+/// Owns ride use-case state and sequencing. Platform adapters execute the concrete
+/// Core Location, geocoder, notification and audio cleanup requested by its results.
+@MainActor
+final class RideSessionController {
+    private let clock: RideClock
+    private let scheduler: RideSessionScheduling
+    private var lifecycle: RideSessionLifecycle
+
+    private(set) var sessionID: UUID?
+    private(set) var generation = UUID()
+    private(set) var startedAt: Date?
+    private(set) var wantsLocationInput = false
+
+    var state: RideSessionState { lifecycle.state }
+
+    init(
+        clock: RideClock = SystemRideClock(),
+        scheduler: RideSessionScheduling? = nil,
+        lifecycle: RideSessionLifecycle = RideSessionLifecycle()
+    ) {
+        self.clock = clock
+        self.scheduler = scheduler ?? DispatchRideSessionScheduler()
+        self.lifecycle = lifecycle
+    }
+
+    func start(
+        at date: Date? = nil,
+        wantsLocationInput: Bool,
+        lifecycle replacement: RideSessionLifecycle? = nil,
+        onScheduledEvaluation: @escaping @MainActor (RideSessionControllerTransition) -> Void
+    ) -> RideSessionStart? {
+        guard state == .idle else { return nil }
+        if let replacement { lifecycle = replacement }
+        let startDate = date ?? clock.now
+        generation = UUID()
+        sessionID = UUID()
+        startedAt = startDate
+        self.wantsLocationInput = wantsLocationInput
+        lifecycle.start(at: startDate)
+        scheduler.scheduleRepeating(every: 15) { [weak self] in
+            guard let self else { return }
+            onScheduledEvaluation(self.evaluate())
+        }
+        return RideSessionStart(sessionID: sessionID!, generation: generation, startedAt: startDate)
+    }
+
+    func accept(_ sample: AcceptedRideLocation) -> RideSessionControllerTransition {
+        guard state.isActive else {
+            return RideSessionControllerTransition(transition: .none, cancellationIntent: nil)
+        }
+        return process(lifecycle.observe(sample))
+    }
+
+    func evaluate(at date: Date? = nil) -> RideSessionControllerTransition {
+        process(lifecycle.advanceTime(to: date ?? clock.now))
+    }
+
+    func continueRide(at date: Date? = nil) -> Bool {
+        lifecycle.continueRide(at: date ?? clock.now)
+    }
+
+    func end() -> RideSessionEnd {
+        let wasActive = wantsLocationInput || state.isActive
+        generation = UUID()
+        lifecycle.end()
+        wantsLocationInput = false
+        scheduler.cancel()
+        sessionID = nil
+        startedAt = nil
+        return RideSessionEnd(
+            wasActive: wasActive,
+            invalidatedGeneration: generation,
+            cancellationIntent: .rideEnded(wasActive: wasActive)
+        )
+    }
+
+    func accepts(rideGeneration: UUID, requestGeneration: UUID, currentRequestGeneration: UUID) -> Bool {
+        state == .riding
+            && generation == rideGeneration
+            && currentRequestGeneration == requestGeneration
+    }
+
+    private func process(_ transition: RideSessionTransition) -> RideSessionControllerTransition {
+        let cancellationIntent: RideSessionCancellationIntent?
+        switch transition {
+        case .inactivityPrompt:
+            cancellationIntent = .inactivityPrompted
+        case .automaticEnd:
+            let wasActive = wantsLocationInput || state.isActive
+            generation = UUID()
+            wantsLocationInput = false
+            scheduler.cancel()
+            sessionID = nil
+            startedAt = nil
+            cancellationIntent = .rideEnded(wasActive: wasActive)
+        case .none, .movementResumed:
+            cancellationIntent = nil
+        }
+        return RideSessionControllerTransition(
+            transition: transition,
+            cancellationIntent: cancellationIntent
+        )
+    }
+}
+
+enum RideSessionCancellationIntent: Equatable {
+    case inactivityPrompted
+    case rideEnded(wasActive: Bool)
 }
 
 @MainActor
