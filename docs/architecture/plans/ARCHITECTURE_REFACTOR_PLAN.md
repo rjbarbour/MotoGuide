@@ -225,8 +225,6 @@ Gate: complete concurrency checking is clean; no unchecked sendability is added 
 
 Use Codex Spark for surgical checkpoint commits after the interface is settled. Use a higher-capability model for interface placement and orchestration ownership. More parallel workers do not justify overlapping edits or extra builds.
 
-Do not use a standard `[skip ci]` token. Before code batches begin, integrate `RH-071 — Architecture CI suppression`, which must suppress only duplicate GitHub iOS execution under an explicit local-evidence marker while preserving proxy and lightweight validation.
-
 ## High-priority verification budget
 
 The default budget is three complete iOS suites, two unsigned Release builds, one proxy suite and one physical iPhone build/install. An activated risk exception may add a targeted run and must record why:

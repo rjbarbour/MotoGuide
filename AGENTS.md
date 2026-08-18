@@ -248,7 +248,6 @@ For the High-priority architecture programme, `RH-013.02 — Baseline capture` o
 - Run the proxy suite only at the baseline unless proxy or shared-contract files change.
 - Build, install and launch on the physical iPhone once at the final High architecture gate, unless an earlier change demonstrably alters runtime platform behaviour.
 - Use one sequential DerivedData path per batch. Parallel workers must use distinct paths and may return commits only after an overlap check.
-- Do not use a standard `[skip ci]` token. `RH-071 — Architecture CI suppression` must be integrated before code batches begin; it may suppress only duplicate GitHub iOS execution while preserving proxy and lightweight validation.
 
 This block overrides the conflicting per-task branch/commit/pull-request rule above and the more frequent build and device-deploy defaults below only for the High-priority architecture programme.
 

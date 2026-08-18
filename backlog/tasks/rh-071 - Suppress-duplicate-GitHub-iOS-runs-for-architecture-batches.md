@@ -1,24 +1,27 @@
 ---
 id: RH-071
 title: Suppress duplicate GitHub iOS runs for architecture batches
-status: In Progress
-assignee:
-  - '@codex'
+status: To Do
+assignee: []
 created_date: '2026-08-18 13:59'
-updated_date: '2026-08-18 14:10'
+updated_date: '2026-08-18 14:33'
 labels:
   - ci
   - architecture
   - test-efficiency
+  - parked
 milestone: m-0
 dependencies:
   - RH-069
   - RH-070
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/33'
+  - dc25f9f
 modified_files:
   - .github/workflows/ci.yml
   - tools/test-changed
   - docs/testing/README.md
-priority: high
+priority: low
 type: chore
 ordinal: 206000
 ---
@@ -49,4 +52,6 @@ For the three High architecture batch branches only, suppress the unreliable dup
 Ready check on 2026-08-18: RH-069 — test-selection hardening and RH-070 — architecture efficiency are integrated; the task is bounded to workflow/tooling files and can run in parallel with RH-013.02 — baseline capture without sharing DerivedData or product-code files.
 
 Claimed by the coordinator on branch codex/rh-071-architecture-ci-suppression. May execute in parallel with RH-013.02 — baseline capture; no product or DerivedData overlap.
+
+Owner decision on 2026-08-18: parked immediately as redundant to RH-069 — test-selection hardening. PR #33 was closed unmerged. Remote branch codex/rh-071-architecture-ci-suppression is preserved at dc25f9f for recovery only. This task is non-blocking and must not delay the architecture batches.
 <!-- SECTION:NOTES:END -->
