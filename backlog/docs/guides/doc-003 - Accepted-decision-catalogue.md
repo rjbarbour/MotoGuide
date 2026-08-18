@@ -3,7 +3,7 @@ id: doc-003
 title: Accepted decision catalogue
 type: guide
 created_date: '2026-08-17 22:56'
-updated_date: '2026-08-17 22:56'
+updated_date: '2026-08-18 13:00'
 tags:
   - decisions
   - guide
@@ -100,3 +100,19 @@ Do not act on the RH-002 exact-build confirmation or release evidence gate until
 ### Consequences
 
 When resumed, confirm the installed build in RideHorizon Settings while stopped before attributing stationary or road results to it. The parked gate is operational evidence, not a new product choice.
+
+## decision-007 — Prioritise background reliability through milestone m-1
+
+### Context
+
+On 2026-08-18 the owner reported that RideHorizon was silent when Google Maps was foregrounded and made background announcement delivery the highest product priority. The owner then confirmed the Dynamic Island outcome, bounded current-ride continuity, a quality-first OpenAI model, a persistent summary of the previous three rides, longer Long Facts, broader Apple voice choice and a later complete Ride Live Activity.
+
+### Decision
+
+Supersede decision-003’s nomination of `RH-024 — Make current-ride fact generation sequence-aware without destroying useful caching` as the next task. Use `m-1 — Core ride reliability and continuity` as the canonical sequence: `RH-059 — Restore announcements while Google Maps is foregrounded`; `RH-060 — Finish active announcements before handling newer boundary speech`; `RH-061 — Show meaningful place updates in the Dynamic Island`; `RH-024 — Make current-ride fact generation sequence-aware without destroying useful caching`; `RH-062 — Upgrade place-fact generation to GPT-5.6 Sol with medium reasoning`; `RH-063 — Maintain one bounded OpenAI conversation per active ride`; `RH-064 — Remember delivered fact summaries from the previous three rides`; `RH-065 — Make Long Facts materially longer`; `RH-066 — Expose all installed English Apple voices and choose a distinct default`; and `RH-067 — Add the complete persistent Ride Live Activity`.
+
+Keep `RH-068 — Evaluate deterministic river-crossing announcements` parked outside the active milestone until the owner explicitly reprioritises it.
+
+### Consequences
+
+Only `RH-059 — Restore announcements while Google Maps is foregrounded` is labelled `ready`. The milestone’s priority and ordinal fields define the remaining sequence, with dependencies used only for hard implementation prerequisites. This decision does not resume the architecture-refactor programme or family-product work.

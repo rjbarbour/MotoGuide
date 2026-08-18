@@ -4,20 +4,22 @@ title: Make ride fact generation sequence-aware without destroying useful cachin
 status: To Do
 assignee: []
 created_date: '2026-08-17 22:42'
+updated_date: '2026-08-18 12:59'
 labels:
-  - ready
   - core
   - tier-1
+  - sequence
+milestone: m-1
 dependencies: []
 priority: high
 type: feature
-ordinal: 33000
+ordinal: 113000
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Implement only Tier 1 next: keep a bounded active-ride record of recent place components and fact subjects, pass bounded recent context to the proxy, avoid repetition across nearby announcements, and clear transient state at End ride. Do not add embeddings, vector search, cross-trip memory, server-side ride history or broad prompt-management machinery.
+Implement bounded Tier 1 current-ride context after the reliability and Dynamic Island priorities in milestone m-1: keep a bounded active-ride record of recent place components and fact subjects, pass bounded recent context to the proxy, avoid repetition across nearby announcements, and clear transient state at End ride. Do not add embeddings, vector search, cross-trip memory, server-side ride history or broad prompt-management machinery.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
