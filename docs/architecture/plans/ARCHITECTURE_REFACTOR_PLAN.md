@@ -2,9 +2,45 @@
 
 Date: 2026-08-04
 
-Status: Approved direction; execution is gated by the current private-beta work.
+Status: Approved direction; delivery graph captured; implementation remains gated by Backlog.md readiness and dependencies.
 
 Status authority: Backlog.md CLI task records under `../../../backlog/`
+
+## Control-plane relationship
+
+Verified on 2026-08-18: this document remains the canonical architectural direction for the refactor programme. It owns the rationale, target boundaries, milestone order, gates, non-goals and programme completion condition. It has not been replaced by, or copied wholesale into, the Backlog.md CLI records.
+
+Backlog.md is the sole live delivery ledger. It owns task status, readiness, claims, execution evidence and completion:
+
+- Milestone `m-0`, **Architecture refactor programme**, holds the programme outcome and replenishment gate.
+- `RH-013` is the non-executing programme container and links every child back to this plan.
+- `RH-013.01` through `RH-013.34` decompose the phases below into one-worktree, one-branch and one-pull-request increments with explicit dependencies and acceptance evidence.
+- Phase and `parallel-candidate` labels describe the intended execution shape. They do not make a task ready or authorise simultaneous edits.
+
+For immediate continuation, run `backlog instructions overview`, `backlog task view RH-013 --plain` and `backlog task list --parent RH-013 --plain`. Only children explicitly labelled `ready`, with every dependency integrated, may be claimed. The long-range child graph remains revisable at phase health gates even though its current outcomes and dependencies are recorded. If the CLI and this document disagree about live status, the CLI wins; if they disagree about architectural direction, stop and reconcile the plan and task contract explicitly.
+
+## Integration checkpoint — 2026-08-18
+
+The user authorised integration of the completed planning batch by replying `Proceed.` No integration command had run at the checkpoint captured here, and refactor implementation had not started.
+
+Verified local state:
+
+- Checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`.
+- Branch: `main`.
+- The planning batch is local and uncommitted. It includes milestone `m-0`, programme updates to `RH-013`, the shaped child graph `RH-013.01` through `RH-013.34`, the parallel-worktree rules in `AGENTS.md` and this plan's control-plane reconciliation.
+- The child graph was checked as 34 children, all under `RH-013` and milestone `m-0`, with plan references, at least three acceptance criteria per child, no unknown dependencies, no dependency cycles and no premature `ready` label.
+- Eleven tasks carry the `parallel-candidate` label: `RH-013.04`, `RH-013.05`, `RH-013.16`, `RH-013.17`, `RH-013.20`, `RH-013.23`, `RH-013.25`, `RH-013.26`, `RH-013.29`, `RH-013.30` and `RH-013.31`. Candidate status is not execution authority; overlap must be rechecked against current `main` before claiming.
+- `RH-013.34` remains a human evidence gate because changing production location defaults requires physical ride and battery evidence.
+- `git diff --check` passed at this checkpoint. No application tests were run because only delivery records and documentation changed.
+
+Immediate continuation:
+
+1. Refresh the binding delivery and Git-integration SOPs, then run `backlog instructions overview` and read the task guide it names. Expected result: the current supported workflow for creating and integrating a control-plane task is displayed.
+2. Create one tracked control-plane work item for integrating this planning batch, using supported public `backlog` CLI commands only. Expected result: one task owns the Goal, branch, worktree, commit, pull request and integration evidence for these existing changes.
+3. Isolate the planning diff on that task's branch/worktree without losing or mixing the current local changes. Expected result: the integration checkout and task checkout have explicit, recoverable ownership.
+4. Verify the exact file set, child graph and `git diff --check`; commit, push, open one pull request, review it independently and merge it serially under the coordinator's control. Expected result: the planning batch is present on current `main` through one traceable pull request.
+5. Verify merged `main`, close the control-plane task through the CLI, remove its worktree and branch as the applicable SOP directs, then make `RH-013.02` the first `ready` child. Expected result: `main` is checkpoint-clean and `RH-013.02` is ready to capture the clean architecture-refactor baseline.
+6. Stop. Do not begin `RH-013.02` or any refactor implementation in the planning-batch integration turn.
 
 ## Bottom line
 
@@ -12,7 +48,7 @@ Refactor through small, behaviour-preserving milestones. Establish the iOS depen
 
 Keep the existing iOS application target and proxy deployment. Source-level boundaries and narrow interfaces are sufficient at this stage; separate Swift packages, services or deployments would add cost without solving the present problems.
 
-The first unattended run may complete only RH-013.01 (legacy RH-013A). It must stop at that gate even if time remains. Later increments are deliberately not implementation-ready yet.
+The first execution sequence is RH-013.02 to establish the clean baseline, followed by RH-013.01 (legacy RH-013A) only after that dependency is integrated. Capturing the full task graph does not make later increments implementation-ready.
 
 ## Why this work is needed
 
@@ -187,9 +223,9 @@ Work:
 
 Gate: complete concurrency checking is clean; no unchecked sendability is added merely to silence warnings; any location-policy change has physical evidence and a rollback point.
 
-## First unattended increment: RH-013.01 (legacy RH-013A)
+## First unattended execution sequence
 
-RH-013.01 is the only increment authorised for an initial overnight implementation run. Inspect its delivery contract with `backlog task view RH-013.01 --plain` before execution.
+RH-013.02 establishes the exact clean baseline and stops if any declared gate is red. After RH-013.02 is integrated and the coordinator marks RH-013.01 ready, RH-013.01 is the first implementation increment. Inspect each delivery contract with `backlog task view RH-013.02 --plain` and `backlog task view RH-013.01 --plain` before claiming it.
 
 Suggested commit sequence:
 
@@ -199,7 +235,7 @@ Suggested commit sequence:
 4. Remove only the duplicated direct access made obsolete by the migration.
 5. Run the complete gate and obtain an independent diff review.
 
-The implementation agent must stop, report evidence and leave the next milestone unstarted. A failed test, required key migration, observable settings change, unrelated release-candidate conflict or need for a new framework is a stop condition rather than permission to widen scope.
+Each implementation agent must stop at its child-task boundary, report evidence and leave later tasks unstarted. A failed test, required key migration, observable settings change, unrelated release-candidate conflict or need for a new framework is a stop condition rather than permission to widen scope. The coordinator may replenish the ready queue only after integration, current-main verification and the applicable phase health gate.
 
 ## Verification baseline
 
