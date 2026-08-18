@@ -14,6 +14,8 @@
 		B26080210000000000000006 /* RideDiagnosticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26080210000000000000005 /* RideDiagnosticsStore.swift */; };
 		C30803010000000000000002 /* PremiumSpeechProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30803010000000000000001 /* PremiumSpeechProcessor.swift */; };
 		C30803010000000000000004 /* SpeechCalibrationLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30803010000000000000003 /* SpeechCalibrationLab.swift */; };
+		D26081810000000000000002 /* RideSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26081810000000000000001 /* RideSettings.swift */; };
+		D26081810000000000000004 /* RideSettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26081810000000000000003 /* RideSettingsStoreTests.swift */; };
 		C30803010000000000000013 /* premium-place-name.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C30803010000000000000009 /* premium-place-name.mp3 */; };
 		C30803010000000000000014 /* premium-boundary.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C3080301000000000000000A /* premium-boundary.mp3 */; };
 		C30803010000000000000015 /* premium-short-fact.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C3080301000000000000000B /* premium-short-fact.mp3 */; };
@@ -73,6 +75,8 @@
 		B26080210000000000000005 /* RideDiagnosticsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideDiagnosticsStore.swift; sourceTree = "<group>"; };
 		C30803010000000000000001 /* PremiumSpeechProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumSpeechProcessor.swift; sourceTree = "<group>"; };
 		C30803010000000000000003 /* SpeechCalibrationLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechCalibrationLab.swift; sourceTree = "<group>"; };
+		D26081810000000000000001 /* RideSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSettings.swift; sourceTree = "<group>"; };
+		D26081810000000000000003 /* RideSettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSettingsStoreTests.swift; sourceTree = "<group>"; };
 		C30803010000000000000009 /* premium-place-name.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "premium-place-name.mp3"; sourceTree = "<group>"; };
 		C3080301000000000000000A /* premium-boundary.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "premium-boundary.mp3"; sourceTree = "<group>"; };
 		C3080301000000000000000B /* premium-short-fact.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "premium-short-fact.mp3"; sourceTree = "<group>"; };
@@ -166,6 +170,7 @@
 				B26080210000000000000005 /* RideDiagnosticsStore.swift */,
 				C30803010000000000000001 /* PremiumSpeechProcessor.swift */,
 				C30803010000000000000003 /* SpeechCalibrationLab.swift */,
+				D26081810000000000000001 /* RideSettings.swift */,
 				C30803010000000000000008 /* CalibrationFixtures */,
 				E13E87A42C3EE36100308669 /* ContentView.swift */,
 				E13E87A82C3EE36400308669 /* Assets.xcassets */,
@@ -222,6 +227,7 @@
 				E13E87E52C3F300200308669 /* AnnouncementPolicyTests.swift */,
 				E13E87F62C3F400600308669 /* PlaceFactTests.swift */,
 				E13E88022C3F500200308669 /* FirstRunStateTests.swift */,
+				D26081810000000000000003 /* RideSettingsStoreTests.swift */,
 			);
 			path = RideHorizonTests;
 			sourceTree = "<group>";
@@ -375,6 +381,7 @@
 				B26080210000000000000006 /* RideDiagnosticsStore.swift in Sources */,
 				C30803010000000000000002 /* PremiumSpeechProcessor.swift in Sources */,
 				C30803010000000000000004 /* SpeechCalibrationLab.swift in Sources */,
+				D26081810000000000000002 /* RideSettings.swift in Sources */,
 				E13E87D12C3EEF7100308669 /* LocationManager.swift in Sources */,
 				E13E87D42C3F200000308669 /* Address.swift in Sources */,
 				E13E87D52C3F200100308669 /* AnnouncementDecision.swift in Sources */,
@@ -406,6 +413,7 @@
 				E13E87E42C3F300200308669 /* AnnouncementPolicyTests.swift in Sources */,
 				E13E87EC2C3F400600308669 /* PlaceFactTests.swift in Sources */,
 				E13E88052C3F500200308669 /* FirstRunStateTests.swift in Sources */,
+				D26081810000000000000004 /* RideSettingsStoreTests.swift in Sources */,
 				E13E87B82C3EE36400308669 /* RideHorizonTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

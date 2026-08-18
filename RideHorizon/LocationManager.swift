@@ -130,25 +130,6 @@ struct SpeechVoiceOption: Identifiable, Hashable {
     }
 }
 
-private enum LocationManagerDefaults {
-    static let preferredVoiceIdentifierKey = "RideHorizonPreferredVoiceIdentifier"
-    static let speechProviderKey = "RideHorizonSpeechProvider"
-    static let speechProviderMigrationKey = "RideHorizonSpeechProviderPremiumNoAppleFallbackMigration20260703"
-    static let premiumVoiceAppleFallbackEnabledKey = "RideHorizonPremiumVoiceAppleFallbackEnabled"
-    static let interruptsMusicKey = "RideHorizonInterruptsMusic"
-    static let homeCountryKey = "RideHorizonHomeCountry"
-    static let homeRegionKey = "RideHorizonHomeRegion"
-    static let familiarRegionsKey = "RideHorizonFamiliarRegions"
-    static let customFactInstructionsKey = "RideHorizonCustomFactInstructions"
-    static let factInterestCategoriesKey = "RideHorizonFactInterestCategories"
-    static let boundarySpeechCooldownSecondsKey = "RideHorizonBoundarySpeechCooldownSeconds"
-    static let testModeKey = "RideHorizonTestMode"
-    static let audioInteropDebugTestModeChoiceKey = "RideHorizonAudioInteropDebugTestModeChoice"
-#if DEBUG
-    static let shortInactivityTimeoutKey = "RideHorizonShortInactivityTimeout"
-#endif
-}
-
 enum SpeechProvider: String, CaseIterable, Identifiable {
     case apple
     case proxyElevenLabs
@@ -781,6 +762,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private let speechOutput: SpeechOutputEngine
     private let audioSession: AudioSessionManaging
     private let diagnostics: RideDiagnosticsStore
+    private let rideSettingsStore: RideSettingsStore
     private var ownsAudioSession = false
     private var previousAddress: Address?
     private var lastUpdateTime: Date?
@@ -830,15 +812,8 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var lastKnownAddress: Address?
     @Published var speakAfterEveryGeocode: Bool = false
     @Published var locationCheckInterval: Int = 10
-    @Published var boundarySpeechCooldownSeconds: Int = UserDefaults.standard.object(
-        forKey: LocationManagerDefaults.boundarySpeechCooldownSecondsKey
-    ) as? Int ?? 10 {
-        didSet {
-            UserDefaults.standard.set(
-                boundarySpeechCooldownSeconds,
-                forKey: LocationManagerDefaults.boundarySpeechCooldownSecondsKey
-            )
-        }
+    @Published var boundarySpeechCooldownSeconds: Int {
+        didSet { persistRideSettings(.boundarySpeechCooldownSeconds) }
     }
     @Published var announceStreet: Bool = false
     @Published var announceTown: Bool = true
@@ -848,26 +823,13 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     @Published var contentMode: ContentMode = .shortFacts
     @Published var bluetoothDelaySeconds: Double = 0.5
 #if DEBUG
-    @Published var shortInactivityTimeout: Bool = UserDefaults.standard.bool(
-        forKey: LocationManagerDefaults.shortInactivityTimeoutKey
-    ) {
-        didSet {
-            UserDefaults.standard.set(
-                shortInactivityTimeout,
-                forKey: LocationManagerDefaults.shortInactivityTimeoutKey
-            )
-        }
+    @Published var shortInactivityTimeout: Bool {
+        didSet { persistRideSettings(.shortInactivityTimeout) }
     }
 #endif
-    @Published var testMode: Bool = LocationManager.loadTestMode() {
+    @Published var testMode: Bool {
         didSet {
-            UserDefaults.standard.set(testMode, forKey: LocationManagerDefaults.testModeKey)
-#if DEBUG
-            UserDefaults.standard.set(
-                true,
-                forKey: LocationManagerDefaults.audioInteropDebugTestModeChoiceKey
-            )
-#endif
+            persistRideSettings(.testMode)
             if testMode {
                 applyDebugTestModeCampaignDefaults()
                 locationManager.stopUpdatingLocation()
@@ -885,80 +847,40 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
             }
         }
     }
-    @Published var interruptsMusic: Bool = {
-        guard UserDefaults.standard.object(forKey: LocationManagerDefaults.interruptsMusicKey) != nil else {
-            return true
-        }
-        return UserDefaults.standard.bool(forKey: LocationManagerDefaults.interruptsMusicKey)
-    }() {
-        didSet {
-            UserDefaults.standard.set(interruptsMusic, forKey: LocationManagerDefaults.interruptsMusicKey)
-        }
+    @Published var interruptsMusic: Bool {
+        didSet { persistRideSettings(.interruptsMusic) }
     }
-    @Published var premiumVoiceAppleFallbackEnabled: Bool = {
-        guard UserDefaults.standard.object(forKey: LocationManagerDefaults.premiumVoiceAppleFallbackEnabledKey) != nil else {
-            return true
-        }
-        return UserDefaults.standard.bool(forKey: LocationManagerDefaults.premiumVoiceAppleFallbackEnabledKey)
-    }() {
-        didSet {
-            UserDefaults.standard.set(
-                premiumVoiceAppleFallbackEnabled,
-                forKey: LocationManagerDefaults.premiumVoiceAppleFallbackEnabledKey
-            )
-        }
+    @Published var premiumVoiceAppleFallbackEnabled: Bool {
+        didSet { persistRideSettings(.premiumVoiceAppleFallbackEnabled) }
     }
-    @Published var preferredVoiceIdentifier: String = UserDefaults.standard.string(
-        forKey: LocationManagerDefaults.preferredVoiceIdentifierKey
-    ) ?? "" {
-        didSet {
-            UserDefaults.standard.set(preferredVoiceIdentifier, forKey: LocationManagerDefaults.preferredVoiceIdentifierKey)
-        }
+    @Published var preferredVoiceIdentifier: String {
+        didSet { persistRideSettings(.preferredVoiceIdentifier) }
     }
 
-    @Published var speechProvider: SpeechProvider = LocationManager.loadSpeechProvider() {
-        didSet {
-            UserDefaults.standard.set(speechProvider.rawValue, forKey: LocationManagerDefaults.speechProviderKey)
-            UserDefaults.standard.set(true, forKey: LocationManagerDefaults.speechProviderMigrationKey)
-        }
+    @Published var speechProvider: SpeechProvider {
+        didSet { persistRideSettings(.speechProvider) }
+    }
+    @Published var lastNonQuietContentMode: ContentMode {
+        didSet { persistRideSettings(.lastNonQuietContentMode) }
     }
 
-    @Published var homeCountry: String = UserDefaults.standard.string(forKey: LocationManagerDefaults.homeCountryKey) ?? "" {
-        didSet {
-            UserDefaults.standard.set(homeCountry, forKey: LocationManagerDefaults.homeCountryKey)
-        }
+    @Published var homeCountry: String {
+        didSet { persistRideSettings(.homeCountry) }
     }
 
-    @Published var homeRegion: String = UserDefaults.standard.string(forKey: LocationManagerDefaults.homeRegionKey) ?? "" {
-        didSet {
-            UserDefaults.standard.set(homeRegion, forKey: LocationManagerDefaults.homeRegionKey)
-        }
+    @Published var homeRegion: String {
+        didSet { persistRideSettings(.homeRegion) }
     }
 
-    @Published var familiarRegions: String = UserDefaults.standard.string(
-        forKey: LocationManagerDefaults.familiarRegionsKey
-    ) ?? "" {
-        didSet {
-            UserDefaults.standard.set(familiarRegions, forKey: LocationManagerDefaults.familiarRegionsKey)
-        }
+    @Published var familiarRegions: String {
+        didSet { persistRideSettings(.familiarRegions) }
     }
 
-    @Published var customFactInstructions: String = UserDefaults.standard.string(
-        forKey: LocationManagerDefaults.customFactInstructionsKey
-    ) ?? "" {
-        didSet {
-            UserDefaults.standard.set(customFactInstructions, forKey: LocationManagerDefaults.customFactInstructionsKey)
-        }
+    @Published var customFactInstructions: String {
+        didSet { persistRideSettings(.customFactInstructions) }
     }
-    @Published var factInterestCategories: [FactInterestCategory] = LocationManager.loadFactInterestCategories() {
-        didSet {
-            UserDefaults.standard.set(
-                factInterestCategories
-                    .map(\.rawValue)
-                    .joined(separator: ","),
-                forKey: LocationManagerDefaults.factInterestCategoriesKey
-            )
-        }
+    @Published var factInterestCategories: [FactInterestCategory] {
+        didSet { persistRideSettings(.factInterestCategories) }
     }
     @Published private(set) var isTracking = false
     @Published private(set) var rideSessionState: RideSessionState = .idle
@@ -990,8 +912,27 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         inactivityNotifier: RideInactivityNotifying? = nil,
         audioSession: AudioSessionManaging? = nil,
         diagnostics: RideDiagnosticsStore? = nil,
+        rideSettingsStore: RideSettingsStore? = nil,
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
+        let resolvedSettingsStore = rideSettingsStore ?? UserDefaultsRideSettingsStore()
+        let settings = resolvedSettingsStore.load()
+        self.rideSettingsStore = resolvedSettingsStore
+        self.boundarySpeechCooldownSeconds = settings.boundarySpeechCooldownSeconds
+#if DEBUG
+        self.shortInactivityTimeout = settings.shortInactivityTimeout
+#endif
+        self.testMode = settings.testMode
+        self.interruptsMusic = settings.interruptsMusic
+        self.premiumVoiceAppleFallbackEnabled = settings.premiumVoiceAppleFallbackEnabled
+        self.preferredVoiceIdentifier = settings.preferredVoiceIdentifier
+        self.speechProvider = settings.speechProvider
+        self.lastNonQuietContentMode = settings.lastNonQuietContentMode
+        self.homeCountry = settings.homeCountry
+        self.homeRegion = settings.homeRegion
+        self.familiarRegions = settings.familiarRegions
+        self.customFactInstructions = settings.customFactInstructions
+        self.factInterestCategories = settings.factInterestCategories
         self.factGenerator = factGenerator ?? Self.makeDefaultFactGenerator()
         self.speechOutput = speechOutput ?? DefaultSpeechOutputEngine()
         self.inactivityNotifier = inactivityNotifier ?? UserNotificationRideInactivityNotifier()
@@ -1126,17 +1067,31 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         CachedPlaceFactGenerator(generator: ProxyFactGenerator())
     }
 
-    private static func loadTestMode() -> Bool {
+    private func persistRideSettings(_ field: RideSettingField) {
+        rideSettingsStore.save(rideSettingsSnapshot, changed: field)
+    }
+
+    private var rideSettingsSnapshot: RideSettings {
 #if DEBUG
-        if !UserDefaults.standard.bool(
-            forKey: LocationManagerDefaults.audioInteropDebugTestModeChoiceKey
-        ) {
-            return true
-        }
+        let currentShortInactivityTimeout = shortInactivityTimeout
+#else
+        let currentShortInactivityTimeout = false
 #endif
-        let key = LocationManagerDefaults.testModeKey
-        guard UserDefaults.standard.object(forKey: key) != nil else { return false }
-        return UserDefaults.standard.bool(forKey: key)
+        return RideSettings(
+            boundarySpeechCooldownSeconds: boundarySpeechCooldownSeconds,
+            shortInactivityTimeout: currentShortInactivityTimeout,
+            testMode: testMode,
+            interruptsMusic: interruptsMusic,
+            premiumVoiceAppleFallbackEnabled: premiumVoiceAppleFallbackEnabled,
+            preferredVoiceIdentifier: preferredVoiceIdentifier,
+            speechProvider: speechProvider,
+            lastNonQuietContentMode: lastNonQuietContentMode,
+            homeCountry: homeCountry,
+            homeRegion: homeRegion,
+            familiarRegions: familiarRegions,
+            customFactInstructions: customFactInstructions,
+            factInterestCategories: factInterestCategories
+        )
     }
 
     func requestLocation() {
@@ -1294,6 +1249,7 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
         customFactInstructions = ""
         factInterestCategories = FactInterestCategory.defaultSelections
         contentMode = .shortFacts
+        lastNonQuietContentMode = .shortFacts
         speechProvider = .proxyElevenLabs
     }
 
@@ -1701,37 +1657,6 @@ class LocationManager: NSObject, ObservableObject, @MainActor CLLocationManagerD
     private func normalizeContextValue(_ value: String) -> String? {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return normalized.isEmpty ? nil : normalized
-    }
-
-    private static func loadFactInterestCategories() -> [FactInterestCategory] {
-        let stored = UserDefaults.standard.string(forKey: LocationManagerDefaults.factInterestCategoriesKey) ?? ""
-        let values = stored
-            .split(separator: ",")
-            .compactMap { normalizeFactInterestCategory(String($0)) }
-        return values.isEmpty ? FactInterestCategory.defaultSelections : values
-    }
-
-    private static func loadSpeechProvider() -> SpeechProvider {
-        let migrationKey = LocationManagerDefaults.speechProviderMigrationKey
-        let providerKey = LocationManagerDefaults.speechProviderKey
-        let stored = UserDefaults.standard.string(forKey: providerKey)
-        let provider = stored.flatMap(SpeechProvider.init(rawValue:)) ?? .proxyElevenLabs
-
-        guard UserDefaults.standard.bool(forKey: migrationKey) else {
-            UserDefaults.standard.set(SpeechProvider.proxyElevenLabs.rawValue, forKey: providerKey)
-            UserDefaults.standard.set(true, forKey: migrationKey)
-            return .proxyElevenLabs
-        }
-
-        return provider
-    }
-
-    private static func normalizeFactInterestCategory(_ value: String) -> FactInterestCategory? {
-        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if normalized == "safetyAdvice" {
-            return .localRidingHints
-        }
-        return FactInterestCategory(rawValue: normalized)
     }
 
     private func parseFamiliarRegionsNormalized() -> [String] {
