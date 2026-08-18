@@ -18,7 +18,7 @@ jobs:
     name: Select relevant tests
     runs-on: ubuntu-latest
     outputs:
-      ios: ${{ steps.selection.outputs.ios }}
+      ios: ${{ steps.selection.outputs.github_ios }}
       proxy: ${{ steps.selection.outputs.proxy }}
     steps:
       - name: Check out repository
@@ -26,12 +26,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify architecture CI suppression rules
+        run: ./tools/tests/test-architecture-ci-suppression.sh
+
       - name: Select changed test suites
         id: selection
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          CURRENT_REPOSITORY: ${{ github.repository }}
           PUSH_BASE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_REF: ${{ github.ref }}
+          PUSH_HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
             ./tools/test-changed --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA" --dry-run --github-output

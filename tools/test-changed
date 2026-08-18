@@ -13,7 +13,7 @@ Select and run the relevant automated unit-test suites for a set of changed file
   --head <ref>          Revision to compare with --base.
   --file <path>         Classify an explicit changed path; may be repeated.
   --dry-run             Report the selection without running tests.
-  --github-output       Write ios and proxy booleans to $GITHUB_OUTPUT.
+  --github-output       Write ios, github_ios, proxy and proxy_deploy booleans to $GITHUB_OUTPUT.
 EOF
 }
 
@@ -25,6 +25,7 @@ run_all=false
 dry_run=false
 github_output=false
 files=()
+comparison_valid=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -87,6 +88,7 @@ if [[ -n "$base" ]]; then
     while IFS= read -r path; do
         [[ -n "$path" ]] && files+=("$path")
     done <<< "$changed_paths"
+    comparison_valid=true
 
     if [[ "$head_was_set" == false ]]; then
         if ! changed_paths="$(git -C "$repo_root" diff --name-only HEAD)"; then
@@ -159,12 +161,82 @@ else
     done
 fi
 
+# The local-iOS-evidence suffix is an explicit branch marker for the three
+# High architecture batches.  The matching task record must be changed in the
+# comparison and prove the evidence line plus checked acceptance criteria.
+task_matches_batch() {
+    local batch_id="$1" path="$2"
+    case "$batch_id:$path" in
+        RH-013.36:backlog/tasks/rh-013.36\ *.md|RH-013.37:backlog/tasks/rh-013.37\ *.md|RH-013.38:backlog/tasks/rh-013.38\ *.md) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+task_evidence_valid() {
+    local batch_id="$1" revision="$2" path content
+    for path in "${files[@]}"; do
+        task_matches_batch "$batch_id" "$path" || continue
+        git -C "$repo_root" cat-file -e "$revision:$path" 2>/dev/null || continue
+        content="$(git -C "$repo_root" show "$revision:$path" 2>/dev/null)" || continue
+        grep -Fxq "Local-iOS-Evidence: $batch_id" <<< "$content" || continue
+        grep -Eq '^- \[ \]' <<< "$content" && continue
+        return 0
+    done
+    return 1
+}
+
+# Local selection remains authoritative and still reports ios=true, while the
+# workflow consumes github_ios below.
+github_ios="$ios"
+if [[ "$github_output" == true && "$comparison_valid" == true && "$ios" == true && "${GITHUB_EVENT_NAME:-}" == "pull_request" ]]; then
+    head_branch="${PR_HEAD_REF:-}"
+    head_repository="${PR_HEAD_REPOSITORY:-}"
+    repository="${CURRENT_REPOSITORY:-}"
+    if [[ -n "$head_repository" && -n "$repository" && "$head_repository" == "$repository" ]]; then
+        if [[ "$head_branch" =~ ^codex/rh-(013\.36|013\.37|013\.38)-[a-z0-9]+(-[a-z0-9]+)*--local-ios-evidence$ ]]; then
+            pr_batch_id="RH-${BASH_REMATCH[1]}"
+            if task_evidence_valid "$pr_batch_id" "$head"; then
+                github_ios=false
+            fi
+        fi
+    fi
+fi
+
+# Once the marker branch is removed after merge, the main push carries the
+# same evidence claim in an exact commit-message trailer. Require a true
+# two-parent merge whose first parent is the supplied base, as well as the
+# matching task evidence. This remains fail-closed for malformed inputs.
+if [[ "$github_output" == true && "$comparison_valid" == true && "$ios" == true && "${GITHUB_EVENT_NAME:-}" == "push" && "${PUSH_HEAD_REF:-${GITHUB_REF:-}}" == "refs/heads/main" ]]; then
+    commit_message="${PUSH_HEAD_MESSAGE:-}"
+    batch_id=""
+    last_message_line=""
+    while IFS= read -r message_line; do
+        message_line="${message_line%$'\r'}"
+        [[ -n "$message_line" ]] && last_message_line="$message_line"
+    done <<< "$commit_message"
+    if [[ "$last_message_line" =~ ^Local-iOS-Evidence:\ (RH-013\.36|RH-013\.37|RH-013\.38)$ ]]; then
+        batch_id="${BASH_REMATCH[1]}"
+    fi
+
+    merge_parents="$(git -C "$repo_root" rev-list --parents -n 1 "$head" 2>/dev/null || true)"
+    read -r merge_commit first_parent second_parent extra_parent <<< "$merge_parents"
+    merge_valid=false
+    if [[ "$merge_commit" == "$head" && -n "$first_parent" && -n "$second_parent" && -z "${extra_parent:-}" && "$first_parent" == "$base" ]]; then
+        merge_valid=true
+    fi
+
+    if [[ "$merge_valid" == true && -n "$batch_id" ]] && task_evidence_valid "$batch_id" "$head"; then
+        github_ios=false
+    fi
+fi
+
 printf 'Selection: iOS=%s, fact proxy=%s (%s).\n' "$ios" "$proxy" "$reason"
 
 if [[ "$github_output" == true ]]; then
     : "${GITHUB_OUTPUT:?--github-output requires GITHUB_OUTPUT}"
     {
         printf 'ios=%s\n' "$ios"
+        printf 'github_ios=%s\n' "$github_ios"
         printf 'proxy=%s\n' "$proxy"
         printf 'proxy_deploy=%s\n' "$proxy_deploy"
     } >> "$GITHUB_OUTPUT"
