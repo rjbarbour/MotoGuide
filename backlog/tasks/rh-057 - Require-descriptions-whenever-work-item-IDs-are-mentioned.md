@@ -1,11 +1,11 @@
 ---
 id: RH-057
 title: Require descriptions whenever work-item IDs are mentioned
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:48'
-updated_date: '2026-08-18 12:50'
+updated_date: '2026-08-18 13:41'
 labels: []
 dependencies: []
 modified_files:
@@ -36,4 +36,12 @@ Make RideHorizon task references understandable without requiring the reader to 
 
 <!-- SECTION:NOTES:BEGIN -->
 Verification passed: automated AGENTS.md assertion confirmed that every work-item reference requires a description and bare ticket identifiers are prohibited; git diff --check passed.
+
+Post-merge verification on 2026-08-18: merge commit 4497321 is an ancestor of current main, and current AGENTS.md contains the required work-item-description rule.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Integrated the standing rule requiring every user-facing work-item ID to include a brief description. Verified on current main through merge commit 4497321 and the resulting AGENTS.md text.
+<!-- SECTION:FINAL_SUMMARY:END -->
