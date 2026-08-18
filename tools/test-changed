@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: ./tools/test-changed (--all | --base <ref> [--head <ref>] | --file <path>...) [--dry-run] [--github-output]
+
+Select and run the relevant automated unit-test suites for a set of changed files.
+
+  --all                 Run both suites.
+  --base <ref>          Compare the merge-base of <ref> and --head (default: HEAD).
+  --head <ref>          Revision to compare with --base.
+  --file <path>         Classify an explicit changed path; may be repeated.
+  --dry-run             Report the selection without running tests.
+  --github-output       Write ios and proxy booleans to $GITHUB_OUTPUT.
+EOF
+}
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+base=""
+head="HEAD"
+head_was_set=false
+run_all=false
+dry_run=false
+github_output=false
+files=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --all)
+            run_all=true
+            ;;
+        --base)
+            base="${2:?--base requires a revision}"
+            shift
+            ;;
+        --head)
+            head="${2:?--head requires a revision}"
+            head_was_set=true
+            shift
+            ;;
+        --file)
+            files+=("${2:?--file requires a path}")
+            shift
+            ;;
+        --dry-run)
+            dry_run=true
+            ;;
+        --github-output)
+            github_output=true
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            printf 'Unknown option: %s\n' "$1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+if [[ "$run_all" == true && ( -n "$base" || ${#files[@]} -gt 0 ) ]]; then
+    printf '%s\n' '--all cannot be combined with --base or --file' >&2
+    exit 2
+fi
+
+if [[ "$run_all" == false && -z "$base" && ${#files[@]} -eq 0 ]]; then
+    printf '%s\n' 'Choose --all, --base, or at least one --file path.' >&2
+    usage >&2
+    exit 2
+fi
+
+if [[ -n "$base" && ${#files[@]} -gt 0 ]]; then
+    printf '%s\n' '--base cannot be combined with --file' >&2
+    exit 2
+fi
+
+if [[ -n "$base" ]]; then
+    while IFS= read -r path; do
+        [[ -n "$path" ]] && files+=("$path")
+    done < <(git -C "$repo_root" diff --name-only "$base...$head")
+
+    if [[ "$head_was_set" == false ]]; then
+        while IFS= read -r path; do
+            [[ -n "$path" ]] && files+=("$path")
+        done < <(git -C "$repo_root" diff --name-only HEAD)
+
+        while IFS= read -r path; do
+            [[ -n "$path" ]] && files+=("$path")
+        done < <(git -C "$repo_root" diff --cached --name-only)
+    fi
+fi
+
+ios=false
+proxy=false
+reason="documentation or metadata only"
+
+if [[ "$run_all" == true ]]; then
+    ios=true
+    proxy=true
+    reason="explicit full-suite request"
+else
+    for path in "${files[@]}"; do
+        case "$path" in
+            .github/workflows/*|.github/actions/*|tools/*|FACT_PROXY_OPENAPI.yaml|*.xcodeproj/*|*.xcworkspace/*|*.swiftpm/*|.gitignore)
+                ios=true
+                proxy=true
+                reason="workflow, tooling, shared contract, or build configuration changed"
+                ;;
+            RideHorizon/*|RideHorizonTests/*|*.swift)
+                ios=true
+                [[ "$reason" == "documentation or metadata only" ]] && reason="iOS source or test changed"
+                ;;
+            fact-proxy/*)
+                proxy=true
+                [[ "$reason" == "documentation or metadata only" ]] && reason="fact proxy source or test changed"
+                ;;
+            docs/*|*.md|README.md|LICENSE|backlog/*)
+                ;;
+            *)
+                ios=true
+                proxy=true
+                reason="unclassified path changed: $path"
+                ;;
+        esac
+    done
+fi
+
+printf 'Selection: iOS=%s, fact proxy=%s (%s).\n' "$ios" "$proxy" "$reason"
+
+if [[ "$github_output" == true ]]; then
+    : "${GITHUB_OUTPUT:?--github-output requires GITHUB_OUTPUT}"
+    {
+        printf 'ios=%s\n' "$ios"
+        printf 'proxy=%s\n' "$proxy"
+    } >> "$GITHUB_OUTPUT"
+fi
+
+if [[ "$dry_run" == true ]]; then
+    exit 0
+fi
+
+if [[ "$ios" == true ]]; then
+    ios_destination="${IOS_TEST_DESTINATION:-platform=iOS Simulator,name=iPhone 17 Pro,OS=latest}"
+    ios_derived_data="${IOS_TEST_DERIVED_DATA_PATH:-$repo_root/DerivedData-SelectiveTests}"
+    xcodebuild test -project "$repo_root/RideHorizon.xcodeproj" -scheme RideHorizon -destination "$ios_destination" -derivedDataPath "$ios_derived_data" -only-testing:RideHorizonTests
+fi
+
+if [[ "$proxy" == true ]]; then
+    (
+        cd "$repo_root/fact-proxy"
+        ./gradlew test --no-daemon
+    )
+fi
+
+if [[ "$ios" == false && "$proxy" == false ]]; then
+    printf '%s\n' 'No automated unit-test suite is selected for these paths.'
+fi
