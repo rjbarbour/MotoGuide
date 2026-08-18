@@ -41,6 +41,21 @@ jobs:
             ./tools/test-changed --base "$PUSH_BASE_SHA" --head "$GITHUB_SHA" --dry-run --github-output
           fi
 
+      - name: Record downstream deployment selection
+        env:
+          PROXY_DEPLOY: ${{ steps.selection.outputs.proxy_deploy }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/test-selection"
+          printf 'proxy_deploy=%s\n' "$PROXY_DEPLOY" > "$RUNNER_TEMP/test-selection/proxy_deploy"
+
+      - name: Upload downstream deployment selection
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-selection
+          path: ${{ runner.temp }}/test-selection/proxy_deploy
+          if-no-files-found: error
+          retention-days: 1
+
   ios-tests:
     name: iOS unit tests
     needs: select-tests

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 13:47'
-updated_date: '2026-08-18 13:49'
+updated_date: '2026-08-18 13:53'
 labels:
   - ci
   - local-dev
@@ -14,6 +14,7 @@ modified_files:
   - tools/test-changed
   - .github/workflows/ci.yml
   - .github/workflows/fact-proxy-deploy.yml
+  - docs/testing/README.md
 priority: high
 type: chore
 ordinal: 201000
@@ -47,4 +48,6 @@ Make the merged selective-test framework fail closed locally and stop documentat
 
 <!-- SECTION:NOTES:BEGIN -->
 Verification on 2026-08-18: shell syntax and diff checks passed; an invalid base exited non-zero; a temporary untracked Swift file selected iOS only; documentation selected neither suite; proxy source selected proxy only. No iOS, Gradle, build, deploy or TestFlight command was run.
+
+Independent review corrections: deployment now consumes the full push-range selection artifact and uses a deploy-specific output limited to fact-proxy/** and FACT_PROXY_OPENAPI.yaml. Documentation now includes non-ignored untracked paths.
 <!-- SECTION:NOTES:END -->
