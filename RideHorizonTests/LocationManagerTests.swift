@@ -2331,6 +2331,7 @@ final class LocationManagerTests: XCTestCase {
         locationManager.customFactInstructions = "Mention industrial history"
         locationManager.factInterestCategories = [.history]
         locationManager.contentMode = .longFacts
+        locationManager.lastNonQuietContentMode = .longFacts
         locationManager.speechProvider = .proxyElevenLabs
 
         locationManager.clearLocalPrivacyState()
@@ -2344,6 +2345,7 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertNil(locationManager.lastKnownAddress)
         XCTAssertNil(locationManager.lastSpokenPhrase)
         XCTAssertEqual(locationManager.contentMode, .shortFacts)
+        XCTAssertEqual(locationManager.lastNonQuietContentMode, .shortFacts)
         XCTAssertEqual(locationManager.speechProvider, .proxyElevenLabs)
         XCTAssertFalse(locationManager.isTracking)
     }

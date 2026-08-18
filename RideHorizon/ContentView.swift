@@ -158,13 +158,13 @@ enum LocationSummaryFormatter {
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var locationManager = LocationManager()
-    @StateObject private var rideDiagnostics = RideDiagnosticsStore.shared
-    @StateObject private var firstRunState = FirstRunState()
-    @StateObject private var aiSharingConsent = AISharingConsentStore()
+    @ObservedObject private var locationManager: LocationManager
+    @ObservedObject private var rideDiagnostics: RideDiagnosticsStore
+    @ObservedObject private var firstRunState: FirstRunState
+    @ObservedObject private var aiSharingConsent: AISharingConsentStore
     @AppStorage("RideHorizonMapLabelScale") private var mapLabelScale = 1.0
 #if DEBUG
-    @StateObject private var debugLog = DebugLogStore.shared
+    @ObservedObject private var debugLog: DebugLogStore
 #endif
     @State private var logs: [RideLogEntry] = []
     @State private var showOnboarding = false
@@ -175,6 +175,34 @@ struct ContentView: View {
     @State private var showLog = false
     @State private var settingsDetent: PresentationDetent = .large
     @State private var logDetent: PresentationDetent = .large
+
+#if DEBUG
+    init(
+        locationManager: LocationManager,
+        rideDiagnostics: RideDiagnosticsStore,
+        firstRunState: FirstRunState,
+        aiSharingConsent: AISharingConsentStore,
+        debugLog: DebugLogStore
+    ) {
+        _locationManager = ObservedObject(wrappedValue: locationManager)
+        _rideDiagnostics = ObservedObject(wrappedValue: rideDiagnostics)
+        _firstRunState = ObservedObject(wrappedValue: firstRunState)
+        _aiSharingConsent = ObservedObject(wrappedValue: aiSharingConsent)
+        _debugLog = ObservedObject(wrappedValue: debugLog)
+    }
+#else
+    init(
+        locationManager: LocationManager,
+        rideDiagnostics: RideDiagnosticsStore,
+        firstRunState: FirstRunState,
+        aiSharingConsent: AISharingConsentStore
+    ) {
+        _locationManager = ObservedObject(wrappedValue: locationManager)
+        _rideDiagnostics = ObservedObject(wrappedValue: rideDiagnostics)
+        _firstRunState = ObservedObject(wrappedValue: firstRunState)
+        _aiSharingConsent = ObservedObject(wrappedValue: aiSharingConsent)
+    }
+#endif
 
     var body: some View {
         NavigationStack {
@@ -373,7 +401,7 @@ struct ContentView: View {
         }
         rideDiagnostics.clear()
 #if DEBUG
-        DebugLogStore.shared.clear()
+        debugLog.clear()
 #endif
         firstRunState.reset()
         aiSharingConsent.reset()
@@ -1059,7 +1087,6 @@ private struct SettingsView: View {
     @State private var lastNonQuietMode: ContentMode = .shortFacts
     @State private var showPrivacyNotice = false
     @State private var showClearLocalDataConfirmation = false
-    private static let lastNonQuietModeKey = "RideHorizonLastNonQuietContentMode"
     @AppStorage("RideHorizonMapLabelScale") private var mapLabelScale = 1.0
     @AppStorage("RideHorizonNightMode") private var nightMode = false
 #if DEBUG
@@ -1103,16 +1130,11 @@ private struct SettingsView: View {
                                 if isQuiet {
                                     if locationManager.contentMode != .quiet {
                                         lastNonQuietMode = locationManager.contentMode
-                                        UserDefaults.standard.set(
-                                            lastNonQuietMode.rawValue,
-                                            forKey: Self.lastNonQuietModeKey
-                                        )
+                                        locationManager.lastNonQuietContentMode = lastNonQuietMode
                                     }
                                     locationManager.contentMode = .quiet
                                 } else {
-                                    let savedMode = UserDefaults.standard.string(forKey: Self.lastNonQuietModeKey)
-                                        .flatMap(ContentMode.init(rawValue:))
-                                    locationManager.contentMode = savedMode ?? lastNonQuietMode
+                                    locationManager.contentMode = locationManager.lastNonQuietContentMode
                                 }
                             }
                         ),
@@ -1511,10 +1533,7 @@ private struct SettingsView: View {
             .tint(palette.accent)
             .environment(\.colorScheme, .dark)
             .onAppear {
-                if let savedMode = UserDefaults.standard.string(forKey: Self.lastNonQuietModeKey),
-                   let savedContentMode = ContentMode(rawValue: savedMode) {
-                    lastNonQuietMode = savedContentMode
-                }
+                lastNonQuietMode = locationManager.lastNonQuietContentMode
 
                 if locationManager.contentMode != .quiet {
                     lastNonQuietMode = locationManager.contentMode
@@ -1527,7 +1546,7 @@ private struct SettingsView: View {
                 }
                 guard newMode != .quiet else { return }
                 lastNonQuietMode = newMode
-                UserDefaults.standard.set(newMode.rawValue, forKey: Self.lastNonQuietModeKey)
+                locationManager.lastNonQuietContentMode = newMode
             }
             .toolbar {
                 Button("Done") {
