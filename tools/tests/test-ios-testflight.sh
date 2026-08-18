@@ -12,7 +12,9 @@ cleanup() {
         rm -rf -- "$TEST_ROOT"
     fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
@@ -463,7 +465,19 @@ test_private_key_is_removed_after_ordinary_failure() {
     run_tool trust-current --owner-override "fixture no-test deployment" >/dev/null
     FAKE_MODE=processing_failure run_tool deploy >/dev/null 2>&1 || true
     ! find "$TEST_ROOT/tmp" -name 'AuthKey_*.p8' -print -quit | grep -q . || fail "temporary private key remained after ordinary failure"
-    pass "temporary private key is removed after ordinary failure"
+
+    new_fixture
+    write_auth_profile
+    run_tool trust-current --owner-override "fixture no-test deployment" >/dev/null
+    local output status
+    set +e
+    output="$(FAKE_MODE=term_during_archive run_tool deploy 2>&1)"
+    status=$?
+    set -e
+    [[ "$status" == "143" ]] || fail "TERM did not stop deployment with status 143: status=$status output=$output"
+    ! find "$TEST_ROOT/tmp" -name 'AuthKey_*.p8' -print -quit | grep -q . || fail "temporary private key remained after TERM"
+    ! grep -q -- '-exportArchive' "$TEST_ROOT/fake.log" || fail "upload continued after TERM"
+    pass "temporary private key is removed after ordinary failure and TERM stops deployment"
 }
 
 test_embedded_jwt_helper_runs_with_ephemeral_key() {

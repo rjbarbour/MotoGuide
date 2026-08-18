@@ -48,6 +48,10 @@ if [[ " $* " == *" archive "* ]]; then
         previous="$argument"
     done
     [[ -n "$archive_path" && -n "$build_number" ]]
+    if [[ "${FAKE_MODE:-success}" == "term_during_archive" ]]; then
+        kill -TERM "$PPID"
+        sleep 1
+    fi
     app_path="$archive_path/Products/Applications/App.app"
     mkdir -p "$app_path"
     /usr/bin/plutil -create xml1 "$archive_path/Info.plist"
