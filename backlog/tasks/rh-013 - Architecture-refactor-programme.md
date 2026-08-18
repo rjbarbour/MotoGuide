@@ -4,7 +4,7 @@ title: Architecture refactor programme
 status: To Do
 assignee: []
 created_date: '2026-08-17 22:35'
-updated_date: '2026-08-18 10:01'
+updated_date: '2026-08-18 13:08'
 labels:
   - shaping
   - architecture
@@ -13,6 +13,7 @@ milestone: m-0
 dependencies: []
 references:
   - docs/architecture/plans/ARCHITECTURE_REFACTOR_PLAN.md
+priority: high
 type: task
 ordinal: 20000
 ---
