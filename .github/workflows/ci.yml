@@ -29,14 +29,32 @@ jobs:
       - name: Select changed test suites
         id: selection
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
         run: |
           if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            ./tools/test-changed --base "$BASE_SHA" --head "$HEAD_SHA" --dry-run --github-output
-          else
+            ./tools/test-changed --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA" --dry-run --github-output
+          elif [[ "$PUSH_BASE_SHA" =~ ^0+$ ]]; then
             ./tools/test-changed --all --dry-run --github-output
+          else
+            ./tools/test-changed --base "$PUSH_BASE_SHA" --head "$GITHUB_SHA" --dry-run --github-output
           fi
+
+      - name: Record downstream deployment selection
+        env:
+          PROXY_DEPLOY: ${{ steps.selection.outputs.proxy_deploy }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/test-selection"
+          printf 'proxy_deploy=%s\n' "$PROXY_DEPLOY" > "$RUNNER_TEMP/test-selection/proxy_deploy"
+
+      - name: Upload downstream deployment selection
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-selection
+          path: ${{ runner.temp }}/test-selection/proxy_deploy
+          if-no-files-found: error
+          retention-days: 1
 
   ios-tests:
     name: iOS unit tests

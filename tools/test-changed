@@ -80,36 +80,64 @@ if [[ -n "$base" && ${#files[@]} -gt 0 ]]; then
 fi
 
 if [[ -n "$base" ]]; then
+    if ! changed_paths="$(git -C "$repo_root" diff --name-only "$base...$head")"; then
+        printf 'Could not compare %s...%s; no test selection was made.\n' "$base" "$head" >&2
+        exit 1
+    fi
     while IFS= read -r path; do
         [[ -n "$path" ]] && files+=("$path")
-    done < <(git -C "$repo_root" diff --name-only "$base...$head")
+    done <<< "$changed_paths"
 
     if [[ "$head_was_set" == false ]]; then
+        if ! changed_paths="$(git -C "$repo_root" diff --name-only HEAD)"; then
+            printf '%s\n' 'Could not inspect unstaged changes; no test selection was made.' >&2
+            exit 1
+        fi
         while IFS= read -r path; do
             [[ -n "$path" ]] && files+=("$path")
-        done < <(git -C "$repo_root" diff --name-only HEAD)
+        done <<< "$changed_paths"
 
+        if ! changed_paths="$(git -C "$repo_root" diff --cached --name-only)"; then
+            printf '%s\n' 'Could not inspect staged changes; no test selection was made.' >&2
+            exit 1
+        fi
         while IFS= read -r path; do
             [[ -n "$path" ]] && files+=("$path")
-        done < <(git -C "$repo_root" diff --cached --name-only)
+        done <<< "$changed_paths"
+
+        if ! changed_paths="$(git -C "$repo_root" ls-files --others --exclude-standard)"; then
+            printf '%s\n' 'Could not inspect untracked changes; no test selection was made.' >&2
+            exit 1
+        fi
+        while IFS= read -r path; do
+            [[ -n "$path" ]] && files+=("$path")
+        done <<< "$changed_paths"
     fi
 fi
 
 ios=false
 proxy=false
+proxy_deploy=false
 reason="documentation or metadata only"
 
 if [[ "$run_all" == true ]]; then
     ios=true
     proxy=true
+    proxy_deploy=true
     reason="explicit full-suite request"
 else
     for path in "${files[@]}"; do
         case "$path" in
-            .github/workflows/*|.github/actions/*|tools/*|FACT_PROXY_OPENAPI.yaml|*.xcodeproj/*|*.xcworkspace/*|*.swiftpm/*|.gitignore)
+            FACT_PROXY_OPENAPI.yaml)
                 ios=true
                 proxy=true
-                reason="workflow, tooling, shared contract, or build configuration changed"
+                proxy_deploy=true
+                reason="shared proxy contract changed"
+                ;;
+            .github/workflows/*|.github/actions/*|tools/*|*.xcodeproj/*|*.xcworkspace/*|*.swiftpm/*|.gitignore)
+                ios=true
+                proxy=true
+                reason="workflow, tooling, or build configuration changed"
                 ;;
             RideHorizon/*|RideHorizonTests/*|*.swift)
                 ios=true
@@ -117,6 +145,7 @@ else
                 ;;
             fact-proxy/*)
                 proxy=true
+                proxy_deploy=true
                 [[ "$reason" == "documentation or metadata only" ]] && reason="fact proxy source or test changed"
                 ;;
             docs/*|*.md|README.md|LICENSE|backlog/*)
@@ -137,6 +166,7 @@ if [[ "$github_output" == true ]]; then
     {
         printf 'ios=%s\n' "$ios"
         printf 'proxy=%s\n' "$proxy"
+        printf 'proxy_deploy=%s\n' "$proxy_deploy"
     } >> "$GITHUB_OUTPUT"
 fi
 

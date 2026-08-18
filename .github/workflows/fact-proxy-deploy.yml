@@ -8,6 +8,7 @@ on:
       - completed
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -20,13 +21,41 @@ env:
   FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'motoguide-fact-proxy' }}
 
 jobs:
-  deploy:
-    name: Deploy after tests
+  select-deploy:
+    name: Select fact proxy deployment
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      proxy_deploy: ${{ steps.selection.outputs.proxy_deploy }}
+    steps:
+      - name: Download tested selection
+        uses: actions/download-artifact@v4
+        with:
+          name: test-selection
+          path: ${{ runner.temp }}/test-selection
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Read deployment selection
+        id: selection
+        run: |
+          selection="$(<"$RUNNER_TEMP/test-selection/proxy_deploy")"
+          [[ "$selection" == "proxy_deploy=true" || "$selection" == "proxy_deploy=false" ]]
+          printf '%s\n' "$selection" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy after tests
+    needs: select-deploy
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      needs.select-deploy.outputs.proxy_deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
