@@ -2,6 +2,22 @@
 
 Use plain language, direct instructions, no waffle. Use ISO-8601 dates.
 
+## Workspace Scope
+
+This repository is the canonical workspace for working on the RideHorizon codebase.
+
+Use this repository for:
+
+- app and service code;
+- tests, builds, releases and deployment tooling;
+- architecture and refactoring plans that govern code changes;
+- implementation-linked technical documentation; and
+- tracked software delivery through the repository's canonical ledger.
+
+Use the parent workspace, `/Users/rob_dev/DocsLocal/motoguide`, for RideHorizon research, discovery, market and competitor analysis, exploratory validation, and supporting source material that does not need to ship with the codebase.
+
+When research produces an accepted product requirement, architectural decision or implementation constraint, transfer the durable outcome into the appropriate repository document or ledger record before implementation. Do not treat unintegrated parent-workspace research as implementation authority.
+
 ## Project Purpose
 
 RideHorizon is a motorbike-specific geographic-awareness companion. It runs alongside normal navigation, shows the rider's best-available current place and can add short, useful place context through a Bluetooth helmet headset.
@@ -209,10 +225,13 @@ Backlog.md is the canonical delivery ledger. Its repository-backed records live 
 
 Use Plan for direction, Goal for the active work item and Loop only for bounded machine-verifiable iteration. Treat coding agents and IDEs as execution surfaces, not project trackers. Use the Delivery Risk Cube to compare the evidence shape with the project's next commitment. Record hard-to-reverse, cross-increment or surprising architectural choices in the project decision log or an ADR; do not embed them silently in code. Do not continue automatically into later milestones.
 
-All agents work in one checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`. There are no separate worktrees unless explicitly created.
+The canonical integration checkout is `/Users/rob_dev/DocsLocal/motoguide/repo`. Task worktrees may be created explicitly for claimed Backlog.md work items.
 
-- Work on one coherent batch of changes at a time. Do not run parallel agents that edit the same repo.
-- Do not run multiple `xcodebuild` jobs in parallel against the same `DerivedData` path.
+- Never let two agents edit the same worktree.
+- Parallel implementation requires separate worktrees, integrated dependencies, explicit `ready` labels, limited conceptual and file overlap, and independent verification. A `parallel-candidate` label records a candidate only; the coordinator must recheck overlap against current `main` before claiming it.
+- Use one work-item ID, branch, worktree and pull request per implementation task. The coordinator owns worktree creation, task coordination, model assignment, serial merge order, current-`main` verification and ready-queue replenishment. Implementation agents do not merge their own work.
+- Use Codex Spark for highly constrained, surgical tasks with deterministic acceptance evidence. Use a higher-capability model when the task contains unresolved architecture, broad coupling or ambiguous failure analysis.
+- Do not run multiple `xcodebuild` jobs against the same `DerivedData` path. Parallel worktrees must use distinct derived-data paths.
 - Prefer writing and compiling over repeated full test/deploy cycles.
 
 ### Default loop
