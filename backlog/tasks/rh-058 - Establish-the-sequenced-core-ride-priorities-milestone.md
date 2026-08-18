@@ -1,11 +1,11 @@
 ---
 id: RH-058
 title: Establish the sequenced core ride priorities milestone
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:56'
-updated_date: '2026-08-18 13:08'
+updated_date: '2026-08-18 13:42'
 labels: []
 dependencies: []
 modified_files:
@@ -39,10 +39,12 @@ Create the canonical Backlog milestone for the RideHorizon priorities agreed on 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-08-18 verification: m-1 contains exactly ten ordered tasks covering background reliability, speech sequencing, Dynamic Island visibility, current-ride sequence awareness, model quality, per-ride conversation, three-ride delivered-summary memory, longer facts, Apple voices and the extended Live Activity. RH-024 is the only pre-existing task moved into the milestone. RH-068 remains low priority, parked and outside the milestone. CLI checks confirm deterministic ordinals, explicit priorities, required dependencies and RH-059 as the sole ready item. No product code changed; builds and device deployment were not applicable.
+
+Post-merge verification on 2026-08-18: merge commit cb235e4 is an ancestor of current main; the CLI reports m-1 with ten deterministically ordered tasks, RH-059 as the sole ready item, decision-007 accepted, and RH-068 parked outside the milestone. PROJECT.md and MILESTONES.md now reflect the accepted reliability-first direction.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Created and verified the separate Core ride reliability and continuity milestone and its dependency-aware delivery sequence. The ledger checkpoint is ready for review and integration; canonical Done remains gated on merge and post-merge verification.
+Integrated and post-merge verified m-1 — Core ride reliability and continuity, its ten-task sequence, decision-007, and the parked river-crossing spike. Refreshed the root project-direction documents to match the accepted reliability-first sequence.
 <!-- SECTION:FINAL_SUMMARY:END -->

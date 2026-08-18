@@ -4,9 +4,9 @@ Date: 2026-07-03
 
 Product capability ladder refined: 2026-08-04
 
-Product-direction decision: 2026-08-17
+Product-direction decision: 2026-08-18
 
-On 2026-08-17, product direction returned to the core RideHorizon motorcycle experience. This dated decision supersedes the dated `Immediate Next Steps` sequence at the end of this document; it does not assert current task status or erase retained milestone history and release evidence. Use `backlog task list --plain` for live delivery status and inspect the selected task through the CLI before claiming it.
+On 2026-08-18, decision-007 established `m-1 — Core ride reliability and continuity` and placed reliable announcements while Google Maps is foregrounded first. This dated decision supersedes the earlier nomination of sequence-aware facts as the next increment and the dated `Immediate Next Steps` sequence at the end of this document; it does not assert current task status or erase retained milestone history and release evidence. Use `backlog task list --plain` for live delivery status and inspect the selected task through the CLI before claiming it.
 
 ## 2026-07-17 Identity Migration
 
@@ -549,8 +549,7 @@ Decision criteria:
 
 ## Immediate Next Steps
 
-1. Integrate RH-055's documentation-only focus reconciliation.
-2. Claim RH-024 Tier 1 on its own implementation branch.
-3. Add bounded same-day delivered-fact context and coherent revisit behaviour without changing the stable cache into a rolling-history key.
-4. Update and verify the app/proxy/OpenAPI contract with focused tests, then run one complete implementation checkpoint.
-5. Return to the milestone health gate before selecting RH-025, RH-027 or any parked stream.
+1. Use `m-1 — Core ride reliability and continuity` as the current product sequence.
+2. Claim `RH-059 — Restore announcements while Google Maps is foregrounded` on its own implementation branch when product implementation is authorised.
+3. Prove the background trigger, generation, queue and helmet-playback path on the supported physical iPhone while Google Maps is foregrounded.
+4. Return to the milestone health gate before selecting the next product item or resuming a separate programme.

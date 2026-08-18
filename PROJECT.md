@@ -1,10 +1,10 @@
 # RideHorizon Project State
 
-Last verified: 2026-08-17
+Last verified: 2026-08-18
 
 ## Current product direction
 
-The owner decision recorded on 2026-08-17 returned attention to core RideHorizon feature development and nominated bounded same-day ride context as the next intended product increment. This is dated product direction, not a duplicate assertion of current task status. Run `backlog task list --plain` and inspect the selected task through the CLI before claiming work.
+The accepted decision recorded on 2026-08-18 establishes `m-1 — Core ride reliability and continuity` as the current product sequence. It supersedes the earlier nomination of sequence-aware facts as the next increment and puts reliable announcements while Google Maps is foregrounded first. This is dated product direction, not a duplicate assertion of live task status. Run `backlog task list --plain` and inspect the selected task through the CLI before claiming work.
 
 ## Last verified result
 
@@ -22,7 +22,7 @@ The on-device place model now retains the supported Apple placemark fields and d
 
 ## Current gate
 
-Delivery selection is controlled by the Backlog.md CLI. The 2026-08-17 decision nominated RH-024 Tier 1 sequence-aware ride facts; confirm its current status with `backlog task view RH-024 --plain` before claiming it. If it remains the selected task, deliver only its bounded same-day context slice and stop before persistent cross-trip memory, server-side rider history, multiple cached variants or live-service deployment.
+Delivery selection is controlled by the Backlog.md CLI. Decision-007 establishes the reliability-first sequence in `m-1 — Core ride reliability and continuity`; its first product outcome is reliable announcements while Google Maps is foregrounded. The architecture-refactor programme remains separate and is not resumed by that product decision. Confirm the selected work item through the CLI before claiming either programme.
 
 ## Residual risks
 
@@ -38,5 +38,5 @@ Delivery selection is controlled by the Backlog.md CLI. The 2026-08-17 decision 
 
 ## Next outcomes
 
-1. Confirm the selected core task through the Backlog.md CLI and claim only that task.
-2. Evaluate its bounded behaviour independently, then return to the milestone health gate before selecting further guide work.
+1. Confirm the selected work item and programme through the Backlog.md CLI and claim only that task.
+2. Evaluate its bounded behaviour independently, then return to the applicable milestone health gate before selecting further work.
