@@ -236,6 +236,22 @@ The canonical integration checkout is `/Users/rob_dev/DocsLocal/motoguide/repo`.
 - Do not run multiple `xcodebuild` jobs against the same `DerivedData` path. Parallel worktrees must use distinct derived-data paths.
 - Prefer writing and compiling over repeated full test/deploy cycles.
 
+### Architecture programme efficiency
+
+For the High-priority architecture programme, `RH-013.02 — Baseline capture` owns the baseline; `RH-013.36 — Dependency foundation`, `RH-013.37 — Ride orchestration` and `RH-013.38 — Announcement orchestration` own the three execution branches, worktrees, commits and pull requests. `RH-013.01 — Settings boundary` and `RH-013.03` through `RH-013.13 — Remaining High architecture checkpoints` are acceptance checkpoints inside those batches, not separately claimable branches or pull requests.
+
+- Every commit uses the owning batch ID. Commit bodies and evidence name the checkpoint IDs and descriptions covered.
+- Checkpoints remain To Do while their batch is active. After the batch merges, the coordinator verifies and closes its checkpoint records from current `main`, then closes the batch and replenishes the ready queue.
+- Run focused deterministic tests after coherent checkpoint groups, not after every edit. The focused test invocation is also the compile check.
+- Run the complete iOS suite only at the baseline, ride-orchestration gate and final announcement-orchestration gate.
+- Run unsigned Release builds only at the baseline and final announcement-orchestration gate.
+- Run the proxy suite only at the baseline unless proxy or shared-contract files change.
+- Build, install and launch on the physical iPhone once at the final High architecture gate, unless an earlier change demonstrably alters runtime platform behaviour.
+- Use one sequential DerivedData path per batch. Parallel workers must use distinct paths and may return commits only after an overlap check.
+- Do not use a standard `[skip ci]` token. `RH-071 — Architecture CI suppression` must be integrated before code batches begin; it may suppress only duplicate GitHub iOS execution while preserving proxy and lightweight validation.
+
+This block overrides the conflicting per-task branch/commit/pull-request rule above and the more frequent build and device-deploy defaults below only for the High-priority architecture programme.
+
 ### Default loop
 
 Batch changes, then validate once:

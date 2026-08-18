@@ -14,33 +14,22 @@ Backlog.md is the sole live delivery ledger. It owns task status, readiness, cla
 
 - Milestone `m-0`, **Architecture refactor programme**, holds the programme outcome and replenishment gate.
 - `RH-013` is the non-executing programme container and links every child back to this plan.
-- `RH-013.01` through `RH-013.34` decompose the phases below into one-worktree, one-branch and one-pull-request increments with explicit dependencies and acceptance evidence.
+- `RH-013.01` — settings boundary — and `RH-013.03` through `RH-013.13` — remaining High architecture checkpoints — retain the detailed outcomes. They are not independently claimable execution branches. `RH-013.02` remains the independently claimable baseline.
+- `RH-013.14` through `RH-013.34` — later architecture tasks — remain independently claimable, subject to their priorities and phase gates.
+- `RH-013.36`, `RH-013.37` and `RH-013.38` own the dependency-foundation, ride-orchestration and announcement-orchestration branches, worktrees, pull requests and phase evidence.
 - Phase and `parallel-candidate` labels describe the intended execution shape. They do not make a task ready or authorise simultaneous edits.
 
 For immediate continuation, run `backlog instructions overview`, `backlog task view RH-013 --plain` and `backlog task list --parent RH-013 --plain`. Only children explicitly labelled `ready`, with every dependency integrated, may be claimed. The long-range child graph remains revisable at phase health gates even though its current outcomes and dependencies are recorded. If the CLI and this document disagree about live status, the CLI wins; if they disagree about architectural direction, stop and reconcile the plan and task contract explicitly.
 
-## Integration checkpoint — 2026-08-18
+## Current execution contract — 2026-08-18
 
-The user authorised integration of the completed planning batch by replying `Proceed.` No integration command had run at the checkpoint captured here, and refactor implementation had not started.
+The planning batch is integrated. `RH-013.02` — baseline capture — is the only independently claimable baseline task. After it passes, the coordinator promotes one dependency-satisfied batch at a time:
 
-Verified local state:
+1. `RH-013.36` — dependency foundation, covering checkpoints `RH-013.01`, `RH-013.03`, `RH-013.04` and `RH-013.05`;
+2. `RH-013.37` — ride orchestration, covering checkpoints `RH-013.06` through `RH-013.09`; and
+3. `RH-013.38` — announcement orchestration, covering checkpoints `RH-013.10` through `RH-013.13`.
 
-- Checkout: `/Users/rob_dev/DocsLocal/motoguide/repo`.
-- Branch: `main`.
-- The planning batch is local and uncommitted. It includes milestone `m-0`, programme updates to `RH-013`, the shaped child graph `RH-013.01` through `RH-013.34`, the parallel-worktree rules in `AGENTS.md` and this plan's control-plane reconciliation.
-- The child graph was checked as 34 children, all under `RH-013` and milestone `m-0`, with plan references, at least three acceptance criteria per child, no unknown dependencies, no dependency cycles and no premature `ready` label.
-- Eleven tasks carry the `parallel-candidate` label: `RH-013.04`, `RH-013.05`, `RH-013.16`, `RH-013.17`, `RH-013.20`, `RH-013.23`, `RH-013.25`, `RH-013.26`, `RH-013.29`, `RH-013.30` and `RH-013.31`. Candidate status is not execution authority; overlap must be rechecked against current `main` before claiming.
-- `RH-013.34` remains a human evidence gate because changing production location defaults requires physical ride and battery evidence.
-- `git diff --check` passed at this checkpoint. No application tests were run because only delivery records and documentation changed.
-
-Immediate continuation:
-
-1. Refresh the binding delivery and Git-integration SOPs, then run `backlog instructions overview` and read the task guide it names. Expected result: the current supported workflow for creating and integrating a control-plane task is displayed.
-2. Create one tracked control-plane work item for integrating this planning batch, using supported public `backlog` CLI commands only. Expected result: one task owns the Goal, branch, worktree, commit, pull request and integration evidence for these existing changes.
-3. Isolate the planning diff on that task's branch/worktree without losing or mixing the current local changes. Expected result: the integration checkout and task checkout have explicit, recoverable ownership.
-4. Verify the exact file set, child graph and `git diff --check`; commit, push, open one pull request, review it independently and merge it serially under the coordinator's control. Expected result: the planning batch is present on current `main` through one traceable pull request.
-5. Verify merged `main`, close the control-plane task through the CLI, remove its worktree and branch as the applicable SOP directs, then make `RH-013.02` the first `ready` child. Expected result: `main` is checkpoint-clean and `RH-013.02` is ready to capture the clean architecture-refactor baseline.
-6. Stop. Do not begin `RH-013.02` or any refactor implementation in the planning-batch integration turn.
+Each batch has one branch, worktree, commit identity and pull request. The batch task is the active execution contract; commit bodies and evidence name the checkpoint IDs and descriptions covered. Checkpoints remain To Do while the batch is active. After merge, the coordinator verifies and closes the contained checkpoints from current `main`, closes the batch and only then replenishes the ready queue. Parallel checkpoint contributions are allowed only after confirming file and conceptual independence; implementation sessions never merge.
 
 ## Bottom line
 
@@ -48,7 +37,7 @@ Refactor through small, behaviour-preserving milestones. Establish the iOS depen
 
 Keep the existing iOS application target and proxy deployment. Source-level boundaries and narrow interfaces are sufficient at this stage; separate Swift packages, services or deployments would add cost without solving the present problems.
 
-The first execution sequence is RH-013.02 to establish the clean baseline, followed by RH-013.01 (legacy RH-013A) only after that dependency is integrated. Capturing the full task graph does not make later increments implementation-ready.
+The High-priority execution sequence is `RH-013.02` — baseline capture — then `RH-013.36` — dependency foundation — `RH-013.37` — ride orchestration — and `RH-013.38` — announcement orchestration. Later architecture work remains gated and does not block new features unless its risk is activated.
 
 ## Why this work is needed
 
@@ -118,7 +107,7 @@ Outcome: begin from a clean, known release baseline and prevent accidental behav
 
 Work:
 
-- Finish or deliberately pause the current RH-001/RH-003/RH-004 gate.
+- Integrate or deliberately pause every pre-existing workstream before selecting the baseline revision.
 - Rebase or branch from clean `main` after the accepted work is committed.
 - Record the complete iOS and proxy test baseline.
 - Treat the existing lifecycle, announcement, audio and persistence behaviour as characterisation unless a later work item changes it explicitly.
@@ -141,7 +130,7 @@ Boundaries:
 - Do not redesign the Settings UI; RH-005 remains a separate product increment.
 - Do not add packages, a dependency-injection framework or a service locator.
 
-Gate: no ride-setting reads or writes outside the settings adapter and composition root; clean-install and existing-install settings tests pass; the full iOS suite and unsigned Release build pass.
+Gate: no ride-setting reads or writes outside the settings adapter and composition root; focused clean-install, existing-install, onboarding and Location evidence passes. The focused iOS test invocation supplies the compile check. Do not run the complete iOS suite, Release build, proxy suite or device deployment at this boundary.
 
 ### Milestone 2 — Extract ride-session orchestration
 
@@ -154,7 +143,7 @@ Work:
 - Keep Core Location configuration and callbacks in the platform adapter.
 - Split the monolithic test suite into contract, lifecycle and adapter-focused suites as ownership moves.
 
-Gate: start/end/inactivity, stale callback rejection, cancellation and test-route behaviour are proven with deterministic fakes; existing physical-device release evidence remains valid or is repeated where the seam changed.
+Gate: start/end/inactivity, stale callback rejection, cancellation and test-route behaviour are proven with deterministic fakes; run the complete iOS suite once after the integrated ride batch. Do not run the Release, proxy or device gates unless runtime behaviour changed.
 
 ### Milestone 3 — Extract announcement coordination
 
@@ -167,7 +156,7 @@ Work:
 - Retain pure announcement policy and queue types for prioritisation and suppression.
 - Make cancellation and terminal cleanup explicit results, not incidental callback combinations.
 
-Gate: fact, Names Only, Apple Voice, Premium Voice, retry/fallback, interruption, supersession and End ride paths are deterministic; RH-004 audio behaviour and privacy-safe diagnostics remain unchanged.
+Gate: fact, Names Only, Apple Voice, Premium Voice, retry/fallback, interruption, supersession and End ride paths are deterministic; RH-004 audio-coexistence behaviour and privacy-safe diagnostics remain unchanged; then run one complete iOS suite, one final unsigned Release build and one physical iPhone build/install. Repeat physical audio evidence only if observable audio behaviour changed.
 
 ### Milestone 4 — Make the app–proxy contract executable
 
@@ -223,28 +212,37 @@ Work:
 
 Gate: complete concurrency checking is clean; no unchecked sendability is added merely to silence warnings; any location-policy change has physical evidence and a rollback point.
 
-## First unattended execution sequence
+## Efficient unattended execution
 
-RH-013.02 establishes the exact clean baseline and stops if any declared gate is red. After RH-013.02 is integrated and the coordinator marks RH-013.01 ready, RH-013.01 is the first implementation increment. Inspect each delivery contract with `backlog task view RH-013.02 --plain` and `backlog task view RH-013.01 --plain` before claiming it.
+`RH-013.02` establishes the exact baseline and stops if any declared gate is red. Thereafter, claim only the next batch task. Within a batch:
 
-Suggested commit sequence:
+1. use existing characterisation evidence unless the new interface exposes an actual gap;
+2. implement coherent checkpoint commits before invoking Xcode;
+3. run only the focused deterministic tests that falsify the changed behaviour;
+4. reuse one sequential batch DerivedData path and never share it with a parallel build;
+5. run the documented batch gate once, after integration of all checkpoint commits; and
+6. obtain independent diff review without rerunning product suites.
 
-1. Add characterisation tests for current setting keys, defaults and round trips.
-2. Add `RideSettings`, `RideSettingsStore` and the `UserDefaults` adapter without changing consumers.
-3. Migrate one coherent consumer group at a time to the store.
-4. Remove only the duplicated direct access made obsolete by the migration.
-5. Run the complete gate and obtain an independent diff review.
+Use Codex Spark for surgical checkpoint commits after the interface is settled. Use a higher-capability model for interface placement and orchestration ownership. More parallel workers do not justify overlapping edits or extra builds.
 
-Each implementation agent must stop at its child-task boundary, report evidence and leave later tasks unstarted. A failed test, required key migration, observable settings change, unrelated release-candidate conflict or need for a new framework is a stop condition rather than permission to widen scope. The coordinator may replenish the ready queue only after integration, current-main verification and the applicable phase health gate.
+Do not use a standard `[skip ci]` token. Before code batches begin, integrate `RH-071 — Architecture CI suppression`, which must suppress only duplicate GitHub iOS execution under an explicit local-evidence marker while preserving proxy and lightweight validation.
 
-## Verification baseline
+## High-priority verification budget
 
-From the repository root:
+The default budget is three complete iOS suites, two unsigned Release builds, one proxy suite and one physical iPhone build/install. An activated risk exception may add a targeted run and must record why:
 
-- iOS tests: `xcodebuild test -project RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath DerivedData-ArchitectureRefactor -only-testing:RideHorizonTests` — expected result: `** TEST SUCCEEDED **` with zero failures.
-- unsigned iOS Release build: `xcodebuild build -project RideHorizon.xcodeproj -scheme RideHorizon -configuration Release -destination 'generic/platform=iOS' -derivedDataPath DerivedData-ArchitectureRefactor-Release CODE_SIGNING_ALLOWED=NO` — expected result: `** BUILD SUCCEEDED **`.
-- proxy tests, when proxy code or contract fixtures change: `cd fact-proxy && ./gradlew test --no-daemon` — expected result: `BUILD SUCCESSFUL`.
-- current documentary OpenAPI parse, until Milestone 4 replaces it with executable validation: `ruby -e 'require "yaml"; doc = YAML.load_file("FACT_PROXY_OPENAPI.yaml"); abort "missing openapi" unless doc["openapi"] == "3.0.3"; abort "missing /v1/fact" unless doc.dig("paths", "/v1/fact", "post"); abort "missing FactRequest" unless doc.dig("components", "schemas", "FactRequest"); puts "OpenAPI YAML parsed: #{doc["info"]["title"]} #{doc["info"]["version"]}"'` — expected result starts with `OpenAPI YAML parsed:`.
+| Gate | Focused evidence | Complete iOS | Unsigned Release | Proxy | Physical iPhone |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `RH-013.02` baseline | Existing complete baseline | 1 | 1 | 1 | 0 |
+| `RH-013.36` dependency foundation | Settings, onboarding and Location | 0 | 0 | 0 | 0 |
+| `RH-013.37` ride orchestration | Ride lifecycle and adapter | 1 | 0 | 0 | 0 unless behaviour changed |
+| `RH-013.38` announcement orchestration | Announcement coordinator and cancellation | 1 | 1 | 0 | 1 |
+
+The complete commands remain:
+
+- iOS suite: `xcodebuild test -project RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath DerivedData-ArchitectureRefactor -only-testing:RideHorizonTests` — expected result: `** TEST SUCCEEDED **`.
+- unsigned Release: `xcodebuild build -project RideHorizon.xcodeproj -scheme RideHorizon -configuration Release -destination 'generic/platform=iOS' -derivedDataPath DerivedData-ArchitectureRefactor-Release CODE_SIGNING_ALLOWED=NO` — expected result: `** BUILD SUCCEEDED **`.
+- proxy baseline: `cd fact-proxy && ./gradlew test --no-daemon` — expected result: `BUILD SUCCESSFUL`.
 
 If the named simulator runtime is unavailable, stop and record the available destination rather than silently substituting a weaker build-only check.
 

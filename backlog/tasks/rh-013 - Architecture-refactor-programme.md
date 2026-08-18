@@ -4,7 +4,7 @@ title: Architecture refactor programme
 status: To Do
 assignee: []
 created_date: '2026-08-17 22:35'
-updated_date: '2026-08-18 13:08'
+updated_date: '2026-08-18 14:00'
 labels:
   - shaping
   - architecture
@@ -21,7 +21,7 @@ ordinal: 20000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Coordinate the approved RideHorizon architecture refactor through independently claimable child tasks. This parent is a programme container, not an implementation branch or pull request. The architecture plan remains the direction authority. Each child task uses one task ID, branch, worktree, pull request and evidence record. Only ready-labelled children may be claimed. The coordinator checks conceptual and file overlap before delegation, selects the model deliberately, merges reviewed work serially into current main, rebases or refreshes remaining branches, and holds a health gate before replenishing the ready queue.
+Coordinate the approved RideHorizon architecture refactor through one clean baseline and three executable behaviour-preserving batches. RH-013.01 — settings boundary and RH-013.03 through RH-013.13 — remaining High architecture checkpoints are non-claimable acceptance records inside the batches; RH-013.02 — baseline capture remains independently claimable; RH-013.36 — dependency foundation, RH-013.37 — ride orchestration and RH-013.38 — announcement orchestration own their branches, worktrees, commits and pull requests. Only the baseline and dependency-satisfied batch tasks may be labelled ready. After a batch merges, the coordinator closes its proven checkpoints from current main, closes the batch and replenishes the queue.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
