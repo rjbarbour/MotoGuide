@@ -2,6 +2,8 @@
 
 Use plain language, direct instructions, no waffle. Use ISO-8601 dates.
 
+Whenever mentioning a tracked work item in user-facing text, give its identifier and a brief title or plain-language description. Never use a bare ticket identifier such as `RH-024` without explaining what the work item is.
+
 ## Workspace Scope
 
 This repository is the canonical workspace for working on the RideHorizon codebase.
