@@ -1,11 +1,11 @@
 ---
 id: RH-022
 title: Remediate CI findings and activate stable gates
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-18 13:28'
+updated_date: '2026-08-18 13:42'
 labels:
   - shaping
   - ci
@@ -28,7 +28,7 @@ Resolve known CI findings and enable only stable, evidence-backed gates through 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each activated gate is stable and its remediation evidence is recorded.
+- [x] #1 Each activated gate is stable and its remediation evidence is recorded.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -48,4 +48,12 @@ Resolve known CI findings and enable only stable, evidence-backed gates through 
 Branch: codex/rh-022-selective-test-execution. Scope: selective local and PR test execution only; no change to release, deployment, or physical-device gates.
 
 Evidence: classifier cases passed for documentation, iOS, proxy, workflow and full-suite selections. 2026-08-18: 182 iOS unit tests passed on the USB-connected iPhone; fact-proxy Gradle tests passed. GitHub rulesets endpoint returned no applicable rulesets; legacy branch-protection read returned HTTP 403 with GH-PERSONAL, so required-check configuration needs owner confirmation in GitHub Settings.
+
+Post-merge verification on 2026-08-18: pull request #29 is integrated through merge commit 86cffde. On current main, dry-run classification selects neither suite for documentation, iOS only for app source, proxy only for proxy source, and both suites for workflow/tooling changes. No tests were rerun during this post-merge metadata closure.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Integrated selective local and pull-request test-suite selection. Existing evidence records 182 iOS tests and fact-proxy tests passing before merge; post-merge dry runs verified documentation, iOS, proxy and shared-workflow classification on current main.
+<!-- SECTION:FINAL_SUMMARY:END -->
