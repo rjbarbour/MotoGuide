@@ -80,18 +80,38 @@ if [[ -n "$base" && ${#files[@]} -gt 0 ]]; then
 fi
 
 if [[ -n "$base" ]]; then
+    if ! changed_paths="$(git -C "$repo_root" diff --name-only "$base...$head")"; then
+        printf 'Could not compare %s...%s; no test selection was made.\n' "$base" "$head" >&2
+        exit 1
+    fi
     while IFS= read -r path; do
         [[ -n "$path" ]] && files+=("$path")
-    done < <(git -C "$repo_root" diff --name-only "$base...$head")
+    done <<< "$changed_paths"
 
     if [[ "$head_was_set" == false ]]; then
+        if ! changed_paths="$(git -C "$repo_root" diff --name-only HEAD)"; then
+            printf '%s\n' 'Could not inspect unstaged changes; no test selection was made.' >&2
+            exit 1
+        fi
         while IFS= read -r path; do
             [[ -n "$path" ]] && files+=("$path")
-        done < <(git -C "$repo_root" diff --name-only HEAD)
+        done <<< "$changed_paths"
 
+        if ! changed_paths="$(git -C "$repo_root" diff --cached --name-only)"; then
+            printf '%s\n' 'Could not inspect staged changes; no test selection was made.' >&2
+            exit 1
+        fi
         while IFS= read -r path; do
             [[ -n "$path" ]] && files+=("$path")
-        done < <(git -C "$repo_root" diff --cached --name-only)
+        done <<< "$changed_paths"
+
+        if ! changed_paths="$(git -C "$repo_root" ls-files --others --exclude-standard)"; then
+            printf '%s\n' 'Could not inspect untracked changes; no test selection was made.' >&2
+            exit 1
+        fi
+        while IFS= read -r path; do
+            [[ -n "$path" ]] && files+=("$path")
+        done <<< "$changed_paths"
     fi
 fi
 
