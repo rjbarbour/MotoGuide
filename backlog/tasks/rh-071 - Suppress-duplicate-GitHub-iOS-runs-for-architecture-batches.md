@@ -4,10 +4,12 @@ title: Suppress duplicate GitHub iOS runs for architecture batches
 status: To Do
 assignee: []
 created_date: '2026-08-18 13:59'
+updated_date: '2026-08-18 14:06'
 labels:
   - ci
   - architecture
   - test-efficiency
+  - ready
 milestone: m-0
 dependencies:
   - RH-069
@@ -34,3 +36,9 @@ For the three High architecture batch branches only, suppress the unreliable dup
 - [ ] #3 No standard skip-ci token or broader workflow suppression is introduced
 - [ ] #4 The selector fails closed when the marker, branch identity or comparison input is invalid
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Ready check on 2026-08-18: RH-069 — test-selection hardening and RH-070 — architecture efficiency are integrated; the task is bounded to workflow/tooling files and can run in parallel with RH-013.02 — baseline capture without sharing DerivedData or product-code files.
+<!-- SECTION:NOTES:END -->
