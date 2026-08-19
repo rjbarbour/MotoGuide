@@ -459,14 +459,242 @@ final class AnnouncementCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(audioSession.deactivateCount, 1)
         XCTAssertTrue(results.contains(.speechRequested(
-            announcementID: plan.id,
-            provider: .proxyElevenLabs
+            plan: plan,
+            provider: .proxyElevenLabs,
+            shouldRecordTestLog: true
         )))
         XCTAssertTrue(results.contains(.playbackStarted(
             announcementID: plan.id,
             provider: .proxyElevenLabs
         )))
         XCTAssertTrue(results.contains(.completed(announcementID: plan.id)))
+    }
+
+    func testSubmitOwnsBoundarySelectionQueueDeliveryAndSpeech() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(scheduler: scheduler, speechOutput: speechOutput)
+        var results: [AnnouncementWorkflowResult] = []
+        coordinator.onResult = { results.append($0) }
+
+        XCTAssertEqual(coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))), .noAnnouncement)
+
+        let outcome = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )))
+        guard case .accepted(let plan, _) = outcome else {
+            return XCTFail("Expected an accepted announcement")
+        }
+
+        XCTAssertTrue(results.contains(.announcementQueued(plan: plan, placeLookupID: nil)))
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+        scheduler.fire()
+        XCTAssertEqual(speechOutput.requests.last?.announcementID, plan.id)
+        XCTAssertTrue(results.contains(.speechRequested(
+            plan: plan,
+            provider: .apple,
+            shouldRecordTestLog: true
+        )))
+    }
+
+    func testSubmitOwnsCooldownAndSupersessionWithoutQueuingSuppressedPlan() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let coordinator = makeCoordinator(scheduler: scheduler)
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), now: Date(timeIntervalSince1970: 1_000)))
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), now: Date(timeIntervalSince1970: 1_001)))
+
+        let outcome = coordinator.submit(workflowInput(address: Address(
+            street: "Long Street",
+            town: "Dursley",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), cooldown: 60, now: Date(timeIntervalSince1970: 1_002)))
+
+        guard case .suppressed = outcome else {
+            return XCTFail("Expected cooldown suppression")
+        }
+        XCTAssertNil(coordinator.pending)
+    }
+
+    func testQueuedDeliveryResolvesProviderVoiceFallbackAndAudioPolicyAtDeliveryTime() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let audioSession = RecordingCoordinatorAudioSession()
+        let coordinator = makeCoordinator(
+            scheduler: scheduler,
+            speechOutput: speechOutput,
+            audioSession: audioSession
+        )
+        var provider = SpeechProvider.apple
+        var voice = SpeechVoiceSelection(identifier: "initial")
+        var allowFallback = true
+        var audioPolicy = AudioCoexistencePolicy.mix
+        let delivery = AnnouncementDeliveryContext(
+            selectedProvider: { provider },
+            aiSharingAllowed: { true },
+            appleVoice: { voice },
+            allowAppleFallback: { allowFallback },
+            audioPolicy: { audioPolicy },
+            delay: 1,
+            shouldRecordTestLog: true
+        )
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), delivery: delivery))
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), delivery: delivery))
+
+        provider = .proxyElevenLabs
+        voice = SpeechVoiceSelection(identifier: "updated")
+        allowFallback = false
+        audioPolicy = .interrupt
+        scheduler.fire()
+
+        XCTAssertEqual(speechOutput.requests.last?.provider, .proxyElevenLabs)
+        XCTAssertEqual(speechOutput.requests.last?.appleVoice?.identifier, "updated")
+        XCTAssertEqual(speechOutput.requests.last?.allowAppleFallback, false)
+        XCTAssertTrue(speechOutput.beginPlayback(provider: .proxyElevenLabs))
+        XCTAssertEqual(audioSession.activatedPolicies, [.interrupt])
+    }
+
+    func testAnnouncementDeferredBeforePlaybackResumesThroughCoordinator() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(scheduler: scheduler, speechOutput: speechOutput)
+        _ = coordinator.externalAudioBegan(.primaryAudio)
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )))
+        let outcome = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )))
+        guard case .accepted(let plan, _) = outcome else {
+            return XCTFail("Expected an accepted announcement")
+        }
+
+        scheduler.fire()
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+        XCTAssertEqual(coordinator.interruptedPlan, plan)
+
+        XCTAssertEqual(
+            coordinator.externalAudioEnded(.primaryAudio, shouldResume: true),
+            .resumed(announcementID: plan.id)
+        )
+        XCTAssertEqual(speechOutput.requests.last?.announcementID, plan.id)
+    }
+
+    func testSubmitRechecksAIConsentWhenFactWorkCompletesAndBeforeDelivery() async {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(
+            scheduler: scheduler,
+            factClient: StubFactClient(result: "Known for its canal-side industry."),
+            speechOutput: speechOutput
+        )
+        var aiSharingAllowed = true
+        let delivery = AnnouncementDeliveryContext(
+            selectedProvider: { .proxyElevenLabs },
+            aiSharingAllowed: { aiSharingAllowed },
+            appleVoice: { nil },
+            allowAppleFallback: { true },
+            audioPolicy: { .mix },
+            delay: 0,
+            shouldRecordTestLog: true
+        )
+        let queued = expectation(description: "Names-only fallback queued")
+        coordinator.onResult = { result in
+            if case .announcementQueued = result { queued.fulfill() }
+        }
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), mode: .shortFacts, delivery: delivery))
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), mode: .shortFacts, delivery: delivery))
+
+        aiSharingAllowed = false
+        await fulfillment(of: [queued], timeout: 1)
+        scheduler.fire()
+
+        XCTAssertEqual(speechOutput.requests.last?.provider, .apple)
+        XCTAssertEqual(speechOutput.requests.last?.text, "You are in Stonehouse, Gloucestershire")
+    }
+
+    private func workflowInput(
+        address: Address,
+        cooldown: TimeInterval = 0,
+        now: Date = Date(timeIntervalSince1970: 1_000),
+        mode: ContentMode = .namesOnly,
+        delivery: AnnouncementDeliveryContext? = nil
+    ) -> AnnouncementWorkflowInput {
+        AnnouncementWorkflowInput(
+            address: address,
+            settings: .ridingDefaults,
+            mode: mode,
+            repeatPreferences: .allRepeats,
+            speakAfterEveryGeocode: false,
+            riderContext: .empty,
+            delivery: delivery ?? AnnouncementDeliveryContext(
+                selectedProvider: { .apple },
+                aiSharingAllowed: { true },
+                appleVoice: { nil },
+                allowAppleFallback: { true },
+                audioPolicy: { .mix },
+                delay: 0,
+                shouldRecordTestLog: true
+            ),
+            boundaryCooldown: cooldown,
+            now: now,
+            placeLookupID: nil
+        )
     }
 
     func testPrivacyFallbackRetryAndEndRideAreExplicitCoordinatorOutcomes() {
@@ -589,8 +817,9 @@ final class AnnouncementCoordinatorTests: XCTestCase {
             .interrupted(announcementID: country.id, reason: .interruptionBegan)
         )
         let resumed = coordinator.externalAudioEnded(.interruption, shouldResume: true)
-        XCTAssertEqual(resumed.plan, country)
-        XCTAssertEqual(resumed.result, .resumed(announcementID: country.id))
+        XCTAssertEqual(resumed, .resumed(announcementID: country.id))
+        XCTAssertEqual(speechOutput.requests.count, 2)
+        XCTAssertEqual(speechOutput.requests.last?.announcementID, country.id)
     }
 
     func testAudioReleaseRetryIsOwnedAndDiagnosedByCoordinator() {
@@ -684,10 +913,10 @@ final class AnnouncementCoordinatorTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            interruptionEnd.result,
+            interruptionEnd,
             .cancelled(announcementID: plan.id, reason: .interruptionMustNotResume)
         )
-        XCTAssertNil(primaryAudioEnd.plan)
+        XCTAssertNil(primaryAudioEnd)
         XCTAssertNil(coordinator.interruptedPlan)
     }
 
@@ -859,6 +1088,9 @@ private final class RecordingCoordinatorSpeechOutput: SpeechOutput {
     struct Request {
         let announcementID: UUID
         let provider: SpeechProvider
+        let text: String
+        let appleVoice: SpeechVoiceSelection?
+        let allowAppleFallback: Bool
     }
 
     var isSpeaking = false
@@ -879,7 +1111,13 @@ private final class RecordingCoordinatorSpeechOutput: SpeechOutput {
         allowAppleFallback: Bool,
         announcementID: UUID
     ) {
-        requests.append(Request(announcementID: announcementID, provider: provider))
+        requests.append(Request(
+            announcementID: announcementID,
+            provider: provider,
+            text: text,
+            appleVoice: appleVoice,
+            allowAppleFallback: allowAppleFallback
+        ))
         isSpeaking = true
     }
 

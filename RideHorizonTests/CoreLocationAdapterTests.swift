@@ -19,10 +19,10 @@ private final class RecordingLocationSource: LocationSource {
 
 @MainActor
 private final class RecordingPlaceResolver: PlaceResolver {
-    private(set) var locations: [CLLocation] = []
+    private(set) var locations: [AcceptedRideLocation] = []
     private(set) var cancelCount = 0
     private var completion: ((PlaceResolutionResult) -> Void)?
-    func resolve(_ location: CLLocation, completion: @escaping (PlaceResolutionResult) -> Void) {
+    func resolve(_ location: AcceptedRideLocation, completion: @escaping (PlaceResolutionResult) -> Void) {
         locations.append(location)
         self.completion = completion
     }
@@ -93,6 +93,22 @@ final class CoreLocationAdapterTests: XCTestCase {
 
 @MainActor
 final class RideSessionAdapterContractTests: XCTestCase {
+    func testRideStartedWithoutLocationInputIgnoresLaterAuthorizationChanges() {
+        let source = RecordingLocationSource()
+        let resolver = RecordingPlaceResolver()
+        let manager = LocationManager(
+            locationSource: source,
+            placeResolver: resolver,
+            rideDistanceMeasurer: CoreLocationRideDistanceMeasurer()
+        )
+        manager.testMode = false
+
+        manager.startRideWithoutLocationInputForTesting()
+        source.onAuthorizationChange?()
+
+        XCTAssertTrue(source.startBackgroundValues.isEmpty)
+    }
+
     func testLocationAndPlaceAdaptersAreDeterministicRideCapabilities() async {
         let source = RecordingLocationSource()
         let resolver = RecordingPlaceResolver()

@@ -40,6 +40,7 @@ struct RideHorizonApp: App {
             audioSession: audioSession,
             diagnostics: rideDiagnostics,
             rideSettingsStore: UserDefaultsRideSettingsStore(),
+            rideSessionController: RideSessionController(),
             locationSource: locationAdapter,
             placeResolver: locationAdapter,
             rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
