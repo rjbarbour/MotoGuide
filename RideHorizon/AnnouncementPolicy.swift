@@ -808,7 +808,10 @@ final class AnnouncementCoordinator {
         _ plan: AnnouncementPlan,
         delivery: AnnouncementDeliveryContext
     ) -> AnnouncementWorkflowResult {
-        if let deferred = deferIfPaused(plan) { return deferred }
+        if let deferred = deferIfPaused(plan) {
+            interruptedDeliveryContext = delivery
+            return deferred
+        }
         activePlan = plan
         activeDeliveryContext = delivery
         fallbackInProgress = false

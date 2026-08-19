@@ -589,6 +589,40 @@ final class AnnouncementCoordinatorTests: XCTestCase {
         XCTAssertEqual(audioSession.activatedPolicies, [.interrupt])
     }
 
+    func testAnnouncementDeferredBeforePlaybackResumesThroughCoordinator() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(scheduler: scheduler, speechOutput: speechOutput)
+        _ = coordinator.externalAudioBegan(.primaryAudio)
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )))
+        let outcome = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )))
+        guard case .accepted(let plan, _) = outcome else {
+            return XCTFail("Expected an accepted announcement")
+        }
+
+        scheduler.fire()
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+        XCTAssertEqual(coordinator.interruptedPlan, plan)
+
+        XCTAssertEqual(
+            coordinator.externalAudioEnded(.primaryAudio, shouldResume: true),
+            .resumed(announcementID: plan.id)
+        )
+        XCTAssertEqual(speechOutput.requests.last?.announcementID, plan.id)
+    }
+
     func testSubmitRechecksAIConsentWhenFactWorkCompletesAndBeforeDelivery() async {
         let scheduler = RecordingAnnouncementScheduler()
         let speechOutput = RecordingCoordinatorSpeechOutput()
