@@ -4,12 +4,14 @@ title: Show meaningful place updates in the Dynamic Island
 status: To Do
 assignee: []
 created_date: '2026-08-18 12:58'
+updated_date: '2026-08-19 14:28'
 labels:
   - core
   - dynamic-island
   - visibility
 milestone: m-1
-dependencies: []
+dependencies:
+  - RH-013.39
 references:
   - >-
     https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities

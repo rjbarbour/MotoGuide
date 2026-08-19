@@ -4,13 +4,14 @@ title: Restore announcements while Google Maps is foregrounded
 status: To Do
 assignee: []
 created_date: '2026-08-18 12:57'
+updated_date: '2026-08-19 14:28'
 labels:
-  - ready
   - core
   - background
   - audio
 milestone: m-1
-dependencies: []
+dependencies:
+  - RH-013.39
 priority: high
 type: bug
 ordinal: 110000

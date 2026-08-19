@@ -4,13 +4,15 @@ title: Make ride fact generation sequence-aware without destroying useful cachin
 status: To Do
 assignee: []
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-18 12:59'
+updated_date: '2026-08-19 14:28'
 labels:
   - core
   - tier-1
   - sequence
 milestone: m-1
-dependencies: []
+dependencies:
+  - RH-013.39
+  - RH-013.15
 priority: high
 type: feature
 ordinal: 113000
