@@ -29,7 +29,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
         text: String,
         boundary: BoundaryType?,
         provider: SpeechProvider,
-        appleVoice: AVSpeechSynthesisVoice?,
+        appleVoice: SpeechVoiceSelection?,
         allowAppleFallback: Bool,
         announcementID: UUID
     ) {

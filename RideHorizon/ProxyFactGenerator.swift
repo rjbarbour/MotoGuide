@@ -148,6 +148,7 @@ struct ProxyRequestExecutor {
     func data(
         for request: URLRequest,
         category: String,
+        onRetry: (@Sendable (Int) -> Void)? = nil,
         shouldRetryResponse: ResponseRetryDecision
     ) async throws -> (Data, URLResponse) {
         var retryIndex = 0
@@ -160,6 +161,7 @@ struct ProxyRequestExecutor {
                 if let http = response as? HTTPURLResponse,
                    retryIndex < retryDelays.count,
                    shouldRetryResponse(http, data) {
+                    onRetry?(retryIndex + 1)
                     try await waitBeforeRetry(category: category, retryIndex: retryIndex, reason: "HTTP \(http.statusCode)")
                     retryIndex += 1
                     continue
@@ -169,6 +171,7 @@ struct ProxyRequestExecutor {
                 guard retryIndex < retryDelays.count, Self.isTransientNetworkError(error) else {
                     throw error
                 }
+                onRetry?(retryIndex + 1)
                 try await waitBeforeRetry(category: category, retryIndex: retryIndex, reason: "transient network failure")
                 retryIndex += 1
             }
@@ -469,6 +472,13 @@ struct ProxySpeechGenerator {
     }
 
     func speechAudios(for text: String) async throws -> [Data] {
+        try await speechAudios(for: text, onRetry: { _ in })
+    }
+
+    func speechAudios(
+        for text: String,
+        onRetry: @escaping @Sendable (Int) -> Void
+    ) async throws -> [Data] {
         try await ProxyOperationDeadline.run(seconds: FactProxyContract.iosTimeoutSeconds) {
             let chunks = Self.chunkSpeechText(Self.normalizedSpeechText(text))
             if chunks.count > 1 {
@@ -478,19 +488,31 @@ struct ProxySpeechGenerator {
             var responses: [Data] = []
             for chunk in chunks {
                 try Task.checkCancellation()
-                responses.append(try await speechAudioChunk(for: chunk))
+                responses.append(try await speechAudioChunk(for: chunk, onRetry: onRetry))
             }
             return responses
         }
     }
 
     private func speechAudioChunk(for text: String) async throws -> Data {
-        try await speechAudioChunk(for: text, retryAfterAuthenticationFailure: true)
+        try await speechAudioChunk(for: text, retryAfterAuthenticationFailure: true, onRetry: { _ in })
     }
 
     private func speechAudioChunk(
         for text: String,
-        retryAfterAuthenticationFailure: Bool
+        onRetry: @escaping @Sendable (Int) -> Void
+    ) async throws -> Data {
+        try await speechAudioChunk(
+            for: text,
+            retryAfterAuthenticationFailure: true,
+            onRetry: onRetry
+        )
+    }
+
+    private func speechAudioChunk(
+        for text: String,
+        retryAfterAuthenticationFailure: Bool,
+        onRetry: @escaping @Sendable (Int) -> Void
     ) async throws -> Data {
         var proxyToken = proxyTokenProvider()
         if proxyToken?.isEmpty != false {
@@ -530,6 +552,7 @@ struct ProxySpeechGenerator {
             (data, response) = try await requestExecutor.data(
                 for: urlRequest,
                 category: "Speech",
+                onRetry: onRetry,
                 shouldRetryResponse: { http, data in
                     guard ProxyRequestExecutor.isTransientHTTPStatus(http.statusCode) else {
                         return false
@@ -559,8 +582,13 @@ struct ProxySpeechGenerator {
                 credentialInvalidator()
                 if retryAfterAuthenticationFailure {
                     ProxyDiagnostics.log("Auth", "Speech session rejected; reprovisioning and retrying once.")
+                    onRetry(1)
                     try await credentialRefresher()
-                    return try await speechAudioChunk(for: text, retryAfterAuthenticationFailure: false)
+                    return try await speechAudioChunk(
+                        for: text,
+                        retryAfterAuthenticationFailure: false,
+                        onRetry: onRetry
+                    )
                 }
             }
             if let proxyError = try? JSONDecoder().decode(SpeechProxyErrorResponse.self, from: data) {
@@ -650,7 +678,15 @@ protocol ProxySpeechGenerating {
     func speechAudios(for text: String) async throws -> [Data]
 }
 
+protocol RetryReportingProxySpeechGenerating: ProxySpeechGenerating {
+    func speechAudios(
+        for text: String,
+        onRetry: @escaping @Sendable (Int) -> Void
+    ) async throws -> [Data]
+}
+
 extension ProxySpeechGenerator: ProxySpeechGenerating {}
+extension ProxySpeechGenerator: RetryReportingProxySpeechGenerating {}
 
 struct ProxyHealthChecker {
     // Contract: public GET /health returns text/plain "ok" and does not require bearer auth.

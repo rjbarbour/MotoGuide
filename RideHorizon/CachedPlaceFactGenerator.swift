@@ -1,10 +1,10 @@
 import Foundation
 
 struct CachedPlaceFactGenerator: PlaceFactGenerating {
-    private let generator: PlaceFactGenerating
+    private let generator: FactClient
     private let cache: PlaceFactCache
 
-    init(generator: PlaceFactGenerating, cache: PlaceFactCache = .shared) {
+    init(generator: FactClient, cache: PlaceFactCache = .shared) {
         self.generator = generator
         self.cache = cache
     }
@@ -32,7 +32,7 @@ enum PlaceFactFetcher {
 
     static func fact(
         for request: PlaceFactRequest,
-        using generator: PlaceFactGenerating,
+        using generator: FactClient,
         timeout: TimeInterval = fetchTimeoutSeconds
     ) async -> String? {
         await withTaskGroup(of: String?.self) { group in
