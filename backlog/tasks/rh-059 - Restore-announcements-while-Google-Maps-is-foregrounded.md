@@ -4,11 +4,12 @@ title: Restore announcements while Google Maps is foregrounded
 status: To Do
 assignee: []
 created_date: '2026-08-18 12:57'
-updated_date: '2026-08-19 14:28'
+updated_date: '2026-08-19 15:35'
 labels:
   - core
   - background
   - audio
+  - ready
 milestone: m-1
 dependencies:
   - RH-013.39
@@ -29,3 +30,9 @@ RideHorizon must continue detecting meaningful triggers and delivering announcem
 - [ ] #2 Google Maps navigation instructions retain priority, and RideHorizon resumes or defers without silently losing eligible announcements
 - [ ] #3 Physical X-COM2 evidence and privacy-safe diagnostics distinguish trigger, generation, queue and playback outcomes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Ready-queue replenishment on 2026-08-19: RH-013.39 — Complete High workflow boundaries merged and its dependency is satisfied. This task is ready for a separate physical-device diagnosis; it is not started by the architecture close-out.
+<!-- SECTION:NOTES:END -->

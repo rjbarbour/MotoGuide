@@ -8,7 +8,7 @@ The accepted decision recorded on 2026-08-18 establishes `m-1 — Core ride reli
 
 ## Last verified result
 
-The High-priority architecture foundation is integrated through PR #37 at `4f8fc09`: typed settings and dependency composition, deterministic ride-session orchestration, and explicit announcement orchestration now sit behind consumer-owned capability seams. The exact announcement code candidate passed 214 iOS tests, an unsigned Release build, proxy tests and zero-finding independent reviews; RideHorizon `0.12.4 (20260804.0246)` then built, installed and launched on Robert's iPhone. Later Medium and Low architecture phases remain gated rather than automatically selected.
+The High-priority architecture foundation and its workflow-boundary refinement are integrated through PR #39 at `243be88`. Production dependencies now enter through the composition root; `RideSessionController` owns ride and place-resolution sequencing; and `AnnouncementCoordinator` owns boundary-to-speech sequencing. The final branch passed 222 local simulator tests, 222 GitHub iOS tests, an unsigned Release build and zero-finding independent Standards and Specification reviews. Later Medium and Low architecture phases remain gated rather than automatically selected.
 
 The latest locally verified Internal TestFlight receipt is for RideHorizon `0.12.4 (20260806.221234)`. Its SHA-256-protected record reports `VALID`, permanently `INTERNAL_ONLY`, `IN_BETA_TESTING`, internal-group readiness and `ready_for_internal_tester`, using unchanged-input evidence from 182 passing simulator tests. The tester state does not prove which binary is installed on the phone. Exact Settings build confirmation and build-specific stationary/road evidence remain outstanding under the parked RH-002 item. The Settings build-identity feature is integrated; the RH-019.01 deployment tool remains preserved as parked WIP under an accepted temporary security exception. Do not treat the receipt as proof that current `main` can reproduce that historical binary.
 
@@ -24,7 +24,7 @@ The on-device place model now retains the supported Apple placemark fields and d
 
 ## Current gate
 
-Delivery selection is controlled by the Backlog.md CLI. Decision-007 establishes the reliability-first sequence in `m-1 — Core ride reliability and continuity`; its first product outcome is reliable announcements while Google Maps is foregrounded. The architecture-refactor programme remains separate and is not resumed by that product decision. Confirm the selected work item through the CLI before claiming either programme.
+Delivery selection is controlled by the Backlog.md CLI. Decision-007 establishes the reliability-first sequence in `m-1 — Core ride reliability and continuity`; `RH-059 — Restore announcements while Google Maps is foregrounded` is the sole ready item after the High architecture close-out. It requires a separate physical-device diagnosis and has not been started. The Medium and Low architecture phases remain separate and gated.
 
 ## Residual risks
 
