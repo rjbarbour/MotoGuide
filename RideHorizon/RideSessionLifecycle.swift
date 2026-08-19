@@ -66,17 +66,48 @@ struct RideSessionStart: Equatable {
     let sessionID: UUID
     let generation: UUID
     let startedAt: Date
+    let effects: [RideSessionEffect]
 }
 
 struct RideSessionEnd: Equatable {
     let wasActive: Bool
     let invalidatedGeneration: UUID
     let cancellationIntent: RideSessionCancellationIntent
+    let effects: [RideSessionEffect]
 }
 
 struct RideSessionControllerTransition: Equatable {
     let transition: RideSessionTransition
     let cancellationIntent: RideSessionCancellationIntent?
+    let effects: [RideSessionEffect]
+
+    init(
+        transition: RideSessionTransition,
+        cancellationIntent: RideSessionCancellationIntent?,
+        effects: [RideSessionEffect] = []
+    ) {
+        self.transition = transition
+        self.cancellationIntent = cancellationIntent
+        self.effects = effects
+    }
+}
+
+enum RideSessionEffect: Equatable {
+    case requestInactivityAuthorization
+    case refreshLocationInput
+    case cancelRideWork(RideSessionCancellationIntent)
+    case showInactivityPrompt(deadline: Date)
+    case cancelInactivityPrompt
+}
+
+struct RidePlaceResolutionRequest: Equatable {
+    let rideGeneration: UUID
+    let requestGeneration: UUID
+}
+
+struct RidePlaceResolutionStart: Equatable {
+    let request: RidePlaceResolutionRequest
+    let supersededRequestID: UUID?
 }
 
 enum RideSessionState: Equatable {
@@ -103,6 +134,7 @@ enum RideSessionState: Equatable {
 enum RideSessionTransition: Equatable {
     case none
     case inactivityPrompt(deadline: Date)
+    case rideContinued
     case movementResumed
     case automaticEnd
 }
@@ -216,6 +248,8 @@ final class RideSessionController {
     private let clock: RideClock
     private let scheduler: RideSessionScheduling
     private var lifecycle: RideSessionLifecycle
+    private var placeResolutionGeneration = UUID()
+    private(set) var activePlaceResolutionID: UUID?
 
     private(set) var sessionID: UUID?
     private(set) var generation = UUID()
@@ -248,11 +282,20 @@ final class RideSessionController {
         startedAt = startDate
         self.wantsLocationInput = wantsLocationInput
         lifecycle.start(at: startDate)
+        placeResolutionGeneration = UUID()
+        activePlaceResolutionID = nil
         scheduler.scheduleRepeating(every: 15) { [weak self] in
             guard let self else { return }
             onScheduledEvaluation(self.evaluate())
         }
-        return RideSessionStart(sessionID: sessionID!, generation: generation, startedAt: startDate)
+        var effects: [RideSessionEffect] = [.requestInactivityAuthorization]
+        if wantsLocationInput { effects.append(.refreshLocationInput) }
+        return RideSessionStart(
+            sessionID: sessionID!,
+            generation: generation,
+            startedAt: startDate,
+            effects: effects
+        )
     }
 
     func accept(_ sample: AcceptedRideLocation) -> RideSessionControllerTransition {
@@ -266,8 +309,19 @@ final class RideSessionController {
         process(lifecycle.advanceTime(to: date ?? clock.now))
     }
 
-    func continueRide(at date: Date? = nil) -> Bool {
-        lifecycle.continueRide(at: date ?? clock.now)
+    func continueRide(at date: Date? = nil) -> RideSessionControllerTransition {
+        let wasActive = sessionID != nil
+        if lifecycle.continueRide(at: date ?? clock.now) {
+            return RideSessionControllerTransition(
+                transition: .rideContinued,
+                cancellationIntent: nil,
+                effects: [.cancelInactivityPrompt]
+            )
+        }
+        guard wasActive, state == .idle else {
+            return RideSessionControllerTransition(transition: .none, cancellationIntent: nil)
+        }
+        return finishAutomaticEnd()
     }
 
     func end() -> RideSessionEnd {
@@ -281,14 +335,43 @@ final class RideSessionController {
         return RideSessionEnd(
             wasActive: wasActive,
             invalidatedGeneration: generation,
-            cancellationIntent: .rideEnded(wasActive: wasActive)
+            cancellationIntent: .rideEnded(wasActive: wasActive),
+            effects: [.cancelRideWork(.rideEnded(wasActive: wasActive))]
         )
     }
 
-    func accepts(rideGeneration: UUID, requestGeneration: UUID, currentRequestGeneration: UUID) -> Bool {
+    func beginPlaceResolution() -> RidePlaceResolutionStart {
+        let supersededRequestID = activePlaceResolutionID
+        placeResolutionGeneration = UUID()
+        activePlaceResolutionID = placeResolutionGeneration
+        return RidePlaceResolutionStart(
+            request: RidePlaceResolutionRequest(
+                rideGeneration: generation,
+                requestGeneration: placeResolutionGeneration
+            ),
+            supersededRequestID: supersededRequestID
+        )
+    }
+
+    func acceptsPlaceResolution(_ request: RidePlaceResolutionRequest) -> Bool {
         state == .riding
-            && generation == rideGeneration
-            && currentRequestGeneration == requestGeneration
+            && generation == request.rideGeneration
+            && activePlaceResolutionID == request.requestGeneration
+            && placeResolutionGeneration == request.requestGeneration
+    }
+
+    @discardableResult
+    func finishPlaceResolution(_ request: RidePlaceResolutionRequest) -> Bool {
+        guard acceptsPlaceResolution(request) else { return false }
+        activePlaceResolutionID = nil
+        return true
+    }
+
+    func cancelPlaceResolution() -> UUID? {
+        let cancelledRequestID = activePlaceResolutionID
+        activePlaceResolutionID = nil
+        placeResolutionGeneration = UUID()
+        return cancelledRequestID
     }
 
     private func process(_ transition: RideSessionTransition) -> RideSessionControllerTransition {
@@ -297,19 +380,41 @@ final class RideSessionController {
         case .inactivityPrompt:
             cancellationIntent = .inactivityPrompted
         case .automaticEnd:
-            let wasActive = wantsLocationInput || state.isActive
-            generation = UUID()
-            wantsLocationInput = false
-            scheduler.cancel()
-            sessionID = nil
-            startedAt = nil
-            cancellationIntent = .rideEnded(wasActive: wasActive)
-        case .none, .movementResumed:
+            return finishAutomaticEnd()
+        case .none, .rideContinued, .movementResumed:
             cancellationIntent = nil
+        }
+        let effects: [RideSessionEffect]
+        switch transition {
+        case .inactivityPrompt(let deadline):
+            effects = [
+                .cancelRideWork(.inactivityPrompted),
+                .showInactivityPrompt(deadline: deadline)
+            ]
+        case .rideContinued, .movementResumed:
+            effects = [.cancelInactivityPrompt]
+        case .none, .automaticEnd:
+            effects = []
         }
         return RideSessionControllerTransition(
             transition: transition,
-            cancellationIntent: cancellationIntent
+            cancellationIntent: cancellationIntent,
+            effects: effects
+        )
+    }
+
+    private func finishAutomaticEnd() -> RideSessionControllerTransition {
+        let wasActive = sessionID != nil
+        generation = UUID()
+        wantsLocationInput = false
+        scheduler.cancel()
+        sessionID = nil
+        startedAt = nil
+        let intent = RideSessionCancellationIntent.rideEnded(wasActive: wasActive)
+        return RideSessionControllerTransition(
+            transition: .automaticEnd,
+            cancellationIntent: intent,
+            effects: [.cancelRideWork(intent)]
         )
     }
 }

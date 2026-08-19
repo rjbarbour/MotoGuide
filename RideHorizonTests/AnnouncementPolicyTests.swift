@@ -459,14 +459,111 @@ final class AnnouncementCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(audioSession.deactivateCount, 1)
         XCTAssertTrue(results.contains(.speechRequested(
-            announcementID: plan.id,
-            provider: .proxyElevenLabs
+            plan: plan,
+            provider: .proxyElevenLabs,
+            shouldRecordTestLog: true
         )))
         XCTAssertTrue(results.contains(.playbackStarted(
             announcementID: plan.id,
             provider: .proxyElevenLabs
         )))
         XCTAssertTrue(results.contains(.completed(announcementID: plan.id)))
+    }
+
+    func testSubmitOwnsBoundarySelectionQueueDeliveryAndSpeech() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(scheduler: scheduler, speechOutput: speechOutput)
+        var results: [AnnouncementWorkflowResult] = []
+        coordinator.onResult = { results.append($0) }
+
+        XCTAssertEqual(coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))), .noAnnouncement)
+
+        let outcome = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )))
+        guard case .accepted(let plan, _) = outcome else {
+            return XCTFail("Expected an accepted announcement")
+        }
+
+        XCTAssertTrue(results.contains(.announcementQueued(plan: plan, placeLookupID: nil)))
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+        scheduler.fire()
+        XCTAssertEqual(speechOutput.requests.last?.announcementID, plan.id)
+        XCTAssertTrue(results.contains(.speechRequested(
+            plan: plan,
+            provider: .apple,
+            shouldRecordTestLog: true
+        )))
+    }
+
+    func testSubmitOwnsCooldownAndSupersessionWithoutQueuingSuppressedPlan() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let coordinator = makeCoordinator(scheduler: scheduler)
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), now: Date(timeIntervalSince1970: 1_000)))
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), now: Date(timeIntervalSince1970: 1_001)))
+
+        let outcome = coordinator.submit(workflowInput(address: Address(
+            street: "Long Street",
+            town: "Dursley",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), cooldown: 60, now: Date(timeIntervalSince1970: 1_002)))
+
+        guard case .suppressed = outcome else {
+            return XCTFail("Expected cooldown suppression")
+        }
+        XCTAssertNil(coordinator.pending)
+    }
+
+    private func workflowInput(
+        address: Address,
+        cooldown: TimeInterval = 0,
+        now: Date = Date(timeIntervalSince1970: 1_000)
+    ) -> AnnouncementWorkflowInput {
+        AnnouncementWorkflowInput(
+            address: address,
+            settings: .ridingDefaults,
+            mode: .namesOnly,
+            repeatPreferences: .allRepeats,
+            speakAfterEveryGeocode: false,
+            riderContext: .empty,
+            delivery: AnnouncementDeliveryContext(
+                selectedProvider: .apple,
+                aiSharingAllowed: { true },
+                appleVoice: nil,
+                allowAppleFallback: true,
+                audioPolicy: .mix,
+                delay: 0,
+                shouldRecordTestLog: true
+            ),
+            boundaryCooldown: cooldown,
+            now: now,
+            placeLookupID: nil
+        )
     }
 
     func testPrivacyFallbackRetryAndEndRideAreExplicitCoordinatorOutcomes() {

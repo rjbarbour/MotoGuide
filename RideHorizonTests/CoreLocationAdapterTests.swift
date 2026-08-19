@@ -93,6 +93,22 @@ final class CoreLocationAdapterTests: XCTestCase {
 
 @MainActor
 final class RideSessionAdapterContractTests: XCTestCase {
+    func testRideStartedWithoutLocationInputIgnoresLaterAuthorizationChanges() {
+        let source = RecordingLocationSource()
+        let resolver = RecordingPlaceResolver()
+        let manager = LocationManager(
+            locationSource: source,
+            placeResolver: resolver,
+            rideDistanceMeasurer: CoreLocationRideDistanceMeasurer()
+        )
+        manager.testMode = false
+
+        manager.startRideWithoutLocationInputForTesting()
+        source.onAuthorizationChange?()
+
+        XCTAssertTrue(source.startBackgroundValues.isEmpty)
+    }
+
     func testLocationAndPlaceAdaptersAreDeterministicRideCapabilities() async {
         let source = RecordingLocationSource()
         let resolver = RecordingPlaceResolver()

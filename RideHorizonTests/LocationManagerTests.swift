@@ -2056,7 +2056,7 @@ final class LocationManagerTests: XCTestCase {
         let locationManager = LocationManager(inactivityNotifier: RecordingRideInactivityNotifier())
         locationManager.startRide()
         let rideGeneration = locationManager.rideSessionGenerationForTesting
-        let requestGeneration = locationManager.geocodeRequestGenerationForTesting
+        let requestGeneration = locationManager.beginPlaceLookupDiagnosticForTesting()
         XCTAssertTrue(
             locationManager.canAcceptGeocodeResultForTesting(
                 rideGeneration: rideGeneration,

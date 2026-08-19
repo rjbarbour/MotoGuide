@@ -328,6 +328,36 @@ struct SpeechVoiceSelection: Equatable {
     let identifier: String
 }
 
+struct AnnouncementDeliveryContext {
+    let selectedProvider: SpeechProvider
+    let aiSharingAllowed: @MainActor () -> Bool
+    let appleVoice: SpeechVoiceSelection?
+    let allowAppleFallback: Bool
+    let audioPolicy: AudioCoexistencePolicy
+    let delay: TimeInterval
+    let shouldRecordTestLog: Bool
+}
+
+struct AnnouncementWorkflowInput {
+    let address: Address
+    let settings: BoundaryAnnouncementSettings
+    let mode: ContentMode
+    let repeatPreferences: RepeatPreferences
+    let speakAfterEveryGeocode: Bool
+    let riderContext: RiderContext
+    let delivery: AnnouncementDeliveryContext
+    let boundaryCooldown: TimeInterval
+    let now: Date
+    let placeLookupID: UUID?
+}
+
+enum AnnouncementSubmissionOutcome: Equatable {
+    case noAnnouncement
+    case suppressed(plan: AnnouncementPlan, supersededAnnouncementIDs: Set<UUID>)
+    case rejected(plan: AnnouncementPlan)
+    case accepted(plan: AnnouncementPlan, supersededAnnouncementIDs: Set<UUID>)
+}
+
 @MainActor
 protocol DiagnosticsSink: AnyObject {
     func record(_ signal: AnnouncementDiagnosticSignal)
@@ -352,7 +382,8 @@ enum AnnouncementWorkflowResult: Equatable {
     case factRequested(announcementID: UUID)
     case factResolved(announcementID: UUID, factAvailable: Bool)
     case factCancelled(announcementID: UUID?)
-    case speechRequested(announcementID: UUID, provider: SpeechProvider)
+    case announcementQueued(plan: AnnouncementPlan, placeLookupID: UUID?)
+    case speechRequested(plan: AnnouncementPlan, provider: SpeechProvider, shouldRecordTestLog: Bool)
     case retryScheduled(announcementID: UUID, provider: SpeechProvider)
     case fallbackStarted(announcementID: UUID, provider: SpeechProvider)
     case playbackStarted(announcementID: UUID, provider: SpeechProvider)
@@ -396,6 +427,9 @@ final class AnnouncementCoordinator {
     private var fallbackInProgress = false
     private var terminalFailureInProgress = false
     private var pauseSources: Set<AnnouncementPauseSource> = []
+    private var previousAddress: Address?
+    private var lastBoundaryAnnouncementAt: Date?
+    private var pendingDeliveryContext: AnnouncementDeliveryContext?
     private(set) var interruptedPlan: AnnouncementPlan?
     private(set) var activePlan: AnnouncementPlan?
 
@@ -423,6 +457,85 @@ final class AnnouncementCoordinator {
     var isSpeaking: Bool { speechOutput.isSpeaking }
     var isPlayingAudio: Bool { speechOutput.isPlayingAudio }
     var isPausedForExternalAudio: Bool { !pauseSources.isEmpty }
+    var currentBoundary: BoundaryType? { activePlan?.boundary ?? interruptedPlan?.boundary }
+
+    @discardableResult
+    func submit(_ input: AnnouncementWorkflowInput) -> AnnouncementSubmissionOutcome {
+        let plan: AnnouncementPlan?
+        if input.speakAfterEveryGeocode {
+            plan = AnnouncementDecision.speechText(
+                for: input.address,
+                previous: previousAddress,
+                preferences: input.repeatPreferences,
+                speakAfterEveryGeocode: true
+            ).map { AnnouncementPlan(text: $0, boundary: .town) }
+        } else {
+            plan = AnnouncementPolicy.plan(
+                previous: previousAddress,
+                current: input.address,
+                settings: input.settings,
+                mode: input.mode
+            )
+        }
+
+        defer { previousAddress = input.address }
+        guard let plan else { return .noAnnouncement }
+
+        let acceptance = acceptBoundary(plan)
+        guard case .boundaryAccepted(_, let supersededAnnouncementIDs) = acceptance else {
+            return .rejected(plan: plan)
+        }
+
+        if !supersededAnnouncementIDs.isEmpty {
+            _ = cancelAll(reason: .supersededByNewerContext)
+        }
+
+        if !input.speakAfterEveryGeocode,
+           input.boundaryCooldown > 0,
+           let lastBoundaryAnnouncementAt,
+           input.now.timeIntervalSince(lastBoundaryAnnouncementAt) < input.boundaryCooldown {
+            return .suppressed(
+                plan: plan,
+                supersededAnnouncementIDs: supersededAnnouncementIDs
+            )
+        }
+
+        lastBoundaryAnnouncementAt = input.now
+        if let factMode = input.mode.factMode,
+           input.delivery.aiSharingAllowed(),
+           plan.boundary != .street {
+            requestFact(
+                for: plan,
+                request: AnnouncementPolicy.factRequest(
+                    for: plan,
+                    address: input.address,
+                    mode: factMode,
+                    riderContext: input.riderContext
+                ),
+                mode: factMode,
+                aiSharingAllowed: input.delivery.aiSharingAllowed
+            ) { [weak self] resolvedPlan in
+                self?.queueForDelivery(
+                    resolvedPlan,
+                    placeLookupID: input.placeLookupID,
+                    delivery: input.delivery
+                )
+            }
+        } else if input.mode != .quiet {
+            queueForDelivery(
+                plan,
+                placeLookupID: input.placeLookupID,
+                delivery: input.delivery
+            )
+        }
+
+        return .accepted(plan: plan, supersededAnnouncementIDs: supersededAnnouncementIDs)
+    }
+
+    func resetContext() {
+        previousAddress = nil
+        lastBoundaryAnnouncementAt = nil
+    }
 
     @discardableResult
     func acceptBoundary(
@@ -552,12 +665,16 @@ final class AnnouncementCoordinator {
 
     func cancelPending(id: UUID) {
         queue.clearPending(id: id)
-        if queue.pending == nil { scheduler.cancel() }
+        if queue.pending == nil {
+            pendingDeliveryContext = nil
+            scheduler.cancel()
+        }
     }
 
     func cancelPending() {
         scheduler.cancel()
         queue.clearPending()
+        pendingDeliveryContext = nil
     }
 
     func beginFact(for plan: AnnouncementPlan) -> AnnouncementFactWork {
@@ -658,16 +775,19 @@ final class AnnouncementCoordinator {
         aiSharingAllowed: Bool,
         appleVoice: SpeechVoiceSelection?,
         allowAppleFallback: Bool,
-        audioPolicy: AudioCoexistencePolicy
+        audioPolicy: AudioCoexistencePolicy,
+        shouldRecordTestLog: Bool = true
     ) -> AnnouncementWorkflowResult {
+        if let deferred = deferIfPaused(plan) { return deferred }
         activePlan = plan
         fallbackInProgress = false
         terminalFailureInProgress = false
         self.audioPolicy = audioPolicy
         let provider: SpeechProvider = aiSharingAllowed ? selectedProvider : .apple
         let result = AnnouncementWorkflowResult.speechRequested(
-            announcementID: plan.id,
-            provider: provider
+            plan: plan,
+            provider: provider,
+            shouldRecordTestLog: shouldRecordTestLog
         )
         onResult?(result)
         speechOutput.speak(
@@ -754,6 +874,59 @@ final class AnnouncementCoordinator {
         audioReleaseScheduler.cancel()
         audioSessionReleaseRetryAttempts = 0
         ownsAudioSession = false
+    }
+
+    private func queueForDelivery(
+        _ plan: AnnouncementPlan,
+        placeLookupID: UUID?,
+        delivery: AnnouncementDeliveryContext
+    ) {
+        if isSpeaking {
+            switch Self.deliveryDecision(newBoundary: plan.boundary, activeBoundary: activePlan?.boundary) {
+            case .drop:
+                return
+            case .interruptThenDeliver:
+                _ = stop(reason: .playbackCancelled)
+            case .deliver:
+                break
+            }
+        }
+
+        pendingDeliveryContext = delivery
+        schedule(plan, after: delivery.delay) { [weak self] id in
+            self?.deliver(id: id)
+        }
+        onResult?(.announcementQueued(plan: plan, placeLookupID: placeLookupID))
+    }
+
+    private func deliver(id: UUID) {
+        guard let pending,
+              pending.id == id,
+              let delivery = pendingDeliveryContext else { return }
+        let plan = AnnouncementPlan(id: pending.id, text: pending.text, boundary: pending.boundary)
+
+        if isSpeaking {
+            switch Self.deliveryDecision(newBoundary: plan.boundary, activeBoundary: activePlan?.boundary) {
+            case .drop:
+                cancelPending(id: id)
+                return
+            case .interruptThenDeliver:
+                _ = stop(reason: .playbackCancelled)
+            case .deliver:
+                break
+            }
+        }
+
+        cancelPending(id: id)
+        _ = speak(
+            plan,
+            selectedProvider: delivery.selectedProvider,
+            aiSharingAllowed: delivery.aiSharingAllowed(),
+            appleVoice: delivery.appleVoice,
+            allowAppleFallback: delivery.allowAppleFallback,
+            audioPolicy: delivery.audioPolicy,
+            shouldRecordTestLog: delivery.shouldRecordTestLog
+        )
     }
 
     func resumeAfterMediaServicesReset() -> (plan: AnnouncementPlan?, result: AnnouncementWorkflowResult?) {

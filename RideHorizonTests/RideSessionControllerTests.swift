@@ -17,6 +17,10 @@ final class RideSessionControllerTests: XCTestCase {
         }
 
         XCTAssertEqual(start?.startedAt, now)
+        XCTAssertEqual(
+            start?.effects,
+            [.requestInactivityAuthorization, .refreshLocationInput]
+        )
         XCTAssertEqual(controller.state, .riding)
         XCTAssertEqual(scheduler.interval, 15)
         scheduler.fire()
@@ -49,7 +53,14 @@ final class RideSessionControllerTests: XCTestCase {
         let prompt = controller.evaluate(at: startedAt.addingTimeInterval(30))
         XCTAssertEqual(prompt.transition, .inactivityPrompt(deadline: startedAt.addingTimeInterval(60)))
         XCTAssertEqual(prompt.cancellationIntent, .inactivityPrompted)
-        XCTAssertTrue(controller.continueRide(at: startedAt.addingTimeInterval(45)))
+        XCTAssertEqual(prompt.effects, [
+            .cancelRideWork(.inactivityPrompted),
+            .showInactivityPrompt(deadline: startedAt.addingTimeInterval(60))
+        ])
+        XCTAssertEqual(
+            controller.continueRide(at: startedAt.addingTimeInterval(45)).transition,
+            .rideContinued
+        )
         XCTAssertEqual(controller.state, .riding)
     }
 
@@ -72,27 +83,50 @@ final class RideSessionControllerTests: XCTestCase {
         XCTAssertEqual(automaticEnd.cancellationIntent, .rideEnded(wasActive: true))
     }
 
+    func testAutomaticEndReportsActiveSessionWithoutLocationInput() {
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+        let controller = RideSessionController(
+            clock: FixedRideClock(now: startedAt),
+            scheduler: RecordingRideSessionScheduler(),
+            lifecycle: RideSessionLifecycle(inactivityInterval: 30, confirmationGracePeriod: 30)
+        )
+        _ = controller.start(wantsLocationInput: false) { _ in }
+
+        _ = controller.evaluate(at: startedAt.addingTimeInterval(30))
+        let automaticEnd = controller.evaluate(at: startedAt.addingTimeInterval(60))
+
+        XCTAssertEqual(automaticEnd.transition, .automaticEnd)
+        XCTAssertEqual(automaticEnd.cancellationIntent, .rideEnded(wasActive: true))
+        XCTAssertEqual(automaticEnd.effects, [.cancelRideWork(.rideEnded(wasActive: true))])
+    }
+
+    func testPlaceResolutionIdentityIsOwnedAndSupersededByController() {
+        let controller = RideSessionController(scheduler: RecordingRideSessionScheduler())
+        _ = controller.start(wantsLocationInput: true) { _ in }
+
+        let first = controller.beginPlaceResolution()
+        let second = controller.beginPlaceResolution()
+
+        XCTAssertNil(first.supersededRequestID)
+        XCTAssertEqual(second.supersededRequestID, first.request.requestGeneration)
+        XCTAssertFalse(controller.acceptsPlaceResolution(first.request))
+        XCTAssertTrue(controller.acceptsPlaceResolution(second.request))
+        XCTAssertTrue(controller.finishPlaceResolution(second.request))
+        XCTAssertFalse(controller.acceptsPlaceResolution(second.request))
+    }
+
     func testStaleRequestIsRejectedAfterEndAndRestart() {
         let scheduler = RecordingRideSessionScheduler()
         let controller = RideSessionController(scheduler: scheduler)
         _ = controller.start(wantsLocationInput: true) { _ in }
-        let staleGeneration = controller.generation
-        let requestGeneration = UUID()
+        let staleRequest = controller.beginPlaceResolution().request
 
-        XCTAssertTrue(controller.accepts(
-            rideGeneration: staleGeneration,
-            requestGeneration: requestGeneration,
-            currentRequestGeneration: requestGeneration
-        ))
+        XCTAssertTrue(controller.acceptsPlaceResolution(staleRequest))
 
         _ = controller.end()
         _ = controller.start(wantsLocationInput: true) { _ in }
 
-        XCTAssertFalse(controller.accepts(
-            rideGeneration: staleGeneration,
-            requestGeneration: requestGeneration,
-            currentRequestGeneration: requestGeneration
-        ))
+        XCTAssertFalse(controller.acceptsPlaceResolution(staleRequest))
     }
 
     private func location(recordedAt: Date, acceptedAt: Date) -> AcceptedRideLocation {
