@@ -26,7 +26,7 @@ final class RideSessionControllerTests: XCTestCase {
         scheduler.fire()
         XCTAssertEqual(
             scheduledTransitions,
-            [RideSessionControllerTransition(transition: .none, cancellationIntent: nil)]
+            [RideSessionControllerTransition(transition: .none)]
         )
 
         let originalGeneration = controller.generation
@@ -35,7 +35,6 @@ final class RideSessionControllerTests: XCTestCase {
         XCTAssertNotEqual(controller.generation, originalGeneration)
         XCTAssertEqual(controller.state, .idle)
         XCTAssertTrue(scheduler.didCancel)
-        XCTAssertEqual(end.cancellationIntent, .rideEnded(wasActive: true))
     }
 
     func testAcceptedLocationAndInactivityRemainDeterministic() {
@@ -52,7 +51,6 @@ final class RideSessionControllerTests: XCTestCase {
         XCTAssertEqual(transition.transition, .none)
         let prompt = controller.evaluate(at: startedAt.addingTimeInterval(30))
         XCTAssertEqual(prompt.transition, .inactivityPrompt(deadline: startedAt.addingTimeInterval(60)))
-        XCTAssertEqual(prompt.cancellationIntent, .inactivityPrompted)
         XCTAssertEqual(prompt.effects, [
             .cancelRideWork(.inactivityPrompted),
             .showInactivityPrompt(deadline: startedAt.addingTimeInterval(60))
@@ -75,12 +73,10 @@ final class RideSessionControllerTests: XCTestCase {
 
         let prompt = controller.evaluate(at: startedAt.addingTimeInterval(30))
         XCTAssertEqual(prompt.transition, .inactivityPrompt(deadline: startedAt.addingTimeInterval(60)))
-        XCTAssertEqual(prompt.cancellationIntent, .inactivityPrompted)
         let automaticEnd = controller.evaluate(at: startedAt.addingTimeInterval(60))
         XCTAssertEqual(automaticEnd.transition, .automaticEnd)
 
         XCTAssertEqual(controller.state, .idle)
-        XCTAssertEqual(automaticEnd.cancellationIntent, .rideEnded(wasActive: true))
     }
 
     func testAutomaticEndReportsActiveSessionWithoutLocationInput() {
@@ -96,7 +92,6 @@ final class RideSessionControllerTests: XCTestCase {
         let automaticEnd = controller.evaluate(at: startedAt.addingTimeInterval(60))
 
         XCTAssertEqual(automaticEnd.transition, .automaticEnd)
-        XCTAssertEqual(automaticEnd.cancellationIntent, .rideEnded(wasActive: true))
         XCTAssertEqual(automaticEnd.effects, [.cancelRideWork(.rideEnded(wasActive: true))])
     }
 
@@ -104,14 +99,33 @@ final class RideSessionControllerTests: XCTestCase {
         let controller = RideSessionController(scheduler: RecordingRideSessionScheduler())
         _ = controller.start(wantsLocationInput: true) { _ in }
 
-        let first = controller.beginPlaceResolution()
-        let second = controller.beginPlaceResolution()
+        let first = controller.beginPlaceResolution(for: location(
+            recordedAt: Date(timeIntervalSince1970: 1_000),
+            acceptedAt: Date(timeIntervalSince1970: 1_000)
+        ))
+        let second = controller.beginPlaceResolution(for: location(
+            recordedAt: Date(timeIntervalSince1970: 1_001),
+            acceptedAt: Date(timeIntervalSince1970: 1_001)
+        ))
 
-        XCTAssertNil(first.supersededRequestID)
-        XCTAssertEqual(second.supersededRequestID, first.request.requestGeneration)
+        XCTAssertEqual(first.effects, [
+            .cancelResolver,
+            .recordStart(requestID: first.request.requestGeneration),
+            .resolve(first.request)
+        ])
+        XCTAssertEqual(second.effects.first, .recordCancellation(
+            requestID: first.request.requestGeneration,
+            reason: .supersededByNewerContext
+        ))
         XCTAssertFalse(controller.acceptsPlaceResolution(first.request))
         XCTAssertTrue(controller.acceptsPlaceResolution(second.request))
-        XCTAssertTrue(controller.finishPlaceResolution(second.request))
+        XCTAssertEqual(
+            controller.completePlaceResolution(second.request, result: .unavailable),
+            RidePlaceResolutionCompletion(
+                requestID: second.request.requestGeneration,
+                result: .unavailable
+            )
+        )
         XCTAssertFalse(controller.acceptsPlaceResolution(second.request))
     }
 
@@ -119,7 +133,10 @@ final class RideSessionControllerTests: XCTestCase {
         let scheduler = RecordingRideSessionScheduler()
         let controller = RideSessionController(scheduler: scheduler)
         _ = controller.start(wantsLocationInput: true) { _ in }
-        let staleRequest = controller.beginPlaceResolution().request
+        let staleRequest = controller.beginPlaceResolution(for: location(
+            recordedAt: Date(timeIntervalSince1970: 1_000),
+            acceptedAt: Date(timeIntervalSince1970: 1_000)
+        )).request
 
         XCTAssertTrue(controller.acceptsPlaceResolution(staleRequest))
 

@@ -19,10 +19,10 @@ private final class RecordingLocationSource: LocationSource {
 
 @MainActor
 private final class RecordingPlaceResolver: PlaceResolver {
-    private(set) var locations: [CLLocation] = []
+    private(set) var locations: [AcceptedRideLocation] = []
     private(set) var cancelCount = 0
     private var completion: ((PlaceResolutionResult) -> Void)?
-    func resolve(_ location: CLLocation, completion: @escaping (PlaceResolutionResult) -> Void) {
+    func resolve(_ location: AcceptedRideLocation, completion: @escaping (PlaceResolutionResult) -> Void) {
         locations.append(location)
         self.completion = completion
     }

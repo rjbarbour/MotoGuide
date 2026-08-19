@@ -44,6 +44,12 @@ struct AcceptedRideLocation: Equatable {
 
 }
 
+enum PlaceResolutionResult: Equatable {
+    case resolved(Address)
+    case failed
+    case unavailable
+}
+
 protocol RideDistanceMeasuring {
     func distance(from: AcceptedRideLocation, to: AcceptedRideLocation) -> Double
 }
@@ -72,22 +78,18 @@ struct RideSessionStart: Equatable {
 struct RideSessionEnd: Equatable {
     let wasActive: Bool
     let invalidatedGeneration: UUID
-    let cancellationIntent: RideSessionCancellationIntent
     let effects: [RideSessionEffect]
 }
 
 struct RideSessionControllerTransition: Equatable {
     let transition: RideSessionTransition
-    let cancellationIntent: RideSessionCancellationIntent?
     let effects: [RideSessionEffect]
 
     init(
         transition: RideSessionTransition,
-        cancellationIntent: RideSessionCancellationIntent?,
         effects: [RideSessionEffect] = []
     ) {
         self.transition = transition
-        self.cancellationIntent = cancellationIntent
         self.effects = effects
     }
 }
@@ -103,11 +105,24 @@ enum RideSessionEffect: Equatable {
 struct RidePlaceResolutionRequest: Equatable {
     let rideGeneration: UUID
     let requestGeneration: UUID
+    let location: AcceptedRideLocation
 }
 
 struct RidePlaceResolutionStart: Equatable {
     let request: RidePlaceResolutionRequest
-    let supersededRequestID: UUID?
+    let effects: [RidePlaceResolutionEffect]
+}
+
+enum RidePlaceResolutionEffect: Equatable {
+    case recordCancellation(requestID: UUID, reason: RideDiagnosticReason)
+    case cancelResolver
+    case recordStart(requestID: UUID)
+    case resolve(RidePlaceResolutionRequest)
+}
+
+struct RidePlaceResolutionCompletion: Equatable {
+    let requestID: UUID
+    let result: PlaceResolutionResult
 }
 
 enum RideSessionState: Equatable {
@@ -300,7 +315,7 @@ final class RideSessionController {
 
     func accept(_ sample: AcceptedRideLocation) -> RideSessionControllerTransition {
         guard state.isActive else {
-            return RideSessionControllerTransition(transition: .none, cancellationIntent: nil)
+            return RideSessionControllerTransition(transition: .none)
         }
         return process(lifecycle.observe(sample))
     }
@@ -314,12 +329,11 @@ final class RideSessionController {
         if lifecycle.continueRide(at: date ?? clock.now) {
             return RideSessionControllerTransition(
                 transition: .rideContinued,
-                cancellationIntent: nil,
                 effects: [.cancelInactivityPrompt]
             )
         }
         guard wasActive, state == .idle else {
-            return RideSessionControllerTransition(transition: .none, cancellationIntent: nil)
+            return RideSessionControllerTransition(transition: .none)
         }
         return finishAutomaticEnd()
     }
@@ -335,54 +349,82 @@ final class RideSessionController {
         return RideSessionEnd(
             wasActive: wasActive,
             invalidatedGeneration: generation,
-            cancellationIntent: .rideEnded(wasActive: wasActive),
             effects: [.cancelRideWork(.rideEnded(wasActive: wasActive))]
         )
     }
 
-    func beginPlaceResolution() -> RidePlaceResolutionStart {
+    func beginPlaceResolution(for location: AcceptedRideLocation) -> RidePlaceResolutionStart {
         let supersededRequestID = activePlaceResolutionID
         placeResolutionGeneration = UUID()
         activePlaceResolutionID = placeResolutionGeneration
+        let request = RidePlaceResolutionRequest(
+            rideGeneration: generation,
+            requestGeneration: placeResolutionGeneration,
+            location: location
+        )
+        var effects: [RidePlaceResolutionEffect] = []
+        if let supersededRequestID {
+            effects.append(.recordCancellation(
+                requestID: supersededRequestID,
+                reason: .supersededByNewerContext
+            ))
+        }
+        effects.append(contentsOf: [
+            .cancelResolver,
+            .recordStart(requestID: request.requestGeneration),
+            .resolve(request)
+        ])
         return RidePlaceResolutionStart(
-            request: RidePlaceResolutionRequest(
-                rideGeneration: generation,
-                requestGeneration: placeResolutionGeneration
-            ),
-            supersededRequestID: supersededRequestID
+            request: request,
+            effects: effects
         )
     }
 
     func acceptsPlaceResolution(_ request: RidePlaceResolutionRequest) -> Bool {
+        acceptsPlaceResolution(
+            rideGeneration: request.rideGeneration,
+            requestGeneration: request.requestGeneration
+        )
+    }
+
+    func acceptsPlaceResolution(rideGeneration: UUID, requestGeneration: UUID) -> Bool {
         state == .riding
-            && generation == request.rideGeneration
-            && activePlaceResolutionID == request.requestGeneration
-            && placeResolutionGeneration == request.requestGeneration
+            && generation == rideGeneration
+            && activePlaceResolutionID == requestGeneration
+            && placeResolutionGeneration == requestGeneration
     }
 
     @discardableResult
-    func finishPlaceResolution(_ request: RidePlaceResolutionRequest) -> Bool {
-        guard acceptsPlaceResolution(request) else { return false }
+    func completePlaceResolution(
+        _ request: RidePlaceResolutionRequest,
+        result: PlaceResolutionResult
+    ) -> RidePlaceResolutionCompletion? {
+        guard acceptsPlaceResolution(request) else { return nil }
         activePlaceResolutionID = nil
-        return true
+        return RidePlaceResolutionCompletion(
+            requestID: request.requestGeneration,
+            result: result
+        )
     }
 
-    func cancelPlaceResolution() -> UUID? {
+    func cancelPlaceResolution(reason: RideDiagnosticReason) -> [RidePlaceResolutionEffect] {
         let cancelledRequestID = activePlaceResolutionID
         activePlaceResolutionID = nil
         placeResolutionGeneration = UUID()
-        return cancelledRequestID
+        var effects: [RidePlaceResolutionEffect] = []
+        if let cancelledRequestID {
+            effects.append(.recordCancellation(requestID: cancelledRequestID, reason: reason))
+        }
+        effects.append(.cancelResolver)
+        return effects
     }
 
     private func process(_ transition: RideSessionTransition) -> RideSessionControllerTransition {
-        let cancellationIntent: RideSessionCancellationIntent?
         switch transition {
-        case .inactivityPrompt:
-            cancellationIntent = .inactivityPrompted
         case .automaticEnd:
             return finishAutomaticEnd()
-        case .none, .rideContinued, .movementResumed:
-            cancellationIntent = nil
+        case .none, .inactivityPrompt, .rideContinued, .movementResumed:
+            break
         }
         let effects: [RideSessionEffect]
         switch transition {
@@ -398,7 +440,6 @@ final class RideSessionController {
         }
         return RideSessionControllerTransition(
             transition: transition,
-            cancellationIntent: cancellationIntent,
             effects: effects
         )
     }
@@ -413,7 +454,6 @@ final class RideSessionController {
         let intent = RideSessionCancellationIntent.rideEnded(wasActive: wasActive)
         return RideSessionControllerTransition(
             transition: .automaticEnd,
-            cancellationIntent: intent,
             effects: [.cancelRideWork(intent)]
         )
     }

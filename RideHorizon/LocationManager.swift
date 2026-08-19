@@ -779,12 +779,6 @@ final class DefaultSpeechOutputEngine: NSObject, SpeechOutputEngine {
 
 }
 
-enum PlaceResolutionResult {
-    case resolved(Address)
-    case failed
-    case unavailable
-}
-
 @MainActor
 protocol LocationSource: AnyObject {
     var authorizationStatus: CLAuthorizationStatus { get }
@@ -799,7 +793,7 @@ protocol LocationSource: AnyObject {
 
 @MainActor
 protocol PlaceResolver: AnyObject {
-    func resolve(_ location: CLLocation, completion: @escaping (PlaceResolutionResult) -> Void)
+    func resolve(_ location: AcceptedRideLocation, completion: @escaping (PlaceResolutionResult) -> Void)
     func cancel()
 }
 
@@ -834,8 +828,11 @@ final class CoreLocationAdapter: NSObject, LocationSource, PlaceResolver, CLLoca
         manager.allowsBackgroundLocationUpdates = false
     }
 
-    func resolve(_ location: CLLocation, completion: @escaping (PlaceResolutionResult) -> Void) {
-        geocoder.reverseGeocodeLocation(location) { placemarks, error in
+    func resolve(_ location: AcceptedRideLocation, completion: @escaping (PlaceResolutionResult) -> Void) {
+        geocoder.reverseGeocodeLocation(CLLocation(
+            latitude: location.latitude,
+            longitude: location.longitude
+        )) { placemarks, error in
             if error != nil {
                 completion(.failed)
             } else if let placemark = placemarks?.first {
@@ -1310,7 +1307,6 @@ class LocationManager: NSObject, ObservableObject {
         }
 
         cancelActivePlaceLookup(reason: reason)
-        placeResolver.cancel()
         _ = announcementCoordinator.cancelAll(reason: reason)
 
         guard case .rideEnded(let wasActive) = intent else { return }
@@ -1794,11 +1790,13 @@ class LocationManager: NSObject, ObservableObject {
             speakAfterEveryGeocode: speakAfterEveryGeocode,
             riderContext: riderContext,
             delivery: AnnouncementDeliveryContext(
-                selectedProvider: speechProvider,
+                selectedProvider: { [weak self] in self?.speechProvider ?? .apple },
                 aiSharingAllowed: aiSharingAllowed,
-                appleVoice: resolveSpeechVoice().map { SpeechVoiceSelection(identifier: $0.identifier) },
-                allowAppleFallback: premiumVoiceAppleFallbackEnabled,
-                audioPolicy: audioCoexistencePolicy,
+                appleVoice: { [weak self] in
+                    self?.resolveSpeechVoice().map { SpeechVoiceSelection(identifier: $0.identifier) }
+                },
+                allowAppleFallback: { [weak self] in self?.premiumVoiceAppleFallbackEnabled ?? false },
+                audioPolicy: { [weak self] in self?.audioCoexistencePolicy ?? .mix },
                 delay: bluetoothDelaySeconds,
                 shouldRecordTestLog: true
             ),
@@ -1866,15 +1864,14 @@ class LocationManager: NSObject, ObservableObject {
 
         if let location = locations.last {
             let currentTime = Date()
-            let transition = rideSessionController.accept(
-                AcceptedRideLocation(
-                    latitude: location.coordinate.latitude,
-                    longitude: location.coordinate.longitude,
-                    horizontalAccuracy: location.horizontalAccuracy,
-                    recordedAt: location.timestamp,
-                    acceptedAt: currentTime
-                )
+            let acceptedLocation = AcceptedRideLocation(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                horizontalAccuracy: location.horizontalAccuracy,
+                recordedAt: location.timestamp,
+                acceptedAt: currentTime
             )
+            let transition = rideSessionController.accept(acceptedLocation)
             let shouldRecordLocationSample = lastLocationDiagnosticTime.map {
                 currentTime.timeIntervalSince($0) >= 10
             } ?? true
@@ -1901,7 +1898,7 @@ class LocationManager: NSObject, ObservableObject {
             lastUpdateTime = currentTime
 
             AppDiagnostics.log("Location updated.")
-            reverseGeocode(location: location)
+            reverseGeocode(location: acceptedLocation)
         }
     }
 
@@ -1925,71 +1922,64 @@ class LocationManager: NSObject, ObservableObject {
     }
 #endif
 
-    private func reverseGeocode(location: CLLocation, completion: (@MainActor () -> Void)? = nil) {
-        let start = rideSessionController.beginPlaceResolution()
-        let request = start.request
-        if let supersededRequestID = start.supersededRequestID {
-            recordDiagnostic(
-                .placeLookupCancelled,
-                placeLookupID: supersededRequestID,
-                reason: .supersededByNewerContext
-            )
-        }
-        placeResolver.cancel()
-        recordDiagnostic(.placeLookupStarted, placeLookupID: request.requestGeneration)
-        placeResolver.resolve(location) { [weak self] result in
-            if case .failed = result {
-                Task { @MainActor [weak self] in
-                    guard let self,
-                          self.rideSessionController.finishPlaceResolution(request) else { return }
-                    self.recordDiagnostic(.placeLookupFailed, placeLookupID: request.requestGeneration)
-                    self.locationStatus = .placeUnavailable("Place lookup failed. GPS is still active.")
+    private func reverseGeocode(location: AcceptedRideLocation) {
+        applyPlaceResolutionEffects(rideSessionController.beginPlaceResolution(for: location).effects)
+    }
+
+    private func applyPlaceResolutionEffects(_ effects: [RidePlaceResolutionEffect]) {
+        for effect in effects {
+            switch effect {
+            case .recordCancellation(let requestID, let reason):
+                recordDiagnostic(.placeLookupCancelled, placeLookupID: requestID, reason: reason)
+            case .cancelResolver:
+                placeResolver.cancel()
+            case .recordStart(let requestID):
+                recordDiagnostic(.placeLookupStarted, placeLookupID: requestID)
+            case .resolve(let request):
+                placeResolver.resolve(request.location) { [weak self] result in
+                    Task { @MainActor [weak self] in
+                        guard let self,
+                              let completion = self.rideSessionController.completePlaceResolution(
+                                request,
+                                result: result
+                              ) else { return }
+                        self.publishPlaceResolution(completion)
+                    }
                 }
-                AppDiagnostics.log("Reverse geocoding failed.")
-                return
-            }
-
-            guard case .resolved(let address) = result else {
-                Task { @MainActor [weak self] in
-                    guard let self,
-                          self.rideSessionController.finishPlaceResolution(request) else { return }
-                    self.recordDiagnostic(.placeLookupFailed, placeLookupID: request.requestGeneration)
-                    self.locationStatus = .placeUnavailable("Place name is unavailable here.")
-                }
-                AppDiagnostics.log("No placemark was returned.")
-                return
-            }
-
-            Task { @MainActor [weak self] in
-                guard let self,
-                      self.rideSessionController.finishPlaceResolution(request) else { return }
-                self.lastKnownAddress = address
-                self.recordDiagnostic(.placeLookupFinished, placeLookupID: request.requestGeneration)
-                AppDiagnostics.log("Resolved a place name.")
-
-                completion?()
-                self.processResolvedAddress(address, placeLookupID: request.requestGeneration)
             }
         }
     }
 
+    private func publishPlaceResolution(_ completion: RidePlaceResolutionCompletion) {
+        switch completion.result {
+        case .failed:
+            recordDiagnostic(.placeLookupFailed, placeLookupID: completion.requestID)
+            locationStatus = .placeUnavailable("Place lookup failed. GPS is still active.")
+            AppDiagnostics.log("Reverse geocoding failed.")
+        case .unavailable:
+            recordDiagnostic(.placeLookupFailed, placeLookupID: completion.requestID)
+            locationStatus = .placeUnavailable("Place name is unavailable here.")
+            AppDiagnostics.log("No placemark was returned.")
+        case .resolved(let address):
+            lastKnownAddress = address
+            recordDiagnostic(.placeLookupFinished, placeLookupID: completion.requestID)
+            AppDiagnostics.log("Resolved a place name.")
+            processResolvedAddress(address, placeLookupID: completion.requestID)
+        }
+    }
+
     private func cancelActivePlaceLookup(reason: RideDiagnosticReason) {
-        guard let activePlaceLookupID = rideSessionController.cancelPlaceResolution() else { return }
-        recordDiagnostic(
-            .placeLookupCancelled,
-            placeLookupID: activePlaceLookupID,
-            reason: reason
-        )
+        applyPlaceResolutionEffects(rideSessionController.cancelPlaceResolution(reason: reason))
     }
 
     private func canAcceptGeocodeResult(
         rideGeneration: UUID,
         requestGeneration: UUID
     ) -> Bool {
-        rideSessionController.acceptsPlaceResolution(RidePlaceResolutionRequest(
+        rideSessionController.acceptsPlaceResolution(
             rideGeneration: rideGeneration,
             requestGeneration: requestGeneration
-        ))
+        )
     }
 
     func recordAnnouncementDiagnostic(_ signal: AnnouncementDiagnosticSignal) {
@@ -2165,18 +2155,11 @@ class LocationManager: NSObject, ObservableObject {
                 interruptionReason: interruptionReason,
                 shouldResume: shouldResume
             )
-            let outcome = announcementCoordinator.externalAudioEnded(
+            _ = announcementCoordinator.externalAudioEnded(
                 .interruption,
-                shouldResume: shouldResume
+                shouldResume: shouldResume,
+                canResume: rideSessionState == .riding
             )
-            if let plan = outcome.plan, rideSessionState == .riding {
-                speak(
-                    announcementID: plan.id,
-                    text: plan.text,
-                    boundary: plan.boundary,
-                    shouldRecordTestLog: false
-                )
-            }
         }
     }
 
@@ -2203,18 +2186,11 @@ class LocationManager: NSObject, ObservableObject {
                 announcementID: announcementCoordinator.interruptedPlan?.id,
                 reason: .primaryAudioEnded
             )
-            let outcome = announcementCoordinator.externalAudioEnded(
+            _ = announcementCoordinator.externalAudioEnded(
                 .primaryAudio,
-                shouldResume: true
+                shouldResume: true,
+                canResume: rideSessionState == .riding
             )
-            if let plan = outcome.plan, rideSessionState == .riding {
-                speak(
-                    announcementID: plan.id,
-                    text: plan.text,
-                    boundary: plan.boundary,
-                    shouldRecordTestLog: false
-                )
-            }
         @unknown default:
             return
         }
@@ -2232,15 +2208,7 @@ class LocationManager: NSObject, ObservableObject {
         ownsAudioSession = false
         announcementCoordinator.handleMediaServicesReset()
         recordDiagnostic(.audioMediaServicesReset)
-        let outcome = announcementCoordinator.resumeAfterMediaServicesReset()
-        if let plan = outcome.plan, rideSessionState == .riding {
-            speak(
-                announcementID: plan.id,
-                text: plan.text,
-                boundary: plan.boundary,
-                shouldRecordTestLog: false
-            )
-        }
+        _ = announcementCoordinator.resumeAfterMediaServicesReset()
     }
 
     private func handleAnnouncementWorkflowResult(_ result: AnnouncementWorkflowResult) {
@@ -2299,15 +2267,17 @@ class LocationManager: NSObject, ObservableObject {
             text: text,
             boundary: boundary ?? .street
         )
-        announcementCoordinator.speak(
-            plan,
-            selectedProvider: speechProvider,
-            aiSharingAllowed: aiSharingAllowed(),
-            appleVoice: resolveSpeechVoice().map { SpeechVoiceSelection(identifier: $0.identifier) },
-            allowAppleFallback: premiumVoiceAppleFallbackEnabled,
-            audioPolicy: audioCoexistencePolicy,
+        announcementCoordinator.speak(plan, delivery: AnnouncementDeliveryContext(
+            selectedProvider: { [weak self] in self?.speechProvider ?? .apple },
+            aiSharingAllowed: aiSharingAllowed,
+            appleVoice: { [weak self] in
+                self?.resolveSpeechVoice().map { SpeechVoiceSelection(identifier: $0.identifier) }
+            },
+            allowAppleFallback: { [weak self] in self?.premiumVoiceAppleFallbackEnabled ?? false },
+            audioPolicy: { [weak self] in self?.audioCoexistencePolicy ?? .mix },
+            delay: 0,
             shouldRecordTestLog: shouldRecordTestLog
-        )
+        ))
     }
 
     private func stopSpeechOutput() {
@@ -2328,7 +2298,14 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     func beginPlaceLookupDiagnosticForTesting() -> UUID {
-        let lookupID = rideSessionController.beginPlaceResolution().request.requestGeneration
+        let now = Date()
+        let lookupID = rideSessionController.beginPlaceResolution(for: AcceptedRideLocation(
+            latitude: 0,
+            longitude: 0,
+            horizontalAccuracy: 0,
+            recordedAt: now,
+            acceptedAt: now
+        )).request.requestGeneration
         recordDiagnostic(.placeLookupStarted, placeLookupID: lookupID)
         return lookupID
     }
@@ -2427,15 +2404,14 @@ class LocationManager: NSObject, ObservableObject {
             speed: 0,
             timestamp: sampleDate
         )
-        handleRideSessionTransition(
-            rideSessionController.accept(AcceptedRideLocation(
-                latitude: sampleLocation.coordinate.latitude,
-                longitude: sampleLocation.coordinate.longitude,
-                horizontalAccuracy: sampleLocation.horizontalAccuracy,
-                recordedAt: sampleLocation.timestamp,
-                acceptedAt: sampleDate
-            ))
+        let acceptedLocation = AcceptedRideLocation(
+            latitude: sampleLocation.coordinate.latitude,
+            longitude: sampleLocation.coordinate.longitude,
+            horizontalAccuracy: sampleLocation.horizontalAccuracy,
+            recordedAt: sampleLocation.timestamp,
+            acceptedAt: sampleDate
         )
+        handleRideSessionTransition(rideSessionController.accept(acceptedLocation))
         guard rideSessionState == .riding else { return }
 
         lastKnownLocation = waypoint.coordinate
@@ -2443,7 +2419,7 @@ class LocationManager: NSObject, ObservableObject {
         locationStatus = .active
         AppDiagnostics.log("Test location advanced.")
 
-        reverseGeocode(location: sampleLocation)
+        reverseGeocode(location: acceptedLocation)
     }
 
     private func startTestRouteIfNeeded() {

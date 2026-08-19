@@ -329,11 +329,11 @@ struct SpeechVoiceSelection: Equatable {
 }
 
 struct AnnouncementDeliveryContext {
-    let selectedProvider: SpeechProvider
+    let selectedProvider: @MainActor () -> SpeechProvider
     let aiSharingAllowed: @MainActor () -> Bool
-    let appleVoice: SpeechVoiceSelection?
-    let allowAppleFallback: Bool
-    let audioPolicy: AudioCoexistencePolicy
+    let appleVoice: @MainActor () -> SpeechVoiceSelection?
+    let allowAppleFallback: @MainActor () -> Bool
+    let audioPolicy: @MainActor () -> AudioCoexistencePolicy
     let delay: TimeInterval
     let shouldRecordTestLog: Bool
 }
@@ -430,6 +430,8 @@ final class AnnouncementCoordinator {
     private var previousAddress: Address?
     private var lastBoundaryAnnouncementAt: Date?
     private var pendingDeliveryContext: AnnouncementDeliveryContext?
+    private var activeDeliveryContext: AnnouncementDeliveryContext?
+    private var interruptedDeliveryContext: AnnouncementDeliveryContext?
     private(set) var interruptedPlan: AnnouncementPlan?
     private(set) var activePlan: AnnouncementPlan?
 
@@ -602,6 +604,7 @@ final class AnnouncementCoordinator {
             ?? fallbackPlan
         guard let plan else { return nil }
         interruptedPlan = plan
+        interruptedDeliveryContext = activeDeliveryContext ?? pendingDeliveryContext
         cancelPending()
         if isSpeaking || activePlan != nil {
             _ = cancelSpeech(reason: source.beganReason)
@@ -616,11 +619,13 @@ final class AnnouncementCoordinator {
 
     func externalAudioEnded(
         _ source: AnnouncementPauseSource,
-        shouldResume: Bool
-    ) -> (plan: AnnouncementPlan?, result: AnnouncementWorkflowResult?) {
+        shouldResume: Bool,
+        canResume: Bool = true
+    ) -> AnnouncementWorkflowResult? {
         pauseSources.remove(source)
         if !shouldResume, let plan = interruptedPlan {
             interruptedPlan = nil
+            interruptedDeliveryContext = nil
             let result = AnnouncementWorkflowResult.cancelled(
                 announcementID: plan.id,
                 reason: .interruptionMustNotResume
@@ -631,10 +636,15 @@ final class AnnouncementCoordinator {
                 reason: .interruptionMustNotResume
             ))
             onResult?(result)
-            return (nil, result)
+            return result
         }
-        guard pauseSources.isEmpty, let plan = interruptedPlan else { return (nil, nil) }
+        guard pauseSources.isEmpty, let plan = interruptedPlan else { return nil }
         interruptedPlan = nil
+        guard canResume, let delivery = interruptedDeliveryContext else {
+            interruptedDeliveryContext = nil
+            return nil
+        }
+        interruptedDeliveryContext = nil
         let result = AnnouncementWorkflowResult.resumed(announcementID: plan.id)
         diagnostics.record(AnnouncementDiagnosticSignal(
             event: .announcementRestarted,
@@ -642,7 +652,8 @@ final class AnnouncementCoordinator {
             reason: source == .interruption ? .interruptionShouldResume : .primaryAudioEnded
         ))
         onResult?(result)
-        return (plan, result)
+        _ = speak(plan, delivery: delivery)
+        return result
     }
 
     func enqueue(id: UUID = UUID(), text: String, boundary: BoundaryType) -> AnnouncementRequest {
@@ -778,24 +789,45 @@ final class AnnouncementCoordinator {
         audioPolicy: AudioCoexistencePolicy,
         shouldRecordTestLog: Bool = true
     ) -> AnnouncementWorkflowResult {
+        speak(
+            plan,
+            delivery: AnnouncementDeliveryContext(
+                selectedProvider: { selectedProvider },
+                aiSharingAllowed: { aiSharingAllowed },
+                appleVoice: { appleVoice },
+                allowAppleFallback: { allowAppleFallback },
+                audioPolicy: { audioPolicy },
+                delay: 0,
+                shouldRecordTestLog: shouldRecordTestLog
+            )
+        )
+    }
+
+    @discardableResult
+    func speak(
+        _ plan: AnnouncementPlan,
+        delivery: AnnouncementDeliveryContext
+    ) -> AnnouncementWorkflowResult {
         if let deferred = deferIfPaused(plan) { return deferred }
         activePlan = plan
+        activeDeliveryContext = delivery
         fallbackInProgress = false
         terminalFailureInProgress = false
-        self.audioPolicy = audioPolicy
-        let provider: SpeechProvider = aiSharingAllowed ? selectedProvider : .apple
+        self.audioPolicy = delivery.audioPolicy()
+        let aiSharingAllowed = delivery.aiSharingAllowed()
+        let provider: SpeechProvider = aiSharingAllowed ? delivery.selectedProvider() : .apple
         let result = AnnouncementWorkflowResult.speechRequested(
             plan: plan,
             provider: provider,
-            shouldRecordTestLog: shouldRecordTestLog
+            shouldRecordTestLog: delivery.shouldRecordTestLog
         )
         onResult?(result)
         speechOutput.speak(
             text: plan.text,
             boundary: plan.boundary,
             provider: provider,
-            appleVoice: appleVoice,
-            allowAppleFallback: aiSharingAllowed ? allowAppleFallback : false,
+            appleVoice: delivery.appleVoice(),
+            allowAppleFallback: aiSharingAllowed ? delivery.allowAppleFallback() : false,
             announcementID: plan.id
         )
         return result
@@ -866,6 +898,7 @@ final class AnnouncementCoordinator {
             results.append(result)
         }
         interruptedPlan = nil
+        interruptedDeliveryContext = nil
         pauseSources.removeAll()
         return results
     }
@@ -918,21 +951,15 @@ final class AnnouncementCoordinator {
         }
 
         cancelPending(id: id)
-        _ = speak(
-            plan,
-            selectedProvider: delivery.selectedProvider,
-            aiSharingAllowed: delivery.aiSharingAllowed(),
-            appleVoice: delivery.appleVoice,
-            allowAppleFallback: delivery.allowAppleFallback,
-            audioPolicy: delivery.audioPolicy,
-            shouldRecordTestLog: delivery.shouldRecordTestLog
-        )
+        _ = speak(plan, delivery: delivery)
     }
 
-    func resumeAfterMediaServicesReset() -> (plan: AnnouncementPlan?, result: AnnouncementWorkflowResult?) {
+    func resumeAfterMediaServicesReset() -> AnnouncementWorkflowResult? {
         pauseSources.removeAll()
-        guard let plan = interruptedPlan else { return (nil, nil) }
+        guard let plan = interruptedPlan else { return nil }
         interruptedPlan = nil
+        let delivery = interruptedDeliveryContext
+        interruptedDeliveryContext = nil
         let result = AnnouncementWorkflowResult.resumed(announcementID: plan.id)
         diagnostics.record(AnnouncementDiagnosticSignal(
             event: .announcementRestarted,
@@ -940,7 +967,8 @@ final class AnnouncementCoordinator {
             reason: .mediaServicesReset
         ))
         onResult?(result)
-        return (plan, result)
+        if let delivery { _ = speak(plan, delivery: delivery) }
+        return result
     }
 
     private func cancelSpeech(reason: RideDiagnosticReason) -> AnnouncementWorkflowResult {
@@ -1055,6 +1083,7 @@ final class AnnouncementCoordinator {
         fallbackInProgress = false
         terminalFailureInProgress = false
         activePlan = nil
+        activeDeliveryContext = nil
         diagnostics.record(AnnouncementDiagnosticSignal(
             event: cancelled ? .audioPlaybackCancelled : .audioPlaybackFinished,
             announcementID: announcementID,
