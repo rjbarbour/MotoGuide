@@ -1,6 +1,6 @@
 # RideHorizon Project State
 
-Last verified: 2026-08-19
+Last verified: 2026-08-20
 
 ## Current product direction
 
@@ -11,6 +11,8 @@ The accepted decision recorded on 2026-08-18 establishes `m-1 — Core ride reli
 The High-priority architecture foundation and its workflow-boundary refinement are integrated through PR #39 at `243be88`. Production dependencies now enter through the composition root; `RideSessionController` owns ride and place-resolution sequencing; and `AnnouncementCoordinator` owns boundary-to-speech sequencing. The final branch passed 222 local simulator tests, 222 GitHub iOS tests, an unsigned Release build and zero-finding independent Standards and Specification reviews. Later Medium and Low architecture phases remain gated rather than automatically selected.
 
 Build-output hygiene is integrated through PR #41 at `5834985`. Local Xcode output now uses one external, task-scoped DerivedData parent with completion cleanup and seven-day stale pruning; generated root/cache residue was removed, while legacy TestFlight archives and evidence were preserved outside the checkout.
+
+Generated-output retention is integrated through PR #45 at `324debe`. Path resolution now prunes seven-day stale DerivedData while preserving evidence-bearing subtrees; task completion removes disposable output; and guarded dependency markers support 30-day inactivity pruning plus explicit disk-pressure cleanup.
 
 The first executable app-proxy contract increments are integrated through PR #42 and PR #43. OpenAPI drift now fails a parser-backed, complete-document gate, and privacy-safe fact-request, fact-response and coded speech-error fixtures are consumed by both Swift and Java production codec paths. The final fixture candidate passed 224 iOS tests, the complete proxy suite, the OpenAPI gate and zero-finding independent reviews.
 

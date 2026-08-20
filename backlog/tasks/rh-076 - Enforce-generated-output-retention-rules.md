@@ -1,11 +1,11 @@
 ---
 id: RH-076
 title: Enforce generated-output retention rules
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-20 11:10'
-updated_date: '2026-08-20 11:45'
+updated_date: '2026-08-20 11:57'
 labels:
   - hygiene
   - retention
@@ -26,11 +26,11 @@ Complete the generated-output lifecycle introduced by RH-073. Automatically prun
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Resolving an Xcode DerivedData path automatically prunes task caches unused for seven days while retaining recent and current caches
-- [ ] #2 A guarded task-completion command removes known disposable build output plus untracked OS, editor and Python residue without deleting dependency caches, tracked files or release evidence
-- [ ] #3 Dependency caches can be pruned after thirty days of inactivity and force-cleaned explicitly under disk pressure, using exact allowlisted paths with ownership, symlink and tracking guards
-- [ ] #4 AGENTS.md and testing documentation define the retention lifecycle, completion commands and release-artifact exclusion
-- [ ] #5 Focused shell tests prove automatic pruning, task cleanup, age-based retention, explicit force cleanup and safety guards without running application builds
+- [x] #1 Resolving an Xcode DerivedData path automatically prunes task caches unused for seven days while retaining recent and current caches
+- [x] #2 A guarded task-completion command removes known disposable build output plus untracked OS, editor and Python residue without deleting dependency caches, tracked files or release evidence
+- [x] #3 Dependency caches can be pruned after thirty days of inactivity and force-cleaned explicitly under disk pressure, using exact allowlisted paths with ownership, symlink and tracking guards
+- [x] #4 AGENTS.md and testing documentation define the retention lifecycle, completion commands and release-artifact exclusion
+- [x] #5 Focused shell tests prove automatic pruning, task cleanup, age-based retention, explicit force cleanup and safety guards without running application builds
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,4 +53,12 @@ Final hardening routes every dependency-marker write through the guarded helper,
 Pull request: https://github.com/rjbarbour/MotoGuide/pull/45. Reviewed implementation head: 753407b.
 
 PR #45 CI exposed that the local cleanup helper uses macOS stat semantics but Gradle invoked it on Ubuntu. The cache-marker hook is now explicitly macOS-only; CI dependency caching remains owned by GitHub Actions. Configuration-only Gradle help passes after the correction.
+
+Integrated by PR #45 at merge commit 324debe. GitHub validation passed: selector, proxy suite, iOS unit suite and aggregate PR validation. The initial proxy CI failure was corrected before merge; the replacement run was fully green.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented safe generated-output retention: seven-day task-scoped DerivedData pruning with evidence preservation, guarded completion cleanup, 30-day activity-based dependency pruning and explicit disk-pressure cleanup. Verified by 10 DerivedData tests, 14 generated-output tests, configuration-only Gradle validation, zero-finding independent Standards and Specification reviews, and green proxy/iOS/aggregate PR CI. Integrated through PR #45 at 324debe.
+<!-- SECTION:FINAL_SUMMARY:END -->
