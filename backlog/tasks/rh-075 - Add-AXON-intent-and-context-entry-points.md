@@ -5,12 +5,14 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-20 10:55'
-updated_date: '2026-08-20 11:02'
+updated_date: '2026-08-20 11:04'
 labels:
   - axon
   - control-plane
   - documentation
 dependencies: []
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/44'
 priority: medium
 type: docs
 ordinal: 211000
