@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:57'
-updated_date: '2026-08-20 12:06'
+updated_date: '2026-08-20 12:14'
 labels:
   - core
   - background
@@ -13,6 +13,13 @@ labels:
 milestone: m-1
 dependencies:
   - RH-013.39
+references:
+  - >-
+    https://developer.apple.com/documentation/coreaudiotypes/avaudiosessionerrorcode/avaudiosessionerrorcodecannotinterruptothers
+modified_files:
+  - RideHorizon/LocationManager.swift
+  - RideHorizon/ContentView.swift
+  - RideHorizonTests/LocationManagerTests.swift
 priority: high
 type: bug
 ordinal: 110000
@@ -45,4 +52,6 @@ Ready-queue replenishment on 2026-08-19: RH-013.39 — Complete High workflow bo
 Claimed in delegated implementation session on branch codex/rh-059-google-maps-background. Stop before speculative code changes if no red-capable reproduction or captured diagnostic evidence can distinguish trigger, generation, queue and playback failure.
 
 Diagnosis evidence: retained UAT traces repeatedly show background speechAudioReady followed by audioSessionActivationFailed and cancellation, with foreground playback succeeding. Apple documents cannotInterruptOthers as activation of a nonmixable session while backgrounded. The current Interrupt music setting resolves to the nonmixable interrupt policy regardless of app state.
+
+Red/green evidence on 2026-08-20: the focused background lifecycle test failed because Interrupt music requested the nonmixable interrupt policy while backgrounded; Apple documents that state as cannotInterruptOthers. The fix preserves foreground interruption but resolves background playback to the mixable policy, allowing activation while navigation retains priority. Four focused policy/interruption tests passed; the complete selected iOS suite passed 225 tests with zero failures. Robert's iPhone was not listed by xcodebuild, so build/install and Google Maps/X-COM2 physical acceptance remain pending.
 <!-- SECTION:NOTES:END -->

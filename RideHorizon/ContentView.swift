@@ -1143,7 +1143,7 @@ private struct SettingsView: View {
 
                     SettingsToggleRow(
                         title: "Interrupt music while speaking",
-                        subtitle: "Pause other audio during an announcement, then let iOS resume it.",
+                        subtitle: "Pause other audio while RideHorizon is visible. Background announcements mix so navigation keeps priority.",
                         isOn: $locationManager.interruptsMusic,
                         palette: palette
                     )
