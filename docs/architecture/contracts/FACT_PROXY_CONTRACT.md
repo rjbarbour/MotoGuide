@@ -35,14 +35,18 @@ The iOS app must not send prompt text, arbitrary model messages, OpenAI configur
 Exact command:
 
 ```bash
-ruby -e 'require "yaml"; doc = YAML.load_file("/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml"); abort "missing openapi" unless doc["openapi"] == "3.0.3"; abort "missing /v1/fact" unless doc.dig("paths", "/v1/fact", "post"); abort "missing FactRequest" unless doc.dig("components", "schemas", "FactRequest"); puts "OpenAPI YAML parsed: #{doc["info"]["title"]} #{doc["info"]["version"]}"'
+./fact-proxy/gradlew -p fact-proxy openApiContractTest --no-daemon
 ```
 
-Expected result:
+Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.2.0`, every published operation, schema and security scheme, and proves the intentional version-drift fixture fails validation.
 
-```text
-OpenAPI YAML parsed: RideHorizon Fact Proxy API 0.1.0
+Drift proof:
+
+```bash
+./fact-proxy/gradlew -p fact-proxy openApiContractTest --no-daemon -PopenApiContract=src/test/resources/contracts/openapi/version-drift.yaml
 ```
+
+Expected result: `BUILD FAILED`; the `configuredContractIsValidAndComplete` test report identifies the `info.version` drift.
 
 ## Endpoint
 

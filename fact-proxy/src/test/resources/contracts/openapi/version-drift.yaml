@@ -1,0 +1,8 @@
+openapi: 3.0.3
+info:
+  title: RideHorizon Fact Proxy API drift fixture
+  version: 9.9.9
+paths: {}
+components:
+  schemas: {}
+  securitySchemes: {}
