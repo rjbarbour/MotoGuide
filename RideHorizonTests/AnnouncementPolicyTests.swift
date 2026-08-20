@@ -235,36 +235,6 @@ final class AnnouncementQueueTests: XCTestCase {
         XCTAssertEqual(queue.pending?.text, "Welcome to Gloucestershire. You are in Stroud, Gloucestershire")
     }
 
-    func testShouldDropLowerPriorityWhileSpeaking() {
-        XCTAssertTrue(
-            AnnouncementQueue.shouldDropWhileSpeaking(
-                newBoundary: .town,
-                currentlySpeaking: .county
-            )
-        )
-        XCTAssertFalse(
-            AnnouncementQueue.shouldDropWhileSpeaking(
-                newBoundary: .county,
-                currentlySpeaking: .town
-            )
-        )
-    }
-
-    func testShouldInterruptForHigherPriorityBoundary() {
-        XCTAssertTrue(
-            AnnouncementQueue.shouldInterrupt(
-                newBoundary: .nation,
-                currentlySpeaking: .town
-            )
-        )
-        XCTAssertFalse(
-            AnnouncementQueue.shouldInterrupt(
-                newBoundary: .town,
-                currentlySpeaking: .nation
-            )
-        )
-    }
-
     func testClearPendingOnlyClearsMatchingRequest() {
         var queue = AnnouncementQueue()
         let request = queue.replacePending(text: "Welcome to Wales. You are in Chepstow, Monmouthshire", boundary: .nation)
@@ -315,13 +285,13 @@ final class AnnouncementCoordinatorTests: XCTestCase {
             AnnouncementCoordinator.supersession(
                 newBoundary: .town,
                 activeBoundaries: [.county],
-                activeAnnouncementIDs: [UUID()]
+                supersedableAnnouncementIDs: [UUID()]
             ),
             .rejectLowerPriority
         )
     }
 
-    func testHigherPriorityContextReturnsEveryWorkItemToCancel() {
+    func testHigherPriorityContextReturnsEverySupersedableWorkItemToCancel() {
         let factID = UUID()
         let speechID = UUID()
 
@@ -329,7 +299,7 @@ final class AnnouncementCoordinatorTests: XCTestCase {
             AnnouncementCoordinator.supersession(
                 newBoundary: .country,
                 activeBoundaries: [.town, .county],
-                activeAnnouncementIDs: [factID, speechID, factID]
+                supersedableAnnouncementIDs: [factID, speechID, factID]
             ),
             .supersede(announcementIDs: [factID, speechID])
         )
@@ -378,21 +348,6 @@ final class AnnouncementCoordinatorTests: XCTestCase {
 
         XCTAssertTrue(delivered.isEmpty)
         XCTAssertTrue(scheduler.didCancel)
-    }
-
-    func testDeliveryDecisionMakesInterruptionExplicit() {
-        XCTAssertEqual(
-            AnnouncementCoordinator.deliveryDecision(newBoundary: .country, activeBoundary: .town),
-            .interruptThenDeliver
-        )
-        XCTAssertEqual(
-            AnnouncementCoordinator.deliveryDecision(newBoundary: .town, activeBoundary: .country),
-            .drop
-        )
-        XCTAssertEqual(
-            AnnouncementCoordinator.deliveryDecision(newBoundary: .town, activeBoundary: nil),
-            .deliver
-        )
     }
 
     func testFactClientIsOwnedByCoordinatorAndProducesResolvedPlan() async {
@@ -587,6 +542,59 @@ final class AnnouncementCoordinatorTests: XCTestCase {
         XCTAssertEqual(speechOutput.requests.last?.allowAppleFallback, false)
         XCTAssertTrue(speechOutput.beginPlayback(provider: .proxyElevenLabs))
         XCTAssertEqual(audioSession.activatedPolicies, [.interrupt])
+    }
+
+    func testNewBoundariesCoalesceBehindPlayingSpeechAndLatestDeliversAfterFinish() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(scheduler: scheduler, speechOutput: speechOutput)
+
+        XCTAssertEqual(coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))), .noAnnouncement)
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )))
+        scheduler.fire()
+        XCTAssertTrue(speechOutput.beginPlayback(provider: .apple))
+        XCTAssertEqual(speechOutput.requests.count, 1)
+
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "Castle Street",
+            town: "Cardiff",
+            county: "South Glamorgan",
+            administrativeArea: "Wales",
+            country: "United Kingdom"
+        )))
+        let latest = coordinator.submit(workflowInput(address: Address(
+            street: "Rue Royale",
+            town: "Calais",
+            county: "Pas-de-Calais",
+            administrativeArea: "Hauts-de-France",
+            country: "France"
+        )))
+        guard case .accepted(let latestPlan, _) = latest else {
+            return XCTFail("Expected the latest boundary to be accepted")
+        }
+
+        scheduler.fire()
+        XCTAssertEqual(speechOutput.stopCount, 0)
+        XCTAssertEqual(speechOutput.requests.count, 1)
+        XCTAssertEqual(coordinator.pending?.id, latestPlan.id)
+
+        speechOutput.finish()
+
+        XCTAssertEqual(speechOutput.requests.count, 2)
+        XCTAssertEqual(speechOutput.requests.last?.announcementID, latestPlan.id)
+        XCTAssertNil(coordinator.pending)
     }
 
     func testAnnouncementDeferredBeforePlaybackResumesThroughCoordinator() {

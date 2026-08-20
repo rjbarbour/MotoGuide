@@ -1200,7 +1200,7 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testNewSamePriorityBoundaryStopsActiveSpeechBeforeReplacement() async {
+    func testNewSamePriorityBoundaryWaitsForActiveSpeechBeforeReplacement() async {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let diagnostics = RideDiagnosticsStore(directoryURL: directory)
@@ -1241,13 +1241,14 @@ final class LocationManagerTests: XCTestCase {
         ))
         try? await Task.sleep(nanoseconds: 100_000_000)
 
-        XCTAssertEqual(speechOutput.stopCount, 1)
+        XCTAssertEqual(speechOutput.stopCount, 0)
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Stonehouse, Gloucestershire"])
+
+        speechOutput.finishPlayback()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
         XCTAssertEqual(speechOutput.requests.map(\.text), ["Stonehouse, Gloucestershire", "Dursley, Gloucestershire"])
-        XCTAssertTrue(
-            diagnostics.entries.contains {
-                $0.event == .announcementSuperseded && $0.reason == .supersededByNewerContext
-            }
-        )
+        XCTAssertFalse(diagnostics.entries.contains { $0.event == .audioPlaybackCancelled })
     }
 
     @MainActor
@@ -2976,7 +2977,7 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testNewBoundaryCancelsOlderSpeechPreparationBeforeQueuingReplacement() async {
+    func testNewBoundaryKeepsOlderSpeechPreparationBeforeQueuingReplacement() async {
         let speechOutput = RecordingSpeechOutputEngine()
         let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
         locationManager.testMode = false
@@ -3011,7 +3012,7 @@ final class LocationManagerTests: XCTestCase {
 
         XCTAssertEqual(
             speechOutput.cancelPendingPreparationCount,
-            cancellationsBeforeNewBoundary + 1
+            cancellationsBeforeNewBoundary
         )
     }
 

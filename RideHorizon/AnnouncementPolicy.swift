@@ -245,32 +245,11 @@ struct AnnouncementQueue {
     mutating func clearPending() {
         pending = nil
     }
-
-    static func shouldDropWhileSpeaking(
-        newBoundary: BoundaryType,
-        currentlySpeaking: BoundaryType?
-    ) -> Bool {
-        guard let currentlySpeaking else { return false }
-        return newBoundary > currentlySpeaking
-    }
-
-    static func shouldInterrupt(
-        newBoundary: BoundaryType,
-        currentlySpeaking: BoundaryType
-    ) -> Bool {
-        newBoundary < currentlySpeaking
-    }
 }
 
 enum AnnouncementSupersession: Equatable {
     case rejectLowerPriority
     case supersede(announcementIDs: Set<UUID>)
-}
-
-enum AnnouncementDeliveryDecision: Equatable {
-    case drop
-    case deliver
-    case interruptThenDeliver
 }
 
 @MainActor
@@ -430,6 +409,7 @@ final class AnnouncementCoordinator {
     private var previousAddress: Address?
     private var lastBoundaryAnnouncementAt: Date?
     private var pendingDeliveryContext: AnnouncementDeliveryContext?
+    private var pendingDeliveryReady = false
     private var activeDeliveryContext: AnnouncementDeliveryContext?
     private var interruptedDeliveryContext: AnnouncementDeliveryContext?
     private(set) var interruptedPlan: AnnouncementPlan?
@@ -488,9 +468,7 @@ final class AnnouncementCoordinator {
             return .rejected(plan: plan)
         }
 
-        if !supersededAnnouncementIDs.isEmpty {
-            _ = cancelAll(reason: .supersededByNewerContext)
-        }
+        cancelSupersededWork(announcementIDs: supersededAnnouncementIDs)
 
         if !input.speakAfterEveryGeocode,
            input.boundaryCooldown > 0,
@@ -544,16 +522,19 @@ final class AnnouncementCoordinator {
         _ plan: AnnouncementPlan,
         additionalActivePlans: [AnnouncementPlan] = []
     ) -> AnnouncementWorkflowResult {
-        let activePlans = [
+        let supersedablePlans = [
             factWork.map { AnnouncementPlan(id: $0.announcementID, text: "", boundary: $0.boundary) },
-            pending.map { AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary) },
+            pending.map { AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary) }
+        ].compactMap { $0 }
+        let protectedPlans = [
             activePlan,
             interruptedPlan
-        ].compactMap { $0 } + additionalActivePlans
+        ].compactMap { $0 }
+        let activePlans = supersedablePlans + protectedPlans + additionalActivePlans
         let supersession = Self.supersession(
             newBoundary: plan.boundary,
             activeBoundaries: activePlans.map(\.boundary),
-            activeAnnouncementIDs: activePlans.map(\.id)
+            supersedableAnnouncementIDs: supersedablePlans.map(\.id)
         )
         switch supersession {
         case .rejectLowerPriority:
@@ -667,8 +648,10 @@ final class AnnouncementCoordinator {
         delivery: @escaping @MainActor (UUID) -> Void
     ) -> AnnouncementRequest {
         let request = queue.replacePending(id: plan.id, text: plan.text, boundary: plan.boundary)
+        pendingDeliveryReady = false
         scheduler.schedule(after: delay) { [weak self] in
-            guard self?.pending?.id == request.id else { return }
+            guard let self, self.pending?.id == request.id else { return }
+            self.pendingDeliveryReady = true
             delivery(request.id)
         }
         return request
@@ -677,6 +660,7 @@ final class AnnouncementCoordinator {
     func cancelPending(id: UUID) {
         queue.clearPending(id: id)
         if queue.pending == nil {
+            pendingDeliveryReady = false
             pendingDeliveryContext = nil
             scheduler.cancel()
         }
@@ -685,6 +669,7 @@ final class AnnouncementCoordinator {
     func cancelPending() {
         scheduler.cancel()
         queue.clearPending()
+        pendingDeliveryReady = false
         pendingDeliveryContext = nil
     }
 
@@ -917,17 +902,6 @@ final class AnnouncementCoordinator {
         placeLookupID: UUID?,
         delivery: AnnouncementDeliveryContext
     ) {
-        if isSpeaking {
-            switch Self.deliveryDecision(newBoundary: plan.boundary, activeBoundary: activePlan?.boundary) {
-            case .drop:
-                return
-            case .interruptThenDeliver:
-                _ = stop(reason: .playbackCancelled)
-            case .deliver:
-                break
-            }
-        }
-
         pendingDeliveryContext = delivery
         schedule(plan, after: delivery.delay) { [weak self] id in
             self?.deliver(id: id)
@@ -939,19 +913,8 @@ final class AnnouncementCoordinator {
         guard let pending,
               pending.id == id,
               let delivery = pendingDeliveryContext else { return }
+        guard !isSpeaking else { return }
         let plan = AnnouncementPlan(id: pending.id, text: pending.text, boundary: pending.boundary)
-
-        if isSpeaking {
-            switch Self.deliveryDecision(newBoundary: plan.boundary, activeBoundary: activePlan?.boundary) {
-            case .drop:
-                cancelPending(id: id)
-                return
-            case .interruptThenDeliver:
-                _ = stop(reason: .playbackCancelled)
-            case .deliver:
-                break
-            }
-        }
 
         cancelPending(id: id)
         _ = speak(plan, delivery: delivery)
@@ -987,33 +950,27 @@ final class AnnouncementCoordinator {
     static func supersession(
         newBoundary: BoundaryType,
         activeBoundaries: [BoundaryType],
-        activeAnnouncementIDs: [UUID]
+        supersedableAnnouncementIDs: [UUID]
     ) -> AnnouncementSupersession {
         if let highestPriorityBoundary = activeBoundaries.min(), newBoundary > highestPriorityBoundary {
             return .rejectLowerPriority
         }
-        return .supersede(announcementIDs: Set(activeAnnouncementIDs))
+        return .supersede(announcementIDs: Set(supersedableAnnouncementIDs))
     }
 
-
-    static func deliveryDecision(
-        newBoundary: BoundaryType,
-        activeBoundary: BoundaryType?
-    ) -> AnnouncementDeliveryDecision {
-        guard let activeBoundary else { return .deliver }
-        if AnnouncementQueue.shouldDropWhileSpeaking(
-            newBoundary: newBoundary,
-            currentlySpeaking: activeBoundary
-        ) {
-            return .drop
+    private func cancelSupersededWork(announcementIDs: Set<UUID>) {
+        if let factWork, announcementIDs.contains(factWork.announcementID) {
+            cancelFact(reason: .supersededByNewerContext)
         }
-        if AnnouncementQueue.shouldInterrupt(
-            newBoundary: newBoundary,
-            currentlySpeaking: activeBoundary
-        ) {
-            return .interruptThenDeliver
+        if let pending, announcementIDs.contains(pending.id) {
+            let announcementID = pending.id
+            cancelPending()
+            let result = AnnouncementWorkflowResult.cancelled(
+                announcementID: announcementID,
+                reason: .supersededByNewerContext
+            )
+            onResult?(result)
         }
-        return .deliver
     }
 
     private func configureSpeechOutput() {
@@ -1097,6 +1054,9 @@ final class AnnouncementCoordinator {
             onResult?(.cancelled(announcementID: announcementID, reason: cancellationReason))
         } else if !terminalFailure {
             onResult?(.completed(announcementID: announcementID))
+        }
+        if !cancelled, pendingDeliveryReady, let pending {
+            deliver(id: pending.id)
         }
     }
 
