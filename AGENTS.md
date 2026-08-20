@@ -225,6 +225,12 @@ Before substantive repository changes, fetch and follow [SOP: Tracked Work and G
 
 Backlog.md is the canonical delivery ledger. Its repository-backed records live under `backlog/` and its project configuration is `backlog.config.yml`. Before creating, claiming, executing or closing work, run `backlog instructions overview`, read the matching task guide it names, and inspect the task with `backlog task view RH-XXX --plain`. Use supported public `backlog` CLI commands for every task, document and decision mutation; do not edit generated records directly. In Backlog.md v1.50.1, `backlog decision list --plain` is the decision index and `backlog doc view doc-003 --plain` holds the complete accepted decision content because the public CLI cannot populate generated decision bodies. Keep the long-range plan shallow and revisable, with only the next one to three work items labelled `ready`. Give the active item a Goal that references its ID and evidence contract. Use independent evaluation, link evidence before **Done**, update `PROJECT.md` without duplicating ledger status, and stop at every milestone health and replenishment gate.
 
+### Backlog.md browser runtime
+
+- Whenever actively working on RideHorizon, ensure the Backlog.md browser is running at `http://127.0.0.1:6420`; start it without waiting for the owner to ask.
+- If it is not already listening, run the exact command `backlog browser --port 6420 --no-open` immediately with host/escalated execution. Do not attempt sandbox execution first.
+- Keep the server running for the active project session unless the owner asks for it to stop.
+
 Use Plan for direction, Goal for the active work item and Loop only for bounded machine-verifiable iteration. Treat coding agents and IDEs as execution surfaces, not project trackers. Use the Delivery Risk Cube to compare the evidence shape with the project's next commitment. Record hard-to-reverse, cross-increment or surprising architectural choices in the project decision log or an ADR; do not embed them silently in code. Do not continue automatically into later milestones.
 
 The canonical integration checkout is `/Users/rob_dev/DocsLocal/motoguide/repo`. Task worktrees may be created explicitly for claimed Backlog.md work items.
