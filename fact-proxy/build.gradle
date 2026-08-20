@@ -24,6 +24,9 @@ repositories {
 def acceptedOpenApiContract = providers.gradleProperty('openApiContract')
         .map { rootProject.file(it).absolutePath }
         .orElse(rootProject.projectDir.parentFile.toPath().resolve('FACT_PROXY_OPENAPI.yaml').toString())
+def sharedContractFixtures = rootProject.projectDir.parentFile.toPath()
+        .resolve('fixtures/contracts/app-proxy/v1')
+        .toString()
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -42,6 +45,10 @@ tasks.withType(Test).configureEach {
     inputs.file(acceptedOpenApiContract)
             .withPropertyName('openApiContract')
             .withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty 'ridehorizon.contract.fixtures', sharedContractFixtures
+    inputs.dir(sharedContractFixtures)
+            .withPropertyName('sharedContractFixtures')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty 'spring.datasource.url', 'jdbc:h2:mem:ridehorizon-tests;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE'
     systemProperty 'spring.datasource.username', 'sa'
     systemProperty 'spring.datasource.password', ''
@@ -55,6 +62,16 @@ tasks.register('openApiContractTest', Test) {
     classpath = sourceSets.test.runtimeClasspath
     filter {
         includeTestsMatching 'ai.digitalmercenaries.ridehorizon.factproxy.OpenApiContractTest'
+    }
+}
+
+tasks.register('sharedContractFixtureTest', Test) {
+    description = 'Verifies the Java contract models against the shared app-proxy fixtures.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    filter {
+        includeTestsMatching 'ai.digitalmercenaries.ridehorizon.factproxy.SharedContractFixtureTest'
     }
 }
 

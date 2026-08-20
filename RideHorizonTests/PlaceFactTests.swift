@@ -976,10 +976,109 @@ final class ProxyFactGeneratorTests: XCTestCase {
         XCTAssertEqual(fact, "Known for its wool trade.")
     }
 
+    func testSharedFactFixturesMatchIOSRequestEncoderAndSuccessDecoder() async throws {
+        let endpoint = self.endpoint
+        let expectedRequest = try sharedContractFixture(named: "fact-request.json")
+        let successResponse = try sharedContractFixture(named: "fact-response.json")
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            factMode: .shortFacts,
+            countryContext: "United Kingdom",
+            placeHierarchy: PlaceHierarchy(
+                street: "B4066",
+                town: "Stroud",
+                county: "Gloucestershire",
+                region: "England",
+                country: "United Kingdom"
+            ),
+            riderContext: RiderContext(
+                homeCountry: "United Kingdom",
+                homeRegion: "West Midlands",
+                familiarRegions: ["England", "Cotswolds"],
+                factInterestCategories: [.geographyBasics, .locationFacts, .history],
+                customFactInstructions: "engineering and old roads"
+            )
+        )
+
+        MockURLProtocol.requestHandler = { urlRequest in
+            let body = try self.requestBodyData(from: urlRequest)
+            XCTAssertEqual(try self.canonicalJSON(body), try self.canonicalJSON(expectedRequest))
+            let response = HTTPURLResponse(
+                url: endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, successResponse)
+        }
+
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        let fact = try await generator.fact(for: request)
+
+        XCTAssertEqual(fact, "Known for its historic wool trade.")
+    }
+
+    func testSharedSpeechErrorFixtureMatchesIOSDecoder() async {
+        let endpoint = URL(string: "https://example.test/v1/speech")!
+
+        do {
+            let errorResponse = try sharedContractFixture(named: "speech-error-response.json")
+            MockURLProtocol.requestHandler = { _ in
+                let response = HTTPURLResponse(
+                    url: endpoint,
+                    statusCode: 502,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (response, errorResponse)
+            }
+        } catch {
+            XCTFail("Could not load shared speech error fixture: \(error)")
+            return
+        }
+
+        let generator = ProxySpeechGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        do {
+            _ = try await generator.speechAudio(for: "Known for its wool trade.")
+            XCTFail("Expected coded speech provider error.")
+        } catch let error as PlaceFactError {
+            XCTAssertEqual(error, .speechServiceUnavailable(code: "RH-TTS-02"))
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     private func makeMockSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
+    }
+
+    private func sharedContractFixture(named name: String) throws -> Data {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try Data(
+            contentsOf: repositoryRoot
+                .appendingPathComponent("fixtures/contracts/app-proxy/v1")
+                .appendingPathComponent(name)
+        )
+    }
+
+    private func canonicalJSON(_ data: Data) throws -> Data {
+        let object = try JSONSerialization.jsonObject(with: data)
+        return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 
     private func requestBodyData(from request: URLRequest) throws -> Data {
