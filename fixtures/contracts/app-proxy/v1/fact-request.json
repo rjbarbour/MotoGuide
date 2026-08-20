@@ -1,0 +1,27 @@
+{
+  "boundary": "town",
+  "placeName": "Stroud",
+  "factMode": "shortFacts",
+  "countryContext": "United Kingdom",
+  "placeHierarchy": {
+    "street": "B4066",
+    "town": "Stroud",
+    "county": "Gloucestershire",
+    "region": "England",
+    "country": "United Kingdom"
+  },
+  "riderContext": {
+    "homeCountry": "united kingdom",
+    "homeRegion": "west midlands",
+    "familiarRegions": [
+      "england",
+      "cotswolds"
+    ],
+    "factInterestCategories": [
+      "geographyBasics",
+      "locationFacts",
+      "history"
+    ],
+    "customFactInstructions": "engineering and old roads"
+  }
+}

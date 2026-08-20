@@ -78,6 +78,8 @@ Prove a drifted contract fails:
 
 Expected result: `BUILD FAILED`; the `configuredContractIsValidAndComplete` test report identifies the `info.version` drift.
 
+Shared privacy-safe request, success and coded-error examples live under `../fixtures/contracts/app-proxy/v1/`. Both Java and Swift contract tests consume the same files. Run the focused Java fixture gate with `./gradlew sharedContractFixtureTest --no-daemon`; expected result: `BUILD SUCCESSFUL`.
+
 ### `GET /health`
 
 Returns `200` with body `ok`.

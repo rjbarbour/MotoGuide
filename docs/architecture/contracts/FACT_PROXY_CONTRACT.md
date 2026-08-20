@@ -48,6 +48,22 @@ Drift proof:
 
 Expected result: `BUILD FAILED`; the `configuredContractIsValidAndComplete` test report identifies the `info.version` drift.
 
+## Shared Contract Fixtures
+
+Canonical privacy-safe examples live under `fixtures/contracts/app-proxy/v1/`:
+
+- `fact-request.json` — fact-request encoder/decoder contract;
+- `fact-response.json` — successful fact response; and
+- `speech-error-response.json` — coded Premium Voice error response.
+
+Swift and Java tests consume these same files. Validate the Java consumers with:
+
+```bash
+./fact-proxy/gradlew -p fact-proxy sharedContractFixtureTest --no-daemon
+```
+
+Expected result: `BUILD SUCCESSFUL`.
+
 ## Endpoint
 
 Production endpoint:
