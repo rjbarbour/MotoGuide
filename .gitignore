@@ -5,6 +5,8 @@
 *.xcuserstate
 xcuserdata/
 .DS_Store
+__pycache__/
+*.py[cod]
 fact-proxy/build/
 fact-proxy/.gradle/
 fact-proxy/.gradle-user/

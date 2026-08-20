@@ -348,7 +348,7 @@ Only after Rob accepts a profile:
 Run the physical-device unit target:
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData-SpeechCalibration -only-testing:RideHorizonTests
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)" -only-testing:RideHorizonTests
 ```
 
 Expected result: `** TEST SUCCEEDED **` with zero failures.
@@ -356,7 +356,7 @@ Expected result: `** TEST SUCCEEDED **` with zero failures.
 Build the internal calibration candidate:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizonCalibration -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData-SpeechCalibration -allowProvisioningUpdates
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizonCalibration -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)" -allowProvisioningUpdates
 ```
 
 Expected result: `** BUILD SUCCEEDED **`, and the built app exposes Speech Calibration under Developer settings.
@@ -364,7 +364,7 @@ Expected result: `** BUILD SUCCEEDED **`, and the built app exposes Speech Calib
 Build the normal Release candidate:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -configuration Release -destination 'generic/platform=iOS' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData-SpeechCalibration-Release CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -configuration Release -destination 'generic/platform=iOS' -derivedDataPath "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)" CODE_SIGNING_ALLOWED=NO
 ```
 
 Expected result: `** BUILD SUCCEEDED **`, and inspection finds no calibration fixtures, manifest, UI entry or calibration-only strings in the Release app bundle.

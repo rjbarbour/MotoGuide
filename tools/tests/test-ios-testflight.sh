@@ -32,6 +32,7 @@ new_fixture() {
     TEST_ROOT="$(mktemp -d "${TMPDIR:-/private/tmp}/ios-testflight-test.XXXXXX")"
     mkdir -p "$TEST_ROOT/repo/.git" "$TEST_ROOT/repo/tools" "$TEST_ROOT/repo/App.xcodeproj/xcshareddata/xcschemes" "$TEST_ROOT/repo/App" "$TEST_ROOT/repo/AppTests" "$TEST_ROOT/auth" "$TEST_ROOT/bin" "$TEST_ROOT/tmp"
     cp "$TOOLS_ROOT/ios-testflight" "$TEST_ROOT/repo/tools/ios-testflight"
+    cp "$TOOLS_ROOT/derived-data" "$TEST_ROOT/repo/tools/derived-data"
     cp "$TOOLS_ROOT/tests/fixtures/bin/"* "$TEST_ROOT/bin/"
     chmod +x "$TEST_ROOT/bin/"*
     : > "$TEST_ROOT/fake.log"
@@ -70,7 +71,10 @@ run_tool() {
     IOS_TESTFLIGHT_CONFIG_PATH="$TEST_ROOT/repo/.ios-testflight.json" \
     IOS_TESTFLIGHT_AUTH_ROOT="$TEST_ROOT/auth" \
     IOS_TESTFLIGHT_STATE_DIR="$TEST_ROOT/state" \
-    IOS_TESTFLIGHT_DERIVED_DATA_PATH="$TEST_ROOT/derived" \
+    IOS_TESTFLIGHT_DERIVED_DATA_PATH="${FIXTURE_ARCHIVE_DERIVED_DATA_PATH-$TEST_ROOT/derived}" \
+    IOS_TESTFLIGHT_TEST_DERIVED_DATA_PATH="${FIXTURE_TEST_DERIVED_DATA_PATH-$TEST_ROOT/test-derived}" \
+    RIDEHORIZON_DERIVED_DATA_ROOT="$TEST_ROOT/RideHorizonDerivedData" \
+    RIDEHORIZON_DERIVED_DATA_KEY="RH-073" \
     IOS_TESTFLIGHT_RECEIPT_DIR="$TEST_ROOT/receipts" \
     IOS_TESTFLIGHT_TOOL_PATH="$TEST_ROOT/repo/tools/ios-testflight" \
     TMPDIR="$TEST_ROOT/tmp" \
@@ -108,6 +112,17 @@ test_configuration_changes_invalidate_fingerprint() {
     after="$(run_tool fingerprint)"
     [[ "$before" != "$after" ]] || fail "test-suite change retained the same fingerprint"
     pass "configuration and test-suite changes invalidate tested inputs"
+}
+
+test_default_derived_data_paths_stay_under_one_external_parent() {
+    new_fixture
+    local output
+    output="$(FIXTURE_ARCHIVE_DERIVED_DATA_PATH='' FIXTURE_TEST_DERIVED_DATA_PATH='' run_tool test-and-trust ridehorizon-unit 2>&1)" || fail "configured tests rejected the external DerivedData defaults: $output"
+    grep -F -- "$TEST_ROOT/RideHorizonDerivedData/RH-073/testflight-tests" "$TEST_ROOT/fake.log" >/dev/null || fail "test evidence did not use the external DerivedData parent"
+    write_auth_profile
+    output="$(FIXTURE_ARCHIVE_DERIVED_DATA_PATH='' FIXTURE_TEST_DERIVED_DATA_PATH='' FAKE_MODE=success run_tool deploy 2>&1)" || fail "deployment rejected the external DerivedData defaults: $output"
+    grep -F -- "$TEST_ROOT/RideHorizonDerivedData/RH-073/testflight-archive" "$TEST_ROOT/fake.log" >/dev/null || fail "archive did not use the external DerivedData parent"
+    pass "TestFlight tests and archives default to one external DerivedData parent"
 }
 
 test_tool_changes_and_schema_are_fail_closed() {
@@ -500,6 +515,7 @@ test_embedded_jwt_helper_runs_with_ephemeral_key() {
 }
 
 test_configuration_changes_invalidate_fingerprint
+test_default_derived_data_paths_stay_under_one_external_parent
 test_tool_changes_and_schema_are_fail_closed
 test_missing_input_fails_closed
 test_arbitrary_evidence_is_rejected

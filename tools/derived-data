@@ -1,0 +1,195 @@
+#!/bin/bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+readonly DEFAULT_ROOT="/private/tmp/RideHorizonDerivedData"
+readonly DERIVED_DATA_ROOT="${RIDEHORIZON_DERIVED_DATA_ROOT:-$DEFAULT_ROOT}"
+readonly ROOT_MARKER="$DERIVED_DATA_ROOT/.ridehorizon-derived-data-root"
+readonly ROOT_MARKER_CONTENT="format=ridehorizon-derived-data-v1"
+
+usage() {
+    cat <<'EOF'
+Usage: ./tools/derived-data path [cache-key]
+       ./tools/derived-data clean [cache-key]
+       ./tools/derived-data prune <days>
+
+Keep RideHorizon Xcode DerivedData under one external parent.
+
+  path [cache-key]   Print the task-scoped DerivedData path. The current branch
+                     is used when no key is supplied.
+  clean [cache-key]  Delete exactly one task-scoped cache.
+  prune <days>       Delete immediate child caches older than the given age.
+
+Set RIDEHORIZON_DERIVED_DATA_KEY to override the current-branch key.
+Set RIDEHORIZON_DERIVED_DATA_ROOT only to an absolute path whose basename is
+RideHorizonDerivedData; this is primarily for deterministic tests.
+EOF
+}
+
+die() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+validate_root() {
+    local root_parent physical_root
+    [[ "$DERIVED_DATA_ROOT" == /* ]] || die "DerivedData root must be absolute"
+    [[ "$DERIVED_DATA_ROOT" != "/" ]] || die "Refusing to use the filesystem root"
+    [[ "$DERIVED_DATA_ROOT" != *"/../"* && "$DERIVED_DATA_ROOT" != */.. ]] || die "DerivedData root must not contain parent traversal"
+    [[ "${DERIVED_DATA_ROOT##*/}" == "RideHorizonDerivedData" ]] || die "DerivedData root basename must be RideHorizonDerivedData"
+    [[ ! -L "$DERIVED_DATA_ROOT" ]] || die "DerivedData root must not be a symbolic link"
+    if [[ -e "$DERIVED_DATA_ROOT" ]]; then
+        [[ -d "$DERIVED_DATA_ROOT" ]] || die "DerivedData root must be a directory"
+        physical_root="$(cd "$DERIVED_DATA_ROOT" && pwd -P)"
+    else
+        root_parent="${DERIVED_DATA_ROOT%/*}"
+        [[ -d "$root_parent" ]] || die "DerivedData root parent does not exist: $root_parent"
+        physical_root="$(cd "$root_parent" && pwd -P)/${DERIVED_DATA_ROOT##*/}"
+    fi
+    [[ "$physical_root" != "$REPO_ROOT" && "$physical_root" != "$REPO_ROOT"/* ]] || die "DerivedData root must resolve outside the repository"
+}
+
+require_owned_root() {
+    local current_user root_owner marker_owner
+    [[ -d "$DERIVED_DATA_ROOT" ]] || return 1
+    [[ -f "$ROOT_MARKER" && ! -L "$ROOT_MARKER" ]] || die "DerivedData root is missing its RideHorizon ownership marker"
+    [[ "$(cat "$ROOT_MARKER")" == "$ROOT_MARKER_CONTENT" ]] || die "DerivedData root ownership marker is invalid"
+    current_user="$(id -u)"
+    root_owner="$(stat -f '%u' "$DERIVED_DATA_ROOT")"
+    marker_owner="$(stat -f '%u' "$ROOT_MARKER")"
+    [[ "$root_owner" == "$current_user" && "$marker_owner" == "$current_user" ]] || die "DerivedData root and marker must be owned by the current user"
+}
+
+prepare_root() {
+    if [[ ! -e "$DERIVED_DATA_ROOT" ]]; then
+        mkdir -p "$DERIVED_DATA_ROOT"
+    fi
+    [[ -d "$DERIVED_DATA_ROOT" && ! -L "$DERIVED_DATA_ROOT" ]] || die "DerivedData root must be a real directory"
+    if [[ ! -e "$ROOT_MARKER" ]]; then
+        local existing
+        existing="$(/usr/bin/find "$DERIVED_DATA_ROOT" -mindepth 1 -maxdepth 1 -print -quit)"
+        [[ -z "$existing" ]] || die "Refusing to claim a non-empty unmarked DerivedData root"
+        printf '%s\n' "$ROOT_MARKER_CONTENT" > "$ROOT_MARKER"
+    fi
+    require_owned_root
+}
+
+cache_key() {
+    local requested="${1:-${RIDEHORIZON_DERIVED_DATA_KEY:-}}"
+    if [[ -z "$requested" ]]; then
+        requested="$(git -C "$REPO_ROOT" branch --show-current 2>/dev/null || true)"
+    fi
+    if [[ -z "$requested" ]]; then
+        local worktree_head worktree_hash
+        worktree_head="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
+        worktree_hash="$(printf '%s' "$REPO_ROOT" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print substr($1,1,8)}')"
+        requested="detached-$worktree_head-$worktree_hash"
+    fi
+    [[ "$requested" != ".." && "$requested" != ../* && "$requested" != */../* && "$requested" != */.. ]] || die "Invalid DerivedData cache key: $requested"
+
+    local original="$requested"
+    requested="${requested//\//-}"
+    requested="${requested// /-}"
+    if [[ "$requested" != "$original" ]]; then
+        local key_hash
+        key_hash="$(printf '%s' "$original" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print substr($1,1,8)}')"
+        requested="$requested-$key_hash"
+    fi
+    [[ "$requested" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "Invalid DerivedData cache key: $requested"
+    [[ "$requested" != "." && "$requested" != ".." ]] || die "Invalid DerivedData cache key: $requested"
+    printf '%s' "$requested"
+}
+
+cache_path() {
+    local key
+    key="$(cache_key "${1:-}")" || return
+    printf '%s/%s' "$DERIVED_DATA_ROOT" "$key"
+}
+
+prepare_cache() {
+    local target
+    target="$(cache_path "${1:-}")" || return
+    prepare_root
+    [[ ! -L "$target" ]] || die "DerivedData cache must not be a symbolic link: $target"
+    mkdir -p "$target"
+    touch "$target/.last-used"
+    printf '%s' "$target"
+}
+
+clean_cache() {
+    local target
+    target="$(cache_path "${1:-}")" || return
+    if [[ ! -e "$DERIVED_DATA_ROOT" ]]; then
+        printf 'No DerivedData parent exists: %s\n' "$DERIVED_DATA_ROOT"
+        return
+    fi
+    require_owned_root
+    if [[ -e "$target" || -L "$target" ]]; then
+        rm -rf -- "$target"
+        printf 'Removed DerivedData cache: %s\n' "$target"
+    else
+        printf 'No DerivedData cache exists: %s\n' "$target"
+    fi
+}
+
+prune_caches() {
+    local days="$1"
+    [[ "$days" =~ ^[0-9]+$ ]] || die "Prune age must be a non-negative whole number of days"
+    if [[ ! -d "$DERIVED_DATA_ROOT" ]]; then
+        printf 'No DerivedData parent exists: %s\n' "$DERIVED_DATA_ROOT"
+        return
+    fi
+    require_owned_root
+
+    local now threshold candidate marker modified removed=0 retained=0
+    now="$(date '+%s')"
+    threshold=$((now - (days * 86400)))
+    for candidate in "$DERIVED_DATA_ROOT"/*; do
+        [[ -e "$candidate" || -L "$candidate" ]] || continue
+        if [[ ! -d "$candidate" || -L "$candidate" ]]; then
+            printf 'Retained unexpected non-directory entry: %s\n' "$candidate" >&2
+            retained=$((retained + 1))
+            continue
+        fi
+        marker="$candidate/.last-used"
+        if [[ -f "$marker" && ! -L "$marker" ]]; then
+            modified="$(stat -f '%m' "$marker")"
+        else
+            modified="$(stat -f '%m' "$candidate")"
+        fi
+        if (( modified < threshold )); then
+            rm -rf -- "$candidate"
+            printf 'Removed stale DerivedData cache: %s\n' "$candidate"
+            removed=$((removed + 1))
+        else
+            retained=$((retained + 1))
+        fi
+    done
+    printf 'Prune complete: removed=%s retained=%s root=%s\n' "$removed" "$retained" "$DERIVED_DATA_ROOT"
+}
+
+validate_root
+
+case "${1:-}" in
+    path)
+        prepare_cache "${2:-}"
+        printf '\n'
+        ;;
+    clean)
+        clean_cache "${2:-}"
+        ;;
+    prune)
+        [[ $# -eq 2 ]] || die "prune requires exactly one age in days"
+        prune_caches "$2"
+        ;;
+    -h|--help)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

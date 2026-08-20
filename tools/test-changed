@@ -176,7 +176,7 @@ fi
 
 if [[ "$ios" == true ]]; then
     ios_destination="${IOS_TEST_DESTINATION:-platform=iOS Simulator,name=iPhone 17 Pro,OS=latest}"
-    ios_derived_data="${IOS_TEST_DERIVED_DATA_PATH:-$repo_root/DerivedData-SelectiveTests}"
+    ios_derived_data="${IOS_TEST_DERIVED_DATA_PATH:-$("$repo_root/tools/derived-data" path)/selective-tests}"
     xcodebuild test -project "$repo_root/RideHorizon.xcodeproj" -scheme RideHorizon -destination "$ios_destination" -derivedDataPath "$ios_derived_data" -only-testing:RideHorizonTests
 fi
 

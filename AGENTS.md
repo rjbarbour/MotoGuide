@@ -242,6 +242,14 @@ The canonical integration checkout is `/Users/rob_dev/DocsLocal/motoguide/repo`.
 - Do not run multiple `xcodebuild` jobs against the same `DerivedData` path. Parallel worktrees must use distinct derived-data paths.
 - Prefer writing and compiling over repeated full test/deploy cycles.
 
+### DerivedData lifecycle
+
+- Keep every local Xcode cache under the single external parent `/private/tmp/RideHorizonDerivedData`. Do not create `DerivedData` or `DerivedData-*` directories in the repository or its worktrees.
+- `tools/derived-data path` returns a cache path derived from the current branch, so separate worktrees do not share a cache. Set `RIDEHORIZON_DERIVED_DATA_KEY` only when an explicit stable key is required.
+- Run `tools/derived-data clean` from the task worktree after its final build, test, install and evidence capture, before removing the worktree. Expected result: it reports the exact task cache removed, or that no cache exists.
+- Run `tools/derived-data prune 7` at milestone or repository-hygiene gates. Expected result: caches older than seven days are removed and recent caches are retained.
+- Release `.xcarchive` bundles are evidence, not DerivedData. Preserve required archives in the standard Xcode archive area outside the repository before deleting build output.
+
 ### Architecture programme efficiency
 
 For the High-priority architecture programme, `RH-013.02 — Baseline capture` owns the baseline; `RH-013.36 — Dependency foundation`, `RH-013.37 — Ride orchestration` and `RH-013.38 — Announcement orchestration` own the three execution branches, worktrees, commits and pull requests. `RH-013.01 — Settings boundary` and `RH-013.03` through `RH-013.13 — Remaining High architecture checkpoints` are acceptance checkpoints inside those batches, not separately claimable branches or pull requests.
@@ -318,9 +326,9 @@ xcodebuild -showdestinations -project /Users/rob_dev/DocsLocal/motoguide/repo/Ri
 Build, install, and launch:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)" -allowProvisioningUpdates
 
-xcrun devicectl device install app --device 00008150-000C70883E87401C /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData/Build/Products/Debug-iphoneos/RideHorizon.app
+xcrun devicectl device install app --device 00008150-000C70883E87401C "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)/Build/Products/Debug-iphoneos/RideHorizon.app"
 
 xcrun devicectl device process launch --device 00008150-000C70883E87401C ai.digitalmercenaries.ridehorizon
 ```
@@ -350,7 +358,7 @@ Expected result: Xcode opens the RideHorizon project.
 Run unit tests on the simulator at a milestone or pre-commit checkpoint (not after every small change):
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -only-testing:RideHorizonTests
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)" -only-testing:RideHorizonTests
 ```
 
 Expected result: the RideHorizon unit test target builds and runs in the iOS Simulator.
