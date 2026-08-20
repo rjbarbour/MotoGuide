@@ -155,6 +155,30 @@ private final class RecordingRideInactivityNotifier: RideInactivityNotifying {
     }
 }
 
+@MainActor
+private final class RecordingRideLiveActivityManager: RideLiveActivityManaging {
+    struct Update: Equatable {
+        let placeName: String
+        let context: String
+    }
+
+    private(set) var startedRideIDs: [UUID] = []
+    private(set) var updates: [Update] = []
+    private(set) var endCount = 0
+
+    func startRide(id: UUID) {
+        startedRideIDs.append(id)
+    }
+
+    func update(placeName: String, context: String) {
+        updates.append(Update(placeName: placeName, context: context))
+    }
+
+    func endRide() {
+        endCount += 1
+    }
+}
+
 private final class RecordingAppleSpeechOutput: AppleSpeechOutputting {
     struct Request: Equatable {
         let text: String
@@ -2049,6 +2073,52 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertFalse(locationManager.isTracking)
         XCTAssertEqual(notifier.cancelCount, 1)
         XCTAssertEqual(speechOutput.stopCount, 1)
+    }
+
+    @MainActor
+    func testActiveRideStartsUpdatesAndEndsLiveActivity() {
+        let liveActivityManager = RecordingRideLiveActivityManager()
+        let locationManager = LocationManager(
+            inactivityNotifier: RecordingRideInactivityNotifier(),
+            liveActivityManager: liveActivityManager
+        )
+
+        locationManager.startRideWithoutLocationInputForTesting()
+
+        XCTAssertEqual(liveActivityManager.startedRideIDs.count, 1)
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+
+        XCTAssertEqual(
+            liveActivityManager.updates,
+            [.init(placeName: "Stroud", context: "Gloucestershire")]
+        )
+
+        locationManager.endRide()
+
+        XCTAssertEqual(liveActivityManager.endCount, 1)
+    }
+
+    @MainActor
+    func testResolvedPlaceDoesNotUpdateLiveActivityOutsideRide() {
+        let liveActivityManager = RecordingRideLiveActivityManager()
+        let locationManager = LocationManager(liveActivityManager: liveActivityManager)
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "N/A",
+            town: "N/A",
+            county: "Kent",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+
+        XCTAssertTrue(liveActivityManager.updates.isEmpty)
     }
 
     @MainActor
