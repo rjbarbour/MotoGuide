@@ -5,12 +5,14 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-20 11:10'
-updated_date: '2026-08-20 11:39'
+updated_date: '2026-08-20 11:42'
 labels:
   - hygiene
   - retention
   - build
 dependencies: []
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/45'
 priority: medium
 type: chore
 ordinal: 212000
@@ -47,4 +49,6 @@ Independent review found tracked-file inspection could fail open, dependency pru
 Final review corrections preserve xcresult and other evidence-bearing DerivedData subtrees while deleting disposable siblings, reject every symbolic-link path component including in-repository aliases, initialise legacy dependency markers with one 30-day grace period, and mark the proxy .tools cache only at its actual fallback use. Focused evidence: nine DerivedData tests and thirteen generated-output tests pass; bash syntax and diff checks pass; no application build or test ran.
 
 Final hardening routes every dependency-marker write through the guarded helper, rejects marker symlinks and wrong ownership, and fails closed if DerivedData evidence inspection fails. Completion and stale-prune fixtures now prove disposable cache removal while result evidence remains. Final focused evidence: ten DerivedData tests, fourteen generated-output tests, Bash syntax, diff validation and configuration-only Gradle help all pass; no application build or application test ran.
+
+Pull request: https://github.com/rjbarbour/MotoGuide/pull/45. Reviewed implementation head: 753407b.
 <!-- SECTION:NOTES:END -->
