@@ -22,7 +22,7 @@ repositories {
 }
 
 def generatedOutputTool = rootProject.projectDir.parentFile.toPath().resolve('tools/generated-output').toFile()
-if (generatedOutputTool.canExecute()) {
+if (System.getProperty('os.name') == 'Mac OS X' && generatedOutputTool.canExecute()) {
     providers.exec {
         workingDir rootProject.projectDir.parentFile
         commandLine generatedOutputTool.absolutePath, 'mark-dependency', 'fact-proxy/.gradle'

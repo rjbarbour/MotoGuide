@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-20 11:10'
-updated_date: '2026-08-20 11:42'
+updated_date: '2026-08-20 11:45'
 labels:
   - hygiene
   - retention
@@ -51,4 +51,6 @@ Final review corrections preserve xcresult and other evidence-bearing DerivedDat
 Final hardening routes every dependency-marker write through the guarded helper, rejects marker symlinks and wrong ownership, and fails closed if DerivedData evidence inspection fails. Completion and stale-prune fixtures now prove disposable cache removal while result evidence remains. Final focused evidence: ten DerivedData tests, fourteen generated-output tests, Bash syntax, diff validation and configuration-only Gradle help all pass; no application build or application test ran.
 
 Pull request: https://github.com/rjbarbour/MotoGuide/pull/45. Reviewed implementation head: 753407b.
+
+PR #45 CI exposed that the local cleanup helper uses macOS stat semantics but Gradle invoked it on Ubuntu. The cache-marker hook is now explicitly macOS-only; CI dependency caching remains owned by GitHub Actions. Configuration-only Gradle help passes after the correction.
 <!-- SECTION:NOTES:END -->
