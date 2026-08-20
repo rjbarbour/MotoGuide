@@ -68,6 +68,40 @@ test_clean_does_not_follow_cache_symlinks() {
     pass "clean removes a cache symlink without following it"
 }
 
+test_prune_preserves_result_evidence_and_removes_disposable_output() {
+    new_fixture
+    run_tool path RH-076 >/dev/null
+    mkdir -p \
+        "$TEST_ROOT/RideHorizonDerivedData/RH-076/Build/Products" \
+        "$TEST_ROOT/RideHorizonDerivedData/RH-076/Logs/Test/Run.xcresult"
+    printf 'cache\n' > "$TEST_ROOT/RideHorizonDerivedData/RH-076/Build/Products/value"
+    printf 'evidence\n' > "$TEST_ROOT/RideHorizonDerivedData/RH-076/Logs/Test/Run.xcresult/value"
+    touch -t 202001010000 "$TEST_ROOT/RideHorizonDerivedData/RH-076/.last-used"
+
+    run_tool prune 7 >/dev/null
+
+    [[ ! -e "$TEST_ROOT/RideHorizonDerivedData/RH-076/Build" ]] || fail "disposable DerivedData was retained"
+    [[ -f "$TEST_ROOT/RideHorizonDerivedData/RH-076/Logs/Test/Run.xcresult/value" ]] || fail "result evidence was removed"
+    pass "prune preserves result evidence while removing disposable DerivedData"
+}
+
+test_clean_fails_closed_when_evidence_inspection_fails() {
+    new_fixture
+    run_tool path RH-076 >/dev/null
+    mkdir -p "$TEST_ROOT/RideHorizonDerivedData/RH-076/unreadable"
+    chmod 000 "$TEST_ROOT/RideHorizonDerivedData/RH-076/unreadable"
+
+    local output
+    if output="$(run_tool clean RH-076 2>&1)"; then
+        chmod 700 "$TEST_ROOT/RideHorizonDerivedData/RH-076/unreadable"
+        fail "clean proceeded after evidence inspection failed"
+    fi
+    chmod 700 "$TEST_ROOT/RideHorizonDerivedData/RH-076/unreadable"
+    [[ "$output" == *"Could not inspect DerivedData for protected evidence"* ]] || fail "evidence-inspection error was unclear: $output"
+    [[ -d "$TEST_ROOT/RideHorizonDerivedData/RH-076" ]] || fail "clean removed cache after evidence inspection failed"
+    pass "clean fails closed when evidence inspection fails"
+}
+
 test_prune_removes_only_stale_directories() {
     new_fixture
     run_tool path stale >/dev/null
@@ -79,6 +113,22 @@ test_prune_removes_only_stale_directories() {
     [[ ! -e "$TEST_ROOT/RideHorizonDerivedData/stale" ]] || fail "stale cache was retained"
     [[ -d "$TEST_ROOT/RideHorizonDerivedData/recent" ]] || fail "recent cache was removed"
     pass "prune removes stale caches and retains recent caches"
+}
+
+test_path_automatically_prunes_abandoned_caches() {
+    new_fixture
+    run_tool path stale >/dev/null
+    run_tool path recent >/dev/null
+    touch -t 202001010000 "$TEST_ROOT/RideHorizonDerivedData/stale/.last-used"
+    touch "$TEST_ROOT/RideHorizonDerivedData/recent/.last-used"
+
+    local current
+    current="$(run_tool path current)"
+
+    [[ ! -e "$TEST_ROOT/RideHorizonDerivedData/stale" ]] || fail "path retained an abandoned cache"
+    [[ -d "$TEST_ROOT/RideHorizonDerivedData/recent" ]] || fail "path removed a recent cache"
+    [[ -d "$current" ]] || fail "path did not prepare the current cache"
+    pass "path automatically prunes abandoned caches"
 }
 
 test_unsafe_roots_and_keys_are_rejected() {
@@ -135,7 +185,10 @@ EOF
 test_path_uses_one_parent_and_sanitises_branch_keys
 test_clean_removes_only_the_requested_cache
 test_clean_does_not_follow_cache_symlinks
+test_prune_preserves_result_evidence_and_removes_disposable_output
+test_clean_fails_closed_when_evidence_inspection_fails
 test_prune_removes_only_stale_directories
+test_path_automatically_prunes_abandoned_caches
 test_unsafe_roots_and_keys_are_rejected
 test_distinct_branch_names_and_worktrees_do_not_collide
 test_changed_uses_the_task_scoped_parent_by_default

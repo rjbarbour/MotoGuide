@@ -9,6 +9,7 @@ readonly DEFAULT_ROOT="/private/tmp/RideHorizonDerivedData"
 readonly DERIVED_DATA_ROOT="${RIDEHORIZON_DERIVED_DATA_ROOT:-$DEFAULT_ROOT}"
 readonly ROOT_MARKER="$DERIVED_DATA_ROOT/.ridehorizon-derived-data-root"
 readonly ROOT_MARKER_CONTENT="format=ridehorizon-derived-data-v1"
+readonly AUTO_PRUNE_DAYS="${RIDEHORIZON_DERIVED_DATA_STALE_DAYS:-7}"
 
 usage() {
     cat <<'EOF'
@@ -113,6 +114,8 @@ prepare_cache() {
     local target
     target="$(cache_path "${1:-}")" || return
     prepare_root
+    [[ "$AUTO_PRUNE_DAYS" =~ ^[0-9]+$ ]] || die "Automatic prune age must be a non-negative whole number of days"
+    prune_caches "$AUTO_PRUNE_DAYS" true
     [[ ! -L "$target" ]] || die "DerivedData cache must not be a symbolic link: $target"
     mkdir -p "$target"
     touch "$target/.last-used"
@@ -128,15 +131,57 @@ clean_cache() {
     fi
     require_owned_root
     if [[ -e "$target" || -L "$target" ]]; then
-        rm -rf -- "$target"
-        printf 'Removed DerivedData cache: %s\n' "$target"
+        remove_cache_preserving_evidence "$target"
     else
         printf 'No DerivedData cache exists: %s\n' "$target"
     fi
 }
 
+contains_protected_evidence() {
+    local target="$1"
+    local protected
+    if ! protected="$(/usr/bin/find "$target" \
+            \( -type d -name '*.xcarchive' \
+            -o -type d -name '*.xcresult' \
+            -o -type d -name 'receipts' \
+            -o -type d -name 'evidence' \
+            -o -type f -name '*.ipa' \
+            -o -type f -name '*.receipt.json' \) \
+            -print -quit)"; then
+        die "Could not inspect DerivedData for protected evidence: $target"
+    fi
+    [[ -n "$protected" ]]
+}
+
+remove_cache_preserving_evidence() {
+    local target="$1"
+    if [[ -L "$target" ]]; then
+        rm -f -- "$target"
+        printf 'Removed DerivedData cache link: %s\n' "$target"
+        return
+    fi
+    if ! contains_protected_evidence "$target"; then
+        rm -rf -- "$target"
+        printf 'Removed DerivedData cache: %s\n' "$target"
+        return
+    fi
+
+    local child
+    for child in "$target"/* "$target"/.[!.]* "$target"/..?*; do
+        [[ -e "$child" || -L "$child" ]] || continue
+        [[ "${child##*/}" == ".last-used" ]] && continue
+        if contains_protected_evidence "$child"; then
+            printf 'Retained DerivedData evidence subtree: %s\n' "$child"
+        else
+            rm -rf -- "$child"
+        fi
+    done
+    printf 'Removed disposable DerivedData while retaining evidence: %s\n' "$target"
+}
+
 prune_caches() {
     local days="$1"
+    local quiet="${2:-false}"
     [[ "$days" =~ ^[0-9]+$ ]] || die "Prune age must be a non-negative whole number of days"
     if [[ ! -d "$DERIVED_DATA_ROOT" ]]; then
         printf 'No DerivedData parent exists: %s\n' "$DERIVED_DATA_ROOT"
@@ -161,14 +206,17 @@ prune_caches() {
             modified="$(stat -f '%m' "$candidate")"
         fi
         if (( modified < threshold )); then
-            rm -rf -- "$candidate"
-            printf 'Removed stale DerivedData cache: %s\n' "$candidate"
+            if [[ "$quiet" == true ]]; then
+                remove_cache_preserving_evidence "$candidate" >/dev/null
+            else
+                remove_cache_preserving_evidence "$candidate"
+            fi
             removed=$((removed + 1))
         else
             retained=$((retained + 1))
         fi
     done
-    printf 'Prune complete: removed=%s retained=%s root=%s\n' "$removed" "$retained" "$DERIVED_DATA_ROOT"
+    [[ "$quiet" == true ]] || printf 'Prune complete: removed=%s retained=%s root=%s\n' "$removed" "$retained" "$DERIVED_DATA_ROOT"
 }
 
 validate_root

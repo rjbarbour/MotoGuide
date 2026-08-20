@@ -21,6 +21,14 @@ repositories {
     mavenCentral()
 }
 
+def generatedOutputTool = rootProject.projectDir.parentFile.toPath().resolve('tools/generated-output').toFile()
+if (System.getProperty('os.name') == 'Mac OS X' && generatedOutputTool.canExecute()) {
+    providers.exec {
+        workingDir rootProject.projectDir.parentFile
+        commandLine generatedOutputTool.absolutePath, 'mark-dependency', 'fact-proxy/.gradle'
+    }.standardOutput.asText.get()
+}
+
 def acceptedOpenApiContract = providers.gradleProperty('openApiContract')
         .map { rootProject.file(it).absolutePath }
         .orElse(rootProject.projectDir.parentFile.toPath().resolve('FACT_PROXY_OPENAPI.yaml').toString())
