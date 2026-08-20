@@ -43,7 +43,7 @@ Required:
 
 - complete iOS unit target at a meaningful checkpoint;
 - fact-proxy test suite and affected privacy-site checks pass;
-- OpenAPI parses when its contract changed;
+- the executable OpenAPI contract gate passes when its contract changed;
 - signed physical-device build succeeds and is installed/launched where the device is available;
 - archive/package checks establish correct signing, device scope, privacy manifest, entitlements and exclusion of internal/test artefacts; and
 - safe live health/fact/speech verification confirms the deployed dependency path, without exposing credentials.

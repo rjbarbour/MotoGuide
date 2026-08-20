@@ -62,13 +62,21 @@ Expected result: Spring Boot starts on `http://127.0.0.1:3000`.
 
 This section summarizes the contract. Keep it aligned with `/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml`.
 
-Validate the OpenAPI file without simulator or deployment:
+Validate the complete OpenAPI contract without simulator or deployment:
 
 ```bash
-ruby -e 'require "yaml"; doc = YAML.load_file("/Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml"); abort "missing openapi" unless doc["openapi"] == "3.0.3"; abort "missing /v1/fact" unless doc.dig("paths", "/v1/fact", "post"); abort "missing FactRequest" unless doc.dig("components", "schemas", "FactRequest"); puts "OpenAPI YAML parsed: #{doc["info"]["title"]} #{doc["info"]["version"]}"'
+./gradlew openApiContractTest --no-daemon
 ```
 
-Expected result: `OpenAPI YAML parsed: RideHorizon Fact Proxy API 0.1.0`.
+Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.2.0`, every published operation, schema and security scheme, and the intentional version-drift fixture.
+
+Prove a drifted contract fails:
+
+```bash
+./gradlew openApiContractTest --no-daemon -PopenApiContract=src/test/resources/contracts/openapi/version-drift.yaml
+```
+
+Expected result: `BUILD FAILED`; the `configuredContractIsValidAndComplete` test report identifies the `info.version` drift.
 
 ### `GET /health`
 
