@@ -1,10 +1,11 @@
 ---
 id: RH-059
 title: Restore announcements while Google Maps is foregrounded
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-08-18 12:57'
-updated_date: '2026-08-19 15:35'
+updated_date: '2026-08-20 12:02'
 labels:
   - core
   - background
@@ -35,4 +36,6 @@ RideHorizon must continue detecting meaningful triggers and delivering announcem
 
 <!-- SECTION:NOTES:BEGIN -->
 Ready-queue replenishment on 2026-08-19: RH-013.39 — Complete High workflow boundaries merged and its dependency is satisfied. This task is ready for a separate physical-device diagnosis; it is not started by the architecture close-out.
+
+Claimed in delegated implementation session on branch codex/rh-059-google-maps-background. Stop before speculative code changes if no red-capable reproduction or captured diagnostic evidence can distinguish trigger, generation, queue and playback failure.
 <!-- SECTION:NOTES:END -->
