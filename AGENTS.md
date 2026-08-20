@@ -4,6 +4,10 @@ Use plain language, direct instructions, no waffle. Use ISO-8601 dates.
 
 Whenever mentioning a tracked work item in user-facing text, give its identifier and a brief title or plain-language description. Never use a bare ticket identifier such as `RH-024` without explaining what the work item is.
 
+## Canonical entry points
+
+Read `CONTEXT.md` at session start, resume, hand-off or re-prime. It routes project authority, domain language and positively triggered procedures. Read `INTENT.md` before making product, scope or trade-off decisions. Use `PROJECT.md` for current verified state and the Backlog.md CLI for sole live task authority. Do not copy their contents into this file.
+
 ## Workspace Scope
 
 This repository is the canonical workspace for working on the RideHorizon codebase.

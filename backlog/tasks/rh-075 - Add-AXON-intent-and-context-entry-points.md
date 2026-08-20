@@ -5,6 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-20 10:55'
+updated_date: '2026-08-20 11:02'
 labels:
   - axon
   - control-plane
@@ -34,3 +35,13 @@ Create concise root INTENT.md and CONTEXT.md authorities from the accepted RideH
 <!-- SECTION:PLAN:BEGIN -->
 1. Read the bounded intent, state, roadmap, documentation-map and decision sources. 2. Draft concise INTENT.md and CONTEXT.md with non-overlapping authority. 3. Add only minimal README.md and AGENTS.md routes. 4. Verify headings, links, duplication and Git diff; obtain one independent intent/standards review. 5. Integrate through one PR, close, clean and stop.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Created concise root INTENT.md and CONTEXT.md from the accepted ICB, AGENTS.md product definition, MILESTONES.md capability ladder, PROJECT.md state boundary, documentation map and accepted decision catalogue. INTENT.md owns enduring purpose and trade-offs; CONTEXT.md owns authority, architecture/language and positive procedure routing. README.md and AGENTS.md received links only. Structural evidence: every relative link resolves, git diff --check passes and test selection correctly chooses no application suite.
+
+Independent intent review found two narrow issues: CONTEXT.md over-triggered the Git SOP for trivial file edits, and README.md still described RideHorizon primarily as an audio companion. Corrections restore the substantive-change threshold and describe the visual geographic-awareness core with optional audio.
+
+Final independent re-review of exact head 4b58796 reports zero findings.
+<!-- SECTION:NOTES:END -->
