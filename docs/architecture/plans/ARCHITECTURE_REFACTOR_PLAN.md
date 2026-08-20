@@ -219,7 +219,7 @@ Gate: complete concurrency checking is clean; no unchecked sendability is added 
 1. use existing characterisation evidence unless the new interface exposes an actual gap;
 2. implement coherent checkpoint commits before invoking Xcode;
 3. run only the focused deterministic tests that falsify the changed behaviour;
-4. reuse one sequential batch DerivedData path and never share it with a parallel build;
+4. reuse the current branch cache under `/private/tmp/RideHorizonDerivedData` and never share it with a parallel build;
 5. run the documented batch gate once, after integration of all checkpoint commits; and
 6. obtain independent diff review without rerunning product suites.
 
@@ -238,8 +238,8 @@ The default budget is three complete iOS suites, two unsigned Release builds, on
 
 The complete commands remain:
 
-- iOS suite: `xcodebuild test -project RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath DerivedData-ArchitectureRefactor -only-testing:RideHorizonTests` — expected result: `** TEST SUCCEEDED **`.
-- unsigned Release: `xcodebuild build -project RideHorizon.xcodeproj -scheme RideHorizon -configuration Release -destination 'generic/platform=iOS' -derivedDataPath DerivedData-ArchitectureRefactor-Release CODE_SIGNING_ALLOWED=NO` — expected result: `** BUILD SUCCEEDED **`.
+- iOS suite: `xcodebuild test -project RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -derivedDataPath "$(tools/derived-data path)" -only-testing:RideHorizonTests` — expected result: `** TEST SUCCEEDED **`.
+- unsigned Release: `xcodebuild build -project RideHorizon.xcodeproj -scheme RideHorizon -configuration Release -destination 'generic/platform=iOS' -derivedDataPath "$(tools/derived-data path)" CODE_SIGNING_ALLOWED=NO` — expected result: `** BUILD SUCCEEDED **`.
 - proxy baseline: `cd fact-proxy && ./gradlew test --no-daemon` — expected result: `BUILD SUCCESSFUL`.
 
 If the named simulator runtime is unavailable, stop and record the available destination rather than silently substituting a weaker build-only check.

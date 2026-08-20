@@ -265,7 +265,7 @@ After the Google Maps gate, select other apps by actual tester use. Likely candi
 Run the complete unit target at each increment checkpoint:
 
 ```bash
-xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData-AudioInterop -only-testing:RideHorizonTests
+xcodebuild test -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)" -only-testing:RideHorizonTests
 ```
 
 Expected result: `** TEST SUCCEEDED **` with zero failures.
@@ -273,7 +273,7 @@ Expected result: `** TEST SUCCEEDED **` with zero failures.
 Build the signed physical-device candidate:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData-AudioInterop -allowProvisioningUpdates
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'platform=iOS,id=00008150-000C70883E87401C' -derivedDataPath "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)" -allowProvisioningUpdates
 ```
 
 Expected result: `** BUILD SUCCEEDED **`.

@@ -126,7 +126,7 @@ Done when:
 Primary command:
 
 ```bash
-xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'id=00008150-000C70883E87401C' -derivedDataPath /Users/rob_dev/DocsLocal/motoguide/repo/DerivedData -allowProvisioningUpdates
+xcodebuild build -project /Users/rob_dev/DocsLocal/motoguide/repo/RideHorizon.xcodeproj -scheme RideHorizon -destination 'id=00008150-000C70883E87401C' -derivedDataPath "$(/Users/rob_dev/DocsLocal/motoguide/repo/tools/derived-data path)" -allowProvisioningUpdates
 ```
 
 Expected result: RideHorizon builds for Robert's iPhone.
