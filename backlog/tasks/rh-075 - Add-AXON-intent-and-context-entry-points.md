@@ -1,11 +1,11 @@
 ---
 id: RH-075
 title: Add AXON intent and context entry points
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-20 10:55'
-updated_date: '2026-08-20 11:04'
+updated_date: '2026-08-20 11:06'
 labels:
   - axon
   - control-plane
@@ -26,10 +26,10 @@ Create concise root INTENT.md and CONTEXT.md authorities from the accepted RideH
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 INTENT.md defines the enduring purpose, first user, canonical use case, MVP boundary, optional future direction, non-goals and decision principles without live task status
-- [ ] #2 CONTEXT.md provides a concise project and architecture summary, intent anchor, authority map, resolved domain language, positive procedure triggers and an explicit Tier 3 position without duplicating AGENTS.md
-- [ ] #3 README.md and AGENTS.md route readers and agents to both files while preserving one source of truth per concern
-- [ ] #4 All links resolve, git diff --check passes and an independent intent review finds no material conflict with accepted project authority
+- [x] #1 INTENT.md defines the enduring purpose, first user, canonical use case, MVP boundary, optional future direction, non-goals and decision principles without live task status
+- [x] #2 CONTEXT.md provides a concise project and architecture summary, intent anchor, authority map, resolved domain language, positive procedure triggers and an explicit Tier 3 position without duplicating AGENTS.md
+- [x] #3 README.md and AGENTS.md route readers and agents to both files while preserving one source of truth per concern
+- [x] #4 All links resolve, git diff --check passes and an independent intent review finds no material conflict with accepted project authority
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -46,4 +46,12 @@ Created concise root INTENT.md and CONTEXT.md from the accepted ICB, AGENTS.md p
 Independent intent review found two narrow issues: CONTEXT.md over-triggered the Git SOP for trivial file edits, and README.md still described RideHorizon primarily as an audio companion. Corrections restore the substantive-change threshold and describe the visual geographic-awareness core with optional audio.
 
 Final independent re-review of exact head 4b58796 reports zero findings.
+
+PR #44 merged normally to main as 08d84cc. Final head dbad502 passed aggregate PR validation and both Socket checks; iOS and fact-proxy suites were correctly skipped as documentation-only.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added concise root INTENT.md and CONTEXT.md authorities, routed README.md and AGENTS.md to them, corrected the human-facing product framing and kept live delivery state out. All relative links resolve, diff and test-selection checks pass, the final independent intent review reports zero findings, and PR #44 merged with the expected documentation-only GitHub checks.
+<!-- SECTION:FINAL_SUMMARY:END -->
