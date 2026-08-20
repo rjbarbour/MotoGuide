@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "../tools/generated-output mark-dependency privacy-site/node_modules",
     "dev": "wrangler pages dev site --port 8787 --compatibility-date 2026-07-31",
+    "pretest": "../tools/generated-output mark-dependency privacy-site/node_modules",
     "test": "node --test",
+    "predeploy": "../tools/generated-output mark-dependency privacy-site/node_modules",
     "deploy": "wrangler pages deploy site --project-name ridehorizon-edge --branch main"
   },
   "devDependencies": {

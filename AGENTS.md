@@ -249,10 +249,12 @@ The canonical integration checkout is `/Users/rob_dev/DocsLocal/motoguide/repo`.
 ### DerivedData lifecycle
 
 - Keep every local Xcode cache under the single external parent `/private/tmp/RideHorizonDerivedData`. Do not create `DerivedData` or `DerivedData-*` directories in the repository or its worktrees.
-- `tools/derived-data path` returns a cache path derived from the current branch, so separate worktrees do not share a cache. Set `RIDEHORIZON_DERIVED_DATA_KEY` only when an explicit stable key is required.
-- Run `tools/derived-data clean` from the task worktree after its final build, test, install and evidence capture, before removing the worktree. Expected result: it reports the exact task cache removed, or that no cache exists.
+- `tools/derived-data path` returns a cache path derived from the current branch, so separate worktrees do not share a cache. It silently prunes caches unused for seven days before preparing the current cache. Set `RIDEHORIZON_DERIVED_DATA_KEY` only when an explicit stable key is required.
+- Run `tools/generated-output complete` from the task worktree after its final build, test, install and evidence capture, before removing the worktree. Expected result: disposable task DerivedData and output are removed; any evidence-bearing DerivedData subtree is retained; dependency caches unused for 30 days are pruned; recent dependency caches and release evidence are retained.
 - Run `tools/derived-data prune 7` at milestone or repository-hygiene gates. Expected result: caches older than seven days are removed and recent caches are retained.
-- Release `.xcarchive` bundles are evidence, not DerivedData. Preserve required archives in the standard Xcode archive area outside the repository before deleting build output.
+- Gradle and privacy-site npm entry points refresh their dependency-cache activity markers. After using another allowlisted dependency cache directly, run `tools/generated-output mark-dependency <path>`. Expected result: it records current use without creating an absent cache. The first prune gives an existing unmarked cache one 30-day grace period by initialising its marker.
+- Use `tools/generated-output clean-dependencies` only when disk pressure justifies rebuilding all allowlisted dependency caches. Expected result: exact untracked cache directories are removed; tracked or symbolic-link targets are refused.
+- Release `.xcarchive` bundles, IPAs, result bundles, receipts and test evidence are not disposable caches and are never automatic cleanup targets. Preserve required artefacts outside the repository and apply an explicit release-retention decision before deletion.
 
 ### Architecture programme efficiency
 

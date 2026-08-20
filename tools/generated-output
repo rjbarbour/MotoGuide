@@ -1,0 +1,290 @@
+#!/bin/bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+readonly DEFAULT_REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+readonly REQUESTED_REPO_ROOT="${RIDEHORIZON_GENERATED_OUTPUT_REPO_ROOT:-$DEFAULT_REPO_ROOT}"
+readonly REPO_ROOT="$(cd "$REQUESTED_REPO_ROOT" && pwd -P)"
+readonly DEPENDENCY_MARKER_NAME=".ridehorizon-last-used"
+
+readonly TASK_OUTPUTS=(
+    "fact-proxy/build"
+    "fact-proxy/out"
+    "privacy-site/.wrangler"
+    "tools/apple-place-audit/.build"
+)
+
+readonly DEPENDENCY_CACHES=(
+    "fact-proxy/.gradle"
+    "fact-proxy/.gradle-user"
+    "fact-proxy/.tools"
+    "fact-proxy/terraform/.terraform"
+    "privacy-site/node_modules"
+)
+
+usage() {
+    cat <<'EOF'
+Usage: ./tools/generated-output clean-task
+       ./tools/generated-output complete
+       ./tools/generated-output mark-dependency <allowlisted-path>
+       ./tools/generated-output prune-dependencies [days]
+       ./tools/generated-output clean-dependencies
+
+Apply RideHorizon generated-output retention safely.
+
+  clean-task                 Remove known disposable task build output plus
+                             untracked OS, Xcode and Python residue.
+  complete                   Remove the current task's DerivedData and
+                             disposable output, then prune 30-day dependency
+                             caches. Run after final evidence capture.
+  mark-dependency <path>     Record current use of one allowlisted dependency
+                             cache without creating an absent cache.
+  prune-dependencies [days]  Remove allowlisted dependency caches with no file
+                             used within the age; defaults to 30 days.
+  clean-dependencies         Explicitly remove all allowlisted dependency
+                             caches when disk pressure justifies rebuilding.
+
+Release archives, IPAs, result bundles, receipts and evidence are never targets.
+EOF
+}
+
+die() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+validate_repo() {
+    local owner inside
+    [[ "$REQUESTED_REPO_ROOT" == /* ]] || die "Repository root must be absolute"
+    [[ -e "$REPO_ROOT/.git" ]] || die "Repository root has no Git metadata: $REPO_ROOT"
+    [[ -d "$REPO_ROOT" && ! -L "$REPO_ROOT" ]] || die "Repository root must be a real directory"
+    if ! inside="$(git -C "$REPO_ROOT" rev-parse --is-inside-work-tree 2>/dev/null)"; then
+        die "Repository Git metadata is unreadable: $REPO_ROOT"
+    fi
+    [[ "$inside" == "true" ]] || die "Repository root is not a Git worktree: $REPO_ROOT"
+    owner="$(stat -f '%u' "$REPO_ROOT")"
+    [[ "$owner" == "$(id -u)" ]] || die "Repository root must be owned by the current user"
+}
+
+has_tracked_content() {
+    local relative="$1"
+    local tracked
+    if ! tracked="$(git -C "$REPO_ROOT" ls-files -- "$relative" "$relative/**" 2>/dev/null)"; then
+        die "Could not inspect tracked content for generated-output target: $relative"
+    fi
+    [[ -n "$tracked" ]]
+}
+
+preflight_relative_target() {
+    local relative="$1"
+    local target="$REPO_ROOT/$relative"
+    if [[ ! -e "$target" && ! -L "$target" ]]; then
+        return 0
+    fi
+    [[ "$relative" != /* && "$relative" != *".."* ]] || die "Unsafe generated-output target: $relative"
+    local component current="$REPO_ROOT"
+    while IFS= read -r component; do
+        current="$current/$component"
+        [[ ! -L "$current" ]] || die "Refusing symbolic-link path component: $relative"
+    done < <(printf '%s\n' "$relative" | tr '/' '\n')
+    [[ -d "$target" ]] || die "Expected generated-output directory: $relative"
+    [[ "$(stat -f '%u' "$target")" == "$(id -u)" ]] || die "Generated-output target is not owned by the current user: $relative"
+    local physical
+    physical="$(cd "$target" && pwd -P)"
+    [[ "$physical" == "$REPO_ROOT"/* ]] || die "Generated-output target resolves outside the repository: $relative"
+    if has_tracked_content "$relative"; then
+        die "Refusing tracked generated-output target: $relative"
+    fi
+    return 0
+}
+
+require_no_protected_artifact() {
+    local relative="$1"
+    local target="$REPO_ROOT/$relative"
+    local protected
+    protected="$(/usr/bin/find "$target" \
+        \( -type d -name '*.xcarchive' \
+        -o -type d -name '*.xcresult' \
+        -o -type d -name 'receipts' \
+        -o -type d -name 'evidence' \
+        -o -type f -name '*.ipa' \
+        -o -type f -name '*.receipt.json' \) \
+        -print -quit)"
+    [[ -z "$protected" ]] || die "Refusing target containing protected release evidence: $relative"
+}
+
+remove_relative_target() {
+    local relative="$1"
+    local target="$REPO_ROOT/$relative"
+    if [[ ! -e "$target" && ! -L "$target" ]]; then
+        return 0
+    fi
+    preflight_relative_target "$relative"
+    require_no_protected_artifact "$relative"
+    rm -rf -- "$target"
+    printf 'Removed generated output: %s\n' "$relative"
+}
+
+remove_residue() {
+    local candidate relative physical
+    while IFS= read -r -d '' candidate; do
+        [[ -e "$candidate" || -L "$candidate" ]] || continue
+        relative="${candidate#"$REPO_ROOT"/}"
+        if has_tracked_content "$relative"; then
+            printf 'Retained tracked generated-looking path: %s\n' "$relative"
+            continue
+        fi
+        if [[ -L "$candidate" ]]; then
+            rm -f -- "$candidate"
+            printf 'Removed generated residue link: %s\n' "$relative"
+            continue
+        fi
+        [[ "$(stat -f '%u' "$candidate")" == "$(id -u)" ]] || die "Generated residue is not owned by the current user: $relative"
+        physical="$(cd "$(dirname "$candidate")" && pwd -P)/$(basename "$candidate")"
+        [[ "$physical" == "$REPO_ROOT"/* ]] || die "Generated residue resolves outside the repository: $relative"
+        rm -rf -- "$candidate"
+        printf 'Removed generated residue: %s\n' "$relative"
+    done < <(
+        /usr/bin/find "$REPO_ROOT" \
+            \( -path "$REPO_ROOT/.git" \
+            -o -path "$REPO_ROOT/build/TestFlight" \
+            -o -path "$REPO_ROOT/fact-proxy/.gradle" \
+            -o -path "$REPO_ROOT/fact-proxy/.gradle-user" \
+            -o -path "$REPO_ROOT/fact-proxy/.tools" \
+            -o -path "$REPO_ROOT/fact-proxy/terraform/.terraform" \
+            -o -path "$REPO_ROOT/privacy-site/node_modules" \
+            -o -type d -name '*.xcarchive' \
+            -o -type d -name '*.xcresult' \) -prune -o \
+            \( -type f -name '.DS_Store' \
+            -o -type d -name '__pycache__' \
+            -o -type f -name '*.pyc' \
+            -o -type f -name '*.pyo' \
+            -o -type d -name '.idea' \
+            -o -type f -name '*.iml' \
+            -o -type f -name '*.xcuserstate' \
+            -o -type d -name 'xcuserdata' \) \
+            -print0
+    )
+    return 0
+}
+
+clean_task() {
+    local relative
+    for relative in "${TASK_OUTPUTS[@]}"; do
+        remove_relative_target "$relative"
+    done
+    remove_residue
+    return 0
+}
+
+prune_dependencies() {
+    local days="$1"
+    [[ "$days" =~ ^[0-9]+$ ]] || die "Dependency prune age must be a non-negative whole number of days"
+    local relative target marker modified now threshold
+    now="$(date '+%s')"
+    threshold=$((now - (days * 86400)))
+    for relative in "${DEPENDENCY_CACHES[@]}"; do
+        target="$REPO_ROOT/$relative"
+        [[ -e "$target" || -L "$target" ]] || continue
+        preflight_relative_target "$relative"
+        marker="$target/$DEPENDENCY_MARKER_NAME"
+        [[ ! -L "$marker" ]] || die "Dependency marker must not be a symbolic link: $relative"
+        if [[ ! -e "$marker" ]]; then
+            write_dependency_marker "$target" "$relative"
+            printf 'Initialised dependency retention marker: %s\n' "$relative"
+            continue
+        fi
+        [[ -f "$marker" ]] || die "Dependency marker must be a regular file: $relative"
+        [[ "$(stat -f '%u' "$marker")" == "$(id -u)" ]] || die "Dependency marker is not owned by the current user: $relative"
+        modified="$(stat -f '%m' "$marker")"
+        if (( modified >= threshold )); then
+            printf 'Retained recently used dependency cache: %s\n' "$relative"
+        else
+            remove_relative_target "$relative"
+        fi
+    done
+    return 0
+}
+
+is_dependency_cache() {
+    local requested="$1"
+    local relative
+    for relative in "${DEPENDENCY_CACHES[@]}"; do
+        [[ "$requested" != "$relative" ]] || return 0
+    done
+    return 1
+}
+
+write_dependency_marker() {
+    local target="$1"
+    local relative="$2"
+    local marker="$target/$DEPENDENCY_MARKER_NAME"
+    [[ ! -L "$marker" ]] || die "Dependency marker must not be a symbolic link: $relative"
+    if [[ -e "$marker" ]]; then
+        [[ -f "$marker" ]] || die "Dependency marker must be a regular file: $relative"
+        [[ "$(stat -f '%u' "$marker")" == "$(id -u)" ]] || die "Dependency marker is not owned by the current user: $relative"
+    fi
+    touch "$marker"
+    [[ "$(stat -f '%u' "$marker")" == "$(id -u)" ]] || die "Dependency marker is not owned by the current user: $relative"
+}
+
+mark_dependency() {
+    local relative="$1"
+    is_dependency_cache "$relative" || die "Dependency cache is not allowlisted: $relative"
+    local target="$REPO_ROOT/$relative"
+    if [[ ! -e "$target" && ! -L "$target" ]]; then
+        printf 'No dependency cache exists: %s\n' "$relative"
+        return
+    fi
+    preflight_relative_target "$relative"
+    write_dependency_marker "$target" "$relative"
+    printf 'Marked dependency cache used: %s\n' "$relative"
+}
+
+clean_dependencies() {
+    local relative
+    for relative in "${DEPENDENCY_CACHES[@]}"; do
+        remove_relative_target "$relative"
+    done
+    return 0
+}
+
+complete_task() {
+    "$SCRIPT_DIR/derived-data" clean
+    clean_task
+    prune_dependencies 30
+}
+
+validate_repo
+
+case "${1:-}" in
+    clean-task)
+        [[ $# -eq 1 ]] || die "clean-task accepts no additional arguments"
+        clean_task
+        ;;
+    complete)
+        [[ $# -eq 1 ]] || die "complete accepts no additional arguments"
+        complete_task
+        ;;
+    mark-dependency)
+        [[ $# -eq 2 ]] || die "mark-dependency requires one allowlisted path"
+        mark_dependency "$2"
+        ;;
+    prune-dependencies)
+        [[ $# -le 2 ]] || die "prune-dependencies accepts at most one age"
+        prune_dependencies "${2:-30}"
+        ;;
+    clean-dependencies)
+        [[ $# -eq 1 ]] || die "clean-dependencies accepts no additional arguments"
+        clean_dependencies
+        ;;
+    -h|--help)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

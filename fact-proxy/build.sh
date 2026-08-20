@@ -35,6 +35,9 @@ esac
 if [[ ! -f gradle/wrapper/gradle-wrapper.jar ]]; then
   echo "Generating Gradle wrapper (one-time)..."
   if [[ -x .tools/gradle-8.12.1/bin/gradle ]]; then
+    if [[ -x ../tools/generated-output ]]; then
+      ../tools/generated-output mark-dependency fact-proxy/.tools >/dev/null
+    fi
     .tools/gradle-8.12.1/bin/gradle wrapper --gradle-version 9.6.1
   elif command -v gradle >/dev/null 2>&1; then
     gradle wrapper --gradle-version 9.6.1
