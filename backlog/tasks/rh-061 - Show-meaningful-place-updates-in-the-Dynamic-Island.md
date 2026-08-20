@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-20 14:15'
+updated_date: '2026-08-20 14:16'
 labels:
   - core
   - dynamic-island
@@ -16,6 +16,7 @@ dependencies:
 references:
   - >-
     https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+  - 'https://github.com/rjbarbour/MotoGuide/pull/47'
 modified_files:
   - RideHorizon.xcodeproj/project.pbxproj
   - RideHorizon/Info.plist
@@ -54,4 +55,6 @@ During an active ride, present short RideHorizon place or boundary updates in th
 Owner authorised simulator-only integration while AFK. Physical iPhone and Google Maps presentation evidence remains outstanding.
 
 Implemented the minimum ActivityKit surface: an embedded WidgetKit extension with compact, minimal and expanded Dynamic Island views; a shared ride activity contract; and start, place-update and end lifecycle wiring. Unit tests isolate ActivityKit behind a capability seam. Focused lifecycle tests passed, the complete simulator suite passed 226 tests with zero failures, the extension embedded and validated successfully, and the final focused rerun passed. AC3 remains open for the exact iPhone with Google Maps because the owner is AFK.
+
+Implementation is in PR #47. The task remains In Progress until exact-device Google Maps coexistence is verified.
 <!-- SECTION:NOTES:END -->
