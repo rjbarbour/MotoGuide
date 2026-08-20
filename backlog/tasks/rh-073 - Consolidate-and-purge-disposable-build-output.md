@@ -5,12 +5,14 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-20 09:17'
-updated_date: '2026-08-20 09:37'
+updated_date: '2026-08-20 09:43'
 labels:
   - hygiene
   - build
   - xcode
 dependencies: []
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/41'
 priority: medium
 type: chore
 ordinal: 209000
@@ -41,4 +43,6 @@ Remove accumulated reproducible build output from the repository root, preserve 
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented one external DerivedData parent with collision-resistant branch/worktree cache paths, exact-cache cleanup, ownership-marker validation and seven-day stale pruning based on an explicit last-used marker. Focused evidence: seven DerivedData safety, isolation, retention and default-path tests pass; the existing TestFlight fixture suite passes 28 tests including external default paths. Local hygiene evidence: 59 ignored root DerivedData directories (about 10 GB) and verified proxy, website, Xcode, Python and OS caches were removed. The complete 162 MB legacy TestFlight folder was preserved at ~/Library/Developer/Xcode/Archives/RideHorizon Legacy 2026-08-20/TestFlight before root build output was removed; it contains ten xcarchives, one exported IPA package and four simulator-smoke evidence directories. No application build, upload or product behaviour change occurred.
+
+Independent review of exact head 15c0771 completed with zero remaining Standards findings and zero remaining Specification findings after correcting root canonicalisation, filesystem ownership, worktree-key collision, freshness-marker coverage and archive-recovery documentation.
 <!-- SECTION:NOTES:END -->
