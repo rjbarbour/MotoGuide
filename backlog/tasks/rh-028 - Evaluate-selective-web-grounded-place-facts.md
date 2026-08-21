@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 13:20'
+updated_date: '2026-08-21 13:31'
 labels:
   - proxy
   - model
@@ -89,6 +89,8 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 PR #59 current-main proxy integration drift: PrivateBetaFallbackQuotaHttpTest reproduced 1 failure because its generateFact(any()) mock no longer intercepts FactController.generateFactWithMetadata for non-ride requests. Commit b01959b changes only that mock to return GeneratedFact("Known for its wool trade.", empty sources, null response ID). Focused verification: ./gradlew test --tests ai.digitalmercenaries.ridehorizon.factproxy.PrivateBetaFallbackQuotaHttpTest --console=plain passed 1 test with 0 failures after reproducing the failure. Full verification: ./gradlew test --console=plain passed all 91 proxy tests with 0 failures. Bounded Standards and Specification reviews of git diff 5623936...HEAD both returned zero findings. No merge or deployment was performed.
 
 2026-08-21 PR #59 hand-off: commits b01959b and 05bdd9e were pushed to origin/codex/rh-028-web-search. PR #59 remains open and unmerged; no deployment was performed.
+
+2026-08-21 PR #59 iOS current-main integration drift: commit b0f9079 changes only ProxyFactGeneratorTests.testCancelledRideFactPreservesLastConfirmedLinkage to return {"fact":"Known for its wool trade.","sources":[]} on successful calls. Host CoreSimulator was available with iPhone 17 / iOS 26.3 after the sandboxed probe was inconclusive. Exact verification: xcodebuild test ... -only-testing:RideHorizonTests/ProxyFactGeneratorTests/testCancelledRideFactPreservesLastConfirmedLinkage passed 1 test with 0 failures. The test still cancels request 2, preserves resp_confirmed and reuses it on request 3. Bounded Standards and Specification reviews of git diff 1ddb590...HEAD both returned zero findings. No merge or deployment was performed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -97,4 +99,6 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 Resolved RH-028 findings F-01 through F-03. The proxy now canonicalises citation URLs to ASCII before validating HTTPS, final length and canonical deduplication; iOS requires sources and rejects missing, malformed, duplicate, non-ASCII, transformed or over-limit source data while accepting explicit sources:[]; and every human-contract success example includes sources. Final focused evidence: 25 Java/OpenAPI tests and 35 Swift simulator tests passed with zero failures, with zero remaining two-axis review findings. Branch remains In Progress and unmerged pending canonical integration.
 
 PR #59 current-main integration drift was corrected by updating the private-beta quota test to the structured non-ride fact mock; the single regression and all 91 proxy tests pass.
+
+PR #59 iOS current-main drift was corrected by adding explicit sources:[] to the cancelled-ride fact fixture; the exact simulator regression passes with linkage semantics unchanged.
 <!-- SECTION:FINAL_SUMMARY:END -->
