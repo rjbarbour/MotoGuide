@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 11:09'
+updated_date: '2026-08-21 11:37'
 labels:
   - proxy
   - model
@@ -38,12 +38,12 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Responses request exposes model-controlled hosted web_search.
-- [ ] #2 Searched and unsearched outputs satisfy the existing ride-safe text and privacy contract.
-- [ ] #3 Timeout, provider failure and tool-cost diagnostics and fallback remain bounded and tested.
-- [ ] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
-- [ ] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
-- [ ] #6 When message phase is present, only a completed final_answer message is accepted; a completed phase-less message remains compatible, while commentary and incomplete message paths are rejected.
-- [ ] #7 openai_result and its diagnostics-only fields are documented as bounded and privacy-safe, excluding search queries, results, sources, place text and rider text.
+- [x] #2 Searched and unsearched outputs satisfy the existing ride-safe text and privacy contract.
+- [x] #3 Timeout, provider failure and tool-cost diagnostics and fallback remain bounded and tested.
+- [x] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
+- [x] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
+- [x] #6 When message phase is present, only a completed final_answer message is accepted; a completed phase-less message remains compatible, while commentary and incomplete message paths are rejected.
+- [x] #7 openai_result and its diagnostics-only fields are documented as bounded and privacy-safe, excluding search queries, results, sources, place text and rider text.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -70,4 +70,14 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 branch hand-off: implementation commit 96c5343 was verified through the GH-PERSONAL capability check and dry-run, then pushed to origin/codex/rh-028-web-search. No pull request, merge or deployment was performed. Status remains In Progress because integration and independent review are outstanding.
 
 2026-08-21 independent review reopened AC #2 and #3. P1 requires visible clickable attribution for web-derived facts; P2 requires completed final_answer selection with phase-less compatibility; P3 requires explicit openai_result field/privacy documentation. RH-063 advanced to 919644a only through a merged RH-062 history commit plus LocationManagerTests and ledger evidence; no production dependency contract changed, so RH-028 retains its existing ce550ca RH-063 production base rather than importing unrelated task evidence.
+
+2026-08-21 independent-review remediation evidence: OpenAiServiceTest 21, FactControllerTest 26, SharedContractFixtureTest 2 and OpenApiContractTest 2 passed with 0 failures (51 focused proxy tests). Focused iPhone 17 / iOS 26.3.1 simulator testing passed RideLogSourceLinkTests 1, CachedPlaceFactGeneratorTests 4, ProxyFactGeneratorTests 30, AnnouncementCoordinatorTests 26 and LocationManagerTests 84 with 0 failures (145 focused Swift tests). Evidence proves bounded unique HTTPS url_citation parsing, required attribution for searched output, completed final_answer selection with phase-less compatibility, commentary/incomplete rejection, structured source transport, sourced-fact cache bypass, exact clickable Log destination, preservation through queue/LocationManager, and exclusion from announcement/TTS text. The first end-to-end Log callback run exposed a test-helper address-state gap; the helper was corrected and the final focused run passed. No full suite, device build, device install, live OpenAI call, merge or deployment was performed.
+
+2026-08-21 two-axis review of git diff 677a41d...HEAD initially found stale human-contract response/event sections, an over-broad source-title overlap rejection and missing direct Log-link destination evidence. Commits 8e97c3e and 9f3e82a resolve them. Follow-up Standards and Specification reviews both returned zero remaining findings. RH-063 linkage/compaction, max_output_tokens:4096 and the no-recent-place-list boundary remain unchanged.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Resolved every independent RH-028 finding. Web-derived facts now carry up to five bounded HTTPS citation sources through the app-proxy and announcement pipeline to visible clickable RideHorizon Log links; sourced facts are not persistently cached, and citation metadata never enters announcement text or TTS. The proxy accepts only a completed final_answer when phase is present, retains completed phase-less compatibility, rejects commentary/incomplete paths, and documents privacy-safe openai_result fields. OpenAPI 0.4.0, app/public privacy text and shared fixtures are synchronised. Final focused evidence: 51 proxy tests and 145 Swift simulator tests passed with zero failures; two-axis follow-up review found zero remaining findings. Branch remains In Progress and unmerged pending integration.
+<!-- SECTION:FINAL_SUMMARY:END -->
