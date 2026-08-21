@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 12:01'
+updated_date: '2026-08-21 13:20'
 labels:
   - proxy
   - model
@@ -85,10 +85,14 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 F-01 through F-03 evidence: OpenAiServiceTest 23 and OpenApiContractTest 2 passed with 0 failures (25 focused Java/OpenAPI tests). ProxyFactGeneratorTests passed 35 simulator tests with 0 failures on iPhone 17 / iOS 26.3.1. The red runs first proved both Java canonical/dedup and Unicode-expansion regressions plus iOS missing/malformed/expanded-source acceptance; the green runs prove canonical ASCII URL output, case-insensitive HTTPS validation before lowercase canonical output, final <=2048 enforcement, canonical deduplication, required all-or-nothing iOS sources, explicit [] compatibility and the corrected human-contract example. Commits acfc692 and 9481763 implement the fixes. Follow-up Standards and Specification reviews both returned zero remaining findings. RH-063 linkage/compaction, max_output_tokens:4096, no recent-place list and source-free announcement/TTS text remain unchanged. No full suite, merge, deployment, device build or device install was performed.
 
 2026-08-21 F-01 through F-03 branch hand-off: commits acfc692, 9481763 and 86afe24 were pushed to origin/codex/rh-028-web-search. No pull request, merge, deployment, device build or device install was performed. Status remains In Progress pending canonical integration.
+
+2026-08-21 PR #59 current-main proxy integration drift: PrivateBetaFallbackQuotaHttpTest reproduced 1 failure because its generateFact(any()) mock no longer intercepts FactController.generateFactWithMetadata for non-ride requests. Commit b01959b changes only that mock to return GeneratedFact("Known for its wool trade.", empty sources, null response ID). Focused verification: ./gradlew test --tests ai.digitalmercenaries.ridehorizon.factproxy.PrivateBetaFallbackQuotaHttpTest --console=plain passed 1 test with 0 failures after reproducing the failure. Full verification: ./gradlew test --console=plain passed all 91 proxy tests with 0 failures. Bounded Standards and Specification reviews of git diff 5623936...HEAD both returned zero findings. No merge or deployment was performed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Resolved RH-028 findings F-01 through F-03. The proxy now canonicalises citation URLs to ASCII before validating HTTPS, final length and canonical deduplication; iOS requires sources and rejects missing, malformed, duplicate, non-ASCII, transformed or over-limit source data while accepting explicit sources:[]; and every human-contract success example includes sources. Final focused evidence: 25 Java/OpenAPI tests and 35 Swift simulator tests passed with zero failures, with zero remaining two-axis review findings. Branch remains In Progress and unmerged pending canonical integration.
+
+PR #59 current-main integration drift was corrected by updating the private-beta quota test to the structured non-ride fact mock; the single regression and all 91 proxy tests pass.
 <!-- SECTION:FINAL_SUMMARY:END -->
