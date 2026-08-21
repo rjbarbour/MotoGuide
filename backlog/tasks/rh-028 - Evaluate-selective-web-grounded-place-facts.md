@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 10:58'
+updated_date: '2026-08-21 10:59'
 labels:
   - proxy
   - model
@@ -58,6 +58,8 @@ Exclusions: no recent-place list, no change to the GPT-5.6 Sol medium model poli
 2026-08-21: Official OpenAI tools guidance and Responses API reference confirm tools:[{type:web_search}], model-controlled selection when tool_choice is not forced, typed web_search_call output items, final message output_text extraction, and max_tool_calls as the total hosted-tool-call ceiling. Selected max_tool_calls:1 with query/source/result-free diagnostics.
 
 2026-08-21 focused verification: OpenAiServiceTest 15, FactControllerTest 25 and OpenApiContractTest 2 passed with 0 failures (42 proxy tests total). Evidence covers model-controlled tools:[{type:web_search}], max_tool_calls:1, preserved GPT-5.6 Sol medium/RH-063 linkage and compaction/4096 ceiling/completed-status rejection/sanitisation/no recent-place list, searched and unsearched response shapes, final-message output_text-only extraction, privacy-safe zero/one-call diagnostics, stable timeout/provider/tool classifications, and the existing retryable 502 base-place fallback. Diff review and git diff --check found no issue. No iOS tests, full proxy suite, live OpenAI call, merge, deployment or device work was performed.
+
+2026-08-21 branch hand-off: implementation commit 96c5343 was verified through the GH-PERSONAL capability check and dry-run, then pushed to origin/codex/rh-028-web-search. No pull request, merge or deployment was performed. Status remains In Progress because integration and independent review are outstanding.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
