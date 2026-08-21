@@ -1,6 +1,7 @@
 package ai.digitalmercenaries.ridehorizon.factproxy;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -9,11 +10,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -84,6 +87,34 @@ class FactControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().exists(RequestInstrumentationFilter.REQUEST_ID_HEADER))
                 .andExpect(jsonPath("$.fact").value("Known for its wool trade."));
+    }
+
+    @Test
+    void rideHeaderLinksFactsAndEndRideClearsTheSameConversation() throws Exception {
+        String rideId = "00000000-0000-0000-0000-000000000063";
+        when(openAiService.generateFact(any(), any())).thenReturn("Known for its wool trade.");
+
+        mockMvc.perform(post("/v1/fact")
+                        .header("Authorization", "Bearer test-token")
+                        .header("X-RideHorizon-Ride-Id", rideId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<OpenAiService.RideConversation> factConversation =
+                ArgumentCaptor.forClass(OpenAiService.RideConversation.class);
+        verify(openAiService).generateFact(any(), factConversation.capture());
+        assertEquals(rideId, factConversation.getValue().rideId().toString());
+
+        mockMvc.perform(delete("/v1/ride/conversation")
+                        .header("Authorization", "Bearer test-token")
+                        .header("X-RideHorizon-Ride-Id", rideId))
+                .andExpect(status().isNoContent());
+
+        ArgumentCaptor<OpenAiService.RideConversation> endedConversation =
+                ArgumentCaptor.forClass(OpenAiService.RideConversation.class);
+        verify(openAiService).endRideConversation(endedConversation.capture());
+        assertEquals(factConversation.getValue(), endedConversation.getValue());
     }
 
     @Test

@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -11,10 +12,13 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.UUID;
+
 @RestController
 public class FactController {
     private static final Logger log = LoggerFactory.getLogger(FactController.class);
     private static final String USER_HEADER = "X-RideHorizon-User-Id";
+    private static final String RIDE_HEADER = "X-RideHorizon-Ride-Id";
 
     private final OpenAiService openAiService;
     private final ElevenLabsSpeechService elevenLabsSpeechService;
@@ -43,6 +47,7 @@ public class FactController {
     public FactResponse fact(
             @RequestBody(required = false) FactRequest request,
             @RequestHeader(name = USER_HEADER, required = false) String userId,
+            @RequestHeader(name = RIDE_HEADER, required = false) String rideId,
             HttpServletRequest httpRequest
     ) {
         if (request == null) {
@@ -66,7 +71,10 @@ public class FactController {
         );
         sessions.authorizeFact(auth);
 
-        String fact = openAiService.generateFact(validatedRequest);
+        OpenAiService.RideConversation rideConversation = rideConversation(auth, rideId, false);
+        String fact = rideConversation == null
+                ? openAiService.generateFact(validatedRequest)
+                : openAiService.generateFact(validatedRequest, rideConversation);
         if (diagnosticsSettings.enabled()) {
             log.info(
                     "event=fact_request_success boundary={} factMode={} factLength={}",
@@ -76,6 +84,18 @@ public class FactController {
             );
         }
         return new FactResponse(fact);
+    }
+
+    @DeleteMapping("/v1/ride/conversation")
+    public ResponseEntity<Void> endRideConversation(
+            @RequestHeader(name = RIDE_HEADER) String rideId,
+            HttpServletRequest httpRequest
+    ) {
+        SessionAuthority.SessionAuthentication auth = (SessionAuthority.SessionAuthentication) httpRequest.getAttribute(
+                ProxyAuthFilter.SESSION_AUTH_ATTRIBUTE
+        );
+        openAiService.endRideConversation(rideConversation(auth, rideId, true));
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping(path = "/v1/speech", consumes = MediaType.APPLICATION_JSON_VALUE, produces = "audio/mpeg")
@@ -107,5 +127,23 @@ public class FactController {
 
     private static String normalizeUserId(String userId) {
         return UserIdSanitizer.normalizeAndValidate(userId);
+    }
+
+    private static OpenAiService.RideConversation rideConversation(
+            SessionAuthority.SessionAuthentication auth,
+            String rideId,
+            boolean required
+    ) {
+        if (rideId == null || rideId.isBlank()) {
+            if (required) {
+                throw new BadRequestException("ride id is required");
+            }
+            return null;
+        }
+        try {
+            return new OpenAiService.RideConversation(auth.quotaSubjectHash(), UUID.fromString(rideId));
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("ride id is invalid");
+        }
     }
 }

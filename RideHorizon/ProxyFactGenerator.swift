@@ -137,6 +137,13 @@ enum FactProxyContract {
     static func healthEndpoint(baseURL: URL = productionBaseURL) -> URL {
         baseURL.appendingPathComponent("health")
     }
+
+    static func endRideConversationEndpoint(baseURL: URL = productionBaseURL) -> URL {
+        baseURL
+            .appendingPathComponent("v1")
+            .appendingPathComponent("ride")
+            .appendingPathComponent("conversation")
+    }
 }
 
 struct ProxyRequestExecutor {
@@ -297,7 +304,7 @@ private final class ProxyOperationRace<Value: Sendable>: @unchecked Sendable {
     }
 }
 
-struct ProxyFactGenerator: PlaceFactGenerating {
+final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
     typealias ProxyTokenProvider = () -> String?
     typealias DeviceIdProvider = () -> String?
@@ -310,7 +317,10 @@ struct ProxyFactGenerator: PlaceFactGenerating {
     private let credentialRefresher: CredentialRefresher
     private let requestExecutor: ProxyRequestExecutor
     private let endpoint: URL
+    private let endRideEndpoint: URL
     private let operationTimeoutSeconds: TimeInterval
+    private let attemptedRideLock = NSLock()
+    private var attemptedRideIDs: Set<UUID> = []
 
     init(
         proxyTokenProvider: @escaping ProxyTokenProvider = { KeychainCredentialLoader.loadRideHorizonProxyToken() },
@@ -322,6 +332,7 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         session: URLSession = .shared,
         baseURL: URL = FactProxyContract.productionBaseURL,
         endpoint: URL? = nil,
+        endRideEndpoint: URL? = nil,
         retryDelays: [TimeInterval] = FactProxyContract.retryDelaysSeconds,
         operationTimeoutSeconds: TimeInterval = FactProxyContract.iosTimeoutSeconds
     ) {
@@ -331,12 +342,18 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         self.credentialRefresher = credentialRefresher
         self.requestExecutor = ProxyRequestExecutor(session: session, retryDelays: retryDelays)
         self.endpoint = endpoint ?? FactProxyContract.factEndpoint(baseURL: baseURL)
+        self.endRideEndpoint = endRideEndpoint ?? FactProxyContract.endRideConversationEndpoint(baseURL: baseURL)
         self.operationTimeoutSeconds = operationTimeoutSeconds
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
-        try await ProxyOperationDeadline.run(seconds: operationTimeoutSeconds) {
-            try await fact(for: request, retryAfterAuthenticationFailure: true)
+        if let rideSessionID = request.rideSessionID {
+            _ = attemptedRideLock.withLock {
+                attemptedRideIDs.insert(rideSessionID)
+            }
+        }
+        return try await ProxyOperationDeadline.run(seconds: operationTimeoutSeconds) {
+            try await self.fact(for: request, retryAfterAuthenticationFailure: true)
         }
     }
 
@@ -363,6 +380,9 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         urlRequest.timeoutInterval = FactProxyContract.factTimeoutSeconds
         urlRequest.setValue("Bearer \(proxyToken)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let rideSessionID = request.rideSessionID {
+            urlRequest.setValue(rideSessionID.uuidString.lowercased(), forHTTPHeaderField: "X-RideHorizon-Ride-Id")
+        }
         if let deviceId = deviceIdProvider()?.trimmingCharacters(in: .whitespacesAndNewlines),
            !deviceId.isEmpty {
             urlRequest.setValue(deviceId, forHTTPHeaderField: "X-RideHorizon-Device-Id")
@@ -421,6 +441,78 @@ struct ProxyFactGenerator: PlaceFactGenerating {
         }
         ProxyDiagnostics.log("Proxy", "Fact accepted: \(sanitized)")
         return sanitized
+    }
+
+    func endRideConversation(_ rideSessionID: UUID) async {
+        let wasAttempted = attemptedRideLock.withLock {
+            attemptedRideIDs.remove(rideSessionID) != nil
+        }
+        guard wasAttempted else { return }
+
+        do {
+            try await ProxyOperationDeadline.run(seconds: operationTimeoutSeconds) { [self] in
+                try await self.sendEndRideConversation(rideSessionID, retryAfterAuthenticationFailure: true)
+            }
+        } catch {
+            ProxyDiagnostics.log("Proxy", "Could not clear ended ride conversation: \(error.localizedDescription)")
+        }
+    }
+
+    private func sendEndRideConversation(
+        _ rideSessionID: UUID,
+        retryAfterAuthenticationFailure: Bool
+    ) async throws {
+        var proxyToken = proxyTokenProvider()
+        if proxyToken?.isEmpty != false {
+            try await credentialRefresher()
+            proxyToken = proxyTokenProvider()
+        }
+        guard let proxyToken, !proxyToken.isEmpty else {
+            throw PlaceFactError.missingProxyToken
+        }
+
+        var urlRequest = URLRequest(url: endRideEndpoint)
+        urlRequest.httpMethod = "DELETE"
+        urlRequest.timeoutInterval = FactProxyContract.factTimeoutSeconds
+        urlRequest.setValue("Bearer \(proxyToken)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue(rideSessionID.uuidString.lowercased(), forHTTPHeaderField: "X-RideHorizon-Ride-Id")
+        if let deviceId = deviceIdProvider()?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !deviceId.isEmpty {
+            urlRequest.setValue(deviceId, forHTTPHeaderField: "X-RideHorizon-Device-Id")
+        }
+
+        let (data, response) = try await requestExecutor.data(
+            for: urlRequest,
+            category: "Proxy",
+            shouldRetryResponse: { http, _ in
+                ProxyRequestExecutor.isTransientHTTPStatus(http.statusCode)
+            }
+        )
+        guard let http = response as? HTTPURLResponse else {
+            throw PlaceFactError.invalidResponse
+        }
+        guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 401 {
+                credentialInvalidator()
+                if retryAfterAuthenticationFailure {
+                    try await credentialRefresher()
+                    return try await sendEndRideConversation(
+                        rideSessionID,
+                        retryAfterAuthenticationFailure: false
+                    )
+                }
+            }
+            ProxyDiagnostics.log("Proxy", "End ride clear returned HTTP \(http.statusCode), \(data.count) byte(s).")
+            throw PlaceFactError.httpError(http.statusCode)
+        }
+    }
+}
+
+private extension NSLock {
+    func withLock<Value>(_ operation: () -> Value) -> Value {
+        lock()
+        defer { unlock() }
+        return operation()
     }
 }
 

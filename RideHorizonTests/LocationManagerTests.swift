@@ -1504,6 +1504,42 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testActiveRideIdentityBoundsFactRequestsAndEndConversation() async {
+        let factGenerator = MockPlaceFactGenerator()
+        let locationManager = LocationManager(
+            factGenerator: factGenerator,
+            speechOutput: RecordingSpeechOutputEngine(),
+            aiSharingAllowed: { true }
+        )
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.startRideWithoutLocationInputForTesting()
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        let rideSessionID = try? XCTUnwrap(factGenerator.requests.first?.rideSessionID)
+
+        locationManager.endRide()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertNotNil(rideSessionID)
+        XCTAssertEqual(factGenerator.endedRideSessionIDs, rideSessionID.map { [$0] } ?? [])
+    }
+
+    @MainActor
     func testFactAnnouncementExportCarriesOneIDFromGenerationThroughAudioRelease() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

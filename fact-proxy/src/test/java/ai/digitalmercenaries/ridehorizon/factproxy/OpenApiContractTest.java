@@ -24,13 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class OpenApiContractTest {
     private static final String ACCEPTED_OPENAPI_VERSION = "3.0.3";
-    private static final String ACCEPTED_CONTRACT_VERSION = "0.2.0";
+    private static final String ACCEPTED_CONTRACT_VERSION = "0.3.0";
     private static final String ACCEPTED_CONTRACT_SHA256 =
-            "39d7a42bdd70590bea7a45a1a1545af91509707a174f98aec83c4e317a8b81b6";
+            "3055c15cae175d6241cfc2d6d1b6e78d46c2bab8c07b5c019824cb84de647df0";
 
     private static final Map<String, String> PUBLISHED_OPERATIONS = Map.ofEntries(
             Map.entry("GET /health", "getHealth"),
             Map.entry("POST /v1/fact", "createPlaceFact"),
+            Map.entry("DELETE /v1/ride/conversation", "endRideConversation"),
             Map.entry("POST /v1/speech", "createSpeech"),
             Map.entry("POST /v1/session/fallback", "issueFallbackSession"),
             Map.entry("GET /admin/v1/sessions", "listInstallations"),

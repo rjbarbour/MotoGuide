@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: RideHorizon Fact Proxy API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     MVP contract for the RideHorizon iOS app to request a short or long
     ride-safe place fact without storing or sending an OpenAI API key from
@@ -184,6 +184,17 @@ paths:
             type: string
             minLength: 4
             maxLength: 64
+        - in: header
+          name: X-RideHorizon-Ride-Id
+          description: |
+            App-owned active ride UUID. When present, successful place-fact
+            responses continue one bounded OpenAI Responses conversation for
+            this authenticated installation and ride. It is not added to the
+            fact JSON or cache key.
+          required: false
+          schema:
+            type: string
+            format: uuid
       x-ios-keychain-service: RideHorizonProxy
       x-ios-device-id-keychain-service: RideHorizonDeviceId
       x-ios-attempt-timeout-seconds: 35
@@ -254,6 +265,33 @@ paths:
           description: Proxy is misconfigured, including missing server-side proxy token.
         "502":
           description: OpenAI returned an error or unusable response.
+  /v1/ride/conversation:
+    delete:
+      tags:
+        - Facts
+      summary: End the active ride's OpenAI conversation
+      description: |
+        Clears provider response linkage for the supplied app-owned ride UUID.
+        This endpoint does not delete application-owned ride evidence and does
+        not call the model provider.
+      operationId: endRideConversation
+      security:
+        - RideHorizonProxyToken: []
+      parameters:
+        - in: header
+          name: X-RideHorizon-Ride-Id
+          description: App-owned UUID for the ride that has ended.
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Provider conversation linkage cleared or already absent.
+        "400":
+          description: Missing or invalid ride UUID.
+        "401":
+          description: Missing or wrong proxy bearer token.
   /v1/speech:
     post:
       tags:

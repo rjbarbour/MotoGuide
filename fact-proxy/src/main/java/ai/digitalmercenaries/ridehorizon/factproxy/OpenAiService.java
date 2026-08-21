@@ -12,13 +12,18 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class OpenAiService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiService.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
     private static final int MAX_OUTPUT_TOKENS = 4_096;
+    static final int COMPACT_THRESHOLD_TOKENS = 24_000;
 
     private static final String BASE_SYSTEM_PROMPT = """
             You are a place-fact generator for a motorcycling ride companion.
@@ -63,6 +68,7 @@ public class OpenAiService {
     private final RideHorizonProperties rideHorizonProperties;
     private final DiagnosticsSettings diagnosticsSettings;
     private final PromptOverridesService promptOverridesService;
+    private final Map<String, RideConversationState> rideConversations = new ConcurrentHashMap<>();
 
     public OpenAiService(
             HttpClient httpClient,
@@ -81,32 +87,67 @@ public class OpenAiService {
     }
 
     public String generateFact(ValidatedFactRequest request) {
+        return generateFact(request, null);
+    }
+
+    public String generateFact(
+            ValidatedFactRequest request,
+            RideConversation rideConversation
+    ) {
         if (openAiProperties.apiKey() == null || openAiProperties.apiKey().isBlank()) {
             throw new UpstreamException("OpenAI API key is not configured");
         }
 
+        if (rideConversation == null) {
+            return generateFactWithState(request, null);
+        }
+
+        RideConversationState state = rideConversations.computeIfAbsent(
+                rideConversation.subject(),
+                ignored -> new RideConversationState()
+        );
+        synchronized (state) {
+            if (rideConversation.rideId().equals(state.lastEndedRideId)) {
+                throw new BadRequestException("ride conversation has ended");
+            }
+            if (!rideConversation.rideId().equals(state.activeRideId)) {
+                state.activeRideId = rideConversation.rideId();
+                state.previousResponseId = null;
+            }
+            try {
+                return generateFactWithState(request, state);
+            } catch (RuntimeException ex) {
+                state.previousResponseId = null;
+                throw ex;
+            }
+        }
+    }
+
+    public void endRideConversation(RideConversation rideConversation) {
+        RideConversationState state = rideConversations.computeIfAbsent(
+                rideConversation.subject(),
+                ignored -> new RideConversationState()
+        );
+        synchronized (state) {
+            if (rideConversation.rideId().equals(state.activeRideId)) {
+                state.activeRideId = null;
+                state.previousResponseId = null;
+            }
+            state.lastEndedRideId = rideConversation.rideId();
+        }
+    }
+
+    private String generateFactWithState(ValidatedFactRequest request, RideConversationState state) {
+        String previousResponseId = state == null ? null : state.previousResponseId;
+
         try {
             FactMode factMode = request.factMode();
-            String body = objectMapper.writeValueAsString(buildPayload(request, factMode));
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(openAiProperties.endpoint()))
-                    .timeout(REQUEST_TIMEOUT)
-                    .header("Authorization", "Bearer " + openAiProperties.apiKey())
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                    .build();
-
-            long started = System.nanoTime();
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            long durationMs = (System.nanoTime() - started) / 1_000_000;
-            if (diagnosticsSettings.enabled()) {
-                log.info(
-                        "event=openai_response status={} durationMs={} boundary={} factMode={}",
-                        response.statusCode(),
-                        durationMs,
-                        request.boundary(),
-                        factMode.wireValue()
-                );
+            HttpResponse<String> response = send(request, factMode, previousResponseId);
+            if (previousResponseId != null && invalidPreviousResponse(response)) {
+                if (state != null) {
+                    state.previousResponseId = null;
+                }
+                response = send(request, factMode, null);
             }
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -122,6 +163,13 @@ public class OpenAiService {
             if (sanitized == null) {
                 throw new UpstreamException("OpenAI response could not be sanitized");
             }
+            if (state != null) {
+                String responseId = root.path("id").asText(null);
+                if (responseId == null || responseId.isBlank()) {
+                    throw new UpstreamException("OpenAI response id is missing");
+                }
+                state.previousResponseId = responseId;
+            }
             return sanitized;
         } catch (UpstreamException ex) {
             log.warn("event=openai_upstream_error boundary={} reason={}", request.boundary(), ex.getMessage());
@@ -132,15 +180,61 @@ public class OpenAiService {
         }
     }
 
-    private Map<String, Object> buildPayload(ValidatedFactRequest request, FactMode factMode) {
-        return Map.of(
-                "model", openAiProperties.model(),
-                "instructions", systemPrompt(factMode, request),
-                "input", userPrompt(request, factMode),
-                "reasoning", Map.of("effort", "medium"),
-                "store", false,
-                "max_output_tokens", MAX_OUTPUT_TOKENS
+    private HttpResponse<String> send(
+            ValidatedFactRequest request,
+            FactMode factMode,
+            String previousResponseId
+    ) throws Exception {
+        String body = objectMapper.writeValueAsString(buildPayload(request, factMode, previousResponseId));
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(openAiProperties.endpoint()))
+                .timeout(REQUEST_TIMEOUT)
+                .header("Authorization", "Bearer " + openAiProperties.apiKey())
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                .build();
+
+        long started = System.nanoTime();
+        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        long durationMs = (System.nanoTime() - started) / 1_000_000;
+        if (diagnosticsSettings.enabled()) {
+            log.info(
+                    "event=openai_response status={} durationMs={} boundary={} factMode={} continued={}",
+                    response.statusCode(),
+                    durationMs,
+                    request.boundary(),
+                    factMode.wireValue(),
+                    previousResponseId != null
+            );
+        }
+        return response;
+    }
+
+    private Map<String, Object> buildPayload(
+            ValidatedFactRequest request,
+            FactMode factMode,
+            String previousResponseId
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", openAiProperties.model());
+        payload.put("instructions", systemPrompt(factMode, request));
+        payload.put("input", userPrompt(request, factMode));
+        payload.put("reasoning", Map.of("effort", "medium"));
+        payload.put("max_output_tokens", MAX_OUTPUT_TOKENS);
+        payload.put("store", true);
+        payload.put(
+                "context_management",
+                List.of(Map.of("type", "compaction", "compact_threshold", COMPACT_THRESHOLD_TOKENS))
         );
+        if (previousResponseId != null) {
+            payload.put("previous_response_id", previousResponseId);
+        }
+        return payload;
+    }
+
+    private static boolean invalidPreviousResponse(HttpResponse<String> response) {
+        return response.statusCode() == 404
+                || (response.statusCode() == 400 && response.body().contains("previous_response_id"));
     }
 
     private static String extractOutputText(JsonNode root) {
@@ -164,6 +258,20 @@ public class OpenAiService {
             }
         }
         return outputText.isEmpty() ? null : outputText.toString();
+    }
+
+    record RideConversation(String subject, UUID rideId) {
+        RideConversation {
+            if (subject == null || subject.isBlank() || rideId == null) {
+                throw new BadRequestException("ride conversation is invalid");
+            }
+        }
+    }
+
+    private static final class RideConversationState {
+        private UUID activeRideId;
+        private UUID lastEndedRideId;
+        private String previousResponseId;
     }
 
     private String systemPrompt(FactMode factMode, ValidatedFactRequest request) {

@@ -1320,6 +1320,11 @@ class LocationManager: NSObject, ObservableObject {
 
         guard case .rideEnded(let wasActive) = intent else { return }
         liveActivityManager.endRide()
+        if wasActive, let activeRideSessionID {
+            Task { [announcementCoordinator] in
+                await announcementCoordinator.endRideConversation(activeRideSessionID)
+            }
+        }
         locationSource.stop()
         isTracking = false
         locationStatus = .idle
@@ -1813,7 +1818,8 @@ class LocationManager: NSObject, ObservableObject {
             ),
             boundaryCooldown: TimeInterval(boundarySpeechCooldownSeconds),
             now: Date(),
-            placeLookupID: placeLookupID
+            placeLookupID: placeLookupID,
+            rideSessionID: activeRideSessionID
         ))
 
         switch outcome {

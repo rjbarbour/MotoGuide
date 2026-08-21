@@ -204,7 +204,8 @@ enum AnnouncementPolicy {
         for plan: AnnouncementPlan,
         address: Address,
         mode: FactMode = .shortFacts,
-        riderContext: RiderContext = .empty
+        riderContext: RiderContext = .empty,
+        rideSessionID: UUID? = nil
     ) -> PlaceFactRequest {
         PlaceFactRequest(
             boundary: plan.boundary,
@@ -212,7 +213,8 @@ enum AnnouncementPolicy {
             factMode: mode,
             countryContext: Address.isValidPlaceName(address.country) ? address.country : nil,
             placeHierarchy: PlaceHierarchy(minimizing: address, for: plan.boundary),
-            riderContext: riderContext
+            riderContext: riderContext,
+            rideSessionID: rideSessionID
         )
     }
 }
@@ -328,6 +330,7 @@ struct AnnouncementWorkflowInput {
     let boundaryCooldown: TimeInterval
     let now: Date
     let placeLookupID: UUID?
+    let rideSessionID: UUID?
 }
 
 enum AnnouncementSubmissionOutcome: Equatable {
@@ -490,7 +493,8 @@ final class AnnouncementCoordinator {
                     for: plan,
                     address: input.address,
                     mode: factMode,
-                    riderContext: input.riderContext
+                    riderContext: input.riderContext,
+                    rideSessionID: input.rideSessionID
                 ),
                 mode: factMode,
                 aiSharingAllowed: input.delivery.aiSharingAllowed
@@ -515,6 +519,10 @@ final class AnnouncementCoordinator {
     func resetContext() {
         previousAddress = nil
         lastBoundaryAnnouncementAt = nil
+    }
+
+    func endRideConversation(_ rideSessionID: UUID) async {
+        await factClient.endRideConversation(rideSessionID)
     }
 
     @discardableResult
@@ -698,10 +706,10 @@ final class AnnouncementCoordinator {
         ))
         onResult?(.factRequested(announcementID: plan.id))
         factTask = Task { [weak self] in
-            let fact = await PlaceFactFetcher.fact(for: request, using: factClient)
+            guard let self else { return }
+            let fact = await PlaceFactFetcher.fact(for: request, using: self.factClient)
             await MainActor.run {
-                guard let self,
-                      !Task.isCancelled,
+                guard !Task.isCancelled,
                       self.acceptsFactCompletion(token: work.token) else { return }
                 self.factTask = nil
                 self.finishFact(token: work.token)

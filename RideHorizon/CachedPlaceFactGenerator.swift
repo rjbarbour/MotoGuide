@@ -25,6 +25,10 @@ struct CachedPlaceFactGenerator: PlaceFactGenerating {
         ProxyDiagnostics.log("Facts", "Generated fact failed local sanitization for \(request.cacheKey)")
         throw PlaceFactError.invalidResponse
     }
+
+    func endRideConversation(_ rideSessionID: UUID) async {
+        await generator.endRideConversation(rideSessionID)
+    }
 }
 
 enum PlaceFactFetcher {
