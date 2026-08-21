@@ -87,6 +87,8 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 F-01 through F-03 branch hand-off: commits acfc692, 9481763 and 86afe24 were pushed to origin/codex/rh-028-web-search. No pull request, merge, deployment, device build or device install was performed. Status remains In Progress pending canonical integration.
 
 2026-08-21 PR #59 current-main proxy integration drift: PrivateBetaFallbackQuotaHttpTest reproduced 1 failure because its generateFact(any()) mock no longer intercepts FactController.generateFactWithMetadata for non-ride requests. Commit b01959b changes only that mock to return GeneratedFact("Known for its wool trade.", empty sources, null response ID). Focused verification: ./gradlew test --tests ai.digitalmercenaries.ridehorizon.factproxy.PrivateBetaFallbackQuotaHttpTest --console=plain passed 1 test with 0 failures after reproducing the failure. Full verification: ./gradlew test --console=plain passed all 91 proxy tests with 0 failures. Bounded Standards and Specification reviews of git diff 5623936...HEAD both returned zero findings. No merge or deployment was performed.
+
+2026-08-21 PR #59 hand-off: commits b01959b and 05bdd9e were pushed to origin/codex/rh-028-web-search. PR #59 remains open and unmerged; no deployment was performed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
