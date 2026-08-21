@@ -3188,6 +3188,73 @@ final class LocationManagerTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testLiveRideIgnoresNoisyEveryLookupOverrideAndAnnouncesOnlyRealChange() async {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
+        locationManager.testMode = false
+        locationManager.contentMode = .namesOnly
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.speakAfterEveryGeocode = true
+        let stroud = Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+        let stonehouse = Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+
+        locationManager.processResolvedAddressForTesting(stroud)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+
+        locationManager.processResolvedAddressForTesting(stonehouse)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Stonehouse, Gloucestershire"])
+        speechOutput.beginPlayback(provider: .apple)
+        speechOutput.finishPlayback()
+
+        locationManager.processResolvedAddressForTesting(stonehouse)
+        locationManager.processResolvedAddressForTesting(stonehouse)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(speechOutput.requests.count, 1)
+    }
+
+    @MainActor
+    func testTestModeCanExplicitlySpeakAfterEveryUnchangedLookup() async {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
+        locationManager.testMode = true
+        locationManager.contentMode = .namesOnly
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.speakAfterEveryGeocode = true
+        let stroud = Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+
+        locationManager.processResolvedAddressForTesting(stroud)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(speechOutput.requests.count, 1)
+        speechOutput.beginPlayback(provider: .apple)
+        speechOutput.finishPlayback()
+
+        locationManager.processResolvedAddressForTesting(stroud)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(speechOutput.requests.count, 2)
+    }
+
     private func clearSpeechProviderDefaults() {
         UserDefaults.standard.removeObject(forKey: "RideHorizonSpeechProvider")
         UserDefaults.standard.removeObject(forKey: "RideHorizonSpeechProviderPremiumNoAppleFallbackMigration20260703")
