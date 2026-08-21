@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:46'
-updated_date: '2026-08-21 12:37'
+updated_date: '2026-08-21 12:47'
 labels:
   - core
   - announcement
@@ -52,4 +52,6 @@ Captured from the 2026-08-21 road test. Intended branch: codex/rh-082-suppress-u
 Draft PR #58 opened on 2026-08-21. Keep draft until physical unchanged-place road evidence is captured on the supported iPhone.
 
 2026-08-21 independent review found a ride-start coverage gap and timing-sensitive negative assertion. Remediation now starts explicit ride sessions, awaits positive speech requests and uses an inverted request expectation for unchanged updates. Final independent re-review: zero findings; git diff --check passed. Verification in this session: focused RH-082 tests passed 2/2 after final remediation; the complete RideHorizonTests simulator checkpoint passed 240/240 before the test-only review strengthening. No physical-device build, install or road test was performed; acceptance criterion 4 remains open.
+
+2026-08-21 GitHub CI infrastructure note: run 32482827982 failed before build or XCTest because the hosted runner exposed no iPhone 17 Pro simulator destination. No application test failed. The approved GitHub PAT cannot rerun Actions jobs, so this ledger-only evidence commit intentionally retriggers PR validation; no local build or test is applicable.
 <!-- SECTION:NOTES:END -->
