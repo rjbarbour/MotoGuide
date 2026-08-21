@@ -1,10 +1,11 @@
 ---
 id: RH-078
 title: Copy current ride diagnostics to the clipboard
-status: To Do
+status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:36'
+updated_date: '2026-08-21 11:44'
 labels:
   - ios
   - diagnostics
@@ -31,3 +32,9 @@ The Release diagnostics screen exposes a file ShareLink. Selecting Copy from the
 - [ ] #2 Copy works after a ride stops without waiting for delayed file persistence and does not copy coordinates, announcement text or credentials.
 - [ ] #3 A focused regression test drives the clipboard action through an injected pasteboard and the relevant iOS tests pass.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add a focused clipboard regression around an injected pasteboard and current in-memory diagnostics. 2. Add privacy-safe JSON text export independent of delayed file persistence. 3. Replace the ambiguous share-sheet Copy route with an explicit Copy diagnostics action and visible success acknowledgement while retaining file export. 4. Run the focused iOS regression and relevant diagnostics tests, then commit, push, review and merge.
+<!-- SECTION:PLAN:END -->
