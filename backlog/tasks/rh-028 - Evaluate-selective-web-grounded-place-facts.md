@@ -91,6 +91,8 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 PR #59 hand-off: commits b01959b and 05bdd9e were pushed to origin/codex/rh-028-web-search. PR #59 remains open and unmerged; no deployment was performed.
 
 2026-08-21 PR #59 iOS current-main integration drift: commit b0f9079 changes only ProxyFactGeneratorTests.testCancelledRideFactPreservesLastConfirmedLinkage to return {"fact":"Known for its wool trade.","sources":[]} on successful calls. Host CoreSimulator was available with iPhone 17 / iOS 26.3 after the sandboxed probe was inconclusive. Exact verification: xcodebuild test ... -only-testing:RideHorizonTests/ProxyFactGeneratorTests/testCancelledRideFactPreservesLastConfirmedLinkage passed 1 test with 0 failures. The test still cancels request 2, preserves resp_confirmed and reuses it on request 3. Bounded Standards and Specification reviews of git diff 1ddb590...HEAD both returned zero findings. No merge or deployment was performed.
+
+2026-08-21 PR #59 iOS drift hand-off: commits b0f9079 and 8b30de4 were pushed to origin/codex/rh-028-web-search. PR #59 remains open and unmerged; no deployment was performed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
