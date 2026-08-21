@@ -1087,6 +1087,7 @@ private struct SettingsView: View {
     @State private var lastNonQuietMode: ContentMode = .shortFacts
     @State private var showPrivacyNotice = false
     @State private var showClearLocalDataConfirmation = false
+    @State private var diagnosticsCopyStatus: String?
     @AppStorage("RideHorizonMapLabelScale") private var mapLabelScale = 1.0
     @AppStorage("RideHorizonNightMode") private var nightMode = false
 #if DEBUG
@@ -1443,6 +1444,23 @@ private struct SettingsView: View {
                                     .foregroundStyle(palette.secondaryText)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        Button {
+                            diagnosticsCopyStatus = RideDiagnosticsClipboard.copy(from: rideDiagnostics)
+                                ? "Diagnostics copied."
+                                : "No diagnostics available to copy."
+                        } label: {
+                            Label("Copy diagnostics", systemImage: "doc.on.doc")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(rideDiagnostics.entries.isEmpty)
+
+                        if let diagnosticsCopyStatus {
+                            Text(diagnosticsCopyStatus)
+                                .font(.callout.weight(.semibold))
+                                .foregroundStyle(palette.secondaryText)
                         }
 
                         ShareLink(item: rideDiagnostics.exportURL) {

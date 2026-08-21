@@ -4,6 +4,11 @@ import AVFoundation
 @testable import RideHorizon
 
 @MainActor
+private final class RecordingDiagnosticsPasteboard: DiagnosticsPasteboardWriting {
+    var string: String?
+}
+
+@MainActor
 private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
     struct Request: Equatable {
         let announcementID: UUID
@@ -1963,6 +1968,31 @@ final class LocationManagerTests: XCTestCase {
 
         restored.clear()
         XCTAssertTrue(restored.entries.isEmpty)
+    }
+
+    @MainActor
+    func testCopyDiagnosticsUsesCurrentEntriesBeforeDelayedPersistence() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = RideDiagnosticsStore(
+            directoryURL: directory,
+            persistenceDelay: 60
+        )
+        let pasteboard = RecordingDiagnosticsPasteboard()
+
+        store.record(.rideEnded)
+
+        XCTAssertTrue(RideDiagnosticsClipboard.copy(from: store, to: pasteboard))
+        let copied = try XCTUnwrap(pasteboard.string)
+        let payload = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(copied.utf8)) as? [[String: Any]]
+        )
+        XCTAssertEqual(payload.count, 1)
+        XCTAssertEqual(payload.first?["event"] as? String, RideDiagnosticEvent.rideEnded.rawValue)
+        XCTAssertFalse(copied.contains("latitude"))
+        XCTAssertFalse(copied.contains("longitude"))
+        XCTAssertFalse(copied.contains("announcementText"))
+        XCTAssertFalse(copied.contains("credential"))
     }
 
     @MainActor

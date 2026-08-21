@@ -1,5 +1,25 @@
 import Foundation
 import Network
+import UIKit
+
+@MainActor
+protocol DiagnosticsPasteboardWriting: AnyObject {
+    var string: String? { get set }
+}
+
+extension UIPasteboard: DiagnosticsPasteboardWriting {}
+
+@MainActor
+enum RideDiagnosticsClipboard {
+    static func copy(
+        from store: RideDiagnosticsStore,
+        to pasteboard: DiagnosticsPasteboardWriting = UIPasteboard.general
+    ) -> Bool {
+        guard let text = store.currentExportText else { return false }
+        pasteboard.string = text
+        return true
+    }
+}
 
 enum RideDiagnosticEvent: String, Codable, Equatable {
     case appEnteredForeground
@@ -488,6 +508,14 @@ final class RideDiagnosticsStore: ObservableObject {
         persistenceQueue.sync {
             Self.persist([], to: url)
         }
+    }
+
+    var currentExportText: String? {
+        guard !entries.isEmpty,
+              let data = try? Self.makeEncoder().encode(entries) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
     }
 
 #if DEBUG
