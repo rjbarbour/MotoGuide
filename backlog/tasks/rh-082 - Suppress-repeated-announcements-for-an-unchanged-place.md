@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:46'
-updated_date: '2026-08-21 12:27'
+updated_date: '2026-08-21 12:28'
 labels:
   - core
   - announcement
@@ -13,6 +13,8 @@ labels:
   - road-test
 milestone: m-1
 dependencies: []
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/58'
 priority: high
 type: bug
 ordinal: 218000
@@ -46,4 +48,6 @@ Captured from the 2026-08-21 road test. Intended branch: codex/rh-082-suppress-u
 2026-08-21 diagnosis: the normal AnnouncementPolicy already rejects unchanged addresses. Static path analysis found one bypass: Speak after every location lookup forces speech for unchanged addresses and is currently honoured during live rides. The field setting itself is not proven from captured road diagnostics, but this is the only code path that produces the reported unchanged-place behaviour.
 
 2026-08-21 red/green evidence: the live-ride test failed with repeated Stroud and Stonehouse announcements before the fix; the Test Mode repeat test passed. After gating the noisy override to Test Mode, both focused tests passed. The complete RideHorizonTests suite passed 240 tests with 0 failures. Robert's iPhone was not listed by xcodebuild, so physical build/install and unchanged-place road validation remain pending.
+
+Draft PR #58 opened on 2026-08-21. Keep draft until physical unchanged-place road evidence is captured on the supported iPhone.
 <!-- SECTION:NOTES:END -->
