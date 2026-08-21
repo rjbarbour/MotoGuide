@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 11:37'
+updated_date: '2026-08-21 11:46'
 labels:
   - proxy
   - model
@@ -30,7 +30,7 @@ ordinal: 37000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Offer OpenAI hosted web search as a model-controlled tool for ride-safe place-fact generation on top of RH-063, while preserving application-owned ride linkage and compaction, output limits, response validation, sanitisation and privacy boundaries.
 
-Scope: proxy Responses request construction; completed final-answer selection; bounded url_citation extraction; structured fact-source contract; source propagation through generation, cache and existing Log display; clickable visual attribution that never enters announcement text or TTS; bounded failure/cost diagnostics and fallback classification; focused changed proxy and Swift simulator tests; and necessary OpenAPI, implementation-contract and privacy wording.
+Scope: proxy Responses request construction; completed final-answer selection; canonical bounded url_citation extraction and deduplication; structured fail-closed fact-source contract; source propagation through generation, cache and existing Log display; clickable visual attribution that never enters announcement text or TTS; bounded failure/cost diagnostics and fallback classification; focused changed proxy and Swift simulator tests; and necessary OpenAPI, implementation-contract and privacy wording.
 
 Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken citation text, no general Log redesign, no deployment, merge or device build.
 <!-- SECTION:DESCRIPTION:END -->
@@ -38,24 +38,27 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Responses request exposes model-controlled hosted web_search.
-- [x] #2 Searched and unsearched outputs satisfy the existing ride-safe text and privacy contract.
+- [ ] #2 Searched and unsearched outputs satisfy the existing ride-safe text and privacy contract.
 - [x] #3 Timeout, provider failure and tool-cost diagnostics and fallback remain bounded and tested.
-- [x] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
-- [x] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
+- [ ] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
+- [ ] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
 - [x] #6 When message phase is present, only a completed final_answer message is accepted; a completed phase-less message remains compatible, while commentary and incomplete message paths are rejected.
 - [x] #7 openai_result and its diagnostics-only fields are documented as bounded and privacy-safe, excluding search queries, results, sources, place text and rider text.
+- [ ] #8 Citation URLs are canonicalised before validation; HTTPS is checked case-insensitively on the canonical URI, the final ASCII URL is at most 2048 characters, and deduplication uses that canonical URL so Unicode expansion cannot break iOS attribution.
+- [ ] #9 The iOS fact response requires a sources field and fails closed when it is missing or any provided source is malformed; an uncited response is valid only with an explicit empty sources array.
+- [ ] #10 Every success example in FACT_PROXY_CONTRACT.md includes the required sources field, either empty or populated with bounded cited sources.
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Preserve the RH-063 implementation base; do not import later dependency-only test/ledger commits that do not change the production contract.
-2. Add focused proxy tests for bounded url_citation parsing, structured sources, source sanitisation/deduplication, completed final_answer selection, phase-less compatibility, and commentary/incomplete rejection.
-3. Extend the proxy result and app-proxy JSON/OpenAPI contract with bounded fact sources while leaving announcement text unchanged.
-4. Add focused Swift tests, then carry sources through ProxyFactGenerator, PlaceFactGenerating and any cache/display path that can reach the existing Log.
-5. Render clearly visible clickable source links only in the existing Log detail; keep titles/URLs out of announcement text and TTS inputs.
-6. Document openai_result privacy-safe fields and update the minimum necessary proxy, contract and privacy wording using official OpenAI citation and phase guidance.
-7. Run only focused changed proxy tests and focused Swift simulator tests selected for the changed files; use the review skill, resolve all findings, commit and push RH-028, and leave the worktree clean without merge, deployment or device build.
+1. Preserve all completed RH-028 behaviour and RH-063 linkage/compaction boundaries.
+2. Add focused Java regressions proving URL canonicalisation precedes case-insensitive HTTPS validation, final ASCII length enforcement and canonical deduplication, including Unicode expansion beyond 2048.
+3. Add focused Swift regressions for missing sources, malformed provided sources, explicit empty sources and canonical cited sources.
+4. Implement proxy canonicalisation/bounding and make FactProxyResponse.sources required with all-or-nothing source validation on iOS.
+5. Correct every stale FACT_PROXY_CONTRACT.md success response example and keep OpenAPI wording synchronised if necessary.
+6. Run only the focused changed proxy tests and focused Swift simulator suites, then perform the bounded two-axis review.
+7. Record evidence, commit and push RH-028, clean generated output, and leave the worktree clean without merge or deployment.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -76,10 +79,6 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 two-axis review of git diff 677a41d...HEAD initially found stale human-contract response/event sections, an over-broad source-title overlap rejection and missing direct Log-link destination evidence. Commits 8e97c3e and 9f3e82a resolve them. Follow-up Standards and Specification reviews both returned zero remaining findings. RH-063 linkage/compaction, max_output_tokens:4096 and the no-recent-place-list boundary remain unchanged.
 
 2026-08-21 final branch hand-off: commits 8e97c3e, 9f3e82a and d7a8a26 were pushed to origin/codex/rh-028-web-search. No pull request, merge, deployment, device build or device install was performed. Status remains In Progress because canonical integration is intentionally outstanding.
+
+2026-08-21 final findings reopened AC #2, #4 and #5. F-01 requires canonical ASCII URL validation/deduplication before the 2048 limit; F-02 requires iOS sources to be present and strictly all-or-nothing valid, with [] as the only uncited representation; F-03 identifies a remaining stale success example in the human contract. No product, model, ride-state or spoken-output scope changes are authorised.
 <!-- SECTION:NOTES:END -->
-
-## Final Summary
-
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Resolved every independent RH-028 finding. Web-derived facts now carry up to five bounded HTTPS citation sources through the app-proxy and announcement pipeline to visible clickable RideHorizon Log links; sourced facts are not persistently cached, and citation metadata never enters announcement text or TTS. The proxy accepts only a completed final_answer when phase is present, retains completed phase-less compatibility, rejects commentary/incomplete paths, and documents privacy-safe openai_result fields. OpenAPI 0.4.0, app/public privacy text and shared fixtures are synchronised. Final focused evidence: 51 proxy tests and 145 Swift simulator tests passed with zero failures; two-axis follow-up review found zero remaining findings. Branch remains In Progress and unmerged pending integration.
-<!-- SECTION:FINAL_SUMMARY:END -->

@@ -103,7 +103,7 @@ x-upstream-openai-candidate:
       maxCallsPerResponse: 1
   acceptedResponseStatus: completed
   acceptedOutput: A completed final_answer message when phase is present, or a completed phase-less compatibility message. Commentary, incomplete messages, reasoning and web_search_call items are not rider text.
-  factSources: Up to 5 unique HTTPS url_citation annotations from the accepted final message, returned separately from fact text.
+  factSources: Up to 5 unique HTTPS url_citation annotations from the accepted final message. URLs are canonicalised to ASCII before final length validation and deduplication, then returned separately from fact text.
   deploymentStatus: Not yet deployed. Merging to main intentionally deploys the private-beta candidate; evaluation follows deployment.
 x-observability:
   responseHeaders:
@@ -795,6 +795,7 @@ components:
           minLength: 9
           maxLength: 2048
           pattern: "^https://"
+          description: Canonical ASCII HTTPS URL. Canonicalisation precedes final length validation and deduplication.
       description: Bounded OpenAI url_citation attribution displayed as a clickable link in the RideHorizon Log.
     DiagnosticsRequest:
       type: object

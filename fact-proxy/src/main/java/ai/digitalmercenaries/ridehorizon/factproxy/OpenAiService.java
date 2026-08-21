@@ -388,21 +388,45 @@ public class OpenAiService {
             return null;
         }
         String url = rawUrl.trim();
-        if (url.isEmpty() || url.length() > MAX_SOURCE_URL_LENGTH) {
+        if (url.isEmpty()) {
             return null;
         }
         try {
-            URI uri = URI.create(url);
-            if (!"https".equalsIgnoreCase(uri.getScheme())
-                    || uri.getHost() == null
-                    || uri.getHost().isBlank()
-                    || uri.getUserInfo() != null) {
+            URI canonicalInput = URI.create(url).normalize();
+            URI asciiUri = URI.create(canonicalInput.toASCIIString()).normalize();
+            if (!"https".equalsIgnoreCase(asciiUri.getScheme())
+                    || asciiUri.getHost() == null
+                    || asciiUri.getHost().isBlank()
+                    || asciiUri.getUserInfo() != null) {
                 return null;
             }
-            return uri.toASCIIString();
+            String canonicalUrl = canonicalSourceUrl(asciiUri);
+            return canonicalUrl.length() <= MAX_SOURCE_URL_LENGTH ? canonicalUrl : null;
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    private static String canonicalSourceUrl(URI uri) {
+        String host = uri.getHost().toLowerCase(java.util.Locale.ROOT);
+        if (host.contains(":")) {
+            host = "[" + host + "]";
+        }
+        int port = uri.getPort() == 443 ? -1 : uri.getPort();
+        StringBuilder canonical = new StringBuilder("https://").append(host);
+        if (port >= 0) {
+            canonical.append(':').append(port);
+        }
+        if (uri.getRawPath() != null) {
+            canonical.append(uri.getRawPath());
+        }
+        if (uri.getRawQuery() != null) {
+            canonical.append('?').append(uri.getRawQuery());
+        }
+        if (uri.getRawFragment() != null) {
+            canonical.append('#').append(uri.getRawFragment());
+        }
+        return canonical.toString();
     }
 
     private static boolean containsCitationUrl(String text) {

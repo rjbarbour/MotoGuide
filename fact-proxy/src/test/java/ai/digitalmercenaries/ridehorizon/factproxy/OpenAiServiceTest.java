@@ -11,6 +11,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -464,6 +465,93 @@ class OpenAiServiceTest {
             assertEquals(new FactSource("One Source", "https://one.example/a"), generated.sources().get(0));
             assertEquals("https://five.example/a", generated.sources().get(4).url());
             assertFalse(generated.sources().stream().anyMatch(source -> source.url().startsWith("http://")));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void citationUrlCanonicalisationPrecedesHttpsValidationAndDeduplication() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> sendResponse(exchange, 200, """
+                {
+                  "id": "resp_canonical_citations",
+                  "status": "completed",
+                  "output": [
+                    {"type": "web_search_call", "id": "ws_1", "status": "completed"},
+                    {
+                      "type": "message",
+                      "status": "completed",
+                      "phase": "final_answer",
+                      "content": [{
+                        "type": "output_text",
+                        "text": "A canonically cited fact.",
+                        "annotations": [
+                          {"type":"url_citation","url":"HTTPS://EXAMPLE.com:443/a/../history","title":"First"},
+                          {"type":"url_citation","url":"https://example.com/history","title":"Duplicate canonical URL"}
+                        ]
+                      }]
+                    }
+                  ]
+                }
+                """));
+        server.start();
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+
+            OpenAiService.GeneratedFact generated = service.generateFactWithMetadata(shortFactRequest());
+
+            assertEquals(List.of(new FactSource("First", "https://example.com/history")), generated.sources());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void unicodeExpansionBeyondFinalAsciiUrlLimitIsRejected() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        String rawUrl = "https://example.com/" + "é".repeat(400);
+        assertTrue(rawUrl.length() < 2_048);
+        assertTrue(URI.create(rawUrl).toASCIIString().length() > 2_048);
+        String responseBody = """
+                {
+                  "id": "resp_expanded_citation",
+                  "status": "completed",
+                  "output": [
+                    {"type": "web_search_call", "id": "ws_1", "status": "completed"},
+                    {
+                      "type": "message",
+                      "status": "completed",
+                      "phase": "final_answer",
+                      "content": [{
+                        "type": "output_text",
+                        "text": "A fact whose only citation expands beyond the URL limit.",
+                        "annotations": [{
+                          "type": "url_citation",
+                          "url": "%s",
+                          "title": "Expanded URL"
+                        }]
+                      }]
+                    }
+                  ]
+                }
+                """.formatted(rawUrl);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> sendResponse(exchange, 200, responseBody));
+        server.start();
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+
+            UpstreamException error = assertThrows(
+                    UpstreamException.class,
+                    () -> service.generateFact(shortFactRequest())
+            );
+
+            assertEquals(UpstreamException.Category.OUTPUT, error.category());
+            assertEquals("OpenAI web search response lacked usable citations", error.getMessage());
         } finally {
             server.stop(0);
         }

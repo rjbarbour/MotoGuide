@@ -39,9 +39,11 @@ forcing its use. OpenAI's model may make zero or one search call; the proxy sets
 `max_tool_calls: 1` to bound the dominant per-fact tool cost. A derived search
 query may contain the minimised place and rider-preference context already sent
 to OpenAI. The proxy extracts at most five unique HTTPS `url_citation`
-annotations from the accepted final answer and returns their bounded titles and
-URLs separately from fact text. It does not log search queries, results,
-sources, place text or rider text.
+annotations from the accepted final answer. It canonicalises each URL to ASCII,
+checks HTTPS case-insensitively on that canonical URI, enforces the final 2048-
+character limit and deduplicates the canonical URL before returning bounded
+titles and URLs separately from fact text. It does not log search queries,
+results, sources, place text or rider text.
 
 Responses may contain reasoning and hosted-tool output items before the final
 message. When any assistant message has `phase`, the proxy accepts only a
@@ -463,7 +465,7 @@ Fields:
 | Field | Required | Type | Meaning |
 |-------|----------|------|---------|
 | `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 1100 characters. `longFacts` is capped at 1500 characters. |
-| `sources` | Yes | Array | Zero to five unique HTTPS `url_citation` sources. Each has a title of at most 160 characters and URL of at most 2048 characters. Sources are clickable Log metadata only and never announcement or TTS text. |
+| `sources` | Yes | Array | Zero to five unique HTTPS `url_citation` sources. Each has a title of at most 160 characters and canonical ASCII URL of at most 2048 characters. Sources are clickable Log metadata only and never announcement or TTS text. |
 
 ## Error Responses
 
@@ -595,7 +597,8 @@ Expected result:
 
 ```json
 {
-  "fact": "One bounded factual sentence."
+  "fact": "One bounded factual sentence.",
+  "sources": []
 }
 ```
 

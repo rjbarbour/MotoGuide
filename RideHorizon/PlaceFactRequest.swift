@@ -245,10 +245,13 @@ struct PlaceFactSource: Codable, Equatable, Identifiable, Sendable {
         let title = rawTitle
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
-        guard !title.isEmpty,
-              title.count <= maximumTitleLength,
-              rawURL.count <= maximumURLLength,
-              let url = URL(string: rawURL),
+        guard !title.isEmpty, title.count <= maximumTitleLength else {
+            return nil
+        }
+        let canonicalURL = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canonicalURL == rawURL,
+              let url = URL(string: canonicalURL),
+              url.absoluteString.utf8.count <= maximumURLLength,
               url.scheme?.lowercased() == "https",
               url.host?.isEmpty == false,
               url.user == nil,

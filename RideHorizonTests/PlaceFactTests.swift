@@ -392,7 +392,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+            return (response, Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
@@ -430,7 +430,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                     httpVersion: nil,
                     headerFields: [FactProxyContract.responseIdHeader: "resp_\(requestCount)"]
                 )!,
-                Data(#"{"fact":"Known for its wool trade."}"#.utf8)
+                Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8)
             )
         }
         let generator = ProxyFactGenerator(
@@ -498,7 +498,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                         : nil
                 )!,
                 statusCode == 200
-                    ? Data(#"{"fact":"Known for its wool trade."}"#.utf8)
+                    ? Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8)
                     : Data(#"{"error":"failed"}"#.utf8)
             )
         }
@@ -547,7 +547,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+            return (response, Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
@@ -595,7 +595,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data(#"{"fact":"A longer but still bounded place blurb."}"#.utf8))
+            return (response, Data(#"{"fact":"A longer but still bounded place blurb.","sources":[]}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
@@ -653,7 +653,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data(#"{"fact":"Great spot for a ride."}"#.utf8))
+            return (response, Data(#"{"fact":"Great spot for a ride.","sources":[]}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
@@ -679,7 +679,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+            return (response, Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
@@ -704,7 +704,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+            return (response, Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
@@ -741,7 +741,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                     httpVersion: nil,
                     headerFields: nil
                 )!
-                return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+                return (response, Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8))
             }
         }
 
@@ -1179,7 +1179,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data(#"{"fact":"Known for its wool trade."}"#.utf8))
+            return (response, Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8))
         }
 
         let generator = ProxyFactGenerator(
@@ -1255,6 +1255,116 @@ final class ProxyFactGeneratorTests: XCTestCase {
             ]
         )
         XCTAssertFalse(fact.text.contains("https://"))
+    }
+
+    func testFactResponseRejectsMissingSourcesField() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: self.endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"fact":"Missing sources."}"#.utf8))
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        do {
+            _ = try await generator.generatedFact(
+                for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+            )
+            XCTFail("Expected a missing sources field to fail closed.")
+        } catch let error as PlaceFactError {
+            XCTAssertEqual(error, .invalidResponse)
+        }
+    }
+
+    func testFactResponseRejectsMalformedProvidedSource() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: self.endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (
+                response,
+                Data(#"{"fact":"Malformed source.","sources":[{"title":"","url":"http://example.com"}]}"#.utf8)
+            )
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        do {
+            _ = try await generator.generatedFact(
+                for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+            )
+            XCTFail("Expected a malformed provided source to fail closed.")
+        } catch let error as PlaceFactError {
+            XCTAssertEqual(error, .invalidResponse)
+        }
+    }
+
+    func testFactResponseAcceptsExplicitEmptySources() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: self.endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"fact":"Explicitly uncited.","sources":[]}"#.utf8))
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        let fact = try await generator.generatedFact(
+            for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+        )
+
+        XCTAssertEqual(fact, GeneratedPlaceFact(text: "Explicitly uncited."))
+    }
+
+    func testFactResponseRejectsSourceWhoseCanonicalUrlExpandsPastLimit() async throws {
+        let rawURL = "https://example.com/" + String(repeating: "é", count: 400)
+        XCTAssertLessThan(rawURL.count, PlaceFactSource.maximumURLLength)
+        let responseBody = try JSONSerialization.data(withJSONObject: [
+            "fact": "Expanded citation.",
+            "sources": [["title": "Expanded URL", "url": rawURL]]
+        ])
+        MockURLProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: self.endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, responseBody)
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        do {
+            _ = try await generator.generatedFact(
+                for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+            )
+            XCTFail("Expected canonical URL expansion beyond the limit to fail closed.")
+        } catch let error as PlaceFactError {
+            XCTAssertEqual(error, .invalidResponse)
+        }
     }
 
     func testSharedSpeechErrorFixtureMatchesIOSDecoder() async {

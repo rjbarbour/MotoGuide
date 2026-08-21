@@ -469,7 +469,7 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
             decoded = try JSONDecoder().decode(FactProxyResponse.self, from: data)
         } catch {
             ProxyDiagnostics.log("Proxy", "Decode error: \(error.localizedDescription)")
-            throw error
+            throw PlaceFactError.invalidResponse
         }
 
         guard let sanitized = FactPhraseBuilder.sanitize(decoded.fact, mode: request.factMode) else {
@@ -477,15 +477,17 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
             throw PlaceFactError.invalidResponse
         }
         var seenSourceURLs = Set<String>()
-        let sources = (decoded.sources ?? [])
-            .prefix(PlaceFactSource.maximumCount)
-            .compactMap { rawSource -> PlaceFactSource? in
-                guard let source = PlaceFactSource.validated(title: rawSource.title, url: rawSource.url),
-                      seenSourceURLs.insert(source.url.absoluteString).inserted else {
-                    return nil
-                }
-                return source
+        guard decoded.sources.count <= PlaceFactSource.maximumCount else {
+            throw PlaceFactError.invalidResponse
+        }
+        var sources: [PlaceFactSource] = []
+        for rawSource in decoded.sources {
+            guard let source = PlaceFactSource.validated(title: rawSource.title, url: rawSource.url),
+                  seenSourceURLs.insert(source.url.absoluteString).inserted else {
+                throw PlaceFactError.invalidResponse
             }
+            sources.append(source)
+        }
         ProxyDiagnostics.log("Proxy", "Fact accepted: \(sanitized)")
         let responseID = request.rideSessionID == nil
             ? nil
@@ -858,7 +860,7 @@ private struct FactProxyRequest: Encodable {
 
 private struct FactProxyResponse: Decodable {
     let fact: String
-    let sources: [Source]?
+    let sources: [Source]
 
     struct Source: Decodable {
         let title: String
