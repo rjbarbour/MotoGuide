@@ -44,7 +44,9 @@ class PrivateBetaFallbackQuotaHttpTest {
 
         JsonNode payload = objectMapper.readTree(sessionResponse);
         String sessionToken = payload.path("sessionToken").asText();
-        when(openAiService.generateFact(any())).thenReturn("Known for its wool trade.");
+        when(openAiService.generateFactWithMetadata(any())).thenReturn(
+                new OpenAiService.GeneratedFact("Known for its wool trade.", java.util.List.of(), null)
+        );
 
         for (int requestNumber = 1; requestNumber <= 21; requestNumber++) {
             mockMvc.perform(post("/v1/fact")
