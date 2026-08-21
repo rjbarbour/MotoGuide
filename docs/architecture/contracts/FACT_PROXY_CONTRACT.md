@@ -21,6 +21,19 @@ The proxy validates the request, chooses the server-side prompt for `shortFacts`
 
 The iOS app must not send prompt text, arbitrary model messages, OpenAI configuration, raw coordinates, or an OpenAI API key.
 
+For an active ride, the app owns one bounded Responses API chain. It sends the
+app-owned ride UUID and latest successful `previous_response_id` as bounded
+headers, then replaces its local link with the response ID returned by the
+proxy. The proxy keeps no process-local conversation state. End ride and
+terminal fact failures discard the app link, and active-ride requests bypass
+the persisted cross-ride fact cache so every delivered fact advances the
+current chain.
+
+The proxy uses `store=true` for this linkage. OpenAI currently documents that
+Responses API application state is retained for at least 30 days in this
+configuration. End ride stops further linkage but does not remotely delete
+provider application state.
+
 ## Implementations
 
 - iOS client: `RideHorizon/ProxyFactGenerator.swift`

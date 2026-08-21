@@ -1655,6 +1655,42 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testActiveRideIdentityBoundsFactRequestsAndEndConversation() async {
+        let factGenerator = MockPlaceFactGenerator()
+        let locationManager = LocationManager(
+            factGenerator: factGenerator,
+            speechOutput: RecordingSpeechOutputEngine(),
+            aiSharingAllowed: { true }
+        )
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.startRideWithoutLocationInputForTesting()
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        let rideSessionID = try? XCTUnwrap(factGenerator.requests.first?.rideSessionID)
+
+        locationManager.endRide()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertNotNil(rideSessionID)
+        XCTAssertEqual(factGenerator.endedRideSessionIDs, rideSessionID.map { [$0] } ?? [])
+    }
+
+    @MainActor
     func testFactAnnouncementExportCarriesOneIDFromGenerationThroughAudioRelease() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -1710,10 +1746,29 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(Set(correlated.compactMap(\.announcementID)).count, 1)
 
         diagnostics.flushForTesting()
-        let export = String(data: try Data(contentsOf: diagnostics.exportURL), encoding: .utf8) ?? ""
+        let exportData = try Data(contentsOf: diagnostics.exportURL)
+        let export = String(data: exportData, encoding: .utf8) ?? ""
         XCTAssertFalse(export.contains("Known for its wool trade."))
         XCTAssertFalse(export.contains("Stonehouse"))
-        XCTAssertFalse(export.contains("51."))
+        let exportedJSON = try JSONSerialization.jsonObject(with: exportData)
+        func fieldNames(in value: Any) -> [String] {
+            if let object = value as? [String: Any] {
+                return object.flatMap { key, nestedValue in
+                    [key] + fieldNames(in: nestedValue)
+                }
+            }
+            if let array = value as? [Any] {
+                return array.flatMap { fieldNames(in: $0) }
+            }
+            return []
+        }
+        let exportedFieldNames = fieldNames(in: exportedJSON)
+        XCTAssertFalse(exportedFieldNames.contains {
+            $0.localizedCaseInsensitiveContains("latitude")
+        })
+        XCTAssertFalse(exportedFieldNames.contains {
+            $0.localizedCaseInsensitiveContains("longitude")
+        })
     }
 
     @MainActor

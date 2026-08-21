@@ -10,6 +10,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -84,6 +85,53 @@ class FactControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().exists(RequestInstrumentationFilter.REQUEST_ID_HEADER))
                 .andExpect(jsonPath("$.fact").value("Known for its wool trade."));
+    }
+
+    @Test
+    void rideHeadersCarryAppOwnedLinkageThroughTheStatelessProxy() throws Exception {
+        String rideId = "00000000-0000-0000-0000-000000000063";
+        when(openAiService.generateFactWithLinkage(any(), eq("resp_previous"))).thenReturn(
+                new OpenAiService.GeneratedFact("Known for its wool trade.", "resp_current")
+        );
+
+        mockMvc.perform(post("/v1/fact")
+                        .header("Authorization", "Bearer test-token")
+                        .header("X-RideHorizon-Ride-Id", rideId)
+                        .header("X-RideHorizon-Previous-Response-Id", "resp_previous")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-RideHorizon-Response-Id", "resp_current"))
+                .andExpect(jsonPath("$.fact").value("Known for its wool trade."));
+
+        verify(openAiService).generateFactWithLinkage(any(), eq("resp_previous"));
+    }
+
+    @Test
+    void previousResponseIdRequiresAnActiveRideId() throws Exception {
+        mockMvc.perform(post("/v1/fact")
+                        .header("Authorization", "Bearer test-token")
+                        .header("X-RideHorizon-Previous-Response-Id", "resp_previous")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("ride id is required with previous response id"));
+
+        verify(openAiService, never()).generateFactWithLinkage(any(), any());
+    }
+
+    @Test
+    void previousResponseIdRejectsUnsafeHeaderCharacters() throws Exception {
+        mockMvc.perform(post("/v1/fact")
+                        .header("Authorization", "Bearer test-token")
+                        .header("X-RideHorizon-Ride-Id", "00000000-0000-0000-0000-000000000063")
+                        .header("X-RideHorizon-Previous-Response-Id", "resp_previous/value")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("previous response id is invalid"));
+
+        verify(openAiService, never()).generateFactWithLinkage(any(), any());
     }
 
     @Test

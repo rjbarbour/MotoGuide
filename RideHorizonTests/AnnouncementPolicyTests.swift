@@ -222,6 +222,21 @@ final class AnnouncementPolicyTests: XCTestCase {
         XCTAssertEqual(request.placeHierarchy.region, "England")
         XCTAssertEqual(request.placeHierarchy.country, "United Kingdom")
     }
+
+    func testFactRequestCarriesRideIdentityOutsideTheCacheKey() {
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000063")!
+        let countyPlan = AnnouncementPlan(text: "Welcome to Gloucestershire", boundary: .county)
+
+        let withRide = AnnouncementPolicy.factRequest(
+            for: countyPlan,
+            address: gloucester,
+            rideSessionID: rideSessionID
+        )
+        let withoutRide = AnnouncementPolicy.factRequest(for: countyPlan, address: gloucester)
+
+        XCTAssertEqual(withRide.rideSessionID, rideSessionID)
+        XCTAssertEqual(withRide.cacheKey, withoutRide.cacheKey)
+    }
 }
 
 final class AnnouncementQueueTests: XCTestCase {
@@ -383,6 +398,16 @@ final class AnnouncementCoordinatorTests: XCTestCase {
         XCTAssertTrue(diagnostics.signals.contains {
             $0.event == .factGenerationFinished && $0.reason == .factAvailable
         })
+    }
+
+    func testEndRideConversationIsForwardedToTheOwnedFactClient() async {
+        let factClient = StubFactClient(result: nil)
+        let coordinator = makeCoordinator(factClient: factClient)
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000063")!
+
+        await coordinator.endRideConversation(rideSessionID)
+
+        XCTAssertEqual(factClient.endedRideSessionIDs, [rideSessionID])
     }
 
     func testSpeechSelectionAudioOwnershipAndCompletionAreCoordinatorResults() {
@@ -764,7 +789,8 @@ final class AnnouncementCoordinatorTests: XCTestCase {
             ),
             boundaryCooldown: cooldown,
             now: now,
-            placeLookupID: nil
+            placeLookupID: nil,
+            rideSessionID: nil
         )
     }
 
@@ -1108,6 +1134,7 @@ private final class RecordingAnnouncementScheduler: AnnouncementScheduling {
 private final class StubFactClient: FactClient {
     private let result: String?
     private(set) var requests: [PlaceFactRequest] = []
+    private(set) var endedRideSessionIDs: [UUID] = []
 
     init(result: String?) {
         self.result = result
@@ -1117,6 +1144,10 @@ private final class StubFactClient: FactClient {
         requests.append(request)
         if let result { return result }
         throw PlaceFactError.invalidResponse
+    }
+
+    func endRideConversation(_ rideSessionID: UUID) async {
+        endedRideSessionIDs.append(rideSessionID)
     }
 }
 

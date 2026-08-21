@@ -189,6 +189,7 @@ struct PlaceFactRequest: Equatable {
     let countryContext: String?
     let placeHierarchy: PlaceHierarchy
     let riderContext: RiderContext
+    let rideSessionID: UUID?
 
     var cacheKey: String {
         [
@@ -217,7 +218,8 @@ struct PlaceFactRequest: Equatable {
         factMode: FactMode = .shortFacts,
         countryContext: String?,
         placeHierarchy: PlaceHierarchy = .empty,
-        riderContext: RiderContext = .empty
+        riderContext: RiderContext = .empty,
+        rideSessionID: UUID? = nil
     ) {
         self.boundary = boundary
         self.placeName = placeName
@@ -225,6 +227,7 @@ struct PlaceFactRequest: Equatable {
         self.countryContext = countryContext
         self.placeHierarchy = placeHierarchy
         self.riderContext = riderContext
+        self.rideSessionID = rideSessionID
     }
 }
 
@@ -275,6 +278,11 @@ enum PlaceNameNormalizer {
 
 protocol FactClient {
     func fact(for request: PlaceFactRequest) async throws -> String
+    func endRideConversation(_ rideSessionID: UUID) async
+}
+
+extension FactClient {
+    func endRideConversation(_ rideSessionID: UUID) async {}
 }
 
 protocol PlaceFactGenerating: FactClient {}

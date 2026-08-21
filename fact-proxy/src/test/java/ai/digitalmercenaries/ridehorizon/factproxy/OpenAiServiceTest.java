@@ -11,6 +11,9 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,6 +22,137 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OpenAiServiceTest {
+
+    @Test
+    void appCarriedPreviousResponseIdContinuesAcrossStatelessProxyCalls() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<String> requestBodies = new CopyOnWriteArrayList<>();
+        AtomicInteger requestNumber = new AtomicInteger();
+        HttpServer server = responseServer(requestBodies, requestNumber, exchange ->
+                sendResponse(exchange, 200, responseBody("resp_" + requestNumber.get(), "Known for its wool trade."))
+        );
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+            OpenAiService.GeneratedFact firstFact = service.generateFactWithLinkage(shortFactRequest(), null);
+            OpenAiService restartedProxy = serviceWithDependencies(objectMapper, endpoint(server), null);
+            OpenAiService.GeneratedFact secondFact = restartedProxy.generateFactWithLinkage(
+                    shortFactRequest(),
+                    firstFact.responseId()
+            );
+
+            JsonNode first = objectMapper.readTree(requestBodies.get(0));
+            JsonNode second = objectMapper.readTree(requestBodies.get(1));
+            assertTrue(first.path("previous_response_id").isMissingNode());
+            assertEquals("resp_1", firstFact.responseId());
+            assertEquals("resp_2", secondFact.responseId());
+            assertEquals("resp_1", second.path("previous_response_id").asText());
+            assertEquals(true, first.path("store").asBoolean());
+            assertEquals(4_096, first.path("max_output_tokens").asInt());
+            assertEquals(
+                    OpenAiService.COMPACT_THRESHOLD_TOKENS,
+                    first.path("context_management").path(0).path("compact_threshold").asInt()
+            );
+            assertEquals("compaction", first.path("context_management").path(0).path("type").asText());
+            assertTrue(second.path("instructions").asText().contains("Do not provide route guidance"));
+            assertTrue(first.path("recentPlaces").isMissingNode());
+            assertTrue(second.path("input").asText().contains("Place name: Stroud"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void structuredPreviousResponseErrorRestartsTheCurrentTurnWithoutLinkageOnce() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<String> requestBodies = new CopyOnWriteArrayList<>();
+        AtomicInteger requestNumber = new AtomicInteger();
+        HttpServer server = responseServer(requestBodies, requestNumber, exchange -> {
+            if (requestNumber.get() == 1) {
+                sendResponse(
+                        exchange,
+                        404,
+                        "{\"error\":{\"message\":\"not found\",\"param\":\"previous_response_id\",\"code\":\"not_found\"}}"
+                );
+            } else {
+                sendResponse(exchange, 200, responseBody("resp_restarted", "A bounded fact."));
+            }
+        });
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+            OpenAiService.GeneratedFact restarted = service.generateFactWithLinkage(
+                    shortFactRequest(),
+                    "resp_expired"
+            );
+
+            assertEquals("A bounded fact.", restarted.fact());
+            assertEquals("resp_restarted", restarted.responseId());
+            assertEquals(2, requestBodies.size());
+            assertEquals(
+                    "resp_expired",
+                    objectMapper.readTree(requestBodies.get(0)).path("previous_response_id").asText()
+            );
+            assertTrue(objectMapper.readTree(requestBodies.get(1)).path("previous_response_id").isMissingNode());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void unstructuredPreviousResponseTextDoesNotTriggerRecovery() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<String> requestBodies = new CopyOnWriteArrayList<>();
+        AtomicInteger requestNumber = new AtomicInteger();
+        HttpServer server = responseServer(requestBodies, requestNumber, exchange ->
+                sendResponse(
+                        exchange,
+                        404,
+                        "{\"error\":{\"message\":\"previous_response_id not found\",\"param\":\"input\"}}"
+                )
+        );
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+
+            UpstreamException error = assertThrows(
+                    UpstreamException.class,
+                    () -> service.generateFactWithLinkage(shortFactRequest(), "resp_expired")
+            );
+
+            assertEquals("OpenAI returned HTTP 404", error.getMessage());
+            assertEquals(1, requestBodies.size());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void serverErrorWithPreviousResponseParamDoesNotTriggerRecovery() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<String> requestBodies = new CopyOnWriteArrayList<>();
+        AtomicInteger requestNumber = new AtomicInteger();
+        HttpServer server = responseServer(requestBodies, requestNumber, exchange ->
+                sendResponse(
+                        exchange,
+                        500,
+                        "{\"error\":{\"message\":\"failed\",\"param\":\"previous_response_id\"}}"
+                )
+        );
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+            UpstreamException error = assertThrows(
+                    UpstreamException.class,
+                    () -> service.generateFactWithLinkage(shortFactRequest(), "resp_current")
+            );
+
+            assertEquals("OpenAI returned HTTP 500", error.getMessage());
+            assertEquals(1, requestBodies.size());
+        } finally {
+            server.stop(0);
+        }
+    }
 
     @Test
     void usesResponsesEndpointWithGpt56SolAndMediumReasoning() throws Exception {
@@ -288,6 +422,45 @@ class OpenAiServiceTest {
         ).validateAndNormalize();
     }
 
+    private static HttpServer responseServer(
+            List<String> requestBodies,
+            AtomicInteger requestNumber,
+            ExchangeHandler handler
+    ) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> {
+            requestBodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            requestNumber.incrementAndGet();
+            handler.handle(exchange);
+        });
+        server.start();
+        return server;
+    }
+
+    private static String endpoint(HttpServer server) {
+        return "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/responses";
+    }
+
+    private static String responseBody(String id, String text) {
+        return """
+                {"id":"%s","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"%s"}]}]}
+                """.formatted(id, text);
+    }
+
+    private static void sendResponse(HttpExchange exchange, int status, String body) throws IOException {
+        byte[] response = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.sendResponseHeaders(status, response.length);
+        try (OutputStream outputStream = exchange.getResponseBody()) {
+            outputStream.write(response);
+        }
+    }
+
+    @FunctionalInterface
+    private interface ExchangeHandler {
+        void handle(HttpExchange exchange) throws IOException;
+    }
+
     private static OpenAiService serviceWithDependencies(
             ObjectMapper objectMapper,
             String openAiEndpoint,
@@ -363,6 +536,7 @@ class OpenAiServiceTest {
         byte[] response = """
                 {
                   "status": "completed",
+                  "id": "resp_test",
                   "output": [
                     {"type": "reasoning", "summary": []},
                     {
