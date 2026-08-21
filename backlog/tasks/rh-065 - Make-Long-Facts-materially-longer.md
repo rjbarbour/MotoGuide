@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 11:51'
+updated_date: '2026-08-21 12:15'
 labels:
   - core
   - facts
@@ -61,10 +61,14 @@ Increase the opt-in Long Facts content depth from the current 75–90 words to a
 2026-08-21: Claimed on branch codex/rh-065-long-facts stacked at RH-028 web-search commit 5e66cfb. Dependency updated to RH-028 so the ledger matches the authorised stack. Acceptance criterion 3 remains a later physical moving/stationary listening gate; no merge, deployment or device build is authorised.
 
 2026-08-21 focused verification: 16 proxy tests passed with 0 failures across FactSanitizerTest, three targeted OpenAiServiceTest cases and OpenApiContractTest. Evidence covers the 110–130-word coherent Long Facts instruction, no trivia-list/repeated-context/padding instruction, exact five-sentence acceptance and six-sentence rejection, unchanged 35–45-word Short Facts bounds, GPT-5.6 Sol medium, model-controlled web search, per-ride previous-response linkage and compaction, and the 4,096 output ceiling. Focused iPhone 17 / iOS 26.3.1 simulator testing passed RideHorizonTests and FactPhraseBuilderTests: 9 tests, 0 failures, proving unchanged Short Facts and Names Only routing plus the compatible 1,500-character Long Facts app bound. Standards and Specification follow-up reviews found zero remaining findings. Privacy wording was unchanged because data handling did not change. No full suite, device build, device install, deployment or merge was performed. Acceptance criterion 3 remains open pending physical moving/stationary listening evidence.
+
+2026-08-21 branch hand-off: implementation commit a588981 passed the GH-PERSONAL capability check and exact-branch dry run, then pushed to origin/codex/rh-065-long-facts. Next gate: review/integration coordination followed by acceptance criterion 3 physical moving/stationary duration, intelligibility and navigation-audio interruption evidence. Status remains In Progress. No pull request, merge, deployment, device build or device install was performed.
+
+2026-08-21 dependency rebase evidence: this supersedes the earlier 5e66cfb/a588981/717b638 branch hand-off. RH-065 — Make Long Facts materially longer was rebased exactly from old base 5e66cfb onto final RH-028 — Web-search-enabled place facts commit e3a76c9, replaying only the two RH-065 commits. The sole conflict was the OpenAPI checksum; resolution preserved RH-028 canonical-ASCII HTTPS citation validation, final-length enforcement, deduplication and fail-closed source behaviour together with the RH-065 Long Facts contract, producing verified SHA-256 449b0bb0d09c83374547e47bac6e6e0fe0e165951aa9e95778dea5d136753d8c. Post-rebase focused verification passed the same 16 proxy tests and 9 iPhone 17 / iOS 26.3.1 simulator tests with zero failures. No other tests, merge, deployment, device build or device install were performed. Acceptance criterion 3 remains open.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-RH-065 — Make Long Facts materially longer now instructs only Long Facts to produce 110–130 coherent words in three to five connected sentences around one or two related anchors, explicitly excluding padding, disconnected trivia and repeated place context. The proxy enforces a five-sentence ceiling while retaining the existing 1,500-character app/proxy limit. Short Facts, Names Only, GPT-5.6 Sol medium, web search, per-ride conversation, 4,096 output ceiling, sanitisation/fallback and speech sequencing remain unchanged. Focused evidence passed 16 proxy and 9 simulator tests with zero failures; independent follow-up review found zero findings. Acceptance criterion 3 remains open for later physical moving/stationary listening evidence.
+RH-065 — Make Long Facts materially longer is rebased onto final RH-028 — Web-search-enabled place facts commit e3a76c9 with exactly the two RH-065 commits replayed. The combined contract preserves RH-028 fail-closed canonical citation/source handling and RH-065's 110–130-word coherent Long Facts target, with verified OpenAPI SHA-256 449b0bb0d09c83374547e47bac6e6e0fe0e165951aa9e95778dea5d136753d8c. Post-rebase focused evidence passed 16 proxy and 9 simulator tests with zero failures. Acceptance criterion 3 remains open for later physical moving/stationary listening evidence.
 <!-- SECTION:FINAL_SUMMARY:END -->
