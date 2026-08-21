@@ -4,16 +4,16 @@ title: Make ride fact generation sequence-aware without destroying useful cachin
 status: To Do
 assignee: []
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-19 14:28'
+updated_date: '2026-08-21 15:33'
 labels:
   - core
   - tier-1
   - sequence
-milestone: m-1
+  - superseded
 dependencies:
   - RH-013.39
   - RH-013.15
-priority: high
+priority: low
 type: feature
 ordinal: 113000
 ---
@@ -30,3 +30,9 @@ Implement bounded Tier 1 current-ride context after the reliability and Dynamic 
 - [ ] #2 The proxy receives bounded recent context and generated facts avoid materially repeating recent subjects.
 - [ ] #3 End ride clears transient sequence state, and fallback, cache and cancellation behaviour remain covered.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+On 2026-08-21, the owner rejected recent-place and recent-fact lists. The prototype was reverted. RH-063 — ongoing per-ride OpenAI conversation now owns continuity.
+<!-- SECTION:NOTES:END -->

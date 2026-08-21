@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 11:16'
+updated_date: '2026-08-21 15:35'
 labels:
   - core
   - model
@@ -61,4 +61,6 @@ Owner rejected a separate recent-place-list payload on 2026-08-21. Provider conv
 2026-08-21 CI-only test failure resolved: the full CI suite passed 235/236 and only LocationManagerTests.testFactAnnouncementExportCarriesOneIDFromGenerationThroughAudioRelease failed at former line 1601. XCTAssertFalse(export.contains("51.")) matched an ISO-8601 timestamp whose seconds value was 51, not exported coordinates. Replaced the value heuristic with recursive assertions over parsed JSON field names, rejecting any key containing latitude or longitude while preserving the exact generated-fact and Stonehouse exclusions. The single test passed twice independently, each run executing 1 test with 0 failures.
 
 2026-08-21 PR #50 P2 PRRT_kwDOMm8pys6bIQgx addressed: ProxyFactGenerator now preserves the last successfully confirmed previous_response_id when superseded or inactivity fact work is cancelled, including CancellationError and URLError.cancelled. Genuine terminal request failures still clear linkage, and explicit End ride still clears it. Added testCancelledRideFactPreservesLastConfirmedLinkage: first call confirms resp_confirmed, a later transient in-flight call is cancelled during retry backoff, and the next call proves continuation by sending resp_confirmed. Focused affected Swift evidence passed 4 tests with 0 failures: cancellation preservation, terminal failure reset, End/new-ride isolation, and prompt cancellation.
+
+2026-08-21 supersession clarification: RH-024 recent-place and recent-fact lists are rejected. Cancellation preserves only the last confirmed provider response linkage; terminal linkage failure clears it and restarts without reconstructing a recent-list payload. Cross-ride continuity remains separately bounded to the latest three completed ride summaries under RH-064.
 <!-- SECTION:NOTES:END -->
