@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 14:03'
+updated_date: '2026-08-21 14:05'
 labels:
   - proxy
   - model
@@ -100,4 +100,6 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 PR #59 thread PRRT_kwDOMm8pys6bKd8z reopened citation-place correctness. The accepted reverse-geocode request retains its coordinate, but LocationManager currently logs a delivered sourced plan through mutable lastKnownLocation/lastKnownAddress. Scope is limited to announcement-ID context capture/use/cleanup and focused Swift evidence; speech text, source semantics, provider state and navigation behaviour remain unchanged.
 
 2026-08-21 PR #59 thread PRRT_kwDOMm8pys6bKd8z resolution evidence: commit 7e1025f retains each accepted announcement's resolved coordinate/address by announcement ID and uses that immutable context for delivered Log phrase/sources. Context is removed on supersession, fact or pending cancellation, completed/cancelled/failed terminal results and End ride; interruption hand-off remains non-terminal. Deterministic focused regressions passed 3 tests with 0 failures for original-place citation logging after a newer lower-priority rejection, active-fact cancellation, supersession replacement, completion and End ride cleanup. Final focused simulator verification on iPhone 17 / iOS 26.3.1 passed LocationManagerTests 102 plus AnnouncementCoordinatorTests 26, 128 tests total with 0 failures. The first sandboxed simulator attempt failed because CoreSimulatorService was inaccessible; host CoreSimulator verification then succeeded. Follow-up Standards and Specification reviews of git diff 01ce1d2...7e1025f both returned zero findings. Speech text and source semantics are unchanged. No full iOS suite, device build, merge or deployment was performed.
+
+2026-08-21 PR #59 thread hand-off: implementation commit 7e1025f and evidence commit 2862978 were pushed to origin/codex/rh-028-web-search with the documented GH-PERSONAL profile. GitHub reports PR #59 OPEN and unmerged at head 2862978. Thread-resolution evidence is the deterministic 3-test lifecycle regression set, the final 128/128 affected-suite pass and zero-finding follow-up reviews. No merge, deployment or device build was performed.
 <!-- SECTION:NOTES:END -->
