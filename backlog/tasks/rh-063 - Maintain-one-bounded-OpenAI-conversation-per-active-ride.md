@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 10:46'
+updated_date: '2026-08-21 11:04'
 labels:
   - core
   - model
@@ -57,4 +57,6 @@ Owner rejected a separate recent-place-list payload on 2026-08-21. Provider conv
 2026-08-21 independent review findings resolved: app-owned previous_response_id linkage is serialised locally and survives proxy restarts or machine changes; the proxy retains no ride linkage and End ride performs no fallible remote cleanup; active-ride fact requests bypass and do not populate the persisted cross-ride cache; any terminal app-proxy failure discards local linkage; expired-link replay requires HTTP 400/404 plus structured error.param=previous_response_id; and OpenAPI, implementation docs and the public privacy policy disclose store=true application-state retention of at least 30 days and that End ride does not delete provider state. Final focused evidence: 81 Swift tests passed with 0 failures; OpenAiServiceTest 9, FactControllerTest 24 and OpenApiContractTest 2 passed with 0 failures (35 proxy tests total). Status remains In Progress because this ledger has no Review status and the branch is not merged.
 
 2026-08-21 rebase evidence: rebased exactly the two RH-063 commits from old RH-062 base 89b9c85 onto final RH-062 commit b0b9861f41e954a7da391cf0a0150a7fd69a97c0. Conflict resolution preserves RH-062 non-ride store=false, the 4096 max_output_tokens ceiling and rejection of any response whose status is not completed; RH-063 changes store to true and enables compaction only for app-owned ride-linked calls. Exact dependency-base checks passed: 81 focused Swift tests with 0 failures and 35 focused proxy tests with 0 failures (OpenAiServiceTest 9, FactControllerTest 24, OpenApiContractTest 2).
+
+2026-08-21 CI-only test failure resolved: the full CI suite passed 235/236 and only LocationManagerTests.testFactAnnouncementExportCarriesOneIDFromGenerationThroughAudioRelease failed at former line 1601. XCTAssertFalse(export.contains("51.")) matched an ISO-8601 timestamp whose seconds value was 51, not exported coordinates. Replaced the value heuristic with recursive assertions over parsed JSON field names, rejecting any key containing latitude or longitude while preserving the exact generated-fact and Stonehouse exclusions. The single test passed twice independently, each run executing 1 test with 0 failures.
 <!-- SECTION:NOTES:END -->
