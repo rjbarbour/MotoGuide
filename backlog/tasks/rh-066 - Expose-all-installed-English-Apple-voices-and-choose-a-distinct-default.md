@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 11:00'
+updated_date: '2026-08-21 11:14'
 labels:
   - core
   - apple-voice
@@ -45,6 +45,10 @@ Remove RideHorizon’s artificial four-voice limit, let the rider preview every 
 3. Route picker, recommendation, preview and normal Apple speech through the validated selection while preserving explicit rider choices in RideSettings.
 4. Add focused deterministic tests for filtering, de-duplication, ordering, labels, provisional-default exclusions, missing-selection fallback and persisted identifier round trips.
 5. Run only the focused simulator tests for the changed voice/settings logic, record evidence while leaving acceptance criterion 4 open for owner listening, then commit and push RH-066 with a clean worktree.
+
+6. Address review findings by capturing SpeechVoiceSelection in the speech-output test double and injecting deterministic voice options into LocationManager tests so persisted, provisional and missing-selection fallback identifiers are asserted through Preview and normal Apple speech.
+7. Make catalogue de-duplication input-order independent and replace locale-sensitive comparisons with fixed POSIX-normalised keys; add a reversed-input conflicting-duplicate regression test.
+8. Re-run only the focused voice/settings simulator tests, retain acceptance criterion 3 only on passing end-to-end evidence, record the review fix, commit once as RH-066, and push clean while criterion 4 remains open.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -52,6 +56,13 @@ Remove RideHorizon’s artificial four-voice limit, let the rider preview every 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented an uncapped deterministic catalogue for all valid installed English Apple voices, with stable British/quality/name ordering and name · locale · quality labels. Serena is the provisional high-quality automatic preference when installed; fallback excludes Eddy/Eddie from automatic selection but preserves an explicit rider choice. Missing persisted voices are replaced by the current safe provisional selection, and preview always routes through Apple TTS.
 Verification on 2026-08-21: focused iPhone 17 / iOS 26.3.1 simulator invocation ran 7 selected voice/settings tests with 0 failures. The full suite, physical-device build, installation, deployment and merge were deliberately not run. Acceptance criterion 4 remains open pending owner listening on the physical iPhone before the production default is selected.
+
+2026-08-21 review follow-up: two independent findings accepted within RH-066 scope—end-to-end selected identifier evidence and deterministic duplicate resolution/sorting.
+
+Acceptance criterion 3 temporarily reopened pending the requested exact identifier propagation tests.
+
+Review findings resolved. RecordingSpeechOutputEngine now captures SpeechVoiceSelection. Deterministic injected voice catalogues prove that the exact persisted, provisional Serena and missing-selection fallback identifiers each reach both Preview and normal Apple speech. Catalogue entries are sorted before de-duplication with fixed en_US_POSIX-normalised comparison keys and raw-value tie-breakers, so conflicting duplicate metadata resolves identically for forward and reversed input.
+Focused verification on 2026-08-21: 10 selected voice/settings tests passed, 0 failed, 0 skipped on iPhone 17 / iOS 26.3.1 simulator. No full suite, device build, deployment or merge was run. Acceptance criterion 3 is re-checked from this evidence; criterion 4 remains open for owner listening.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -61,5 +72,11 @@ author: @codex
 created: 2026-08-21 11:00
 ---
 Implementation and focused automated evidence are ready. Owner action remains: listen to the provisional Serena choice and alternatives on the physical iPhone before accepting criterion 4 or selecting the production default.
+---
+
+author: @codex
+created: 2026-08-21 11:14
+---
+Both independent RH-066 review findings are resolved with focused automated evidence; criterion 4 remains open for physical-iPhone owner listening.
 ---
 <!-- COMMENTS:END -->

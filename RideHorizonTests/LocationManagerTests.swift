@@ -9,6 +9,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
         let announcementID: UUID
         let text: String
         let provider: SpeechProvider
+        let appleVoice: SpeechVoiceSelection?
         let boundary: BoundaryType?
         let allowAppleFallback: Bool
     }
@@ -44,6 +45,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
                 announcementID: announcementID,
                 text: text,
                 provider: provider,
+                appleVoice: appleVoice,
                 boundary: boundary,
                 allowAppleFallback: allowAppleFallback
             )
@@ -423,11 +425,31 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(
             options.map(\.identifier),
             [
-                "gb-premium", "gb-enhanced", "gb-default", "au-premium",
-                "za-enhanced", "duplicate", "ie-default", "us-default"
+                "duplicate", "gb-premium", "gb-enhanced", "gb-default",
+                "au-premium", "za-enhanced", "ie-default", "us-default"
             ]
         )
-        XCTAssertEqual(options.first(where: { $0.identifier == "duplicate" })?.displayName, "First")
+        XCTAssertEqual(options.first(where: { $0.identifier == "duplicate" })?.displayName, "Second")
+    }
+
+    func testSpeechVoiceCatalogDuplicateResolutionAndSortingIgnoreInputOrder() {
+        let voices = [
+            speechVoice("shared", "Zulu", "en-US", .default),
+            speechVoice("serena", "serena", "en-GB", .premium),
+            speechVoice("shared", "Alpha", "en-GB", .enhanced),
+            speechVoice("ava", "Áva", "en-US", .premium),
+            speechVoice("daniel", "Ｄaniel", "en-GB", .enhanced)
+        ]
+
+        let forward = SpeechVoiceCatalog.options(from: voices)
+        let reversed = SpeechVoiceCatalog.options(from: Array(voices.reversed()))
+
+        XCTAssertEqual(forward, reversed)
+        XCTAssertEqual(
+            forward.map(\.identifier),
+            ["serena", "shared", "daniel", "ava"]
+        )
+        XCTAssertEqual(forward.first(where: { $0.identifier == "shared" })?.displayName, "Alpha")
     }
 
     func testSpeechVoiceOptionLabelShowsNameLocaleAndQualityOnce() {
@@ -494,14 +516,39 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testAppleVoicePreviewUsesAppleProviderEvenWhenPremiumProviderIsSelected() {
-        let speechOutput = RecordingSpeechOutputEngine()
-        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
-        locationManager.speechProvider = .proxyElevenLabs
+    func testPersistedAppleVoiceIdentifierReachesPreviewAndNormalSpeech() {
+        assertAppleVoiceIdentifierReachesPreviewAndNormalSpeech(
+            persistedIdentifier: "daniel",
+            voices: [
+                speechVoice("serena", "Serena", "en-GB", .premium),
+                speechVoice("daniel", "Daniel", "en-GB", .enhanced)
+            ],
+            expectedIdentifier: "daniel"
+        )
+    }
 
-        locationManager.previewSelectedVoice()
+    @MainActor
+    func testProvisionalAppleVoiceIdentifierReachesPreviewAndNormalSpeech() {
+        assertAppleVoiceIdentifierReachesPreviewAndNormalSpeech(
+            persistedIdentifier: "",
+            voices: [
+                speechVoice("daniel", "Daniel", "en-GB", .premium),
+                speechVoice("serena", "Serena", "en-GB", .enhanced)
+            ],
+            expectedIdentifier: "serena"
+        )
+    }
 
-        XCTAssertEqual(speechOutput.requests.last?.provider, .apple)
+    @MainActor
+    func testFallbackAppleVoiceIdentifierReachesPreviewAndNormalSpeech() {
+        assertAppleVoiceIdentifierReachesPreviewAndNormalSpeech(
+            persistedIdentifier: "removed-voice",
+            voices: [
+                speechVoice("serena", "Serena", "en-GB", .premium),
+                speechVoice("ava", "Ava", "en-US", .premium)
+            ],
+            expectedIdentifier: "serena"
+        )
     }
 
     @MainActor
@@ -3248,6 +3295,65 @@ final class LocationManagerTests: XCTestCase {
             displayName: name,
             localeIdentifier: locale,
             quality: quality
+        )
+    }
+
+    @MainActor
+    private func assertAppleVoiceIdentifierReachesPreviewAndNormalSpeech(
+        persistedIdentifier: String,
+        voices: [SpeechVoiceOption],
+        expectedIdentifier: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let suiteName = "LocationManagerVoiceSelectionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settingsStore = UserDefaultsRideSettingsStore(defaults: defaults)
+        var settings = settingsStore.load()
+        settings.preferredVoiceIdentifier = persistedIdentifier
+        settingsStore.save(settings, changed: .preferredVoiceIdentifier)
+
+        let previewOutput = RecordingSpeechOutputEngine()
+        let previewManager = LocationManager(
+            speechOutput: previewOutput,
+            rideSettingsStore: settingsStore,
+            speechVoiceOptions: { voices },
+            aiSharingAllowed: { true }
+        )
+        previewManager.speechProvider = .proxyElevenLabs
+        previewManager.previewSelectedVoice()
+
+        XCTAssertEqual(previewOutput.requests.last?.provider, .apple, file: file, line: line)
+        XCTAssertEqual(
+            previewOutput.requests.last?.appleVoice?.identifier,
+            expectedIdentifier,
+            file: file,
+            line: line
+        )
+
+        let normalOutput = RecordingSpeechOutputEngine()
+        let normalManager = LocationManager(
+            speechOutput: normalOutput,
+            rideSettingsStore: settingsStore,
+            speechVoiceOptions: { voices },
+            aiSharingAllowed: { true }
+        )
+        normalManager.speechProvider = .apple
+        normalManager.speakForTesting(text: "Voice selection test", boundary: .town)
+
+        XCTAssertEqual(normalOutput.requests.last?.provider, .apple, file: file, line: line)
+        XCTAssertEqual(
+            normalOutput.requests.last?.appleVoice?.identifier,
+            expectedIdentifier,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            settingsStore.load().preferredVoiceIdentifier,
+            expectedIdentifier,
+            file: file,
+            line: line
         )
     }
 }
