@@ -59,8 +59,8 @@ class JdbcSessionAuthority implements SessionAuthority {
             @Value("${ridehorizon.fallback-session-ttl-seconds:900}") long fallbackSessionTtlSeconds,
             @Value("${ridehorizon.verified-fact-daily-limit:180}") int verifiedFactDailyLimit,
             @Value("${ridehorizon.verified-speech-char-daily-limit:120000}") int verifiedSpeechCharDailyLimit,
-            @Value("${ridehorizon.fallback-fact-daily-limit:20}") int fallbackFactDailyLimit,
-            @Value("${ridehorizon.fallback-speech-char-daily-limit:12000}") int fallbackSpeechCharDailyLimit,
+            @Value("${ridehorizon.fallback-fact-daily-limit:180}") int fallbackFactDailyLimit,
+            @Value("${ridehorizon.fallback-speech-char-daily-limit:120000}") int fallbackSpeechCharDailyLimit,
             @Value("${ridehorizon.global-fact-daily-limit:2000}") int globalFactDailyLimit,
             @Value("${ridehorizon.global-speech-char-daily-limit:250000}") int globalSpeechCharDailyLimit,
             @Value("${ridehorizon.proxy-token:}") String operatorToken
