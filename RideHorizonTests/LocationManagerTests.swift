@@ -3329,6 +3329,85 @@ final class LocationManagerTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testLiveRideIgnoresNoisyEveryLookupOverrideAndAnnouncesOnlyRealChange() async {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
+        locationManager.testMode = false
+        locationManager.contentMode = .namesOnly
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.speakAfterEveryGeocode = true
+        let stroud = Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+        let stonehouse = Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+
+        locationManager.startRideWithoutLocationInputForTesting()
+        locationManager.processResolvedAddressForTesting(stroud)
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+
+        let firstEligibleAnnouncement = expectation(description: "First eligible post-start boundary announces")
+        speechOutput.onRequest = { firstEligibleAnnouncement.fulfill() }
+        locationManager.processResolvedAddressForTesting(stonehouse)
+        await fulfillment(of: [firstEligibleAnnouncement], timeout: 1)
+        XCTAssertEqual(speechOutput.requests.map(\.text), ["Stonehouse, Gloucestershire"])
+        speechOutput.beginPlayback(provider: .apple)
+        speechOutput.finishPlayback()
+
+        let duplicateAnnouncement = expectation(description: "Unchanged place does not announce")
+        duplicateAnnouncement.isInverted = true
+        speechOutput.onRequest = { duplicateAnnouncement.fulfill() }
+        locationManager.processResolvedAddressForTesting(stonehouse)
+        locationManager.processResolvedAddressForTesting(stonehouse)
+        await fulfillment(of: [duplicateAnnouncement], timeout: 0.2)
+        XCTAssertEqual(speechOutput.requests.count, 1)
+        locationManager.endRide()
+    }
+
+    @MainActor
+    func testTestModeCanExplicitlySpeakAfterEveryUnchangedLookup() async {
+        let speechOutput = RecordingSpeechOutputEngine()
+        let locationManager = LocationManager(speechOutput: speechOutput, aiSharingAllowed: { true })
+        locationManager.testMode = true
+        locationManager.contentMode = .namesOnly
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.speakAfterEveryGeocode = true
+        let stroud = Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )
+
+        locationManager.startRideWithoutLocationInputForTesting()
+        let firstAnnouncement = expectation(description: "Authorised first post-start lookup announces")
+        speechOutput.onRequest = { firstAnnouncement.fulfill() }
+        locationManager.processResolvedAddressForTesting(stroud)
+        await fulfillment(of: [firstAnnouncement], timeout: 1)
+        XCTAssertEqual(speechOutput.requests.count, 1)
+        speechOutput.beginPlayback(provider: .apple)
+        speechOutput.finishPlayback()
+
+        let authorisedRepeat = expectation(description: "Authorised unchanged-place repeat announces")
+        speechOutput.onRequest = { authorisedRepeat.fulfill() }
+        locationManager.processResolvedAddressForTesting(stroud)
+        await fulfillment(of: [authorisedRepeat], timeout: 1)
+        XCTAssertEqual(speechOutput.requests.count, 2)
+        locationManager.endRide()
+    }
+
     private func clearSpeechProviderDefaults() {
         UserDefaults.standard.removeObject(forKey: "RideHorizonSpeechProvider")
         UserDefaults.standard.removeObject(forKey: "RideHorizonSpeechProviderPremiumNoAppleFallbackMigration20260703")

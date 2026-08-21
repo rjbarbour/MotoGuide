@@ -1814,7 +1814,7 @@ class LocationManager: NSObject, ObservableObject {
             settings: boundarySettings,
             mode: contentMode,
             repeatPreferences: legacyRepeatPreferences,
-            speakAfterEveryGeocode: speakAfterEveryGeocode,
+            speakAfterEveryGeocode: testMode && speakAfterEveryGeocode,
             riderContext: riderContext,
             delivery: AnnouncementDeliveryContext(
                 selectedProvider: { [weak self] in self?.speechProvider ?? .apple },
