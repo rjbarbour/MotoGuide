@@ -874,6 +874,7 @@ class LocationManager: NSObject, ObservableObject {
     private let announcementCoordinator: AnnouncementCoordinator
     private let aiSharingAllowed: () -> Bool
     private let inactivityNotifier: RideInactivityNotifying
+    private let liveActivityManager: RideLiveActivityManaging
     private var wantsRideTracking: Bool { rideSessionController.wantsLocationInput }
     private var hasSeededTestRoute = false
     private let rideSessionController: RideSessionController
@@ -1004,6 +1005,7 @@ class LocationManager: NSObject, ObservableObject {
         locationSource: LocationSource,
         placeResolver: PlaceResolver,
         rideDistanceMeasurer: RideDistanceMeasuring,
+        liveActivityManager: RideLiveActivityManaging? = nil,
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let settings = rideSettingsStore.load()
@@ -1031,8 +1033,10 @@ class LocationManager: NSObject, ObservableObject {
         self.audioSession = audioSession
         self.diagnostics = diagnostics
         self.rideSessionController = rideSessionController
+        self.liveActivityManager = liveActivityManager ?? SystemRideLiveActivityManager()
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
+        self.liveActivityManager.endOrphanedActivities()
         configureAnnouncementCoordinator()
         if testMode {
             applyDebugTestModeCampaignDefaults()
@@ -1123,6 +1127,7 @@ class LocationManager: NSObject, ObservableObject {
         diagnostics: RideDiagnosticsStore? = nil,
         rideSettingsStore: RideSettingsStore? = nil,
         rideSessionController: RideSessionController? = nil,
+        liveActivityManager: RideLiveActivityManaging? = nil,
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let locationAdapter = CoreLocationAdapter()
@@ -1148,6 +1153,7 @@ class LocationManager: NSObject, ObservableObject {
             locationSource: locationAdapter,
             placeResolver: locationAdapter,
             rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
+            liveActivityManager: liveActivityManager ?? DisabledRideLiveActivityManager(),
             aiSharingAllowed: aiSharingAllowed
         )
         diagnosticsRelay.connect { [weak self] signal in
@@ -1181,6 +1187,7 @@ class LocationManager: NSObject, ObservableObject {
             locationSource: locationSource,
             placeResolver: placeResolver,
             rideDistanceMeasurer: rideDistanceMeasurer,
+            liveActivityManager: DisabledRideLiveActivityManager(),
             aiSharingAllowed: aiSharingAllowed
         )
         diagnosticsRelay.connect { [weak self] signal in
@@ -1252,6 +1259,7 @@ class LocationManager: NSObject, ObservableObject {
         rideStartedAt = start.startedAt
         rideSessionState = rideSessionController.state
         locationStatus = .checking
+        liveActivityManager.startRide(id: start.sessionID)
         applyRideSessionEffects(start.effects)
         recordDiagnostic(.rideStarted, at: date)
     }
@@ -1311,6 +1319,7 @@ class LocationManager: NSObject, ObservableObject {
         _ = announcementCoordinator.cancelAll(reason: reason)
 
         guard case .rideEnded(let wasActive) = intent else { return }
+        liveActivityManager.endRide()
         locationSource.stop()
         isTracking = false
         locationStatus = .idle
@@ -1783,6 +1792,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     private func processResolvedAddress(_ address: Address, placeLookupID: UUID? = nil) {
+        updateLiveActivity(for: address)
         let outcome = announcementCoordinator.submit(AnnouncementWorkflowInput(
             address: address,
             settings: boundarySettings,
@@ -1821,6 +1831,23 @@ class LocationManager: NSObject, ObservableObject {
             recordSupersededAnnouncements(supersededAnnouncementIDs)
             if !testMode { onAddressChange?(address) }
         }
+    }
+
+    private func updateLiveActivity(for address: Address) {
+        guard rideSessionState.isActive else { return }
+
+        var placeLevels: [String] = []
+        for value in [address.town, address.county, address.administrativeArea, address.country] {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if Address.isValidPlaceName(trimmed), !placeLevels.contains(trimmed) {
+                placeLevels.append(trimmed)
+            }
+        }
+        guard let placeName = placeLevels.first else { return }
+        liveActivityManager.update(
+            placeName: placeName,
+            context: placeLevels.dropFirst().first ?? ""
+        )
     }
 
     private func recordTestLog(utteredPhrase: String?) {
