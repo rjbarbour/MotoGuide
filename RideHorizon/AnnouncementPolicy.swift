@@ -547,7 +547,13 @@ final class AnnouncementCoordinator {
         let supersedablePlans = [
             factWork.map { AnnouncementPlan(id: $0.announcementID, text: "", boundary: $0.boundary) },
             pending.map {
-                AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary, sources: $0.sources)
+                AnnouncementPlan(
+                    id: $0.id,
+                    text: $0.text,
+                    boundary: $0.boundary,
+                    sources: $0.sources,
+                    factContent: $0.factContent
+                )
             }
         ].compactMap { $0 }
         let protectedPlans = [
@@ -606,7 +612,13 @@ final class AnnouncementCoordinator {
         pauseSources.insert(source)
         let plan = activePlan
             ?? pending.map {
-                AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary, sources: $0.sources)
+                AnnouncementPlan(
+                    id: $0.id,
+                    text: $0.text,
+                    boundary: $0.boundary,
+                    sources: $0.sources,
+                    factContent: $0.factContent
+                )
             }
             ?? fallbackPlan
         guard let plan else { return nil }

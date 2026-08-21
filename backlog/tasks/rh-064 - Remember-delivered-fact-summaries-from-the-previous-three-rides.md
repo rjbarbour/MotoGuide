@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 14:30'
+updated_date: '2026-08-21 14:51'
 labels:
   - core
   - memory
@@ -50,6 +50,8 @@ After each completed ride, persist a compact local summary of what the rider act
 2026-08-21 current-main merge reconciliation: resolved the in-progress merge of origin/main 1e3908579d62c3684cd49f4abea5c629021b0867 without aborting. The three conflicts preserved current-main RH-028 immutable announcement Log attribution context, RH-081 playback-time audio policy, RH-082 unchanged-place repeat suppression, RH-066 injected voice catalogue dependencies and RH-078 diagnostics clipboard status/control, together with RH-064 delivered-fact tracking, previous-ride memory injection/count, End-ride compaction, explicit/all-local clearing, request summaries and tests. ContentView retains both clear-memory confirmation and diagnosticsCopyStatus. Terminal result handling appends completed delivered fact content before removing both factContentByAnnouncementID and announcementLogContexts; cancellation/failure remove both without delivery. The active-ride identity test retains expectation-based timing and now asserts previousRideSummaries. Verification: git diff --check passed; focused RH-064 Swift 13/13; RH-064 review-fix Swift 8/8; current-main attribution-context cleanup 3/3; focused proxy 67/67. No PR merge or deployment performed.
 
 2026-08-21 PR #60 GitHub CI infrastructure note: run 32492258614 failed before build or XCTest because the hosted runner exposed no iPhone 17 Pro simulator destination. No application test failed. The approved GitHub PAT cannot rerun Actions jobs, so this ledger-only evidence commit intentionally retriggers PR validation; no local build or test is applicable.
+
+2026-08-21 PR #60 review thread PRRT_kwDOMm8pys6bL80p: preserved pending.factContent in AnnouncementCoordinator.externalAudioBegan and the equivalent acceptBoundary pending-to-AnnouncementPlan conversion, alongside existing sources and sequencing. Added LocationManager regression testPendingFactInterruptedDuringBluetoothDelayResumesAndPersistsCompletedRideMemory: a sourced fact remains pending during Bluetooth delay, primary/navigation audio interrupts before playback, the announcement resumes with source attribution, completed playback is recorded, and End ride persists the heard fact summary. Red evidence: the focused test failed with an empty summary before the fix. Green evidence: the regression passed 1/1; focused affected sequencing/memory set passed 5/5 with 0 failures.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
