@@ -267,13 +267,35 @@ private struct DelayedFailingProxySpeechGenerator: ProxySpeechGenerating {
     }
 }
 
+private actor AsyncGate {
+    private var isOpen = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
 private struct ConstantPlaceFactGenerator: PlaceFactGenerating {
     let fact: String
     let sources: [PlaceFactSource]
+    let beforeResult: (() async throws -> Void)?
 
-    init(fact: String, sources: [PlaceFactSource] = []) {
+    init(
+        fact: String,
+        sources: [PlaceFactSource] = [],
+        beforeResult: (() async throws -> Void)? = nil
+    ) {
         self.fact = fact
         self.sources = sources
+        self.beforeResult = beforeResult
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
@@ -281,7 +303,8 @@ private struct ConstantPlaceFactGenerator: PlaceFactGenerating {
     }
 
     func generatedFact(for request: PlaceFactRequest) async throws -> GeneratedPlaceFact {
-        GeneratedPlaceFact(text: fact, sources: sources)
+        try await beforeResult?()
+        return GeneratedPlaceFact(text: fact, sources: sources)
     }
 }
 
@@ -1722,6 +1745,187 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertFalse(loggedPhrase?.contains(source.title) ?? true)
         XCTAssertFalse(loggedPhrase?.contains(source.url.absoluteString) ?? true)
         locationManager.endRide()
+    }
+
+    @MainActor
+    func testSourcedFactLogsItsAcceptedPlaceAfterNewerLowerPriorityContextArrives() async throws {
+        let source = PlaceFactSource(
+            title: "Cadw",
+            url: URL(string: "https://cadw.gov.wales/chepstow-castle")!
+        )
+        let acceptedCoordinate = CLLocationCoordinate2D(latitude: 51.6419, longitude: -2.6738)
+        let newerCoordinate = CLLocationCoordinate2D(latitude: 51.7032, longitude: -2.9038)
+        let acceptedAddress = Address(
+            street: "Bridge Street",
+            town: "Chepstow",
+            county: "Monmouthshire",
+            administrativeArea: "Wales",
+            country: "United Kingdom"
+        )
+        let newerAddress = Address(
+            street: "Maryport Street",
+            town: "Usk",
+            county: "Monmouthshire",
+            administrativeArea: "Wales",
+            country: "United Kingdom"
+        )
+        let speechOutput = RecordingSpeechOutputEngine()
+        let factGate = AsyncGate()
+        let factRequested = expectation(description: "Original sourced fact request remains active")
+        let speechRequested = expectation(description: "Original sourced announcement reached speech")
+        speechOutput.onRequest = { speechRequested.fulfill() }
+        let sourceLogged = expectation(description: "Original sourced announcement reached the Log")
+        var loggedCoordinate: CLLocationCoordinate2D?
+        var loggedAddress: Address?
+        var loggedSources: [PlaceFactSource] = []
+        let locationManager = LocationManager(
+            factGenerator: ConstantPlaceFactGenerator(
+                fact: "Chepstow Castle stands above a strategic crossing of the River Wye.",
+                sources: [source],
+                beforeResult: {
+                    factRequested.fulfill()
+                    await factGate.wait()
+                }
+            ),
+            speechOutput: speechOutput,
+            aiSharingAllowed: { true }
+        )
+        locationManager.onRideLog = { coordinate, address, _, sources in
+            guard !sources.isEmpty else { return }
+            loggedCoordinate = coordinate
+            loggedAddress = address
+            loggedSources = sources
+            sourceLogged.fulfill()
+        }
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.startRideWithoutLocationInputForTesting()
+
+        locationManager.processResolvedAddressForTesting(
+            Address(
+                street: "High Street",
+                town: "Gloucester",
+                county: "Gloucestershire",
+                administrativeArea: "England",
+                country: "United Kingdom"
+            ),
+            resolvedCoordinate: CLLocationCoordinate2D(latitude: 51.8642, longitude: -2.2382)
+        )
+        locationManager.processResolvedAddressForTesting(
+            acceptedAddress,
+            resolvedCoordinate: acceptedCoordinate
+        )
+        await fulfillment(of: [factRequested], timeout: 3)
+        locationManager.processResolvedAddressForTesting(
+            newerAddress,
+            resolvedCoordinate: newerCoordinate
+        )
+        await factGate.open()
+
+        await fulfillment(of: [speechRequested, sourceLogged], timeout: 3)
+        let actualCoordinate = try XCTUnwrap(loggedCoordinate)
+        XCTAssertEqual(actualCoordinate.latitude, acceptedCoordinate.latitude, accuracy: 0.000_001)
+        XCTAssertEqual(actualCoordinate.longitude, acceptedCoordinate.longitude, accuracy: 0.000_001)
+        XCTAssertEqual(loggedAddress, acceptedAddress)
+        XCTAssertEqual(loggedSources, [source])
+        XCTAssertEqual(locationManager.announcementLogContextCountForTesting, 1)
+
+        speechOutput.beginPlayback()
+        speechOutput.finishPlayback()
+        XCTAssertEqual(locationManager.announcementLogContextCountForTesting, 0)
+        locationManager.endRide()
+    }
+
+    @MainActor
+    func testAnnouncementLogContextIsRemovedWhenActiveFactIsCancelled() async {
+        let factGate = AsyncGate()
+        let factRequested = expectation(description: "Fact request remains active")
+        let locationManager = LocationManager(
+            factGenerator: ConstantPlaceFactGenerator(
+                fact: "Chepstow Castle overlooks the River Wye.",
+                beforeResult: {
+                    factRequested.fulfill()
+                    await factGate.wait()
+                }
+            ),
+            speechOutput: RecordingSpeechOutputEngine(),
+            aiSharingAllowed: { true }
+        )
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.startRideWithoutLocationInputForTesting()
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Gloucester",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), resolvedCoordinate: CLLocationCoordinate2D(latitude: 51.8642, longitude: -2.2382))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bridge Street",
+            town: "Chepstow",
+            county: "Monmouthshire",
+            administrativeArea: "Wales",
+            country: "United Kingdom"
+        ), resolvedCoordinate: CLLocationCoordinate2D(latitude: 51.6419, longitude: -2.6738))
+
+        await fulfillment(of: [factRequested], timeout: 3)
+        XCTAssertEqual(locationManager.announcementLogContextCountForTesting, 1)
+        locationManager.applyAISharingDecision(isGranted: false)
+        XCTAssertEqual(locationManager.announcementLogContextCountForTesting, 0)
+        await factGate.open()
+        locationManager.endRide()
+    }
+
+    @MainActor
+    func testAnnouncementLogContextIsReplacedOnSupersessionAndClearedOnEndRide() async {
+        let factGate = AsyncGate()
+        let factRequested = expectation(description: "Lower-priority fact request remains active")
+        let locationManager = LocationManager(
+            factGenerator: ConstantPlaceFactGenerator(
+                fact: "Stonehouse grew around the wool trade.",
+                beforeResult: {
+                    factRequested.fulfill()
+                    await factGate.wait()
+                }
+            ),
+            speechOutput: RecordingSpeechOutputEngine(),
+            aiSharingAllowed: { true }
+        )
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.startRideWithoutLocationInputForTesting()
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Gloucester",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), resolvedCoordinate: CLLocationCoordinate2D(latitude: 51.8642, longitude: -2.2382))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), resolvedCoordinate: CLLocationCoordinate2D(latitude: 51.7486, longitude: -2.2797))
+
+        await fulfillment(of: [factRequested], timeout: 3)
+        XCTAssertEqual(locationManager.announcementLogContextCountForTesting, 1)
+        locationManager.contentMode = .namesOnly
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bridge Street",
+            town: "Chepstow",
+            county: "Monmouthshire",
+            administrativeArea: "Wales",
+            country: "United Kingdom"
+        ), resolvedCoordinate: CLLocationCoordinate2D(latitude: 51.6419, longitude: -2.6738))
+        XCTAssertEqual(locationManager.announcementLogContextCountForTesting, 1)
+
+        locationManager.endRide()
+        XCTAssertEqual(locationManager.announcementLogContextCountForTesting, 0)
+        await factGate.open()
     }
 
     @MainActor

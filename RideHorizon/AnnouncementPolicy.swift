@@ -685,11 +685,14 @@ final class AnnouncementCoordinator {
         }
     }
 
-    func cancelPending() {
+    @discardableResult
+    func cancelPending() -> UUID? {
+        let announcementID = pending?.id
         scheduler.cancel()
         queue.clearPending()
         pendingDeliveryReady = false
         pendingDeliveryContext = nil
+        return announcementID
     }
 
     func beginFact(for plan: AnnouncementPlan) -> AnnouncementFactWork {

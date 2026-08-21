@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 13:31'
+updated_date: '2026-08-21 13:47'
 labels:
   - proxy
   - model
@@ -40,13 +40,14 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 - [x] #1 Responses request exposes model-controlled hosted web_search.
 - [x] #2 Searched and unsearched outputs satisfy the existing ride-safe text and privacy contract.
 - [x] #3 Timeout, provider failure and tool-cost diagnostics and fallback remain bounded and tested.
-- [x] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
-- [x] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
+- [ ] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
+- [ ] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
 - [x] #6 When message phase is present, only a completed final_answer message is accepted; a completed phase-less message remains compatible, while commentary and incomplete message paths are rejected.
 - [x] #7 openai_result and its diagnostics-only fields are documented as bounded and privacy-safe, excluding search queries, results, sources, place text and rider text.
 - [x] #8 Citation URLs are canonicalised before validation; HTTPS is checked case-insensitively on the canonical URI, the final ASCII URL is at most 2048 characters, and deduplication uses that canonical URL so Unicode expansion cannot break iOS attribution.
 - [x] #9 The iOS fact response requires a sources field and fails closed when it is missing or any provided source is malformed; an uncited response is valid only with an explicit empty sources array.
 - [x] #10 Every success example in FACT_PROXY_CONTRACT.md includes the required sources field, either empty or populated with bounded cited sources.
+- [ ] #11 Each accepted announcement retains its resolved coordinate and address by announcement ID; delivered phrase/source logging uses that immutable context even after newer or rejected geocodes, and context is removed on supersession, terminal completion/cancellation/failure and End ride.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -59,6 +60,8 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 5. Correct every stale FACT_PROXY_CONTRACT.md success response example and keep OpenAPI wording synchronised if necessary.
 6. Run only the focused changed proxy tests and focused Swift simulator suites, then perform the bounded two-axis review.
 7. Record evidence, commit and push RH-028, clean generated output, and leave the worktree clean without merge or deployment.
+
+8. Resolve PR #59 thread PRRT_kwDOMm8pys6bKd8z by capturing immutable resolved coordinate/address context per accepted announcement ID, using it for delivered Log attribution, cleaning every terminal path, and proving a newer lower-priority context cannot relabel the older sourced fact.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -93,14 +96,6 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 PR #59 iOS current-main integration drift: commit b0f9079 changes only ProxyFactGeneratorTests.testCancelledRideFactPreservesLastConfirmedLinkage to return {"fact":"Known for its wool trade.","sources":[]} on successful calls. Host CoreSimulator was available with iPhone 17 / iOS 26.3 after the sandboxed probe was inconclusive. Exact verification: xcodebuild test ... -only-testing:RideHorizonTests/ProxyFactGeneratorTests/testCancelledRideFactPreservesLastConfirmedLinkage passed 1 test with 0 failures. The test still cancels request 2, preserves resp_confirmed and reuses it on request 3. Bounded Standards and Specification reviews of git diff 1ddb590...HEAD both returned zero findings. No merge or deployment was performed.
 
 2026-08-21 PR #59 iOS drift hand-off: commits b0f9079 and 8b30de4 were pushed to origin/codex/rh-028-web-search. PR #59 remains open and unmerged; no deployment was performed.
+
+2026-08-21 PR #59 thread PRRT_kwDOMm8pys6bKd8z reopened citation-place correctness. The accepted reverse-geocode request retains its coordinate, but LocationManager currently logs a delivered sourced plan through mutable lastKnownLocation/lastKnownAddress. Scope is limited to announcement-ID context capture/use/cleanup and focused Swift evidence; speech text, source semantics, provider state and navigation behaviour remain unchanged.
 <!-- SECTION:NOTES:END -->
-
-## Final Summary
-
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Resolved RH-028 findings F-01 through F-03. The proxy now canonicalises citation URLs to ASCII before validating HTTPS, final length and canonical deduplication; iOS requires sources and rejects missing, malformed, duplicate, non-ASCII, transformed or over-limit source data while accepting explicit sources:[]; and every human-contract success example includes sources. Final focused evidence: 25 Java/OpenAPI tests and 35 Swift simulator tests passed with zero failures, with zero remaining two-axis review findings. Branch remains In Progress and unmerged pending canonical integration.
-
-PR #59 current-main integration drift was corrected by updating the private-beta quota test to the structured non-ride fact mock; the single regression and all 91 proxy tests pass.
-
-PR #59 iOS current-main drift was corrected by adding explicit sources:[] to the cancelled-ride fact fixture; the exact simulator regression passes with linkage semantics unchanged.
-<!-- SECTION:FINAL_SUMMARY:END -->
