@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:46'
-updated_date: '2026-08-21 12:39'
+updated_date: '2026-08-21 12:50'
 labels:
   - core
   - audio
@@ -37,7 +37,7 @@ Road-test regression observed on 2026-08-21: when RideHorizon is in the foregrou
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Add deterministic regression tests for foreground-to-background and background-to-foreground lifecycle changes while TTS is preparing. 2. Resolve the current application state and audio coexistence policy once at the playback boundary, immediately before audio-session activation, and use that same value for activation and playback diagnostics. 3. Run the focused affected tests and one complete RideHorizonTests checkpoint. 4. Record automated evidence, commit and push the branch; keep the physical iPhone/X-COM2 music pause/resume gate open and do not merge or device-build.
+1. Add deterministic retained-session regressions for background mix to foreground interrupt and foreground interrupt to background mix after a deactivation failure, including consistent activation/playback diagnostics. 2. Make every playback start sample the current delivery/lifecycle policy; activate when ownership is new or the retained policy changed, and avoid redundant activation when unchanged. 3. Verify retained-session retry and End cancellation/release semantics alongside the focused policy tests. 4. Run the complete RideHorizonTests checkpoint, record evidence, commit and push; keep the physical iPhone/X-COM2 gate open and do not merge or device-build.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -52,4 +52,6 @@ Captured from the 2026-08-21 road test. Intended branch: codex/rh-081-foreground
 Draft PR #57 opened on 2026-08-21. Keep draft until physical foreground music pause/resume evidence is captured on the supported iPhone and X-COM2.
 
 2026-08-21 P1 correction: audio policy is no longer captured when TTS preparation starts. The coordinator resolves the current lifecycle-derived policy once in the playback-start callback immediately before audio-session activation, and uses that resolved policy for activation and playback diagnostics. Deterministic foreground-to-background and background-to-foreground preparation-transition tests first failed against the stale snapshot (4 assertions), then passed after the fix (2 tests, 0 failures); the strengthened diagnostic rerun passed after one simulator test-host bootstrap failure. Complete RideHorizonTests checkpoint passed 239 tests with 0 failures. RH-059 background playback remains mixable; foreground playback remains interrupting. Physical iPhone/X-COM2 music pause/resume acceptance remains open; no device build/install or merge was performed.
+
+2026-08-21 P2 correction: every playback start now samples the current lifecycle-derived audio policy, including when the coordinator still owns the session after deactivation failure. A changed retained policy reactivates/reconfigures the session before playback and records matching activation/playback diagnostics; an unchanged retained policy avoids redundant activation. Background mix to foreground interrupt and the material reverse transition first failed with 6 assertions against stale retained policy, then passed. Focused checkpoint passed 7 tests with 0 failures, covering preparation transitions, both retained-session directions, unchanged-policy reuse, release retry/neutralisation and End-driven release. Complete RideHorizonTests checkpoint passed 241 tests with 0 failures. Physical iPhone/X-COM2 music pause/resume acceptance remains open; no device build/install or merge was performed.
 <!-- SECTION:NOTES:END -->
