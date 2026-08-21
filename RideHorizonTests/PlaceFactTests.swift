@@ -1367,6 +1367,38 @@ final class ProxyFactGeneratorTests: XCTestCase {
         }
     }
 
+    func testFactResponseRejectsNonAsciiSourceEvenWhenCanonicalExpansionFitsLimit() async throws {
+        let rawURL = "https://example.com/café"
+        XCTAssertLessThan(rawURL.count, PlaceFactSource.maximumURLLength)
+        let responseBody = try JSONSerialization.data(withJSONObject: [
+            "fact": "Non-ASCII citation.",
+            "sources": [["title": "Non-ASCII URL", "url": rawURL]]
+        ])
+        MockURLProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: self.endpoint,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, responseBody)
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint
+        )
+
+        do {
+            _ = try await generator.generatedFact(
+                for: PlaceFactRequest(boundary: .town, placeName: "Stroud", countryContext: nil)
+            )
+            XCTFail("Expected a non-ASCII source URL to fail closed.")
+        } catch let error as PlaceFactError {
+            XCTAssertEqual(error, .invalidResponse)
+        }
+    }
+
     func testSharedSpeechErrorFixtureMatchesIOSDecoder() async {
         let endpoint = URL(string: "https://example.test/v1/speech")!
 

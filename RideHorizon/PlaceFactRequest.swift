@@ -250,10 +250,15 @@ struct PlaceFactSource: Codable, Equatable, Identifiable, Sendable {
         }
         let canonicalURL = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canonicalURL == rawURL,
+              canonicalURL.unicodeScalars.allSatisfy(\.isASCII),
               let url = URL(string: canonicalURL),
+              url.absoluteString == canonicalURL,
               url.absoluteString.utf8.count <= maximumURLLength,
-              url.scheme?.lowercased() == "https",
-              url.host?.isEmpty == false,
+              url.scheme == "https",
+              let host = url.host,
+              !host.isEmpty,
+              host == host.lowercased(),
+              url.port != 443,
               url.user == nil,
               url.password == nil else {
             return nil
