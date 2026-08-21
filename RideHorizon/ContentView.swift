@@ -1500,10 +1500,11 @@ private struct SettingsView: View {
                         )
                         SettingsToggleRow(
                             title: "Speak after every location lookup",
-                            subtitle: "Developer-only noisy speech mode.",
+                            subtitle: "Test Mode only. Repeats after every location lookup.",
                             isOn: $locationManager.speakAfterEveryGeocode,
                             palette: palette
                         )
+                        .disabled(!locationManager.testMode)
 
 #if INTERNAL_AUDIO_CALIBRATION
                         NavigationLink {
