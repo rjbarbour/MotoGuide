@@ -6,9 +6,12 @@ final class MockPlaceFactGenerator: PlaceFactGenerating {
     var callCount = 0
     var delayNanoseconds: UInt64 = 0
     var shouldThrow = false
+    var endedRideSessionIDs: [UUID] = []
+    var requests: [PlaceFactRequest] = []
 
     func fact(for request: PlaceFactRequest) async throws -> String {
         callCount += 1
+        requests.append(request)
         if delayNanoseconds > 0 {
             try await Task.sleep(nanoseconds: delayNanoseconds)
         }
@@ -19,6 +22,10 @@ final class MockPlaceFactGenerator: PlaceFactGenerating {
             return fact
         }
         throw PlaceFactError.invalidResponse
+    }
+
+    func endRideConversation(_ rideSessionID: UUID) async {
+        endedRideSessionIDs.append(rideSessionID)
     }
 }
 
@@ -108,6 +115,23 @@ final class PlaceFactCacheTests: XCTestCase {
         XCTAssertNotEqual(short.cacheKey, long.cacheKey)
     }
 
+    func testCacheKeyDoesNotParallelProviderRideState() {
+        let firstRide = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            rideSessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000063")
+        )
+        let secondRide = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            rideSessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000064")
+        )
+
+        XCTAssertEqual(firstRide.cacheKey, secondRide.cacheKey)
+    }
+
     func testCacheKeyIncludesPlaceHierarchy() {
         let first = PlaceFactRequest(
             boundary: .town,
@@ -155,6 +179,37 @@ final class CachedPlaceFactGeneratorTests: XCTestCase {
         XCTAssertEqual(first, "A steep Cotswold town.")
         XCTAssertEqual(second, "A steep Cotswold town.")
         XCTAssertEqual(mock.callCount, 1)
+    }
+
+    func testEndRideConversationForwardsWithoutChangingTheCache() async {
+        let mock = MockPlaceFactGenerator()
+        let cache = PlaceFactCache(loadPersisted: false)
+        let generator = CachedPlaceFactGenerator(generator: mock, cache: cache)
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000063")!
+
+        await generator.endRideConversation(rideSessionID)
+
+        XCTAssertEqual(mock.endedRideSessionIDs, [rideSessionID])
+    }
+
+    func testActiveRideBypassesPersistedCrossRideCache() async throws {
+        let mock = MockPlaceFactGenerator()
+        let cache = PlaceFactCache(loadPersisted: false)
+        let generator = CachedPlaceFactGenerator(generator: mock, cache: cache)
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            rideSessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000063")
+        )
+        cache.store("Stale cached fact.", forKey: request.cacheKey)
+        mock.factsByCacheKey[request.cacheKey] = "Fresh current-ride fact."
+
+        let fact = try await generator.fact(for: request)
+
+        XCTAssertEqual(fact, "Fresh current-ride fact.")
+        XCTAssertEqual(mock.callCount, 1)
+        XCTAssertEqual(cache.fact(forKey: request.cacheKey), "Stale cached fact.")
     }
 }
 
@@ -305,6 +360,188 @@ final class ProxyFactGeneratorTests: XCTestCase {
         let fact = try await generator.fact(for: request)
 
         XCTAssertEqual(fact, "Known for its wool trade.")
+    }
+
+    func testAppCarriesLinkageAcrossFactsAndEndRideDiscardsItLocally() async throws {
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000063")!
+        let nextRideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000064")!
+        var previousResponseHeaders: [String?] = []
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { urlRequest in
+            requestCount += 1
+            XCTAssertEqual(urlRequest.httpMethod, "POST")
+            XCTAssertEqual(urlRequest.url, self.endpoint)
+            previousResponseHeaders.append(
+                urlRequest.value(forHTTPHeaderField: FactProxyContract.previousResponseIdHeader)
+            )
+            let body = try self.requestBodyData(from: urlRequest)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertNil(json["rideSessionID"])
+            XCTAssertNil(json["recentPlaces"])
+            return (
+                HTTPURLResponse(
+                    url: self.endpoint,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: [FactProxyContract.responseIdHeader: "resp_\(requestCount)"]
+                )!,
+                Data(#"{"fact":"Known for its wool trade."}"#.utf8)
+            )
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: []
+        )
+
+        let firstRequest = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            rideSessionID: rideSessionID
+        )
+        _ = try await generator.fact(for: firstRequest)
+        _ = try await generator.fact(for: firstRequest)
+        await generator.endRideConversation(rideSessionID)
+        _ = try await generator.fact(for: PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stonehouse",
+            countryContext: "United Kingdom",
+            rideSessionID: nextRideSessionID
+        ))
+
+        XCTAssertEqual(previousResponseHeaders.count, 3)
+        XCTAssertNil(previousResponseHeaders[0])
+        XCTAssertEqual(previousResponseHeaders[1], "resp_1")
+        XCTAssertNil(previousResponseHeaders[2])
+    }
+
+    func testEndRideWithoutAnEligibleFactMakesNoProxyRequest() async {
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000063")!
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("End ride must not contact the proxy before an eligible fact request.")
+            throw PlaceFactError.invalidResponse
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: []
+        )
+
+        await generator.endRideConversation(rideSessionID)
+    }
+
+    func testFailedRideFactDiscardsLinkageBeforeTheNextAttempt() async throws {
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000063")!
+        var previousResponseHeaders: [String?] = []
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            previousResponseHeaders.append(
+                request.value(forHTTPHeaderField: FactProxyContract.previousResponseIdHeader)
+            )
+            let statusCode = requestCount == 2 ? 400 : 200
+            return (
+                HTTPURLResponse(
+                    url: self.endpoint,
+                    statusCode: statusCode,
+                    httpVersion: nil,
+                    headerFields: statusCode == 200
+                        ? [FactProxyContract.responseIdHeader: "resp_\(requestCount)"]
+                        : nil
+                )!,
+                statusCode == 200
+                    ? Data(#"{"fact":"Known for its wool trade."}"#.utf8)
+                    : Data(#"{"error":"failed"}"#.utf8)
+            )
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: []
+        )
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            rideSessionID: rideSessionID
+        )
+
+        _ = try await generator.fact(for: request)
+        do {
+            _ = try await generator.fact(for: request)
+            XCTFail("Expected the failed provider turn to surface.")
+        } catch let error as PlaceFactError {
+            XCTAssertEqual(error, .httpError(400))
+        }
+        _ = try await generator.fact(for: request)
+
+        XCTAssertEqual(previousResponseHeaders.count, 3)
+        XCTAssertNil(previousResponseHeaders[0])
+        XCTAssertEqual(previousResponseHeaders[1], "resp_1")
+        XCTAssertNil(previousResponseHeaders[2])
+    }
+
+    func testCancelledRideFactPreservesLastConfirmedLinkage() async throws {
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000063")!
+        var previousResponseHeaders: [String?] = []
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            previousResponseHeaders.append(
+                request.value(forHTTPHeaderField: FactProxyContract.previousResponseIdHeader)
+            )
+            if requestCount == 2 {
+                throw URLError(.notConnectedToInternet)
+            }
+            return (
+                HTTPURLResponse(
+                    url: self.endpoint,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: [
+                        FactProxyContract.responseIdHeader:
+                            requestCount == 1 ? "resp_confirmed" : "resp_after_cancel"
+                    ]
+                )!,
+                Data(#"{"fact":"Known for its wool trade."}"#.utf8)
+            )
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: [30, 30]
+        )
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            rideSessionID: rideSessionID
+        )
+
+        _ = try await generator.fact(for: request)
+        let cancelledFact = Task {
+            try await generator.fact(for: request)
+        }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        cancelledFact.cancel()
+        do {
+            _ = try await cancelledFact.value
+            XCTFail("Expected the superseded fact request to be cancelled.")
+        } catch is CancellationError {
+            // Expected: cancellation must preserve the prior confirmed link.
+        }
+
+        _ = try await generator.fact(for: request)
+
+        XCTAssertEqual(requestCount, 3)
+        XCTAssertNil(previousResponseHeaders[0])
+        XCTAssertEqual(previousResponseHeaders[1], "resp_confirmed")
+        XCTAssertEqual(previousResponseHeaders[2], "resp_confirmed")
     }
 
     func testPostsDeviceIdHeaderWhenConfigured() async throws {

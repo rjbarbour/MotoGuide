@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: RideHorizon Fact Proxy API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     MVP contract for the RideHorizon iOS app to request a short or long
     ride-safe place fact without storing or sending an OpenAI API key from
@@ -81,6 +81,7 @@ x-current-security-model:
   deviceSecretStorage: A per-install identifier and short-lived session token are stored in iOS Keychain.
   serverSecretStorage: Fly.io secrets.
   openAiKeyExposure: Server-side only. Never store the OpenAI API key in the iOS app or repository.
+  openAiResponseRetention: With store=true, OpenAI retains Responses API application state for at least 30 days under its current documented default.
   currentLimitations:
     - Automatic sessions are restricted by per-install, global daily, and per-IP request limits but are not yet protected by Apple App Attest.
     - The server-side RIDEHORIZON_PROXY_TOKEN remains an operator-only compatibility path until the private beta migration is complete.
@@ -184,6 +185,27 @@ paths:
             type: string
             minLength: 4
             maxLength: 64
+        - in: header
+          name: X-RideHorizon-Ride-Id
+          description: |
+            App-owned active ride UUID. It bounds linkage held by the app and
+            is not added to the fact JSON or persisted cache key. The proxy
+            does not retain ride conversation state.
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: X-RideHorizon-Previous-Response-Id
+          description: |
+            Latest successful OpenAI response ID held by the app for this
+            active ride. Omitted for the first call and after End ride or a
+            failed call. Requires X-RideHorizon-Ride-Id.
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+            pattern: "^[A-Za-z0-9_-]+$"
       x-ios-keychain-service: RideHorizonProxy
       x-ios-device-id-keychain-service: RideHorizonDeviceId
       x-ios-attempt-timeout-seconds: 35
@@ -236,6 +258,15 @@ paths:
       responses:
         "200":
           description: One sanitized bounded fact.
+          headers:
+            X-RideHorizon-Response-Id:
+              description: |
+                OpenAI response ID for app-owned continuation of the active
+                ride. Present when X-RideHorizon-Ride-Id was supplied.
+              schema:
+                type: string
+                maxLength: 200
+                pattern: "^[A-Za-z0-9_-]+$"
           content:
             application/json:
               schema:

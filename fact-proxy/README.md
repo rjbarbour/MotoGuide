@@ -132,6 +132,20 @@ Response: JSON containing `sessionToken`, `expiresAt`, and `fallback: true`.
 `factMode` is one of: `shortFacts`, `longFacts`. Unknown modes return `400` before any OpenAI call.
 The iOS app sends place hierarchy only. It does not send prompt text, model messages, OpenAI configuration, or coordinates.
 
+During an active ride, the app sends its ride UUID in
+`X-RideHorizon-Ride-Id` and carries the last successful OpenAI response ID in
+`X-RideHorizon-Previous-Response-Id`. The proxy returns the new ID in
+`X-RideHorizon-Response-Id`. The app owns and serialises this linkage, clears
+it locally at End ride or after a failed request, and bypasses the persisted
+cross-ride fact cache while a ride is active. The proxy retains no ride
+conversation map, so linkage survives proxy machine changes and restarts.
+
+Responses use `store=true` because `previous_response_id` continuation
+requires stored provider state. OpenAI currently documents at least 30 days of
+Responses API application-state retention for this configuration. Ending a
+ride discards RideHorizon's local linkage; it does not delete state already
+retained by OpenAI.
+
 **Response `200`**
 
 ```json
