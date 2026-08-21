@@ -68,7 +68,7 @@ Validate the complete OpenAPI contract without simulator or deployment:
 ./gradlew openApiContractTest --no-daemon
 ```
 
-Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.2.0`, every published operation, schema and security scheme, and the intentional version-drift fixture.
+Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.5.0`, every published operation, schema and security scheme, and the intentional version-drift fixture.
 
 Prove a drifted contract fails:
 
@@ -131,6 +131,12 @@ Response: JSON containing `sessionToken`, `expiresAt`, and `fallback: true`.
 `boundary` is one of: `country`, `nation`, `county`, `town`, `street`.
 `factMode` is one of: `shortFacts`, `longFacts`. Unknown modes return `400` before any OpenAI call.
 The iOS app sends place hierarchy only. It does not send prompt text, model messages, OpenAI configuration, or coordinates.
+
+The optional `previousRideSummaries` body field contains at most three compact
+summaries of fact content that completed speech playback on earlier rides. It is
+separate from active-ride response linkage and contains no coordinates, tracks
+or recent-place list. The proxy validates the bounds and labels the summaries as
+historical, untrusted context so OpenAI can avoid repeating already-heard facts.
 
 During an active ride, the app sends its ride UUID in
 `X-RideHorizon-Ride-Id` and carries the last successful OpenAI response ID in

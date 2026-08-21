@@ -24,9 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class OpenApiContractTest {
     private static final String ACCEPTED_OPENAPI_VERSION = "3.0.3";
-    private static final String ACCEPTED_CONTRACT_VERSION = "0.4.0";
+    private static final String ACCEPTED_CONTRACT_VERSION = "0.5.0";
     private static final String ACCEPTED_CONTRACT_SHA256 =
-            "7552c79f5fd30962b7f3cef0de0c32ee06b5a015b476669bb27608f2b7a5d34d";
+            "d060884bbd1b042f7550920a826b07b9b19ec9e4432b7d8f007886cd8f2d8f45";
 
     private static final Map<String, String> PUBLISHED_OPERATIONS = Map.ofEntries(
             Map.entry("GET /health", "getHealth"),

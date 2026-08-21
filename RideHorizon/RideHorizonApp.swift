@@ -44,6 +44,7 @@ struct RideHorizonApp: App {
             locationSource: locationAdapter,
             placeResolver: locationAdapter,
             rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
+            previousRideMemoryStore: .shared,
             aiSharingAllowed: { aiSharingConsent.isGranted }
         )
         announcementDiagnostics.connect { [weak locationManager] signal in

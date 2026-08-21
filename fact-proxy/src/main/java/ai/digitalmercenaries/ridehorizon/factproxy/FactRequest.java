@@ -3,6 +3,7 @@ package ai.digitalmercenaries.ridehorizon.factproxy;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.List;
 import java.util.Set;
 
 @JsonIgnoreProperties(ignoreUnknown = false)
@@ -12,7 +13,8 @@ public record FactRequest(
         String factMode,
         @JsonProperty("countryContext") String countryContext,
         PlaceHierarchy placeHierarchy,
-        RiderContext riderContext
+        RiderContext riderContext,
+        @JsonProperty("previousRideSummaries") List<String> previousRideSummaries
 ) {
     public FactRequest(
             String boundary,
@@ -21,7 +23,18 @@ public record FactRequest(
             String countryContext,
             PlaceHierarchy placeHierarchy
     ) {
-        this(boundary, placeName, factMode, countryContext, placeHierarchy, null);
+        this(boundary, placeName, factMode, countryContext, placeHierarchy, null, List.of());
+    }
+
+    public FactRequest(
+            String boundary,
+            String placeName,
+            String factMode,
+            String countryContext,
+            PlaceHierarchy placeHierarchy,
+            RiderContext riderContext
+    ) {
+        this(boundary, placeName, factMode, countryContext, placeHierarchy, riderContext, List.of());
     }
 
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
@@ -53,6 +66,8 @@ public record FactRequest(
         ValidatedRiderContext validatedRiderContext = riderContext == null
                 ? new ValidatedRiderContext(null, null, java.util.List.of(), null, java.util.List.of())
                 : riderContext.validateAndNormalize();
+        List<String> validatedPreviousRideSummaries =
+                PlaceInputValidator.validatePreviousRideSummaries(previousRideSummaries);
 
         return new ValidatedFactRequest(
                 normalizedBoundary,
@@ -61,7 +76,8 @@ public record FactRequest(
                 normalizedCountryContext,
                 userId,
                 validatedPlaceHierarchy,
-                validatedRiderContext
+                validatedRiderContext,
+                validatedPreviousRideSummaries
         );
     }
 
@@ -92,7 +108,8 @@ record ValidatedFactRequest(
         String countryContext,
         String userId,
         ValidatedPlaceHierarchy placeHierarchy,
-        ValidatedRiderContext riderContext
+        ValidatedRiderContext riderContext,
+        List<String> previousRideSummaries
 ) {
 }
 
