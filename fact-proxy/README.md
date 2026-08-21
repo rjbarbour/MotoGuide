@@ -146,11 +146,30 @@ Responses API application-state retention for this configuration. Ending a
 ride discards RideHorizon's local linkage; it does not delete state already
 retained by OpenAI.
 
+Each place-fact request offers OpenAI's hosted `web_search` tool for
+model-controlled use and sets `max_tool_calls: 1`. The proxy accepts zero or
+one completed search call, ignores tool output as rider text, and extracts only
+completed final-answer `output_text`. It returns up to five unique HTTPS
+`url_citation` sources separately for clickable attribution in the app Log. A
+searched answer without a usable citation is rejected. `openai_result` is
+diagnostics-only and records boundary type, fact mode, a `0...1` search-call
+count, searched boolean and `0...5` source count. It never logs queries,
+results, source titles or URLs, place/rider/fact/announcement text, coordinates,
+identifiers, tokens or credentials. A failed search or provider breach of the
+one-call ceiling returns the existing fact `502`, preserving iOS retry and
+base-place fallback behaviour.
+
 **Response `200`**
 
 ```json
 {
-  "fact": "A compact historical or practical rider-relevant fact."
+  "fact": "A compact historical or practical rider-relevant fact.",
+  "sources": [
+    {
+      "title": "Cotswold Canals Trust",
+      "url": "https://www.cotswoldcanals.org/history"
+    }
+  ]
 }
 ```
 

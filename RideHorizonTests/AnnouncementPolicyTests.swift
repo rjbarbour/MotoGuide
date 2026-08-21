@@ -366,7 +366,14 @@ final class AnnouncementCoordinatorTests: XCTestCase {
     }
 
     func testFactClientIsOwnedByCoordinatorAndProducesResolvedPlan() async {
-        let factClient = StubFactClient(result: "Stroud grew around its woollen mills")
+        let source = PlaceFactSource(
+            title: "Cotswold Canals Trust",
+            url: URL(string: "https://www.cotswoldcanals.org/history")!
+        )
+        let factClient = StubFactClient(
+            result: "Stroud grew around its woollen mills",
+            sources: [source]
+        )
         let speechOutput = RecordingCoordinatorSpeechOutput()
         let audioSession = RecordingCoordinatorAudioSession()
         let diagnostics = RecordingDiagnosticsSink()
@@ -395,6 +402,21 @@ final class AnnouncementCoordinatorTests: XCTestCase {
         XCTAssertEqual(factClient.requests, [request])
         XCTAssertEqual(resolved.id, plan.id)
         XCTAssertTrue(resolved.text.contains("woollen mills"))
+        XCTAssertEqual(resolved.sources, [source])
+        XCTAssertFalse(resolved.text.contains(source.title))
+        XCTAssertFalse(resolved.text.contains(source.url.absoluteString))
+
+        _ = coordinator.speak(
+            resolved,
+            selectedProvider: .proxyElevenLabs,
+            aiSharingAllowed: true,
+            appleVoice: nil,
+            allowAppleFallback: false,
+            audioPolicy: .mix
+        )
+        XCTAssertEqual(speechOutput.requests.last?.text, resolved.text)
+        XCTAssertFalse(speechOutput.requests.last?.text.contains(source.title) ?? true)
+        XCTAssertFalse(speechOutput.requests.last?.text.contains(source.url.absoluteString) ?? true)
         XCTAssertTrue(diagnostics.signals.contains {
             $0.event == .factGenerationFinished && $0.reason == .factAvailable
         })
@@ -1133,17 +1155,23 @@ private final class RecordingAnnouncementScheduler: AnnouncementScheduling {
 
 private final class StubFactClient: FactClient {
     private let result: String?
+    private let sources: [PlaceFactSource]
     private(set) var requests: [PlaceFactRequest] = []
     private(set) var endedRideSessionIDs: [UUID] = []
 
-    init(result: String?) {
+    init(result: String?, sources: [PlaceFactSource] = []) {
         self.result = result
+        self.sources = sources
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
         requests.append(request)
         if let result { return result }
         throw PlaceFactError.invalidResponse
+    }
+
+    func generatedFact(for request: PlaceFactRequest) async throws -> GeneratedPlaceFact {
+        GeneratedPlaceFact(text: try await fact(for: request), sources: sources)
     }
 
     func endRideConversation(_ rideSessionID: UUID) async {

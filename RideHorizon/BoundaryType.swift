@@ -63,11 +63,18 @@ struct AnnouncementPlan: Equatable {
     let id: UUID
     let text: String
     let boundary: BoundaryType
+    let sources: [PlaceFactSource]
 
-    init(id: UUID = UUID(), text: String, boundary: BoundaryType) {
+    init(
+        id: UUID = UUID(),
+        text: String,
+        boundary: BoundaryType,
+        sources: [PlaceFactSource] = []
+    ) {
         self.id = id
         self.text = text
         self.boundary = boundary
+        self.sources = sources
     }
 }
 

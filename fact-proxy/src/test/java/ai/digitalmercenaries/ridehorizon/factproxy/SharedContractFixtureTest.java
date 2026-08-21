@@ -46,7 +46,16 @@ final class SharedContractFixtureTest {
 
     @Test
     void factRequestAndResponseFixturesMatchProductionHttpCodec() throws Exception {
-        when(openAiService.generateFact(any())).thenReturn("Known for its historic wool trade.");
+        when(openAiService.generateFactWithMetadata(any())).thenReturn(
+                new OpenAiService.GeneratedFact(
+                        "Known for its historic wool trade.",
+                        java.util.List.of(new FactSource(
+                                "Cotswold Canals Trust",
+                                "https://www.cotswoldcanals.org/history"
+                        )),
+                        null
+                )
+        );
         ArgumentCaptor<ValidatedFactRequest> requestCaptor = ArgumentCaptor.forClass(ValidatedFactRequest.class);
 
         MvcResult result = mockMvc.perform(post("/v1/fact")
@@ -56,7 +65,7 @@ final class SharedContractFixtureTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        verify(openAiService).generateFact(requestCaptor.capture());
+        verify(openAiService).generateFactWithMetadata(requestCaptor.capture());
         ValidatedFactRequest request = requestCaptor.getValue();
         assertEquals("town", request.boundary());
         assertEquals("Stroud", request.placeName());

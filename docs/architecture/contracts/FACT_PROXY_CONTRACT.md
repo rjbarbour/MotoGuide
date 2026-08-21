@@ -34,6 +34,40 @@ Responses API application state is retained for at least 30 days in this
 configuration. End ride stops further linkage but does not remotely delete
 provider application state.
 
+Every place-fact Responses request offers the hosted `web_search` tool without
+forcing its use. OpenAI's model may make zero or one search call; the proxy sets
+`max_tool_calls: 1` to bound the dominant per-fact tool cost. A derived search
+query may contain the minimised place and rider-preference context already sent
+to OpenAI. The proxy extracts at most five unique HTTPS `url_citation`
+annotations from the accepted final answer. It canonicalises each URL to ASCII,
+checks HTTPS case-insensitively on that canonical URI, enforces the final 2048-
+character limit and deduplicates the canonical URL before returning bounded
+titles and URLs separately from fact text. It does not log search queries,
+results, sources, place text or rider text.
+
+Responses may contain reasoning and hosted-tool output items before the final
+message. When any assistant message has `phase`, the proxy accepts only a
+completed `final_answer`; completed phase-less messages remain compatible when
+no message carries phase. Commentary and incomplete messages are never fact
+text. A failed search, more than one search call, a searched answer without a
+usable citation, provider failure, timeout, missing final text or rejected text
+remains a `502`; the iOS client retains its bounded retries and base-place
+announcement fallback.
+
+The app carries sources beside the generated fact through the announcement
+queue and into the existing in-memory RideHorizon Log. Each source is shown as
+a clearly visible clickable link. Announcement text and TTS receive only the
+sanitised fact text, never source titles or URLs. Cross-ride caching remains
+available for unsearched facts; facts with sources are not persisted so a
+later display cannot lose required attribution. Active-ride facts continue to
+bypass that cache under RH-063.
+
+`openai_result` is emitted only when verbose proxy diagnostics are enabled. Its
+privacy-safe fields are `boundary` (type only), `factMode`, `webSearchCalls`
+(`0...1`), `searched` and `sourceCount` (`0...5`). It excludes search queries,
+results, source titles and URLs, place names, rider/fact/announcement text,
+coordinates, identifiers, tokens and credentials.
+
 ## Implementations
 
 - iOS client: `RideHorizon/ProxyFactGenerator.swift`
@@ -53,7 +87,7 @@ Exact command:
 ./fact-proxy/gradlew -p fact-proxy openApiContractTest --no-daemon
 ```
 
-Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.2.0`, every published operation, schema and security scheme, and proves the intentional version-drift fixture fails validation.
+Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.4.0`, every published operation, schema and security scheme, and proves the intentional version-drift fixture fails validation.
 
 Drift proof:
 
@@ -137,11 +171,11 @@ Runtime configuration:
 | `RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST` | (not set) | Comma-separated host allowlist. Required when `RIDEHORIZON_PROMPT_OVERRIDES_ENABLED=true`. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Per identity (trusted user/device if provided, else IP) request limit for authenticated proxy calls. |
 
-### RH-062 candidate OpenAI request contract
+### RH-028 candidate OpenAI request contract
 
-The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium` and `store: false`. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–90-word facts. OpenAI documents that this ceiling covers reasoning, visible output and non-visible formatting tokens; it does not publish a smaller workload-specific safe value. The proxy accepts only a top-level Responses result with `status: completed`, then extracts typed `output_text` content and applies the existing fact sentence and character limits. [OpenAI reasoning guidance](https://developers.openai.com/api/docs/guides/reasoning#allocating-space-for-reasoning) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
+The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium`, the model-controlled hosted `web_search` tool and `max_tool_calls: 1`. It retains `store: false` outside rides and RH-063's `store: true`, `previous_response_id` and compaction behaviour for active rides. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–90-word facts. The proxy accepts only a top-level Responses result with `status: completed`, selects a completed `final_answer` when phase is present, accepts a completed phase-less compatibility message otherwise, and extracts typed `output_text` plus bounded `url_citation` annotations. OpenAI requires citations for displayed web-derived information to be visible and clickable. [OpenAI web-search output and citations](https://developers.openai.com/api/docs/guides/tools-web-search#output-and-citations) [OpenAI phase guidance](https://developers.openai.com/api/docs/guides/reasoning#phase-parameter) [OpenAI Responses reference](https://developers.openai.com/api/reference/resources/responses/methods/create) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
 
-This is candidate behaviour only. Merging the accepted RH-062 change to `main` intentionally deploys the private-beta candidate. RH-062 remains In Progress after deployment until representative UK factuality, repetition, relevance, latency and token-cost evaluation is complete.
+This is candidate behaviour only. RH-028 is not merged or deployed by this work item hand-off.
 
 Health check:
 
@@ -277,12 +311,13 @@ Proxy logs include these event names:
 |-------|---------|-------------------------|
 | `fact_proxy_request` | Final request status and duration for `/v1/fact`. | No token, no place name, no IP. |
 | `fact_request_valid` | Request passed deterministic validation. Emitted only when diagnostics are enabled. | Boundary, fact mode, place-name length, country-context presence. |
-| `fact_request_success` | Fact generated and returned. Emitted only when diagnostics are enabled. | Boundary, fact mode, fact length. |
+| `fact_request_success` | Fact generated and returned. Emitted only when diagnostics are enabled. | Boundary type, fact mode, fact length and source count; no fact or source content. |
 | `fact_request_rejected` | Request failed validation with `400`. | Rejection reason only. |
 | `proxy_auth_failed` | Missing or wrong bearer token with `401`. | Failure category only. |
 | `proxy_auth_misconfigured` | Missing server-side proxy token with `500`. | No secret value. |
 | `rate_limit_exceeded` | Client exceeded per-IP limit with `429`. | Limit value only. |
-| `openai_response` | OpenAI returned an HTTP response. Emitted only when diagnostics are enabled. | Status, duration, boundary. |
+| `openai_response` | OpenAI returned an HTTP response. Emitted only when diagnostics are enabled. | Status, duration, boundary type, fact mode and whether provider linkage continued. |
+| `openai_result` | A completed OpenAI response passed final-answer, citation and fact validation. Emitted only when diagnostics are enabled. | Boundary type, fact mode, web-search call count (`0...1`), searched boolean and source count (`0...5`). No queries, results, source titles/URLs, place/rider/fact/announcement text, identifiers or credentials. |
 | `openai_upstream_error` | OpenAI returned an unusable response. | Boundary and bounded reason. |
 | `openai_request_failed` | OpenAI request failed before usable response. | Boundary and exception class. |
 | `diagnostics_updated` | Admin diagnostics setting changed for the current proxy process. | Enabled flag only. |
@@ -415,7 +450,13 @@ JSON body:
 
 ```json
 {
-  "fact": "Known for its wool trade."
+  "fact": "Known for its wool trade.",
+  "sources": [
+    {
+      "title": "Cotswold Canals Trust",
+      "url": "https://www.cotswoldcanals.org/history"
+    }
+  ]
 }
 ```
 
@@ -424,6 +465,7 @@ Fields:
 | Field | Required | Type | Meaning |
 |-------|----------|------|---------|
 | `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 1100 characters. `longFacts` is capped at 1500 characters. |
+| `sources` | Yes | Array | Zero to five unique HTTPS `url_citation` sources. Each has a title of at most 160 characters and canonical ASCII URL of at most 2048 characters. Sources are clickable Log metadata only and never announcement or TTS text. |
 
 ## Error Responses
 
@@ -555,7 +597,8 @@ Expected result:
 
 ```json
 {
-  "fact": "One bounded factual sentence."
+  "fact": "One bounded factual sentence.",
+  "sources": []
 }
 ```
 

@@ -10,10 +10,14 @@ struct CachedPlaceFactGenerator: PlaceFactGenerating {
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
+        try await generatedFact(for: request).text
+    }
+
+    func generatedFact(for request: PlaceFactRequest) async throws -> GeneratedPlaceFact {
         let usesCrossRideCache = request.rideSessionID == nil
         if usesCrossRideCache, let cached = cache.fact(forKey: request.cacheKey) {
             ProxyDiagnostics.log("Facts", "Cache hit for \(request.cacheKey)")
-            return cached
+            return GeneratedPlaceFact(text: cached)
         }
 
         ProxyDiagnostics.log(
@@ -22,13 +26,16 @@ struct CachedPlaceFactGenerator: PlaceFactGenerating {
                 ? "Cache miss for \(request.cacheKey)"
                 : "Bypassing cross-ride cache for active ride fact"
         )
-        let fact = try await generator.fact(for: request)
-        if let sanitized = FactPhraseBuilder.sanitize(fact, mode: request.factMode) {
-            if usesCrossRideCache {
+        let generated = try await generator.generatedFact(for: request)
+        if let sanitized = FactPhraseBuilder.sanitize(generated.text, mode: request.factMode) {
+            let sanitizedFact = GeneratedPlaceFact(text: sanitized, sources: generated.sources)
+            if usesCrossRideCache, sanitizedFact.sources.isEmpty {
                 cache.store(sanitized, forKey: request.cacheKey)
                 ProxyDiagnostics.log("Facts", "Stored fact in cache for \(request.cacheKey)")
+            } else if usesCrossRideCache {
+                ProxyDiagnostics.log("Facts", "Skipped cross-ride cache for sourced fact")
             }
-            return sanitized
+            return sanitizedFact
         }
         ProxyDiagnostics.log("Facts", "Generated fact failed local sanitization for \(request.cacheKey)")
         throw PlaceFactError.invalidResponse
@@ -47,10 +54,18 @@ enum PlaceFactFetcher {
         using generator: FactClient,
         timeout: TimeInterval = fetchTimeoutSeconds
     ) async -> String? {
-        await withTaskGroup(of: String?.self) { group in
+        await generatedFact(for: request, using: generator, timeout: timeout)?.text
+    }
+
+    static func generatedFact(
+        for request: PlaceFactRequest,
+        using generator: FactClient,
+        timeout: TimeInterval = fetchTimeoutSeconds
+    ) async -> GeneratedPlaceFact? {
+        await withTaskGroup(of: GeneratedPlaceFact?.self) { group in
             group.addTask {
                 do {
-                    return try await generator.fact(for: request)
+                    return try await generator.generatedFact(for: request)
                 } catch {
                     ProxyDiagnostics.log("Facts", "Fact fetch failed for \(request.cacheKey): \(error.localizedDescription)")
                     return nil

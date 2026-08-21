@@ -958,6 +958,11 @@ struct CoreLocationRideDistanceMeasurer: RideDistanceMeasuring {
     }
 }
 
+private struct AnnouncementLogContext {
+    let coordinate: CLLocationCoordinate2D
+    let address: Address
+}
+
 @MainActor
 class LocationManager: NSObject, ObservableObject {
     static let movingMapInteractionThresholdMetersPerSecond = 8.0 / 3.6
@@ -987,6 +992,7 @@ class LocationManager: NSObject, ObservableObject {
     private var audioSessionReleaseRetryAttempts = 0
     private var activeRideSessionID: UUID?
     private var diagnosticAppState: DiagnosticAppState = .foreground
+    private var announcementLogContexts: [UUID: AnnouncementLogContext] = [:]
 #if INTERNAL_AUDIO_CALIBRATION
     private let calibrationProcessor: PremiumSpeechProcessing = DefaultPremiumSpeechProcessor()
     private let calibrationPremiumAudioPlayer: PremiumAudioPlaying = NormalisedPremiumAudioPlayer()
@@ -1097,7 +1103,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     var onAddressChange: ((Address) -> Void)?
-    var onRideLog: ((CLLocationCoordinate2D, Address, String?) -> Void)?
+    var onRideLog: ((CLLocationCoordinate2D, Address, String?, [PlaceFactSource]) -> Void)?
 
     init(
         announcementCoordinator: AnnouncementCoordinator,
@@ -1453,6 +1459,7 @@ class LocationManager: NSObject, ObservableObject {
         _ = announcementCoordinator.cancelAll(reason: reason)
 
         guard case .rideEnded(let wasActive) = intent else { return }
+        announcementLogContexts.removeAll()
         liveActivityManager.endRide()
         if wasActive, let activeRideSessionID {
             Task { [announcementCoordinator] in
@@ -1606,7 +1613,7 @@ class LocationManager: NSObject, ObservableObject {
 
     func previewSelectedVoice() {
         stopSpeechOutput()
-        announcementCoordinator.cancelPending()
+        cancelPendingAnnouncement()
         speak(
             text: "\(ProductIdentity.displayName) can speak in this voice. Keep the road in front of you, rider.",
             shouldRecordTestLog: false,
@@ -1882,7 +1889,14 @@ class LocationManager: NSObject, ObservableObject {
         processResolvedAddress(currentAddress)
     }
 
-    private func processResolvedAddress(_ address: Address, placeLookupID: UUID? = nil) {
+    private func processResolvedAddress(
+        _ address: Address,
+        placeLookupID: UUID? = nil,
+        resolvedCoordinate: CLLocationCoordinate2D? = nil
+    ) {
+        let acceptedLogContext = (resolvedCoordinate ?? lastKnownLocation).map {
+            AnnouncementLogContext(coordinate: $0, address: address)
+        }
         updateLiveActivity(for: address)
         let outcome = announcementCoordinator.submit(AnnouncementWorkflowInput(
             address: address,
@@ -1919,8 +1933,11 @@ class LocationManager: NSObject, ObservableObject {
         case .rejected:
             if testMode { recordTestLog(utteredPhrase: nil) }
             AppDiagnostics.log("Dropped lower-priority announcement while higher-priority work remains active.")
-        case .accepted(_, let supersededAnnouncementIDs):
+        case .accepted(let plan, let supersededAnnouncementIDs):
             recordSupersededAnnouncements(supersededAnnouncementIDs)
+            if let acceptedLogContext {
+                announcementLogContexts[plan.id] = acceptedLogContext
+            }
             if !testMode { onAddressChange?(address) }
         }
     }
@@ -1942,15 +1959,25 @@ class LocationManager: NSObject, ObservableObject {
         )
     }
 
-    private func recordTestLog(utteredPhrase: String?) {
-        guard testMode,
+    private func recordTestLog(
+        utteredPhrase: String?,
+        sources: [PlaceFactSource] = []
+    ) {
+        guard (testMode || !sources.isEmpty),
               let location = lastKnownLocation,
               let address = lastKnownAddress else { return }
-        onRideLog?(location, address, utteredPhrase)
+        onRideLog?(location, address, utteredPhrase, sources)
+    }
+
+    private func recordDeliveredLog(for plan: AnnouncementPlan) {
+        guard (testMode || !plan.sources.isEmpty),
+              let context = announcementLogContexts[plan.id] else { return }
+        onRideLog?(context.coordinate, context.address, plan.text, plan.sources)
     }
 
     private func recordSupersededAnnouncements(_ supersededAnnouncementIDs: Set<UUID>) {
         for announcementID in supersededAnnouncementIDs {
+            announcementLogContexts.removeValue(forKey: announcementID)
             recordDiagnostic(
                 .announcementSuperseded,
                 announcementID: announcementID,
@@ -1967,7 +1994,7 @@ class LocationManager: NSObject, ObservableObject {
             return
         }
 
-        announcementCoordinator.cancelPending()
+        cancelPendingAnnouncement()
         stopSpeechOutput()
         speak(text: text, boundary: announcementCoordinator.currentBoundary, shouldRecordTestLog: false)
     }
@@ -2063,14 +2090,17 @@ class LocationManager: NSObject, ObservableObject {
                                 request,
                                 result: result
                               ) else { return }
-                        self.publishPlaceResolution(completion)
+                        self.publishPlaceResolution(completion, resolvedLocation: request.location)
                     }
                 }
             }
         }
     }
 
-    private func publishPlaceResolution(_ completion: RidePlaceResolutionCompletion) {
+    private func publishPlaceResolution(
+        _ completion: RidePlaceResolutionCompletion,
+        resolvedLocation: AcceptedRideLocation
+    ) {
         switch completion.result {
         case .failed:
             recordDiagnostic(.placeLookupFailed, placeLookupID: completion.requestID)
@@ -2084,7 +2114,14 @@ class LocationManager: NSObject, ObservableObject {
             lastKnownAddress = address
             recordDiagnostic(.placeLookupFinished, placeLookupID: completion.requestID)
             AppDiagnostics.log("Resolved a place name.")
-            processResolvedAddress(address, placeLookupID: completion.requestID)
+            processResolvedAddress(
+                address,
+                placeLookupID: completion.requestID,
+                resolvedCoordinate: CLLocationCoordinate2D(
+                    latitude: resolvedLocation.latitude,
+                    longitude: resolvedLocation.longitude
+                )
+            )
         }
     }
 
@@ -2333,8 +2370,10 @@ class LocationManager: NSObject, ObservableObject {
 
     private func handleAnnouncementWorkflowResult(_ result: AnnouncementWorkflowResult) {
         switch result {
-        case .boundaryAccepted, .boundaryRejected:
+        case .boundaryAccepted:
             break
+        case .boundaryRejected(let announcementID):
+            announcementLogContexts.removeValue(forKey: announcementID)
         case .announcementQueued(let plan, let placeLookupID):
             announcementStatus = .phraseReady
             recordDiagnostic(
@@ -2352,14 +2391,19 @@ class LocationManager: NSObject, ObservableObject {
             announcementStatus = .retrievingContent
         case .factResolved:
             announcementStatus = .phraseReady
-        case .factCancelled:
+        case .factCancelled(let announcementID):
+            if let announcementID {
+                announcementLogContexts.removeValue(forKey: announcementID)
+            }
             if !isSpeechOutputActive { announcementStatus = .idle }
         case .speechRequested(let plan, _, let shouldRecordTestLog):
             AppDiagnostics.log("Speaking an announcement.")
             lastSpokenPhrase = plan.text
             lastSpokenAt = Date()
             lastSpeechDiagnosticNote = nil
-            if shouldRecordTestLog { recordTestLog(utteredPhrase: plan.text) }
+            if shouldRecordTestLog {
+                recordDeliveredLog(for: plan)
+            }
             announcementStatus = .preparingVoice
         case .retryScheduled, .fallbackStarted:
             announcementStatus = .preparingVoice
@@ -2369,7 +2413,12 @@ class LocationManager: NSObject, ObservableObject {
             announcementStatus = .waitingForAudio
         case .resumed:
             announcementStatus = .preparingVoice
-        case .completed, .cancelled, .failed:
+        case .completed(let announcementID),
+             .cancelled(let announcementID, _),
+             .failed(let announcementID, _):
+            if let announcementID {
+                announcementLogContexts.removeValue(forKey: announcementID)
+            }
             announcementStatus = .idle
         }
     }
@@ -2405,6 +2454,11 @@ class LocationManager: NSObject, ObservableObject {
         _ = announcementCoordinator.stop(reason: .playbackCancelled)
     }
 
+    private func cancelPendingAnnouncement() {
+        guard let announcementID = announcementCoordinator.cancelPending() else { return }
+        announcementLogContexts.removeValue(forKey: announcementID)
+    }
+
 #if DEBUG
     func startRideWithoutLocationInputForTesting(at date: Date = Date()) {
         startRide(at: date, startsLocationInput: false)
@@ -2414,8 +2468,24 @@ class LocationManager: NSObject, ObservableObject {
         speak(text: text, boundary: boundary, shouldRecordTestLog: false, ignoreQuietMode: true)
     }
 
-    func processResolvedAddressForTesting(_ address: Address, placeLookupID: UUID? = nil) {
-        processResolvedAddress(address, placeLookupID: placeLookupID)
+    func processResolvedAddressForTesting(
+        _ address: Address,
+        placeLookupID: UUID? = nil,
+        resolvedCoordinate: CLLocationCoordinate2D? = nil
+    ) {
+        if let resolvedCoordinate {
+            lastKnownLocation = resolvedCoordinate
+        }
+        lastKnownAddress = address
+        processResolvedAddress(
+            address,
+            placeLookupID: placeLookupID,
+            resolvedCoordinate: resolvedCoordinate
+        )
+    }
+
+    var announcementLogContextCountForTesting: Int {
+        announcementLogContexts.count
     }
 
     func beginPlaceLookupDiagnosticForTesting() -> UUID {

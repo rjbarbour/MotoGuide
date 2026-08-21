@@ -223,6 +223,7 @@ struct AnnouncementRequest: Equatable {
     let id: UUID
     let text: String
     let boundary: BoundaryType
+    let sources: [PlaceFactSource]
 }
 
 struct AnnouncementQueue {
@@ -231,9 +232,10 @@ struct AnnouncementQueue {
     mutating func replacePending(
         id: UUID = UUID(),
         text: String,
-        boundary: BoundaryType
+        boundary: BoundaryType,
+        sources: [PlaceFactSource] = []
     ) -> AnnouncementRequest {
-        let request = AnnouncementRequest(id: id, text: text, boundary: boundary)
+        let request = AnnouncementRequest(id: id, text: text, boundary: boundary, sources: sources)
         pending = request
         return request
     }
@@ -532,7 +534,9 @@ final class AnnouncementCoordinator {
     ) -> AnnouncementWorkflowResult {
         let supersedablePlans = [
             factWork.map { AnnouncementPlan(id: $0.announcementID, text: "", boundary: $0.boundary) },
-            pending.map { AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary) }
+            pending.map {
+                AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary, sources: $0.sources)
+            }
         ].compactMap { $0 }
         let protectedPlans = [
             activePlan,
@@ -589,7 +593,9 @@ final class AnnouncementCoordinator {
     ) -> AnnouncementWorkflowResult? {
         pauseSources.insert(source)
         let plan = activePlan
-            ?? pending.map { AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary) }
+            ?? pending.map {
+                AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary, sources: $0.sources)
+            }
             ?? fallbackPlan
         guard let plan else { return nil }
         interruptedPlan = plan
@@ -655,7 +661,12 @@ final class AnnouncementCoordinator {
         after delay: TimeInterval,
         delivery: @escaping @MainActor (UUID) -> Void
     ) -> AnnouncementRequest {
-        let request = queue.replacePending(id: plan.id, text: plan.text, boundary: plan.boundary)
+        let request = queue.replacePending(
+            id: plan.id,
+            text: plan.text,
+            boundary: plan.boundary,
+            sources: plan.sources
+        )
         pendingDeliveryReady = false
         scheduler.schedule(after: delay) { [weak self] in
             guard let self, self.pending?.id == request.id else { return }
@@ -674,11 +685,14 @@ final class AnnouncementCoordinator {
         }
     }
 
-    func cancelPending() {
+    @discardableResult
+    func cancelPending() -> UUID? {
+        let announcementID = pending?.id
         scheduler.cancel()
         queue.clearPending()
         pendingDeliveryReady = false
         pendingDeliveryContext = nil
+        return announcementID
     }
 
     func beginFact(for plan: AnnouncementPlan) -> AnnouncementFactWork {
@@ -707,7 +721,7 @@ final class AnnouncementCoordinator {
         onResult?(.factRequested(announcementID: plan.id))
         factTask = Task { [weak self] in
             guard let self else { return }
-            let fact = await PlaceFactFetcher.fact(for: request, using: self.factClient)
+            let fact = await PlaceFactFetcher.generatedFact(for: request, using: self.factClient)
             await MainActor.run {
                 guard !Task.isCancelled,
                       self.acceptsFactCompletion(token: work.token) else { return }
@@ -736,8 +750,9 @@ final class AnnouncementCoordinator {
                 }
                 completion(AnnouncementPlan(
                     id: plan.id,
-                    text: FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact, mode: mode),
-                    boundary: plan.boundary
+                    text: FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact.text, mode: mode),
+                    boundary: plan.boundary,
+                    sources: fact.sources
                 ))
             }
         }
@@ -921,7 +936,12 @@ final class AnnouncementCoordinator {
               pending.id == id,
               let delivery = pendingDeliveryContext else { return }
         guard !isSpeaking, (pauseSources.isEmpty || interruptedPlan == nil) else { return }
-        let plan = AnnouncementPlan(id: pending.id, text: pending.text, boundary: pending.boundary)
+        let plan = AnnouncementPlan(
+            id: pending.id,
+            text: pending.text,
+            boundary: pending.boundary,
+            sources: pending.sources
+        )
 
         cancelPending(id: id)
         _ = speak(plan, delivery: delivery)

@@ -119,7 +119,7 @@ struct OnboardingView: View {
                         .font(.title2.bold())
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
-                    Text("If you allow AI features, RideHorizon sends the current town, county, region or country and your optional fact preferences to OpenAI. If you choose Premium Voice, announcement text is sent to ElevenLabs. Precise GPS coordinates are not sent to either provider.")
+                    Text("If you allow AI features, RideHorizon sends the current town, county, region or country and your optional fact preferences to OpenAI. OpenAI may search the public web and return source links for the Log. If you choose Premium Voice, announcement text—but not source titles or URLs—is sent to ElevenLabs. Precise GPS coordinates are not sent to either provider.")
                         .font(.body)
                         .foregroundStyle(.white.opacity(0.96))
                         .multilineTextAlignment(.center)
@@ -275,7 +275,7 @@ struct AISharingChoiceView: View {
                     Text("Choose how RideHorizon uses third-party AI")
                         .font(.title.bold())
 
-                    Text("AI facts send the current town, county, region or country and your optional fact preferences to OpenAI. Premium Voice sends announcement text to ElevenLabs. RideHorizon does not send precise GPS coordinates to either provider.")
+                    Text("AI facts send the current town, county, region or country and your optional fact preferences to OpenAI. OpenAI may search the public web and return source links for the Log. Premium Voice sends announcement text, but not source titles or URLs, to ElevenLabs. RideHorizon does not send precise GPS coordinates to either provider.")
 
                     Text("You can decline and continue with place-name announcements and Apple Voice. You can change or withdraw this choice later in Settings.")
 
@@ -318,11 +318,11 @@ struct PrivacyNoticeView: View {
         NavigationStack {
             List {
                 Section("On your iPhone") {
-                    Text("RideHorizon uses precise location to identify places, but does not send latitude or longitude to the RideHorizon fact or speech proxy. Ride history stays in memory for the current session. Settings and generated facts are stored locally until cleared; cached facts expire after 30 days.")
+                    Text("RideHorizon uses precise location to identify places, but does not send latitude or longitude to the RideHorizon fact or speech proxy. Ride history stays in memory for the current session. Uncited generated facts may be cached for up to 30 days. Web-derived facts with source links are not persistently cached.")
                 }
 
                 Section("Optional AI features") {
-                    Text("With your permission, OpenAI receives the announced place hierarchy and optional rider fact preferences to generate a short fact. ElevenLabs receives announcement text only when Premium Voice is selected. OpenAI may retain API inputs and outputs for up to 30 days unless lower-retention controls apply. RideHorizon asks ElevenLabs not to log the text or generated audio; availability depends on the production account configuration.")
+                    Text("With your permission, OpenAI receives the announced place hierarchy and optional rider fact preferences to generate a short fact. It may search the public web and return cited source links for the in-memory Log. ElevenLabs receives announcement text only when Premium Voice is selected; source titles and URLs are not included. OpenAI may retain API inputs and outputs for up to 30 days unless lower-retention controls apply. RideHorizon asks ElevenLabs not to log the text or generated audio; availability depends on the production account configuration.")
                 }
 
                 Section("Service operation") {

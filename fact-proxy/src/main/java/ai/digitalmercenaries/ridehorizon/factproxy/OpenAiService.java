@@ -10,17 +10,25 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class OpenAiService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiService.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
     private static final int MAX_OUTPUT_TOKENS = 4_096;
+    static final int MAX_FACT_SOURCES = 5;
+    private static final int MAX_SOURCE_TITLE_LENGTH = 160;
+    private static final int MAX_SOURCE_URL_LENGTH = 2_048;
+    static final int MAX_WEB_SEARCH_CALLS = 1;
     static final int COMPACT_THRESHOLD_TOKENS = 24_000;
 
     private static final String BASE_SYSTEM_PROMPT = """
@@ -84,7 +92,11 @@ public class OpenAiService {
     }
 
     public String generateFact(ValidatedFactRequest request) {
-        return generateFact(request, null, false).fact();
+        return generateFactWithMetadata(request).fact();
+    }
+
+    public GeneratedFact generateFactWithMetadata(ValidatedFactRequest request) {
+        return generateFact(request, null, false);
     }
 
     public GeneratedFact generateFactWithLinkage(
@@ -100,7 +112,10 @@ public class OpenAiService {
             boolean rideLinked
     ) {
         if (openAiProperties.apiKey() == null || openAiProperties.apiKey().isBlank()) {
-            throw new UpstreamException("OpenAI API key is not configured");
+            throw new UpstreamException(
+                    UpstreamException.Category.CONFIGURATION,
+                    "OpenAI API key is not configured"
+            );
         }
 
         try {
@@ -111,32 +126,106 @@ public class OpenAiService {
             }
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new UpstreamException("OpenAI returned HTTP " + response.statusCode());
+                throw new UpstreamException(
+                        UpstreamException.Category.PROVIDER,
+                        "OpenAI returned HTTP " + response.statusCode()
+                );
             }
 
             JsonNode root = objectMapper.readTree(response.body());
             if (!"completed".equals(root.path("status").asText(null))) {
-                throw new UpstreamException("OpenAI response was not completed");
+                throw new UpstreamException(
+                        UpstreamException.Category.PROVIDER,
+                        "OpenAI response was not completed"
+                );
             }
-            String content = extractOutputText(root);
-            String sanitized = FactSanitizer.sanitize(content, factMode);
+            WebSearchUsage webSearchUsage = inspectWebSearchUsage(root);
+            if (webSearchUsage.callCount() > MAX_WEB_SEARCH_CALLS) {
+                throw new UpstreamException(
+                        UpstreamException.Category.TOOL,
+                        "OpenAI exceeded web search call limit"
+                );
+            }
+            if (webSearchUsage.failed()) {
+                throw new UpstreamException(
+                        UpstreamException.Category.TOOL,
+                        "OpenAI web search failed"
+                );
+            }
+            JsonNode finalAnswerMessage = selectFinalAnswerMessage(root);
+            if (finalAnswerMessage == null) {
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI response lacked a completed final answer"
+                );
+            }
+            FinalAnswer finalAnswer = extractFinalAnswer(finalAnswerMessage);
+            if (webSearchUsage.callCount() > 0 && finalAnswer.sources().isEmpty()) {
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI web search response lacked usable citations"
+                );
+            }
+            if (containsCitationUrl(finalAnswer.text())) {
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI response included a citation URL in fact text"
+                );
+            }
+            String sanitized = FactSanitizer.sanitize(finalAnswer.text(), factMode);
             if (sanitized == null) {
-                throw new UpstreamException("OpenAI response could not be sanitized");
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI response could not be sanitized"
+                );
             }
             String responseId = root.path("id").asText(null);
             if (responseId == null
                     || responseId.isBlank()
                     || responseId.length() > 200
                     || !responseId.matches("[A-Za-z0-9_-]+")) {
-                throw new UpstreamException("OpenAI response id is missing");
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI response id is missing"
+                );
             }
-            return new GeneratedFact(sanitized, responseId);
+            if (diagnosticsSettings.enabled()) {
+                log.info(
+                        "event=openai_result boundary={} factMode={} webSearchCalls={} searched={} sourceCount={}",
+                        request.boundary(),
+                        factMode.wireValue(),
+                        webSearchUsage.callCount(),
+                        webSearchUsage.callCount() > 0,
+                        finalAnswer.sources().size()
+                );
+            }
+            return new GeneratedFact(sanitized, finalAnswer.sources(), responseId);
         } catch (UpstreamException ex) {
-            log.warn("event=openai_upstream_error boundary={} reason={}", request.boundary(), ex.getMessage());
+            log.warn(
+                    "event=openai_upstream_error boundary={} category={} reason={}",
+                    request.boundary(),
+                    ex.category(),
+                    ex.getMessage()
+            );
             throw ex;
+        } catch (HttpTimeoutException ex) {
+            log.warn("event=openai_request_failed boundary={} category=TIMEOUT", request.boundary());
+            throw new UpstreamException(
+                    UpstreamException.Category.TIMEOUT,
+                    "OpenAI request timed out",
+                    ex
+            );
         } catch (Exception ex) {
-            log.warn("event=openai_request_failed boundary={} reason={}", request.boundary(), ex.getClass().getSimpleName());
-            throw new UpstreamException("OpenAI request failed: " + ex.getMessage());
+            log.warn(
+                    "event=openai_request_failed boundary={} category=PROVIDER reason={}",
+                    request.boundary(),
+                    ex.getClass().getSimpleName()
+            );
+            throw new UpstreamException(
+                    UpstreamException.Category.PROVIDER,
+                    "OpenAI request failed",
+                    ex
+            );
         }
     }
 
@@ -185,6 +274,8 @@ public class OpenAiService {
         payload.put("input", userPrompt(request, factMode));
         payload.put("reasoning", Map.of("effort", "medium"));
         payload.put("max_output_tokens", MAX_OUTPUT_TOKENS);
+        payload.put("tools", List.of(Map.of("type", "web_search")));
+        payload.put("max_tool_calls", MAX_WEB_SEARCH_CALLS);
         payload.put("store", rideLinked);
         if (rideLinked) {
             payload.put(
@@ -211,30 +302,168 @@ public class OpenAiService {
         }
     }
 
-    private static String extractOutputText(JsonNode root) {
-        StringBuilder outputText = new StringBuilder();
+    private static JsonNode selectFinalAnswerMessage(JsonNode root) {
+        JsonNode completedFinalAnswer = null;
+        JsonNode completedPhaseLess = null;
+        boolean phaseWasPresent = false;
         for (JsonNode outputItem : root.path("output")) {
             if (!"message".equals(outputItem.path("type").asText())) {
                 continue;
             }
-            for (JsonNode contentItem : outputItem.path("content")) {
-                if (!"output_text".equals(contentItem.path("type").asText())) {
-                    continue;
+            boolean hasPhase = outputItem.hasNonNull("phase");
+            phaseWasPresent = phaseWasPresent || hasPhase;
+            if (!"completed".equals(outputItem.path("status").asText())) {
+                continue;
+            }
+            if (hasPhase) {
+                if ("final_answer".equals(outputItem.path("phase").asText())) {
+                    completedFinalAnswer = outputItem;
                 }
-                String text = contentItem.path("text").asText(null);
-                if (text == null || text.isBlank()) {
-                    continue;
-                }
+            } else {
+                completedPhaseLess = outputItem;
+            }
+        }
+        return phaseWasPresent ? completedFinalAnswer : completedPhaseLess;
+    }
+
+    private static FinalAnswer extractFinalAnswer(JsonNode message) {
+        StringBuilder outputText = new StringBuilder();
+        List<FactSource> sources = new ArrayList<>();
+        Set<String> seenUrls = new HashSet<>();
+        for (JsonNode contentItem : message.path("content")) {
+            if (!"output_text".equals(contentItem.path("type").asText())) {
+                continue;
+            }
+            String text = contentItem.path("text").asText(null);
+            if (text != null && !text.isBlank()) {
                 if (!outputText.isEmpty()) {
                     outputText.append('\n');
                 }
                 outputText.append(text);
             }
+            appendCitationSources(contentItem.path("annotations"), sources, seenUrls);
         }
-        return outputText.isEmpty() ? null : outputText.toString();
+        return new FinalAnswer(outputText.isEmpty() ? null : outputText.toString(), List.copyOf(sources));
     }
 
-    record GeneratedFact(String fact, String responseId) {
+    private static void appendCitationSources(
+            JsonNode annotations,
+            List<FactSource> sources,
+            Set<String> seenUrls
+    ) {
+        if (sources.size() >= MAX_FACT_SOURCES) {
+            return;
+        }
+        for (JsonNode annotation : annotations) {
+            if (sources.size() >= MAX_FACT_SOURCES) {
+                return;
+            }
+            if (!"url_citation".equals(annotation.path("type").asText())) {
+                continue;
+            }
+            String title = sanitizeSourceTitle(annotation.path("title").asText(null));
+            String url = sanitizeSourceUrl(annotation.path("url").asText(null));
+            if (title == null || url == null || !seenUrls.add(url)) {
+                continue;
+            }
+            sources.add(new FactSource(title, url));
+        }
+    }
+
+    private static String sanitizeSourceTitle(String rawTitle) {
+        if (rawTitle == null) {
+            return null;
+        }
+        String title = rawTitle.trim().replaceAll("\\s+", " ");
+        if (title.isEmpty()) {
+            return null;
+        }
+        return title.length() <= MAX_SOURCE_TITLE_LENGTH
+                ? title
+                : title.substring(0, MAX_SOURCE_TITLE_LENGTH).trim();
+    }
+
+    private static String sanitizeSourceUrl(String rawUrl) {
+        if (rawUrl == null) {
+            return null;
+        }
+        String url = rawUrl.trim();
+        if (url.isEmpty()) {
+            return null;
+        }
+        try {
+            URI canonicalInput = URI.create(url).normalize();
+            URI asciiUri = URI.create(canonicalInput.toASCIIString()).normalize();
+            if (!"https".equalsIgnoreCase(asciiUri.getScheme())
+                    || asciiUri.getHost() == null
+                    || asciiUri.getHost().isBlank()
+                    || asciiUri.getUserInfo() != null) {
+                return null;
+            }
+            String canonicalUrl = canonicalSourceUrl(asciiUri);
+            return canonicalUrl.length() <= MAX_SOURCE_URL_LENGTH ? canonicalUrl : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static String canonicalSourceUrl(URI uri) {
+        String host = uri.getHost().toLowerCase(java.util.Locale.ROOT);
+        if (host.contains(":")) {
+            host = "[" + host + "]";
+        }
+        int port = uri.getPort() == 443 ? -1 : uri.getPort();
+        StringBuilder canonical = new StringBuilder("https://").append(host);
+        if (port >= 0) {
+            canonical.append(':').append(port);
+        }
+        if (uri.getRawPath() != null) {
+            canonical.append(uri.getRawPath());
+        }
+        if (uri.getRawQuery() != null) {
+            canonical.append('?').append(uri.getRawQuery());
+        }
+        if (uri.getRawFragment() != null) {
+            canonical.append('#').append(uri.getRawFragment());
+        }
+        return canonical.toString();
+    }
+
+    private static boolean containsCitationUrl(String text) {
+        if (text == null) {
+            return false;
+        }
+        String normalized = text.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("http://") || normalized.contains("https://");
+    }
+
+    private static WebSearchUsage inspectWebSearchUsage(JsonNode root) {
+        int callCount = 0;
+        boolean failed = false;
+        for (JsonNode outputItem : root.path("output")) {
+            if (!"web_search_call".equals(outputItem.path("type").asText())) {
+                continue;
+            }
+            callCount += 1;
+            failed = failed || !"completed".equals(outputItem.path("status").asText());
+        }
+        return new WebSearchUsage(callCount, failed);
+    }
+
+    private record WebSearchUsage(int callCount, boolean failed) {
+    }
+
+    private record FinalAnswer(String text, List<FactSource> sources) {
+    }
+
+    record GeneratedFact(String fact, List<FactSource> sources, String responseId) {
+        GeneratedFact {
+            sources = List.copyOf(sources);
+        }
+
+        GeneratedFact(String fact, String responseId) {
+            this(fact, List.of(), responseId);
+        }
     }
 
     private String systemPrompt(FactMode factMode, ValidatedFactRequest request) {
