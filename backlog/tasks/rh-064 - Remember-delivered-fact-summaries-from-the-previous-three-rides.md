@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 14:25'
+updated_date: '2026-08-21 14:30'
 labels:
   - core
   - memory
@@ -48,6 +48,8 @@ After each completed ride, persist a compact local summary of what the rider act
 2026-08-21 final dependency-base reconciliation: rebased exactly RH-064 commits 0c7216b, 1f7df83 and a8ef2eb from old RH-028 base 5e66cfb onto final RH-028 commit e3a76c9. The only manual conflict was OpenApiContractTest: preserved contract version 0.5.0 and recalculated the combined FACT_PROXY_OPENAPI.yaml SHA-256 as d060884bbd1b042f7550920a826b07b9b19ec9e4432b7d8f007886cd8f2d8f45. Final RH-028 mandatory sources decoding, canonical ASCII URL validation, source-count/malformed-source fail-closed behaviour and invalid-response mapping remain intact. One RH-064 mock response was updated to include the now-required explicit sources:[] field. Final dependency-base evidence: existing focused Swift set passed 13/13; existing review-fix Swift set passed 8/8; the unchanged five-class focused proxy command passed 67/67 because final RH-028 adds two tests to the previously recorded 65-test set.
 
 2026-08-21 current-main merge reconciliation: resolved the in-progress merge of origin/main 1e3908579d62c3684cd49f4abea5c629021b0867 without aborting. The three conflicts preserved current-main RH-028 immutable announcement Log attribution context, RH-081 playback-time audio policy, RH-082 unchanged-place repeat suppression, RH-066 injected voice catalogue dependencies and RH-078 diagnostics clipboard status/control, together with RH-064 delivered-fact tracking, previous-ride memory injection/count, End-ride compaction, explicit/all-local clearing, request summaries and tests. ContentView retains both clear-memory confirmation and diagnosticsCopyStatus. Terminal result handling appends completed delivered fact content before removing both factContentByAnnouncementID and announcementLogContexts; cancellation/failure remove both without delivery. The active-ride identity test retains expectation-based timing and now asserts previousRideSummaries. Verification: git diff --check passed; focused RH-064 Swift 13/13; RH-064 review-fix Swift 8/8; current-main attribution-context cleanup 3/3; focused proxy 67/67. No PR merge or deployment performed.
+
+2026-08-21 PR #60 GitHub CI infrastructure note: run 32492258614 failed before build or XCTest because the hosted runner exposed no iPhone 17 Pro simulator destination. No application test failed. The approved GitHub PAT cannot rerun Actions jobs, so this ledger-only evidence commit intentionally retriggers PR validation; no local build or test is applicable.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
