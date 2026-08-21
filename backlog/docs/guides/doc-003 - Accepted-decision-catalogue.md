@@ -3,7 +3,7 @@ id: doc-003
 title: Accepted decision catalogue
 type: guide
 created_date: '2026-08-17 22:56'
-updated_date: '2026-08-18 13:00'
+updated_date: '2026-08-21 15:36'
 tags:
   - decisions
   - guide
@@ -109,10 +109,12 @@ On 2026-08-18 the owner reported that RideHorizon was silent when Google Maps wa
 
 ### Decision
 
-Supersede decision-003’s nomination of `RH-024 — Make current-ride fact generation sequence-aware without destroying useful caching` as the next task. Use `m-1 — Core ride reliability and continuity` as the canonical sequence: `RH-059 — Restore announcements while Google Maps is foregrounded`; `RH-060 — Finish active announcements before handling newer boundary speech`; `RH-061 — Show meaningful place updates in the Dynamic Island`; `RH-024 — Make current-ride fact generation sequence-aware without destroying useful caching`; `RH-062 — Upgrade place-fact generation to GPT-5.6 Sol with medium reasoning`; `RH-063 — Maintain one bounded OpenAI conversation per active ride`; `RH-064 — Remember delivered fact summaries from the previous three rides`; `RH-065 — Make Long Facts materially longer`; `RH-066 — Expose all installed English Apple voices and choose a distinct default`; and `RH-067 — Add the complete persistent Ride Live Activity`.
+Supersede decision-003’s nomination of `RH-024 — Make current-ride fact generation sequence-aware without destroying useful caching` as the next task. Use `m-1 — Core ride reliability and continuity` as the canonical sequence: `RH-059 — Restore announcements while Google Maps is foregrounded`; `RH-060 — Finish active announcements before handling newer boundary speech`; `RH-061 — Show meaningful place updates in the Dynamic Island`; `RH-062 — Upgrade place-fact generation to GPT-5.6 Sol with medium reasoning`; `RH-063 — Maintain one bounded OpenAI conversation per active ride`; `RH-064 — Remember delivered fact summaries from the previous three rides`; `RH-065 — Make Long Facts materially longer`; `RH-066 — Expose all installed English Apple voices and choose a distinct default`; and `RH-067 — Add the complete persistent Ride Live Activity`.
+
+`RH-063 — Maintain one bounded OpenAI conversation per active ride` supersedes the rejected RH-024 recent-place and recent-fact list design. Current-ride continuity uses provider response linkage; it does not reconstruct a parallel recent-list payload when linkage fails.
 
 Keep `RH-068 — Evaluate deterministic river-crossing announcements` parked outside the active milestone until the owner explicitly reprioritises it.
 
 ### Consequences
 
-Only `RH-059 — Restore announcements while Google Maps is foregrounded` is labelled `ready`. The milestone’s priority and ordinal fields define the remaining sequence, with dependencies used only for hard implementation prerequisites. This decision does not resume the architecture-refactor programme or family-product work.
+The live Backlog.md ledger determines current readiness and completion. Milestone priority and ordinal fields define any remaining sequence, with dependencies used only for hard implementation prerequisites. This decision does not resume the architecture-refactor programme or family-product work.
