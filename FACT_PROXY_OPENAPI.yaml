@@ -246,7 +246,8 @@ paths:
       x-openai-api-key-location: Server-side only. Never store the OpenAI API key in the iOS app or repository.
       x-speech-safety-rules:
         - Short Facts may use up to 5 concise sentences.
-        - Long Facts may use up to 8 concise sentences.
+        - Long Facts target 110–130 coherent words in up to 5 concise, connected sentences.
+        - Long Facts must not use trivia-list structure, repeat supplied place context, or add padding.
         - Short Facts prioritises geographic/cultural context over rider-coaching details.
         - Factual and neutral.
         - Useful as ambient place context.

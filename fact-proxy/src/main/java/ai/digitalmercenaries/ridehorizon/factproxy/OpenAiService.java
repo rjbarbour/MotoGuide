@@ -61,10 +61,11 @@ public class OpenAiService {
                     + "Use cautious wording when exact directions or landmarks are uncertain. "
                     + "Avoid lists, schoolbook definitions, generic safety advice, and vague claims about narrow lanes, damp roads, pedestrians, traffic, or changing weather.";
     private static final String FALLBACK_LONG_FACT_PROMPT =
-            "Write 75 to 90 words of local context for an adult touring rider. "
-                    + "Use two to four concise sentences. "
-                    + "Use specific anchors from landscape, industry, architecture, waterways, border history, notable people, markets, old roads, or landmarks. "
-                    + "Connect the anchors into a useful place picture rather than a trivia list. "
+            "Write 110 to 130 words of local context for an adult touring rider. "
+                    + "Use three to five concise, connected sentences. "
+                    + "Choose one or two related anchors from landscape, industry, architecture, waterways, border history, notable people, markets, old roads, or landmarks. "
+                    + "Develop them into one coherent place picture rather than disconnected trivia. "
+                    + "Do not repeat the supplied place or hierarchy context, and do not pad the response to reach the target. "
                     + "Use cautious wording when exact directions or landmarks are uncertain. "
                     + "Avoid generic administrative definitions, roadcraft, hazard warnings, and filler about traffic, weather, pedestrians, cyclists, or grip.";
 

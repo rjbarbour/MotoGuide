@@ -3,7 +3,9 @@ package ai.digitalmercenaries.ridehorizon.factproxy;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FactSanitizerTest {
 
@@ -39,12 +41,41 @@ class FactSanitizerTest {
     @Test
     void sanitizeRejectsExcessSentencesInLongMode() {
         assertNull(FactSanitizer.sanitize(
-                "Stroud is in Gloucestershire. It is famous for wool. It has deep history. " +
-                        "That town shaped trade. It still hosts markets. Another local note remains. " +
-                        "The hills can influence local weather. Its rail links were important historically. " +
-                        "Riders can cross the bridge on the A419.",
+                "The valley shaped the town. Wool powered its mills. Canals carried their cloth. " +
+                        "Markets linked local producers. Stone buildings preserve that history. " +
+                        "Modern workshops continue the tradition.",
                 FactMode.LONG_FACTS
         ));
+    }
+
+    @Test
+    void sanitizeAllowsFiveSentencesInLongMode() {
+        String fact = "The valley shaped the town. Wool powered its mills. Canals carried their cloth. " +
+                "Markets linked local producers. Stone buildings preserve that history.";
+
+        assertEquals(fact, FactSanitizer.sanitize(fact, FactMode.LONG_FACTS));
+    }
+
+    @Test
+    void longFactsTargetCoherent110To130WordsWithFiveSentenceBound() {
+        String prompt = FactMode.LONG_FACTS.defaultPrompt();
+
+        assertTrue(prompt.contains("110 to 130 words"));
+        assertTrue(prompt.contains("coherent"));
+        assertTrue(prompt.contains("connected sentences"));
+        assertTrue(prompt.contains("trivia list"));
+        assertTrue(prompt.contains("repeat"));
+        assertEquals(5, FactMode.LONG_FACTS.maxSentences());
+    }
+
+    @Test
+    void shortFactsPromptAndBoundsRemainUnchanged() {
+        String prompt = FactMode.SHORT_FACTS.defaultPrompt();
+
+        assertTrue(prompt.contains("35 to 45 words"));
+        assertFalse(prompt.contains("110 to 130 words"));
+        assertEquals(2, FactMode.SHORT_FACTS.maxSentences());
+        assertEquals(1100, FactMode.SHORT_FACTS.maxFactLength());
     }
 
     @Test
