@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 11:46'
+updated_date: '2026-08-21 12:01'
 labels:
   - proxy
   - model
@@ -38,15 +38,15 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Responses request exposes model-controlled hosted web_search.
-- [ ] #2 Searched and unsearched outputs satisfy the existing ride-safe text and privacy contract.
+- [x] #2 Searched and unsearched outputs satisfy the existing ride-safe text and privacy contract.
 - [x] #3 Timeout, provider failure and tool-cost diagnostics and fallback remain bounded and tested.
-- [ ] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
-- [ ] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
+- [x] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
+- [x] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
 - [x] #6 When message phase is present, only a completed final_answer message is accepted; a completed phase-less message remains compatible, while commentary and incomplete message paths are rejected.
 - [x] #7 openai_result and its diagnostics-only fields are documented as bounded and privacy-safe, excluding search queries, results, sources, place text and rider text.
-- [ ] #8 Citation URLs are canonicalised before validation; HTTPS is checked case-insensitively on the canonical URI, the final ASCII URL is at most 2048 characters, and deduplication uses that canonical URL so Unicode expansion cannot break iOS attribution.
-- [ ] #9 The iOS fact response requires a sources field and fails closed when it is missing or any provided source is malformed; an uncited response is valid only with an explicit empty sources array.
-- [ ] #10 Every success example in FACT_PROXY_CONTRACT.md includes the required sources field, either empty or populated with bounded cited sources.
+- [x] #8 Citation URLs are canonicalised before validation; HTTPS is checked case-insensitively on the canonical URI, the final ASCII URL is at most 2048 characters, and deduplication uses that canonical URL so Unicode expansion cannot break iOS attribution.
+- [x] #9 The iOS fact response requires a sources field and fails closed when it is missing or any provided source is malformed; an uncited response is valid only with an explicit empty sources array.
+- [x] #10 Every success example in FACT_PROXY_CONTRACT.md includes the required sources field, either empty or populated with bounded cited sources.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -81,4 +81,12 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 final branch hand-off: commits 8e97c3e, 9f3e82a and d7a8a26 were pushed to origin/codex/rh-028-web-search. No pull request, merge, deployment, device build or device install was performed. Status remains In Progress because canonical integration is intentionally outstanding.
 
 2026-08-21 final findings reopened AC #2, #4 and #5. F-01 requires canonical ASCII URL validation/deduplication before the 2048 limit; F-02 requires iOS sources to be present and strictly all-or-nothing valid, with [] as the only uncited representation; F-03 identifies a remaining stale success example in the human contract. No product, model, ride-state or spoken-output scope changes are authorised.
+
+2026-08-21 F-01 through F-03 evidence: OpenAiServiceTest 23 and OpenApiContractTest 2 passed with 0 failures (25 focused Java/OpenAPI tests). ProxyFactGeneratorTests passed 35 simulator tests with 0 failures on iPhone 17 / iOS 26.3.1. The red runs first proved both Java canonical/dedup and Unicode-expansion regressions plus iOS missing/malformed/expanded-source acceptance; the green runs prove canonical ASCII URL output, case-insensitive HTTPS validation before lowercase canonical output, final <=2048 enforcement, canonical deduplication, required all-or-nothing iOS sources, explicit [] compatibility and the corrected human-contract example. Commits acfc692 and 9481763 implement the fixes. Follow-up Standards and Specification reviews both returned zero remaining findings. RH-063 linkage/compaction, max_output_tokens:4096, no recent-place list and source-free announcement/TTS text remain unchanged. No full suite, merge, deployment, device build or device install was performed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Resolved RH-028 findings F-01 through F-03. The proxy now canonicalises citation URLs to ASCII before validating HTTPS, final length and canonical deduplication; iOS requires sources and rejects missing, malformed, duplicate, non-ASCII, transformed or over-limit source data while accepting explicit sources:[]; and every human-contract success example includes sources. Final focused evidence: 25 Java/OpenAPI tests and 35 Swift simulator tests passed with zero failures, with zero remaining two-axis review findings. Branch remains In Progress and unmerged pending canonical integration.
+<!-- SECTION:FINAL_SUMMARY:END -->
