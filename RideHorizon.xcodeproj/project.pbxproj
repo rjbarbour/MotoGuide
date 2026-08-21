@@ -18,6 +18,10 @@
 		C30803010000000000000004 /* SpeechCalibrationLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30803010000000000000003 /* SpeechCalibrationLab.swift */; };
 		D26081810000000000000002 /* RideSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26081810000000000000001 /* RideSettings.swift */; };
 		D26081810000000000000004 /* RideSettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26081810000000000000003 /* RideSettingsStoreTests.swift */; };
+		F06100000000000000000001 /* LiveRideActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06100000000000000000010 /* LiveRideActivity.swift */; };
+		F06100000000000000000002 /* LiveRideActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06100000000000000000010 /* LiveRideActivity.swift */; };
+		F06100000000000000000003 /* RideHorizonLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06100000000000000000011 /* RideHorizonLiveActivity.swift */; };
+		F06100000000000000000004 /* RideHorizonLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F06100000000000000000013 /* RideHorizonLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C30803010000000000000013 /* premium-place-name.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C30803010000000000000009 /* premium-place-name.mp3 */; };
 		C30803010000000000000014 /* premium-boundary.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C3080301000000000000000A /* premium-boundary.mp3 */; };
 		C30803010000000000000015 /* premium-short-fact.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C3080301000000000000000B /* premium-short-fact.mp3 */; };
@@ -67,7 +71,28 @@
 			remoteGlobalIDString = E13E879E2C3EE36100308669;
 			remoteInfo = RideHorizon;
 		};
+		F06100000000000000000060 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E13E87972C3EE36100308669 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F06100000000000000000040;
+			remoteInfo = RideHorizonLiveActivity;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F06100000000000000000033 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F06100000000000000000004 /* RideHorizonLiveActivity.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A17D26072026071700000001 /* ProductIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductIdentity.swift; sourceTree = "<group>"; };
@@ -118,6 +143,10 @@
 		E13E88002C3F500000308669 /* FirstRunState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunState.swift; sourceTree = "<group>"; };
 		E13E88012C3F500100308669 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		E13E88022C3F500200308669 /* FirstRunStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunStateTests.swift; sourceTree = "<group>"; };
+		F06100000000000000000010 /* LiveRideActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveRideActivity.swift; sourceTree = "<group>"; };
+		F06100000000000000000011 /* RideHorizonLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideHorizonLiveActivity.swift; sourceTree = "<group>"; };
+		F06100000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F06100000000000000000013 /* RideHorizonLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RideHorizonLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -142,6 +171,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F06100000000000000000031 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -149,6 +185,7 @@
 			isa = PBXGroup;
 			children = (
 				E13E87A12C3EE36100308669 /* RideHorizon */,
+				F06100000000000000000020 /* RideHorizonLiveActivity */,
 				E13E87B62C3EE36400308669 /* RideHorizonTests */,
 				E13E87C02C3EE36400308669 /* RideHorizonUITests */,
 				E13E87A02C3EE36100308669 /* Products */,
@@ -159,6 +196,7 @@
 			isa = PBXGroup;
 			children = (
 				E13E879F2C3EE36100308669 /* RideHorizon.app */,
+				F06100000000000000000013 /* RideHorizonLiveActivity.appex */,
 				E13E87B32C3EE36400308669 /* RideHorizonTests.xctest */,
 				E13E87BD2C3EE36400308669 /* RideHorizonUITests.xctest */,
 			);
@@ -169,6 +207,7 @@
 			isa = PBXGroup;
 			children = (
 				E13E87A22C3EE36100308669 /* RideHorizonApp.swift */,
+				F06100000000000000000010 /* LiveRideActivity.swift */,
 				A17D26072026071700000001 /* ProductIdentity.swift */,
 				B26080210000000000000001 /* RideSessionLifecycle.swift */,
 				B26080210000000000000005 /* RideDiagnosticsStore.swift */,
@@ -198,6 +237,15 @@
 				E13E88012C3F500100308669 /* OnboardingView.swift */,
 			);
 			path = RideHorizon;
+			sourceTree = "<group>";
+		};
+		F06100000000000000000020 /* RideHorizonLiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				F06100000000000000000011 /* RideHorizonLiveActivity.swift */,
+				F06100000000000000000012 /* Info.plist */,
+			);
+			path = RideHorizonLiveActivity;
 			sourceTree = "<group>";
 		};
 		C30803010000000000000008 /* CalibrationFixtures */ = {
@@ -257,15 +305,34 @@
 				E13E879B2C3EE36100308669 /* Sources */,
 				E13E879C2C3EE36100308669 /* Frameworks */,
 				E13E879D2C3EE36100308669 /* Resources */,
+				F06100000000000000000033 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F06100000000000000000061 /* PBXTargetDependency */,
 			);
 			name = RideHorizon;
 			productName = RideHorizon;
 			productReference = E13E879F2C3EE36100308669 /* RideHorizon.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F06100000000000000000040 /* RideHorizonLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F06100000000000000000053 /* Build configuration list for PBXNativeTarget "RideHorizonLiveActivity" */;
+			buildPhases = (
+				F06100000000000000000030 /* Sources */,
+				F06100000000000000000031 /* Frameworks */,
+				F06100000000000000000032 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RideHorizonLiveActivity;
+			productName = RideHorizonLiveActivity;
+			productReference = F06100000000000000000013 /* RideHorizonLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		E13E87B22C3EE36400308669 /* RideHorizonTests */ = {
 			isa = PBXNativeTarget;
@@ -324,6 +391,9 @@
 						CreatedOnToolsVersion = 15.2;
 						TestTargetID = E13E879E2C3EE36100308669;
 					};
+					F06100000000000000000040 = {
+						CreatedOnToolsVersion = 26.0;
+					};
 				};
 			};
 			buildConfigurationList = E13E879A2C3EE36100308669 /* Build configuration list for PBXProject "RideHorizon" */;
@@ -340,6 +410,7 @@
 			projectRoot = "";
 			targets = (
 				E13E879E2C3EE36100308669 /* RideHorizon */,
+				F06100000000000000000040 /* RideHorizonLiveActivity */,
 				E13E87B22C3EE36400308669 /* RideHorizonTests */,
 				E13E87BC2C3EE36400308669 /* RideHorizonUITests */,
 			);
@@ -375,6 +446,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F06100000000000000000032 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -383,6 +461,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A17D26072026071700000002 /* ProductIdentity.swift in Sources */,
+				F06100000000000000000001 /* LiveRideActivity.swift in Sources */,
 				B26080210000000000000002 /* RideSessionLifecycle.swift in Sources */,
 				B26080210000000000000006 /* RideDiagnosticsStore.swift in Sources */,
 				C30803010000000000000002 /* PremiumSpeechProcessor.swift in Sources */,
@@ -435,6 +514,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F06100000000000000000030 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F06100000000000000000002 /* LiveRideActivity.swift in Sources */,
+				F06100000000000000000003 /* RideHorizonLiveActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -447,6 +535,11 @@
 			isa = PBXTargetDependency;
 			target = E13E879E2C3EE36100308669 /* RideHorizon */;
 			targetProxy = E13E87BE2C3EE36400308669 /* PBXContainerItemProxy */;
+		};
+		F06100000000000000000061 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F06100000000000000000040 /* RideHorizonLiveActivity */;
+			targetProxy = F06100000000000000000060 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -822,6 +915,79 @@
 			};
 			name = Calibration;
 		};
+		F06100000000000000000050 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 20260804.0246;
+				DEVELOPMENT_TEAM = W64ZN45B4A;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RideHorizonLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.12.4;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon.liveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F06100000000000000000051 /* Calibration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 20260804.0246;
+				DEVELOPMENT_TEAM = W64ZN45B4A;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RideHorizonLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.12.4;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon.liveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG INTERNAL_AUDIO_CALIBRATION $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Calibration;
+		};
+		F06100000000000000000052 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 20260804.0246;
+				DEVELOPMENT_TEAM = W64ZN45B4A;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RideHorizonLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.12.4;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon.liveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -861,6 +1027,16 @@
 				E13E87CE2C3EE36400308669 /* Debug */,
 				C30803010000000000000023 /* Calibration */,
 				E13E87CF2C3EE36400308669 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F06100000000000000000053 /* Build configuration list for PBXNativeTarget "RideHorizonLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F06100000000000000000050 /* Debug */,
+				F06100000000000000000051 /* Calibration */,
+				F06100000000000000000052 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
