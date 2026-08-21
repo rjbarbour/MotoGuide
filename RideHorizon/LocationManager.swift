@@ -988,7 +988,8 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     private var audioCoexistencePolicy: AudioCoexistencePolicy {
-        interruptsMusic ? .interrupt : .mix
+        guard diagnosticAppState == .foreground else { return .mix }
+        return interruptsMusic ? .interrupt : .mix
     }
 
     var onAddressChange: ((Address) -> Void)?
