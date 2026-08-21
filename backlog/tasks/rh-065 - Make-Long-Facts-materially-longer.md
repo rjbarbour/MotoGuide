@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 12:15'
+updated_date: '2026-08-21 15:17'
 labels:
   - core
   - facts
@@ -65,6 +65,8 @@ Increase the opt-in Long Facts content depth from the current 75–90 words to a
 2026-08-21 branch hand-off: implementation commit a588981 passed the GH-PERSONAL capability check and exact-branch dry run, then pushed to origin/codex/rh-065-long-facts. Next gate: review/integration coordination followed by acceptance criterion 3 physical moving/stationary duration, intelligibility and navigation-audio interruption evidence. Status remains In Progress. No pull request, merge, deployment, device build or device install was performed.
 
 2026-08-21 dependency rebase evidence: this supersedes the earlier 5e66cfb/a588981/717b638 branch hand-off. RH-065 — Make Long Facts materially longer was rebased exactly from old base 5e66cfb onto final RH-028 — Web-search-enabled place facts commit e3a76c9, replaying only the two RH-065 commits. The sole conflict was the OpenAPI checksum; resolution preserved RH-028 canonical-ASCII HTTPS citation validation, final-length enforcement, deduplication and fail-closed source behaviour together with the RH-065 Long Facts contract, producing verified SHA-256 449b0bb0d09c83374547e47bac6e6e0fe0e165951aa9e95778dea5d136753d8c. Post-rebase focused verification passed the same 16 proxy tests and 9 iPhone 17 / iOS 26.3.1 simulator tests with zero failures. No other tests, merge, deployment, device build or device install were performed. Acceptance criterion 3 remains open.
+
+2026-08-21 post-RH-064 integration evidence: rebased RH-065 — Make Long Facts materially longer onto origin/main ef58e67 after RH-064 — Three-ride memory merged. The only conflict was the OpenAPI checksum; resolution preserves RH-064 previousRideSummaries and RH-028 source/citation handling with RH-065's 110–130-word Long Facts contract, verified SHA-256 1a6b82d37c01c51b18be0e2ca6b209d5b9163ffb8bcafc6d88cafe7853965901. Focused verification passed 16 proxy tests and 9 iPhone 17 / iOS 26.3.1 simulator tests with zero failures. No full suite, device build, install or deployment was run. Acceptance criterion 3 remains open for coordinator-owned physical listening evidence. Next gate: force-with-lease push, pull request, required review and CI; executor must not merge.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
