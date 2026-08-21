@@ -71,6 +71,20 @@ final class FactPhraseBuilderTests: XCTestCase {
     }
 }
 
+final class RideLogSourceLinkTests: XCTestCase {
+    func testLogSourceLinkUsesTheStructuredCitationDestination() {
+        let source = PlaceFactSource(
+            title: "Cotswold Canals Trust",
+            url: URL(string: "https://www.cotswoldcanals.org/history")!
+        )
+
+        let link = RideLogSourceLink(source: source)
+
+        XCTAssertEqual(link.title, "Cotswold Canals Trust")
+        XCTAssertEqual(link.destination, URL(string: "https://www.cotswoldcanals.org/history"))
+    }
+}
+
 final class PlaceFactCacheTests: XCTestCase {
     func testCacheStoresAndReturnsFacts() {
         let cache = PlaceFactCache(loadPersisted: false)

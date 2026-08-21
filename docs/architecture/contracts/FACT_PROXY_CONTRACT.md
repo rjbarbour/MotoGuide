@@ -309,12 +309,13 @@ Proxy logs include these event names:
 |-------|---------|-------------------------|
 | `fact_proxy_request` | Final request status and duration for `/v1/fact`. | No token, no place name, no IP. |
 | `fact_request_valid` | Request passed deterministic validation. Emitted only when diagnostics are enabled. | Boundary, fact mode, place-name length, country-context presence. |
-| `fact_request_success` | Fact generated and returned. Emitted only when diagnostics are enabled. | Boundary, fact mode, fact length. |
+| `fact_request_success` | Fact generated and returned. Emitted only when diagnostics are enabled. | Boundary type, fact mode, fact length and source count; no fact or source content. |
 | `fact_request_rejected` | Request failed validation with `400`. | Rejection reason only. |
 | `proxy_auth_failed` | Missing or wrong bearer token with `401`. | Failure category only. |
 | `proxy_auth_misconfigured` | Missing server-side proxy token with `500`. | No secret value. |
 | `rate_limit_exceeded` | Client exceeded per-IP limit with `429`. | Limit value only. |
-| `openai_response` | OpenAI returned an HTTP response. Emitted only when diagnostics are enabled. | Status, duration, boundary. |
+| `openai_response` | OpenAI returned an HTTP response. Emitted only when diagnostics are enabled. | Status, duration, boundary type, fact mode and whether provider linkage continued. |
+| `openai_result` | A completed OpenAI response passed final-answer, citation and fact validation. Emitted only when diagnostics are enabled. | Boundary type, fact mode, web-search call count (`0...1`), searched boolean and source count (`0...5`). No queries, results, source titles/URLs, place/rider/fact/announcement text, identifiers or credentials. |
 | `openai_upstream_error` | OpenAI returned an unusable response. | Boundary and bounded reason. |
 | `openai_request_failed` | OpenAI request failed before usable response. | Boundary and exception class. |
 | `diagnostics_updated` | Admin diagnostics setting changed for the current proxy process. | Enabled flag only. |
@@ -447,7 +448,13 @@ JSON body:
 
 ```json
 {
-  "fact": "Known for its wool trade."
+  "fact": "Known for its wool trade.",
+  "sources": [
+    {
+      "title": "Cotswold Canals Trust",
+      "url": "https://www.cotswoldcanals.org/history"
+    }
+  ]
 }
 ```
 
@@ -456,6 +463,7 @@ Fields:
 | Field | Required | Type | Meaning |
 |-------|----------|------|---------|
 | `fact` | Yes | String | One bounded, factual, ride-safe fact. `shortFacts` is capped at 1100 characters. `longFacts` is capped at 1500 characters. |
+| `sources` | Yes | Array | Zero to five unique HTTPS `url_citation` sources. Each has a title of at most 160 characters and URL of at most 2048 characters. Sources are clickable Log metadata only and never announcement or TTS text. |
 
 ## Error Responses
 

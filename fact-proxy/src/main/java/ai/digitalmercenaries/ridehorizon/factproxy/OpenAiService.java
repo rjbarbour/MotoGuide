@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -167,10 +166,10 @@ public class OpenAiService {
                         "OpenAI web search response lacked usable citations"
                 );
             }
-            if (containsCitationMetadata(finalAnswer.text(), finalAnswer.sources())) {
+            if (containsCitationUrl(finalAnswer.text())) {
                 throw new UpstreamException(
                         UpstreamException.Category.OUTPUT,
-                        "OpenAI response mixed citation metadata into fact text"
+                        "OpenAI response included a citation URL in fact text"
                 );
             }
             String sanitized = FactSanitizer.sanitize(finalAnswer.text(), factMode);
@@ -406,18 +405,12 @@ public class OpenAiService {
         }
     }
 
-    private static boolean containsCitationMetadata(String text, List<FactSource> sources) {
+    private static boolean containsCitationUrl(String text) {
         if (text == null) {
             return false;
         }
-        String normalized = text.toLowerCase(Locale.ROOT);
-        if (normalized.contains("http://") || normalized.contains("https://")) {
-            return true;
-        }
-        return sources.stream()
-                .map(FactSource::title)
-                .map(title -> title.toLowerCase(Locale.ROOT))
-                .anyMatch(normalized::contains);
+        String normalized = text.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("http://") || normalized.contains("https://");
     }
 
     private static WebSearchUsage inspectWebSearchUsage(JsonNode root) {

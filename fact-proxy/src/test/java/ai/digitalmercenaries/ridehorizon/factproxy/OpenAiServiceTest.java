@@ -374,7 +374,48 @@ class OpenAiServiceTest {
             );
 
             assertEquals(UpstreamException.Category.OUTPUT, error.category());
-            assertEquals("OpenAI response mixed citation metadata into fact text", error.getMessage());
+            assertEquals("OpenAI response included a citation URL in fact text", error.getMessage());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void ordinaryFactWordingMayNaturallyMatchItsSourceTitle() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> sendResponse(exchange, 200, """
+                {
+                  "id": "resp_title_overlap",
+                  "status": "completed",
+                  "output": [
+                    {"type": "web_search_call", "id": "ws_1", "status": "completed"},
+                    {
+                      "type": "message",
+                      "status": "completed",
+                      "phase": "final_answer",
+                      "content": [{
+                        "type": "output_text",
+                        "text": "The History of Stroud includes a long woollen-mill tradition.",
+                        "annotations": [{
+                          "type": "url_citation",
+                          "url": "https://history.example/stroud",
+                          "title": "History of Stroud"
+                        }]
+                      }]
+                    }
+                  ]
+                }
+                """));
+        server.start();
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+
+            OpenAiService.GeneratedFact generated = service.generateFactWithMetadata(shortFactRequest());
+
+            assertEquals("The History of Stroud includes a long woollen-mill tradition.", generated.fact());
+            assertEquals(List.of(new FactSource("History of Stroud", "https://history.example/stroud")), generated.sources());
         } finally {
             server.stop(0);
         }

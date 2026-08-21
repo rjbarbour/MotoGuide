@@ -35,6 +35,18 @@ private struct RideLogEntry: Identifiable {
     let sources: [PlaceFactSource]
 }
 
+struct RideLogSourceLink: Equatable, Identifiable {
+    let title: String
+    let destination: URL
+
+    var id: String { destination.absoluteString }
+
+    init(source: PlaceFactSource) {
+        title = source.title
+        destination = source.url
+    }
+}
+
 struct LocationHierarchyRow: Equatable, Identifiable {
     let id: String
     let label: String
@@ -1877,12 +1889,12 @@ private struct LogRow: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                ForEach(log.sources) { source in
-                    Link(destination: source.url) {
-                        Label(source.title, systemImage: "arrow.up.right.square")
+                ForEach(log.sources.map(RideLogSourceLink.init)) { sourceLink in
+                    Link(destination: sourceLink.destination) {
+                        Label(sourceLink.title, systemImage: "arrow.up.right.square")
                     }
                     .font(.caption)
-                    .accessibilityLabel("Source: \(source.title)")
+                    .accessibilityLabel("Source: \(sourceLink.title)")
                 }
             }
 
