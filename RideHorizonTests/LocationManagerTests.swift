@@ -14,6 +14,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
         let announcementID: UUID
         let text: String
         let provider: SpeechProvider
+        let appleVoice: SpeechVoiceSelection?
         let boundary: BoundaryType?
         let allowAppleFallback: Bool
     }
@@ -49,6 +50,7 @@ private final class RecordingSpeechOutputEngine: SpeechOutputEngine {
                 announcementID: announcementID,
                 text: text,
                 provider: provider,
+                appleVoice: appleVoice,
                 boundary: boundary,
                 allowAppleFallback: allowAppleFallback
             )
@@ -403,6 +405,155 @@ final class LocationManagerTests: XCTestCase {
         clearLocationManagerDefaults()
         clearSpeechProviderDefaults()
         clearRiderContextDefaults()
+    }
+
+    func testSpeechVoiceCatalogKeepsEverySuitableEnglishVoiceAndOrdersDeterministically() {
+        let voices = [
+            speechVoice("us-default", "Samantha", "en-US", .default),
+            speechVoice("gb-enhanced", "Daniel", "en-GB", .enhanced),
+            speechVoice("au-premium", "Matilda", "en-AU", .premium),
+            speechVoice("gb-premium", "Serena", "en-GB", .premium),
+            speechVoice("ie-default", "Moira", "en-IE", .default),
+            speechVoice("gb-default", "Martha", "en-GB", .default),
+            speechVoice("za-enhanced", "Tessa", "en-ZA", .enhanced),
+            speechVoice("duplicate", "First", "en-US", .default),
+            speechVoice("duplicate", "Second", "en-GB", .premium),
+            speechVoice("french", "Thomas", "fr-FR", .premium),
+            speechVoice("", "Missing identifier", "en-GB", .premium),
+            speechVoice("missing-name", " ", "en-GB", .premium),
+            speechVoice("missing-locale", "Unknown", " ", .premium)
+        ]
+
+        let options = SpeechVoiceCatalog.options(from: voices)
+
+        XCTAssertEqual(options.count, 8)
+        XCTAssertEqual(
+            options.map(\.identifier),
+            [
+                "duplicate", "gb-premium", "gb-enhanced", "gb-default",
+                "au-premium", "za-enhanced", "ie-default", "us-default"
+            ]
+        )
+        XCTAssertEqual(options.first(where: { $0.identifier == "duplicate" })?.displayName, "Second")
+    }
+
+    func testSpeechVoiceCatalogDuplicateResolutionAndSortingIgnoreInputOrder() {
+        let voices = [
+            speechVoice("shared", "Zulu", "en-US", .default),
+            speechVoice("serena", "serena", "en-GB", .premium),
+            speechVoice("shared", "Alpha", "en-GB", .enhanced),
+            speechVoice("ava", "Áva", "en-US", .premium),
+            speechVoice("daniel", "Ｄaniel", "en-GB", .enhanced)
+        ]
+
+        let forward = SpeechVoiceCatalog.options(from: voices)
+        let reversed = SpeechVoiceCatalog.options(from: Array(voices.reversed()))
+
+        XCTAssertEqual(forward, reversed)
+        XCTAssertEqual(
+            forward.map(\.identifier),
+            ["serena", "shared", "daniel", "ava"]
+        )
+        XCTAssertEqual(forward.first(where: { $0.identifier == "shared" })?.displayName, "Alpha")
+    }
+
+    func testSpeechVoiceOptionLabelShowsNameLocaleAndQualityOnce() {
+        let voice = speechVoice("serena", "Serena", "en-GB", .premium)
+
+        XCTAssertEqual(voice.pickerLabel, "Serena · en-GB · Premium")
+        XCTAssertEqual(voice.compactLabel, "Serena · en-GB · Premium")
+    }
+
+    func testSpeechVoiceCatalogChoosesSerenaAsProvisionalHighQualityDefault() {
+        let options = SpeechVoiceCatalog.options(from: [
+            speechVoice("daniel", "Daniel", "en-GB", .premium),
+            speechVoice("serena", "Serena", "en-GB", .enhanced),
+            speechVoice("ava", "Ava", "en-US", .premium)
+        ])
+
+        XCTAssertEqual(SpeechVoiceCatalog.provisionalDefault(from: options)?.identifier, "serena")
+        XCTAssertEqual(
+            SpeechVoiceCatalog.resolvedIdentifier(preferredIdentifier: "", options: options),
+            "serena"
+        )
+    }
+
+    func testSpeechVoiceCatalogExcludesEddyAndEddieOnlyFromAutomaticSelection() {
+        let options = SpeechVoiceCatalog.options(from: [
+            speechVoice("eddy", "Eddy", "en-GB", .premium),
+            speechVoice("eddie", "Eddie", "en-US", .premium),
+            speechVoice("daniel", "Daniel", "en-GB", .enhanced)
+        ])
+
+        XCTAssertEqual(SpeechVoiceCatalog.provisionalDefault(from: options)?.identifier, "daniel")
+        XCTAssertEqual(
+            SpeechVoiceCatalog.resolvedIdentifier(preferredIdentifier: "eddy", options: options),
+            "eddy",
+            "An explicit rider selection remains valid"
+        )
+        XCTAssertNil(
+            SpeechVoiceCatalog.provisionalDefault(
+                from: options.filter { $0.identifier == "eddy" || $0.identifier == "eddie" }
+            )
+        )
+    }
+
+    func testSpeechVoiceCatalogFallsBackWhenPersistedSelectionDisappears() {
+        let options = SpeechVoiceCatalog.options(from: [
+            speechVoice("serena", "Serena", "en-GB", .premium),
+            speechVoice("ava", "Ava", "en-US", .premium)
+        ])
+
+        XCTAssertEqual(
+            SpeechVoiceCatalog.resolvedIdentifier(
+                preferredIdentifier: "removed-voice",
+                options: options
+            ),
+            "serena"
+        )
+        XCTAssertEqual(
+            SpeechVoiceCatalog.resolvedIdentifier(
+                preferredIdentifier: "removed-voice",
+                options: []
+            ),
+            ""
+        )
+    }
+
+    @MainActor
+    func testPersistedAppleVoiceIdentifierReachesPreviewAndNormalSpeech() {
+        assertAppleVoiceIdentifierReachesPreviewAndNormalSpeech(
+            persistedIdentifier: "daniel",
+            voices: [
+                speechVoice("serena", "Serena", "en-GB", .premium),
+                speechVoice("daniel", "Daniel", "en-GB", .enhanced)
+            ],
+            expectedIdentifier: "daniel"
+        )
+    }
+
+    @MainActor
+    func testProvisionalAppleVoiceIdentifierReachesPreviewAndNormalSpeech() {
+        assertAppleVoiceIdentifierReachesPreviewAndNormalSpeech(
+            persistedIdentifier: "",
+            voices: [
+                speechVoice("daniel", "Daniel", "en-GB", .premium),
+                speechVoice("serena", "Serena", "en-GB", .enhanced)
+            ],
+            expectedIdentifier: "serena"
+        )
+    }
+
+    @MainActor
+    func testFallbackAppleVoiceIdentifierReachesPreviewAndNormalSpeech() {
+        assertAppleVoiceIdentifierReachesPreviewAndNormalSpeech(
+            persistedIdentifier: "removed-voice",
+            voices: [
+                speechVoice("serena", "Serena", "en-GB", .premium),
+                speechVoice("ava", "Ava", "en-US", .premium)
+            ],
+            expectedIdentifier: "serena"
+        )
     }
 
     @MainActor
@@ -1509,8 +1660,10 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testActiveRideIdentityBoundsFactRequestsAndEndConversation() async {
+    func testActiveRideIdentityBoundsFactRequestsAndEndConversation() async throws {
         let factGenerator = MockPlaceFactGenerator()
+        let factRequested = expectation(description: "Fact request records the active ride identity")
+        factGenerator.onRequest = { _ in factRequested.fulfill() }
         let locationManager = LocationManager(
             factGenerator: factGenerator,
             speechOutput: RecordingSpeechOutputEngine(),
@@ -1534,14 +1687,20 @@ final class LocationManagerTests: XCTestCase {
             administrativeArea: "England",
             country: "United Kingdom"
         ))
-        try? await Task.sleep(nanoseconds: 100_000_000)
-        let rideSessionID = try? XCTUnwrap(factGenerator.requests.first?.rideSessionID)
+        await fulfillment(of: [factRequested], timeout: 1)
+        let rideSessionID = try XCTUnwrap(factGenerator.requests.first?.rideSessionID)
+
+        let conversationEnded = expectation(description: "End ride clears the linked fact conversation")
+        factGenerator.onEndRideConversation = { endedRideSessionID in
+            if endedRideSessionID == rideSessionID {
+                conversationEnded.fulfill()
+            }
+        }
 
         locationManager.endRide()
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await fulfillment(of: [conversationEnded], timeout: 1)
 
-        XCTAssertNotNil(rideSessionID)
-        XCTAssertEqual(factGenerator.endedRideSessionIDs, rideSessionID.map { [$0] } ?? [])
+        XCTAssertEqual(factGenerator.endedRideSessionIDs, [rideSessionID])
     }
 
     @MainActor
@@ -3436,5 +3595,78 @@ final class LocationManagerTests: XCTestCase {
             "RideHorizonCustomFactInstructions",
             "RideHorizonFactInterestCategories"
         ].forEach(UserDefaults.standard.removeObject(forKey:))
+    }
+
+    private func speechVoice(
+        _ identifier: String,
+        _ name: String,
+        _ locale: String,
+        _ quality: AVSpeechSynthesisVoiceQuality
+    ) -> SpeechVoiceOption {
+        SpeechVoiceOption(
+            identifier: identifier,
+            displayName: name,
+            localeIdentifier: locale,
+            quality: quality
+        )
+    }
+
+    @MainActor
+    private func assertAppleVoiceIdentifierReachesPreviewAndNormalSpeech(
+        persistedIdentifier: String,
+        voices: [SpeechVoiceOption],
+        expectedIdentifier: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let suiteName = "LocationManagerVoiceSelectionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settingsStore = UserDefaultsRideSettingsStore(defaults: defaults)
+        var settings = settingsStore.load()
+        settings.preferredVoiceIdentifier = persistedIdentifier
+        settingsStore.save(settings, changed: .preferredVoiceIdentifier)
+
+        let previewOutput = RecordingSpeechOutputEngine()
+        let previewManager = LocationManager(
+            speechOutput: previewOutput,
+            rideSettingsStore: settingsStore,
+            speechVoiceOptions: { voices },
+            aiSharingAllowed: { true }
+        )
+        previewManager.speechProvider = .proxyElevenLabs
+        previewManager.previewSelectedVoice()
+
+        XCTAssertEqual(previewOutput.requests.last?.provider, .apple, file: file, line: line)
+        XCTAssertEqual(
+            previewOutput.requests.last?.appleVoice?.identifier,
+            expectedIdentifier,
+            file: file,
+            line: line
+        )
+
+        let normalOutput = RecordingSpeechOutputEngine()
+        let normalManager = LocationManager(
+            speechOutput: normalOutput,
+            rideSettingsStore: settingsStore,
+            speechVoiceOptions: { voices },
+            aiSharingAllowed: { true }
+        )
+        normalManager.speechProvider = .apple
+        normalManager.speakForTesting(text: "Voice selection test", boundary: .town)
+
+        XCTAssertEqual(normalOutput.requests.last?.provider, .apple, file: file, line: line)
+        XCTAssertEqual(
+            normalOutput.requests.last?.appleVoice?.identifier,
+            expectedIdentifier,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            settingsStore.load().preferredVoiceIdentifier,
+            expectedIdentifier,
+            file: file,
+            line: line
+        )
     }
 }
