@@ -367,7 +367,8 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
             await conversationMutex.release()
             return response.fact
         } catch {
-            if request.rideSessionID == linkedRideSessionID {
+            let wasCancelled = Task.isCancelled || Self.isCancellation(error)
+            if !wasCancelled, request.rideSessionID == linkedRideSessionID {
                 linkedRideSessionID = nil
                 previousResponseID = nil
             }
@@ -486,6 +487,13 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
             previousResponseID = nil
         }
         await conversationMutex.release()
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        return (error as? URLError)?.code == .cancelled
     }
 }
 

@@ -485,6 +485,65 @@ final class ProxyFactGeneratorTests: XCTestCase {
         XCTAssertNil(previousResponseHeaders[2])
     }
 
+    func testCancelledRideFactPreservesLastConfirmedLinkage() async throws {
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000063")!
+        var previousResponseHeaders: [String?] = []
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            previousResponseHeaders.append(
+                request.value(forHTTPHeaderField: FactProxyContract.previousResponseIdHeader)
+            )
+            if requestCount == 2 {
+                throw URLError(.notConnectedToInternet)
+            }
+            return (
+                HTTPURLResponse(
+                    url: self.endpoint,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: [
+                        FactProxyContract.responseIdHeader:
+                            requestCount == 1 ? "resp_confirmed" : "resp_after_cancel"
+                    ]
+                )!,
+                Data(#"{"fact":"Known for its wool trade."}"#.utf8)
+            )
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: [30, 30]
+        )
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            rideSessionID: rideSessionID
+        )
+
+        _ = try await generator.fact(for: request)
+        let cancelledFact = Task {
+            try await generator.fact(for: request)
+        }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        cancelledFact.cancel()
+        do {
+            _ = try await cancelledFact.value
+            XCTFail("Expected the superseded fact request to be cancelled.")
+        } catch is CancellationError {
+            // Expected: cancellation must preserve the prior confirmed link.
+        }
+
+        _ = try await generator.fact(for: request)
+
+        XCTAssertEqual(requestCount, 3)
+        XCTAssertNil(previousResponseHeaders[0])
+        XCTAssertEqual(previousResponseHeaders[1], "resp_confirmed")
+        XCTAssertEqual(previousResponseHeaders[2], "resp_confirmed")
+    }
+
     func testPostsDeviceIdHeaderWhenConfigured() async throws {
         let endpoint = self.endpoint
         let request = PlaceFactRequest(
