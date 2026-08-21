@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 15:17'
+updated_date: '2026-08-21 15:19'
 labels:
   - core
   - facts
@@ -13,6 +13,8 @@ labels:
 milestone: m-1
 dependencies:
   - RH-028
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/61'
 modified_files:
   - FACT_PROXY_OPENAPI.yaml
   - RideHorizonTests/RideHorizonTests.swift
@@ -67,6 +69,8 @@ Increase the opt-in Long Facts content depth from the current 75–90 words to a
 2026-08-21 dependency rebase evidence: this supersedes the earlier 5e66cfb/a588981/717b638 branch hand-off. RH-065 — Make Long Facts materially longer was rebased exactly from old base 5e66cfb onto final RH-028 — Web-search-enabled place facts commit e3a76c9, replaying only the two RH-065 commits. The sole conflict was the OpenAPI checksum; resolution preserved RH-028 canonical-ASCII HTTPS citation validation, final-length enforcement, deduplication and fail-closed source behaviour together with the RH-065 Long Facts contract, producing verified SHA-256 449b0bb0d09c83374547e47bac6e6e0fe0e165951aa9e95778dea5d136753d8c. Post-rebase focused verification passed the same 16 proxy tests and 9 iPhone 17 / iOS 26.3.1 simulator tests with zero failures. No other tests, merge, deployment, device build or device install were performed. Acceptance criterion 3 remains open.
 
 2026-08-21 post-RH-064 integration evidence: rebased RH-065 — Make Long Facts materially longer onto origin/main ef58e67 after RH-064 — Three-ride memory merged. The only conflict was the OpenAPI checksum; resolution preserves RH-064 previousRideSummaries and RH-028 source/citation handling with RH-065's 110–130-word Long Facts contract, verified SHA-256 1a6b82d37c01c51b18be0e2ca6b209d5b9163ffb8bcafc6d88cafe7853965901. Focused verification passed 16 proxy tests and 9 iPhone 17 / iOS 26.3.1 simulator tests with zero failures. No full suite, device build, install or deployment was run. Acceptance criterion 3 remains open for coordinator-owned physical listening evidence. Next gate: force-with-lease push, pull request, required review and CI; executor must not merge.
+
+2026-08-21 PR hand-off: PR #61 is open from codex/rh-065-long-facts into main. Required gate is focused CI and review; status remains In Progress because this Backlog.md project has no Review status and acceptance criterion 3 remains open. Coordinator owns merge and later physical listening acceptance.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
