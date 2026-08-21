@@ -556,7 +556,7 @@ final class ProxyFactGeneratorTests: XCTestCase {
                             requestCount == 1 ? "resp_confirmed" : "resp_after_cancel"
                     ]
                 )!,
-                Data(#"{"fact":"Known for its wool trade."}"#.utf8)
+                Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8)
             )
         }
         let generator = ProxyFactGenerator(
