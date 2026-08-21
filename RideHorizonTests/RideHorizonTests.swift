@@ -26,4 +26,11 @@ final class RideHorizonTests: XCTestCase {
         XCTAssertNil(ContentMode.namesOnly.factMode)
         XCTAssertNil(ContentMode.quiet.factMode)
     }
+
+    func testLongFactsRemainCompatibleWithExistingAppBoundWithoutChangingShortOrNamesOnly() {
+        XCTAssertEqual(FactMode.longFacts.maxFactLength, 1_500)
+        XCTAssertEqual(FactMode.shortFacts.maxFactLength, 1_100)
+        XCTAssertEqual(ContentMode.shortFacts.factMode, .shortFacts)
+        XCTAssertNil(ContentMode.namesOnly.factMode)
+    }
 }

@@ -16,9 +16,10 @@ public enum FactMode {
     LONG_FACTS(
             "longFacts",
             1500,
-            4,
-            "Write 75 to 90 words of local context with geography, cultural character, and practical significance. "
-                    + "Prioritise what is distinctive about this place and why it matters to a rider nearby. "
+            5,
+            "Write 110 to 130 words of coherent local context in three to five concise, connected sentences. "
+                    + "Build one flowing explanation around one or two concrete anchors from geography, cultural character, or practical significance, and explain why they matter to a rider nearby. "
+                    + "Do not use a trivia list, repeat the supplied place or hierarchy context, or pad the response with generic description. "
                     + "Keep practical or safety framing brief and only when truly relevant."
     );
 

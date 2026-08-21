@@ -179,7 +179,7 @@ Runtime configuration:
 
 ### RH-028 candidate OpenAI request contract
 
-The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium`, the model-controlled hosted `web_search` tool and `max_tool_calls: 1`. It retains `store: false` outside rides and RH-063's `store: true`, `previous_response_id` and compaction behaviour for active rides. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–90-word facts. The proxy accepts only a top-level Responses result with `status: completed`, selects a completed `final_answer` when phase is present, accepts a completed phase-less compatibility message otherwise, and extracts typed `output_text` plus bounded `url_citation` annotations. OpenAI requires citations for displayed web-derived information to be visible and clickable. [OpenAI web-search output and citations](https://developers.openai.com/api/docs/guides/tools-web-search#output-and-citations) [OpenAI phase guidance](https://developers.openai.com/api/docs/guides/reasoning#phase-parameter) [OpenAI Responses reference](https://developers.openai.com/api/reference/resources/responses/methods/create) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
+The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium`, the model-controlled hosted `web_search` tool and `max_tool_calls: 1`. It retains `store: false` outside rides and the `RH-063 — App-owned per-ride OpenAI conversation` behaviour: `store: true`, `previous_response_id` and compaction during active rides. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–130-word facts. The proxy accepts only a top-level Responses result with `status: completed`, selects a completed `final_answer` when phase is present, accepts a completed phase-less compatibility message otherwise, and extracts typed `output_text` plus bounded `url_citation` annotations. OpenAI requires citations for displayed web-derived information to be visible and clickable. [OpenAI web-search output and citations](https://developers.openai.com/api/docs/guides/tools-web-search#output-and-citations) [OpenAI phase guidance](https://developers.openai.com/api/docs/guides/reasoning#phase-parameter) [OpenAI Responses reference](https://developers.openai.com/api/reference/resources/responses/methods/create) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
 
 This is candidate behaviour only. RH-028 is not merged or deployed by this work item hand-off.
 
@@ -283,7 +283,7 @@ Example object payload:
 {
   "modePrompts": {
     "shortFacts": "up to five concise local-context facts, up to 1100 characters",
-    "longFacts": "up to eight concise contextual facts, up to 1500 characters total"
+    "longFacts": "110 to 130 coherent words in up to five connected sentences, up to 1500 characters total"
   },
   "users": {
     "rider-a": {
@@ -567,7 +567,7 @@ The iOS app treats `/v1/speech` separately from fact generation:
 The returned `fact` must be:
 
 - `shortFacts`: up to 5 short sentences and no more than 1100 characters.
-- `longFacts`: up to 8 short sentences and no more than 1500 characters.
+- `longFacts`: target 110–130 coherent words in up to 5 concise, connected sentences and no more than 1500 characters; do not use trivia-list structure, repeat supplied place context or add padding.
 - Factual and neutral.
 - Useful as ambient place context.
 - Short enough to keep the total spoken announcement ride-safe.
