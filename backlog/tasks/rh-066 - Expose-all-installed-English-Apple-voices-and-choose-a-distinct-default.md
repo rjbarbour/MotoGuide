@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 11:14'
+updated_date: '2026-08-21 11:57'
 labels:
   - core
   - apple-voice
@@ -17,6 +17,7 @@ references:
 modified_files:
   - RideHorizon/LocationManager.swift
   - RideHorizonTests/LocationManagerTests.swift
+  - RideHorizonTests/PlaceFactTests.swift
   - RideHorizonTests/RideSettingsStoreTests.swift
 priority: medium
 type: enhancement
@@ -49,6 +50,9 @@ Remove RideHorizon’s artificial four-voice limit, let the rider preview every 
 6. Address review findings by capturing SpeechVoiceSelection in the speech-output test double and injecting deterministic voice options into LocationManager tests so persisted, provisional and missing-selection fallback identifiers are asserted through Preview and normal Apple speech.
 7. Make catalogue de-duplication input-order independent and replace locale-sensitive comparisons with fixed POSIX-normalised keys; add a reversed-input conflicting-duplicate regression test.
 8. Re-run only the focused voice/settings simulator tests, retain acceptance criterion 3 only on passing end-to-end evidence, record the review fix, commit once as RH-066, and push clean while criterion 4 remains open.
+
+9. Fix PR #53’s CI-only timing failure without product changes: add request/end callbacks to MockPlaceFactGenerator and replace fixed sleeps in testActiveRideIdentityBoundsFactRequestsAndEndConversation with XCTest expectations tied to the recorded request and end-conversation linkage.
+10. Run only that one test twice, record both passes, commit once as test(RH-066), push the branch clean, and leave PR #53 unmerged.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -63,6 +67,11 @@ Acceptance criterion 3 temporarily reopened pending the requested exact identifi
 
 Review findings resolved. RecordingSpeechOutputEngine now captures SpeechVoiceSelection. Deterministic injected voice catalogues prove that the exact persisted, provisional Serena and missing-selection fallback identifiers each reach both Preview and normal Apple speech. Catalogue entries are sorted before de-duplication with fixed en_US_POSIX-normalised comparison keys and raw-value tie-breakers, so conflicting duplicate metadata resolves identically for forward and reversed input.
 Focused verification on 2026-08-21: 10 selected voice/settings tests passed, 0 failed, 0 skipped on iPhone 17 / iOS 26.3.1 simulator. No full suite, device build, deployment or merge was run. Acceptance criterion 3 is re-checked from this evidence; criterion 4 remains open for owner listening.
+
+PR #53 CI follow-up: full-suite failure was isolated to testActiveRideIdentityBoundsFactRequestsAndEndConversation timing out its fixed 100 ms sleep during CI voice-database startup; product behaviour was not implicated.
+
+CI timing fix implemented without product changes. MockPlaceFactGenerator now exposes optional callbacks after appending a fact request and after recording endRideConversation. testActiveRideIdentityBoundsFactRequestsAndEndConversation waits for those XCTest expectations before reading the ride ID and asserting end linkage; the fixed 100 ms and 50 ms sleeps are removed.
+Focused verification on 2026-08-21: the single test passed twice independently on iPhone 17 / iOS 26.3.1 simulator; each completed result bundle reports exactly 1 passed, 0 failed and 0 skipped. One earlier invocation ended during simulator test-host bootstrap before XCTest ran and is not counted as test evidence. No other tests, product build, device build, deployment or merge were run.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -78,5 +87,11 @@ author: @codex
 created: 2026-08-21 11:14
 ---
 Both independent RH-066 review findings are resolved with focused automated evidence; criterion 4 remains open for physical-iPhone owner listening.
+---
+
+author: @codex
+created: 2026-08-21 11:57
+---
+PR #53 CI-only timing fix is ready: the formerly flaky test passed twice using event-driven expectations; product code is unchanged.
 ---
 <!-- COMMENTS:END -->

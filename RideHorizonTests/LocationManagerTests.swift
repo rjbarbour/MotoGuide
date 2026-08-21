@@ -1655,8 +1655,10 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testActiveRideIdentityBoundsFactRequestsAndEndConversation() async {
+    func testActiveRideIdentityBoundsFactRequestsAndEndConversation() async throws {
         let factGenerator = MockPlaceFactGenerator()
+        let factRequested = expectation(description: "Fact request records the active ride identity")
+        factGenerator.onRequest = { _ in factRequested.fulfill() }
         let locationManager = LocationManager(
             factGenerator: factGenerator,
             speechOutput: RecordingSpeechOutputEngine(),
@@ -1680,14 +1682,20 @@ final class LocationManagerTests: XCTestCase {
             administrativeArea: "England",
             country: "United Kingdom"
         ))
-        try? await Task.sleep(nanoseconds: 100_000_000)
-        let rideSessionID = try? XCTUnwrap(factGenerator.requests.first?.rideSessionID)
+        await fulfillment(of: [factRequested], timeout: 1)
+        let rideSessionID = try XCTUnwrap(factGenerator.requests.first?.rideSessionID)
+
+        let conversationEnded = expectation(description: "End ride clears the linked fact conversation")
+        factGenerator.onEndRideConversation = { endedRideSessionID in
+            if endedRideSessionID == rideSessionID {
+                conversationEnded.fulfill()
+            }
+        }
 
         locationManager.endRide()
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await fulfillment(of: [conversationEnded], timeout: 1)
 
-        XCTAssertNotNil(rideSessionID)
-        XCTAssertEqual(factGenerator.endedRideSessionIDs, rideSessionID.map { [$0] } ?? [])
+        XCTAssertEqual(factGenerator.endedRideSessionIDs, [rideSessionID])
     }
 
     @MainActor

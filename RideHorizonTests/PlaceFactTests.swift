@@ -8,10 +8,13 @@ final class MockPlaceFactGenerator: PlaceFactGenerating {
     var shouldThrow = false
     var endedRideSessionIDs: [UUID] = []
     var requests: [PlaceFactRequest] = []
+    var onRequest: ((PlaceFactRequest) -> Void)?
+    var onEndRideConversation: ((UUID) -> Void)?
 
     func fact(for request: PlaceFactRequest) async throws -> String {
         callCount += 1
         requests.append(request)
+        onRequest?(request)
         if delayNanoseconds > 0 {
             try await Task.sleep(nanoseconds: delayNanoseconds)
         }
@@ -26,6 +29,7 @@ final class MockPlaceFactGenerator: PlaceFactGenerating {
 
     func endRideConversation(_ rideSessionID: UUID) async {
         endedRideSessionIDs.append(rideSessionID)
+        onEndRideConversation?(rideSessionID)
     }
 }
 
