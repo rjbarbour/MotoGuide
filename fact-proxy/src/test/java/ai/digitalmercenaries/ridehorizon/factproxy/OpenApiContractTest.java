@@ -26,7 +26,7 @@ final class OpenApiContractTest {
     private static final String ACCEPTED_OPENAPI_VERSION = "3.0.3";
     private static final String ACCEPTED_CONTRACT_VERSION = "0.2.0";
     private static final String ACCEPTED_CONTRACT_SHA256 =
-            "98495fe2deeef924fd59a3d10288ace047d3f4c55e3ac61e253e79e4c2e4266c";
+            "40cea1d44d361ff2754a25e6d025bd1cc89b619a76e71050e218cd681ace8b5f";
 
     private static final Map<String, String> PUBLISHED_OPERATIONS = Map.ofEntries(
             Map.entry("GET /health", "getHealth"),

@@ -7,7 +7,6 @@ public enum FactMode {
     SHORT_FACTS(
             "shortFacts",
             1100,
-            700,
             2,
             "Write 35 to 45 words of ride-relevant local context, usually one sentence and never more than two. "
                     + "Give it a practical place-awareness angle for riders passing through. "
@@ -17,7 +16,6 @@ public enum FactMode {
     LONG_FACTS(
             "longFacts",
             1500,
-            1000,
             4,
             "Write 75 to 90 words of local context with geography, cultural character, and practical significance. "
                     + "Prioritise what is distinctive about this place and why it matters to a rider nearby. "
@@ -26,20 +24,17 @@ public enum FactMode {
 
     private final String wireValue;
     private final int maxFactLength;
-    private final int maxCompletionTokens;
     private final int maxSentences;
     private final String defaultPrompt;
 
     FactMode(
             String wireValue,
             int maxFactLength,
-            int maxCompletionTokens,
             int maxSentences,
             String defaultPrompt
     ) {
         this.wireValue = wireValue;
         this.maxFactLength = maxFactLength;
-        this.maxCompletionTokens = maxCompletionTokens;
         this.maxSentences = maxSentences;
         this.defaultPrompt = defaultPrompt;
     }
@@ -50,10 +45,6 @@ public enum FactMode {
 
     public int maxFactLength() {
         return maxFactLength;
-    }
-
-    public int maxCompletionTokens() {
-        return maxCompletionTokens;
     }
 
     public int maxSentences() {
