@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import AVFoundation
+import UIKit
 
 enum LocationServiceStatus: Equatable {
     case idle
@@ -873,6 +874,7 @@ class LocationManager: NSObject, ObservableObject {
     private var testIndex = 0
     private let announcementCoordinator: AnnouncementCoordinator
     private let aiSharingAllowed: () -> Bool
+    private let isApplicationForeground: @MainActor () -> Bool
     private let inactivityNotifier: RideInactivityNotifying
     private let liveActivityManager: RideLiveActivityManaging
     private var wantsRideTracking: Bool { rideSessionController.wantsLocationInput }
@@ -988,6 +990,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     private var audioCoexistencePolicy: AudioCoexistencePolicy {
+        diagnosticAppState = isApplicationForeground() ? .foreground : .background
         guard diagnosticAppState == .foreground else { return .mix }
         return interruptsMusic ? .interrupt : .mix
     }
@@ -1006,6 +1009,9 @@ class LocationManager: NSObject, ObservableObject {
         placeResolver: PlaceResolver,
         rideDistanceMeasurer: RideDistanceMeasuring,
         liveActivityManager: RideLiveActivityManaging? = nil,
+        isApplicationForeground: @escaping @MainActor () -> Bool = {
+            UIApplication.shared.applicationState != .background
+        },
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let settings = rideSettingsStore.load()
@@ -1034,6 +1040,7 @@ class LocationManager: NSObject, ObservableObject {
         self.diagnostics = diagnostics
         self.rideSessionController = rideSessionController
         self.liveActivityManager = liveActivityManager ?? SystemRideLiveActivityManager()
+        self.isApplicationForeground = isApplicationForeground
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
         self.liveActivityManager.endOrphanedActivities()
@@ -1128,6 +1135,9 @@ class LocationManager: NSObject, ObservableObject {
         rideSettingsStore: RideSettingsStore? = nil,
         rideSessionController: RideSessionController? = nil,
         liveActivityManager: RideLiveActivityManaging? = nil,
+        isApplicationForeground: @escaping @MainActor () -> Bool = {
+            UIApplication.shared.applicationState != .background
+        },
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let locationAdapter = CoreLocationAdapter()
@@ -1154,6 +1164,7 @@ class LocationManager: NSObject, ObservableObject {
             placeResolver: locationAdapter,
             rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
             liveActivityManager: liveActivityManager ?? DisabledRideLiveActivityManager(),
+            isApplicationForeground: isApplicationForeground,
             aiSharingAllowed: aiSharingAllowed
         )
         diagnosticsRelay.connect { [weak self] signal in
