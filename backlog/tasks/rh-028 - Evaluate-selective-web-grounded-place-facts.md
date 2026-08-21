@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 12:01'
+updated_date: '2026-08-21 14:05'
 labels:
   - proxy
   - model
@@ -47,6 +47,7 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 - [x] #8 Citation URLs are canonicalised before validation; HTTPS is checked case-insensitively on the canonical URI, the final ASCII URL is at most 2048 characters, and deduplication uses that canonical URL so Unicode expansion cannot break iOS attribution.
 - [x] #9 The iOS fact response requires a sources field and fails closed when it is missing or any provided source is malformed; an uncited response is valid only with an explicit empty sources array.
 - [x] #10 Every success example in FACT_PROXY_CONTRACT.md includes the required sources field, either empty or populated with bounded cited sources.
+- [x] #11 Each accepted announcement retains its resolved coordinate and address by announcement ID; delivered phrase/source logging uses that immutable context even after newer or rejected geocodes, and context is removed on supersession, terminal completion/cancellation/failure and End ride.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -59,6 +60,8 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 5. Correct every stale FACT_PROXY_CONTRACT.md success response example and keep OpenAPI wording synchronised if necessary.
 6. Run only the focused changed proxy tests and focused Swift simulator suites, then perform the bounded two-axis review.
 7. Record evidence, commit and push RH-028, clean generated output, and leave the worktree clean without merge or deployment.
+
+8. Resolve PR #59 thread PRRT_kwDOMm8pys6bKd8z by capturing immutable resolved coordinate/address context per accepted announcement ID, using it for delivered Log attribution, cleaning every terminal path, and proving a newer lower-priority context cannot relabel the older sourced fact.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -85,10 +88,18 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 F-01 through F-03 evidence: OpenAiServiceTest 23 and OpenApiContractTest 2 passed with 0 failures (25 focused Java/OpenAPI tests). ProxyFactGeneratorTests passed 35 simulator tests with 0 failures on iPhone 17 / iOS 26.3.1. The red runs first proved both Java canonical/dedup and Unicode-expansion regressions plus iOS missing/malformed/expanded-source acceptance; the green runs prove canonical ASCII URL output, case-insensitive HTTPS validation before lowercase canonical output, final <=2048 enforcement, canonical deduplication, required all-or-nothing iOS sources, explicit [] compatibility and the corrected human-contract example. Commits acfc692 and 9481763 implement the fixes. Follow-up Standards and Specification reviews both returned zero remaining findings. RH-063 linkage/compaction, max_output_tokens:4096, no recent-place list and source-free announcement/TTS text remain unchanged. No full suite, merge, deployment, device build or device install was performed.
 
 2026-08-21 F-01 through F-03 branch hand-off: commits acfc692, 9481763 and 86afe24 were pushed to origin/codex/rh-028-web-search. No pull request, merge, deployment, device build or device install was performed. Status remains In Progress pending canonical integration.
+
+2026-08-21 PR #59 current-main proxy integration drift: PrivateBetaFallbackQuotaHttpTest reproduced 1 failure because its generateFact(any()) mock no longer intercepts FactController.generateFactWithMetadata for non-ride requests. Commit b01959b changes only that mock to return GeneratedFact("Known for its wool trade.", empty sources, null response ID). Focused verification: ./gradlew test --tests ai.digitalmercenaries.ridehorizon.factproxy.PrivateBetaFallbackQuotaHttpTest --console=plain passed 1 test with 0 failures after reproducing the failure. Full verification: ./gradlew test --console=plain passed all 91 proxy tests with 0 failures. Bounded Standards and Specification reviews of git diff 5623936...HEAD both returned zero findings. No merge or deployment was performed.
+
+2026-08-21 PR #59 hand-off: commits b01959b and 05bdd9e were pushed to origin/codex/rh-028-web-search. PR #59 remains open and unmerged; no deployment was performed.
+
+2026-08-21 PR #59 iOS current-main integration drift: commit b0f9079 changes only ProxyFactGeneratorTests.testCancelledRideFactPreservesLastConfirmedLinkage to return {"fact":"Known for its wool trade.","sources":[]} on successful calls. Host CoreSimulator was available with iPhone 17 / iOS 26.3 after the sandboxed probe was inconclusive. Exact verification: xcodebuild test ... -only-testing:RideHorizonTests/ProxyFactGeneratorTests/testCancelledRideFactPreservesLastConfirmedLinkage passed 1 test with 0 failures. The test still cancels request 2, preserves resp_confirmed and reuses it on request 3. Bounded Standards and Specification reviews of git diff 1ddb590...HEAD both returned zero findings. No merge or deployment was performed.
+
+2026-08-21 PR #59 iOS drift hand-off: commits b0f9079 and 8b30de4 were pushed to origin/codex/rh-028-web-search. PR #59 remains open and unmerged; no deployment was performed.
+
+2026-08-21 PR #59 thread PRRT_kwDOMm8pys6bKd8z reopened citation-place correctness. The accepted reverse-geocode request retains its coordinate, but LocationManager currently logs a delivered sourced plan through mutable lastKnownLocation/lastKnownAddress. Scope is limited to announcement-ID context capture/use/cleanup and focused Swift evidence; speech text, source semantics, provider state and navigation behaviour remain unchanged.
+
+2026-08-21 PR #59 thread PRRT_kwDOMm8pys6bKd8z resolution evidence: commit 7e1025f retains each accepted announcement's resolved coordinate/address by announcement ID and uses that immutable context for delivered Log phrase/sources. Context is removed on supersession, fact or pending cancellation, completed/cancelled/failed terminal results and End ride; interruption hand-off remains non-terminal. Deterministic focused regressions passed 3 tests with 0 failures for original-place citation logging after a newer lower-priority rejection, active-fact cancellation, supersession replacement, completion and End ride cleanup. Final focused simulator verification on iPhone 17 / iOS 26.3.1 passed LocationManagerTests 102 plus AnnouncementCoordinatorTests 26, 128 tests total with 0 failures. The first sandboxed simulator attempt failed because CoreSimulatorService was inaccessible; host CoreSimulator verification then succeeded. Follow-up Standards and Specification reviews of git diff 01ce1d2...7e1025f both returned zero findings. Speech text and source semantics are unchanged. No full iOS suite, device build, merge or deployment was performed.
+
+2026-08-21 PR #59 thread hand-off: implementation commit 7e1025f and evidence commit 2862978 were pushed to origin/codex/rh-028-web-search with the documented GH-PERSONAL profile. GitHub reports PR #59 OPEN and unmerged at head 2862978. Thread-resolution evidence is the deterministic 3-test lifecycle regression set, the final 128/128 affected-suite pass and zero-finding follow-up reviews. No merge, deployment or device build was performed.
 <!-- SECTION:NOTES:END -->
-
-## Final Summary
-
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Resolved RH-028 findings F-01 through F-03. The proxy now canonicalises citation URLs to ASCII before validating HTTPS, final length and canonical deduplication; iOS requires sources and rejects missing, malformed, duplicate, non-ASCII, transformed or over-limit source data while accepting explicit sources:[]; and every human-contract success example includes sources. Final focused evidence: 25 Java/OpenAPI tests and 35 Swift simulator tests passed with zero failures, with zero remaining two-axis review findings. Branch remains In Progress and unmerged pending canonical integration.
-<!-- SECTION:FINAL_SUMMARY:END -->

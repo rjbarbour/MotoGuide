@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import AVFoundation
+import UIKit
 
 enum LocationServiceStatus: Equatable {
     case idle
@@ -92,10 +93,6 @@ struct SpeechVoiceOption: Identifiable, Hashable {
 
     var id: String { identifier }
 
-    var isRecommended: Bool {
-        localeIdentifier.hasPrefix("en-GB") && quality == .premium
-    }
-
     var isSafeDefaultCandidate: Bool {
         quality == .premium || quality == .enhanced
     }
@@ -118,15 +115,119 @@ struct SpeechVoiceOption: Identifiable, Hashable {
     }
 
     var pickerLabel: String {
-        if isRecommended {
-            return "\(displayLabel) · Premium"
-        }
-
-        return displayLabel
+        displayLabel
     }
 
     var compactLabel: String {
         displayLabel
+    }
+}
+
+enum SpeechVoiceCatalog {
+    static let provisionalPreferredName = "Serena"
+
+    static func options(from voices: [SpeechVoiceOption]) -> [SpeechVoiceOption] {
+        let orderedVoices = voices
+            .filter { voice in
+                let language = voice.localeIdentifier
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+                return !voice.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && !voice.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && (language == "en" || language.hasPrefix("en-") || language.hasPrefix("en_"))
+            }
+            .sorted(by: precedes)
+
+        var seenIdentifiers: Set<String> = []
+        return orderedVoices.filter { seenIdentifiers.insert($0.identifier).inserted }
+    }
+
+    static func resolvedIdentifier(
+        preferredIdentifier: String,
+        options: [SpeechVoiceOption]
+    ) -> String {
+        if options.contains(where: { $0.identifier == preferredIdentifier }) {
+            return preferredIdentifier
+        }
+
+        return provisionalDefault(from: options)?.identifier ?? ""
+    }
+
+    static func provisionalDefault(from options: [SpeechVoiceOption]) -> SpeechVoiceOption? {
+        let eligible = options.filter { !isExcludedAutomaticDefault($0) }
+
+        if let provisional = eligible.first(where: {
+            comparisonKey($0.displayName) == comparisonKey(provisionalPreferredName)
+                && $0.isSafeDefaultCandidate
+        }) {
+            return provisional
+        }
+
+        return eligible.first(where: \.isSafeDefaultCandidate) ?? eligible.first
+    }
+
+    static func isExcludedAutomaticDefault(_ voice: SpeechVoiceOption) -> Bool {
+        let name = comparisonKey(voice.displayName.trimmingCharacters(in: .whitespacesAndNewlines))
+        return name == "eddy" || name == "eddie"
+    }
+
+    static func qualityRank(_ quality: AVSpeechSynthesisVoiceQuality) -> Int {
+        switch quality {
+        case .premium:
+            return 3
+        case .enhanced:
+            return 2
+        case .default:
+            return 1
+        @unknown default:
+            return 1
+        }
+    }
+
+    private static func precedes(_ lhs: SpeechVoiceOption, _ rhs: SpeechVoiceOption) -> Bool {
+        let lhsIsBritish = lhs.localeIdentifier.lowercased().hasPrefix("en-gb")
+        let rhsIsBritish = rhs.localeIdentifier.lowercased().hasPrefix("en-gb")
+        if lhsIsBritish != rhsIsBritish {
+            return lhsIsBritish
+        }
+
+        let lhsQuality = qualityRank(lhs.quality)
+        let rhsQuality = qualityRank(rhs.quality)
+        if lhsQuality != rhsQuality {
+            return lhsQuality > rhsQuality
+        }
+        if lhs.quality != rhs.quality {
+            return lhs.quality.rawValue > rhs.quality.rawValue
+        }
+
+        let lhsName = comparisonKey(lhs.displayName)
+        let rhsName = comparisonKey(rhs.displayName)
+        if lhsName != rhsName {
+            return lhsName < rhsName
+        }
+        if lhs.displayName != rhs.displayName {
+            return lhs.displayName < rhs.displayName
+        }
+
+        let lhsLocale = comparisonKey(lhs.localeIdentifier)
+        let rhsLocale = comparisonKey(rhs.localeIdentifier)
+        if lhsLocale != rhsLocale {
+            return lhsLocale < rhsLocale
+        }
+        if lhs.localeIdentifier != rhs.localeIdentifier {
+            return lhs.localeIdentifier < rhs.localeIdentifier
+        }
+
+        return lhs.identifier < rhs.identifier
+    }
+
+    private static func comparisonKey(_ value: String) -> String {
+        value
+            .precomposedStringWithCanonicalMapping
+            .folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
     }
 }
 
@@ -857,6 +958,11 @@ struct CoreLocationRideDistanceMeasurer: RideDistanceMeasuring {
     }
 }
 
+private struct AnnouncementLogContext {
+    let coordinate: CLLocationCoordinate2D
+    let address: Address
+}
+
 @MainActor
 class LocationManager: NSObject, ObservableObject {
     static let movingMapInteractionThresholdMetersPerSecond = 8.0 / 3.6
@@ -873,6 +979,8 @@ class LocationManager: NSObject, ObservableObject {
     private var testIndex = 0
     private let announcementCoordinator: AnnouncementCoordinator
     private let aiSharingAllowed: () -> Bool
+    private let speechVoiceOptions: () -> [SpeechVoiceOption]
+    private let isApplicationForeground: @MainActor () -> Bool
     private let inactivityNotifier: RideInactivityNotifying
     private let liveActivityManager: RideLiveActivityManaging
     private var wantsRideTracking: Bool { rideSessionController.wantsLocationInput }
@@ -887,6 +995,7 @@ class LocationManager: NSObject, ObservableObject {
     private var diagnosticAppState: DiagnosticAppState = .foreground
     private var factContentByAnnouncementID: [UUID: String] = [:]
     private var deliveredFactContents: [String] = []
+    private var announcementLogContexts: [UUID: AnnouncementLogContext] = [:]
 #if INTERNAL_AUDIO_CALIBRATION
     private let calibrationProcessor: PremiumSpeechProcessing = DefaultPremiumSpeechProcessor()
     private let calibrationPremiumAudioPlayer: PremiumAudioPlaying = NormalisedPremiumAudioPlayer()
@@ -992,6 +1101,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     private var audioCoexistencePolicy: AudioCoexistencePolicy {
+        diagnosticAppState = isApplicationForeground() ? .foreground : .background
         guard diagnosticAppState == .foreground else { return .mix }
         return interruptsMusic ? .interrupt : .mix
     }
@@ -1011,6 +1121,19 @@ class LocationManager: NSObject, ObservableObject {
         rideDistanceMeasurer: RideDistanceMeasuring,
         previousRideMemoryStore: PreviousRideMemoryStore = .shared,
         liveActivityManager: RideLiveActivityManaging? = nil,
+        speechVoiceOptions: @escaping () -> [SpeechVoiceOption] = {
+            AVSpeechSynthesisVoice.speechVoices().map { voice in
+                SpeechVoiceOption(
+                    identifier: voice.identifier,
+                    displayName: voice.name,
+                    localeIdentifier: voice.language,
+                    quality: voice.quality
+                )
+            }
+        },
+        isApplicationForeground: @escaping @MainActor () -> Bool = {
+            UIApplication.shared.applicationState != .background
+        },
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let settings = rideSettingsStore.load()
@@ -1040,6 +1163,8 @@ class LocationManager: NSObject, ObservableObject {
         self.rideSessionController = rideSessionController
         self.previousRideMemoryStore = previousRideMemoryStore
         self.liveActivityManager = liveActivityManager ?? SystemRideLiveActivityManager()
+        self.speechVoiceOptions = speechVoiceOptions
+        self.isApplicationForeground = isApplicationForeground
         self.aiSharingAllowed = aiSharingAllowed
         self.previousRideSummaryCount = previousRideMemoryStore.summaries.count
         super.init()
@@ -1136,6 +1261,19 @@ class LocationManager: NSObject, ObservableObject {
         rideSessionController: RideSessionController? = nil,
         liveActivityManager: RideLiveActivityManaging? = nil,
         previousRideMemoryStore: PreviousRideMemoryStore? = nil,
+        speechVoiceOptions: @escaping () -> [SpeechVoiceOption] = {
+            AVSpeechSynthesisVoice.speechVoices().map { voice in
+                SpeechVoiceOption(
+                    identifier: voice.identifier,
+                    displayName: voice.name,
+                    localeIdentifier: voice.language,
+                    quality: voice.quality
+                )
+            }
+        },
+        isApplicationForeground: @escaping @MainActor () -> Bool = {
+            UIApplication.shared.applicationState != .background
+        },
         aiSharingAllowed: @escaping () -> Bool = { AISharingConsentStore.isGranted() }
     ) {
         let locationAdapter = CoreLocationAdapter()
@@ -1163,6 +1301,8 @@ class LocationManager: NSObject, ObservableObject {
             rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
             previousRideMemoryStore: previousRideMemoryStore ?? .shared,
             liveActivityManager: liveActivityManager ?? DisabledRideLiveActivityManager(),
+            speechVoiceOptions: speechVoiceOptions,
+            isApplicationForeground: isApplicationForeground,
             aiSharingAllowed: aiSharingAllowed
         )
         diagnosticsRelay.connect { [weak self] signal in
@@ -1339,6 +1479,7 @@ class LocationManager: NSObject, ObservableObject {
         }
         factContentByAnnouncementID.removeAll()
         deliveredFactContents.removeAll()
+        announcementLogContexts.removeAll()
         liveActivityManager.endRide()
         if wasActive, let activeRideSessionID {
             Task { [announcementCoordinator] in
@@ -1489,69 +1630,21 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     func availableSpeechVoices() -> [SpeechVoiceOption] {
-        let englishVoices = AVSpeechSynthesisVoice.speechVoices().filter {
-            $0.language.hasPrefix("en")
-        }
-
-        let options = englishVoices
-            .filter { !$0.identifier.isEmpty && !$0.language.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .map { voice in
-                SpeechVoiceOption(
-                    identifier: voice.identifier,
-                    displayName: voice.name,
-                    localeIdentifier: voice.language,
-                    quality: voice.quality
-                )
-            }
-            .sorted { lhs, rhs in
-                if lhs.isRecommended != rhs.isRecommended {
-                    return lhs.isRecommended
-                }
-
-                let lhsIsGb = lhs.localeIdentifier.hasPrefix("en-GB")
-                let rhsIsGb = rhs.localeIdentifier.hasPrefix("en-GB")
-                if lhsIsGb != rhsIsGb {
-                    return lhsIsGb
-                }
-
-                if lhs.quality != rhs.quality {
-                    return Self.speechQualityRank(lhs.quality) > Self.speechQualityRank(rhs.quality)
-                }
-
-                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
-            }
-
-        var deduped: [SpeechVoiceOption] = []
-        var seen: Set<String> = []
-        for option in options {
-            if deduped.count >= 4 { break }
-            if seen.insert(option.identifier).inserted {
-                deduped.append(option)
-            }
-        }
-
-        if deduped.count < 4 {
-            for option in options
-                .filter({ !deduped.contains($0) }) {
-                if deduped.count >= 4 { break }
-                deduped.append(option)
-            }
-        }
-
-        return deduped
+        SpeechVoiceCatalog.options(from: speechVoiceOptions())
     }
 
     func recommendedSpeechVoice() -> SpeechVoiceOption? {
-        availableSpeechVoices().first(where: { $0.isSafeDefaultCandidate })
+        SpeechVoiceCatalog.provisionalDefault(from: availableSpeechVoices())
     }
 
     func previewSelectedVoice() {
         stopSpeechOutput()
-        announcementCoordinator.cancelPending()
+        cancelPendingAnnouncement()
         speak(
             text: "\(ProductIdentity.displayName) can speak in this voice. Keep the road in front of you, rider.",
             shouldRecordTestLog: false,
-            ignoreQuietMode: true
+            ignoreQuietMode: true,
+            providerOverride: .apple
         )
     }
 
@@ -1822,20 +1915,27 @@ class LocationManager: NSObject, ObservableObject {
         processResolvedAddress(currentAddress)
     }
 
-    private func processResolvedAddress(_ address: Address, placeLookupID: UUID? = nil) {
+    private func processResolvedAddress(
+        _ address: Address,
+        placeLookupID: UUID? = nil,
+        resolvedCoordinate: CLLocationCoordinate2D? = nil
+    ) {
+        let acceptedLogContext = (resolvedCoordinate ?? lastKnownLocation).map {
+            AnnouncementLogContext(coordinate: $0, address: address)
+        }
         updateLiveActivity(for: address)
         let outcome = announcementCoordinator.submit(AnnouncementWorkflowInput(
             address: address,
             settings: boundarySettings,
             mode: contentMode,
             repeatPreferences: legacyRepeatPreferences,
-            speakAfterEveryGeocode: speakAfterEveryGeocode,
+            speakAfterEveryGeocode: testMode && speakAfterEveryGeocode,
             riderContext: riderContext,
             delivery: AnnouncementDeliveryContext(
                 selectedProvider: { [weak self] in self?.speechProvider ?? .apple },
                 aiSharingAllowed: aiSharingAllowed,
                 appleVoice: { [weak self] in
-                    self?.resolveSpeechVoice().map { SpeechVoiceSelection(identifier: $0.identifier) }
+                    self?.resolveSpeechVoiceSelection()
                 },
                 allowAppleFallback: { [weak self] in self?.premiumVoiceAppleFallbackEnabled ?? false },
                 audioPolicy: { [weak self] in self?.audioCoexistencePolicy ?? .mix },
@@ -1860,8 +1960,11 @@ class LocationManager: NSObject, ObservableObject {
         case .rejected:
             if testMode { recordTestLog(utteredPhrase: nil) }
             AppDiagnostics.log("Dropped lower-priority announcement while higher-priority work remains active.")
-        case .accepted(_, let supersededAnnouncementIDs):
+        case .accepted(let plan, let supersededAnnouncementIDs):
             recordSupersededAnnouncements(supersededAnnouncementIDs)
+            if let acceptedLogContext {
+                announcementLogContexts[plan.id] = acceptedLogContext
+            }
             if !testMode { onAddressChange?(address) }
         }
     }
@@ -1893,8 +1996,15 @@ class LocationManager: NSObject, ObservableObject {
         onRideLog?(location, address, utteredPhrase, sources)
     }
 
+    private func recordDeliveredLog(for plan: AnnouncementPlan) {
+        guard (testMode || !plan.sources.isEmpty),
+              let context = announcementLogContexts[plan.id] else { return }
+        onRideLog?(context.coordinate, context.address, plan.text, plan.sources)
+    }
+
     private func recordSupersededAnnouncements(_ supersededAnnouncementIDs: Set<UUID>) {
         for announcementID in supersededAnnouncementIDs {
+            announcementLogContexts.removeValue(forKey: announcementID)
             recordDiagnostic(
                 .announcementSuperseded,
                 announcementID: announcementID,
@@ -1911,7 +2021,7 @@ class LocationManager: NSObject, ObservableObject {
             return
         }
 
-        announcementCoordinator.cancelPending()
+        cancelPendingAnnouncement()
         stopSpeechOutput()
         speak(text: text, boundary: announcementCoordinator.currentBoundary, shouldRecordTestLog: false)
     }
@@ -2007,14 +2117,17 @@ class LocationManager: NSObject, ObservableObject {
                                 request,
                                 result: result
                               ) else { return }
-                        self.publishPlaceResolution(completion)
+                        self.publishPlaceResolution(completion, resolvedLocation: request.location)
                     }
                 }
             }
         }
     }
 
-    private func publishPlaceResolution(_ completion: RidePlaceResolutionCompletion) {
+    private func publishPlaceResolution(
+        _ completion: RidePlaceResolutionCompletion,
+        resolvedLocation: AcceptedRideLocation
+    ) {
         switch completion.result {
         case .failed:
             recordDiagnostic(.placeLookupFailed, placeLookupID: completion.requestID)
@@ -2028,7 +2141,14 @@ class LocationManager: NSObject, ObservableObject {
             lastKnownAddress = address
             recordDiagnostic(.placeLookupFinished, placeLookupID: completion.requestID)
             AppDiagnostics.log("Resolved a place name.")
-            processResolvedAddress(address, placeLookupID: completion.requestID)
+            processResolvedAddress(
+                address,
+                placeLookupID: completion.requestID,
+                resolvedCoordinate: CLLocationCoordinate2D(
+                    latitude: resolvedLocation.latitude,
+                    longitude: resolvedLocation.longitude
+                )
+            )
         }
     }
 
@@ -2281,8 +2401,9 @@ class LocationManager: NSObject, ObservableObject {
             for announcementID in supersededAnnouncementIDs {
                 factContentByAnnouncementID.removeValue(forKey: announcementID)
             }
-        case .boundaryRejected:
-            break
+        case .boundaryRejected(let announcementID):
+            factContentByAnnouncementID.removeValue(forKey: announcementID)
+            announcementLogContexts.removeValue(forKey: announcementID)
         case .announcementQueued(let plan, let placeLookupID):
             announcementStatus = .phraseReady
             recordDiagnostic(
@@ -2303,6 +2424,7 @@ class LocationManager: NSObject, ObservableObject {
         case .factCancelled(let announcementID):
             if let announcementID {
                 factContentByAnnouncementID.removeValue(forKey: announcementID)
+                announcementLogContexts.removeValue(forKey: announcementID)
             }
             if !isSpeechOutputActive { announcementStatus = .idle }
         case .speechRequested(let plan, _, let shouldRecordTestLog):
@@ -2314,7 +2436,7 @@ class LocationManager: NSObject, ObservableObject {
             lastSpokenAt = Date()
             lastSpeechDiagnosticNote = nil
             if shouldRecordTestLog {
-                recordTestLog(utteredPhrase: plan.text, sources: plan.sources)
+                recordDeliveredLog(for: plan)
             }
             announcementStatus = .preparingVoice
         case .retryScheduled, .fallbackStarted:
@@ -2328,13 +2450,18 @@ class LocationManager: NSObject, ObservableObject {
         case .completed(let announcementID):
             if activeRideSessionID != nil,
                let announcementID,
-               let factContent = factContentByAnnouncementID.removeValue(forKey: announcementID) {
+               let factContent = factContentByAnnouncementID[announcementID] {
                 deliveredFactContents.append(factContent)
+            }
+            if let announcementID {
+                factContentByAnnouncementID.removeValue(forKey: announcementID)
+                announcementLogContexts.removeValue(forKey: announcementID)
             }
             announcementStatus = .idle
         case .cancelled(let announcementID, _), .failed(let announcementID, _):
             if let announcementID {
                 factContentByAnnouncementID.removeValue(forKey: announcementID)
+                announcementLogContexts.removeValue(forKey: announcementID)
             }
             announcementStatus = .idle
         }
@@ -2345,7 +2472,8 @@ class LocationManager: NSObject, ObservableObject {
         text: String,
         boundary: BoundaryType? = nil,
         shouldRecordTestLog: Bool = true,
-        ignoreQuietMode: Bool = false
+        ignoreQuietMode: Bool = false,
+        providerOverride: SpeechProvider? = nil
     ) {
         guard ignoreQuietMode || contentMode != .quiet else { return }
         let plan = AnnouncementPlan(
@@ -2354,10 +2482,10 @@ class LocationManager: NSObject, ObservableObject {
             boundary: boundary ?? .street
         )
         announcementCoordinator.speak(plan, delivery: AnnouncementDeliveryContext(
-            selectedProvider: { [weak self] in self?.speechProvider ?? .apple },
+            selectedProvider: { [weak self] in providerOverride ?? self?.speechProvider ?? .apple },
             aiSharingAllowed: aiSharingAllowed,
             appleVoice: { [weak self] in
-                self?.resolveSpeechVoice().map { SpeechVoiceSelection(identifier: $0.identifier) }
+                self?.resolveSpeechVoiceSelection()
             },
             allowAppleFallback: { [weak self] in self?.premiumVoiceAppleFallbackEnabled ?? false },
             audioPolicy: { [weak self] in self?.audioCoexistencePolicy ?? .mix },
@@ -2368,6 +2496,11 @@ class LocationManager: NSObject, ObservableObject {
 
     private func stopSpeechOutput() {
         _ = announcementCoordinator.stop(reason: .playbackCancelled)
+    }
+
+    private func cancelPendingAnnouncement() {
+        guard let announcementID = announcementCoordinator.cancelPending() else { return }
+        announcementLogContexts.removeValue(forKey: announcementID)
     }
 
 #if DEBUG
@@ -2383,9 +2516,24 @@ class LocationManager: NSObject, ObservableObject {
         speak(text: text, boundary: boundary, shouldRecordTestLog: false, ignoreQuietMode: true)
     }
 
-    func processResolvedAddressForTesting(_ address: Address, placeLookupID: UUID? = nil) {
+    func processResolvedAddressForTesting(
+        _ address: Address,
+        placeLookupID: UUID? = nil,
+        resolvedCoordinate: CLLocationCoordinate2D? = nil
+    ) {
+        if let resolvedCoordinate {
+            lastKnownLocation = resolvedCoordinate
+        }
         lastKnownAddress = address
-        processResolvedAddress(address, placeLookupID: placeLookupID)
+        processResolvedAddress(
+            address,
+            placeLookupID: placeLookupID,
+            resolvedCoordinate: resolvedCoordinate
+        )
+    }
+
+    var announcementLogContextCountForTesting: Int {
+        announcementLogContexts.count
     }
 
     func beginPlaceLookupDiagnosticForTesting() -> UUID {
@@ -2420,62 +2568,25 @@ class LocationManager: NSObject, ObservableObject {
     }
 #endif
 
-    private func resolveSpeechVoice() -> AVSpeechSynthesisVoice? {
-        let voices = AVSpeechSynthesisVoice.speechVoices()
-        if let preferred = voices.first(where: { $0.identifier == preferredVoiceIdentifier }) {
-            return preferred
-        }
-
-        return bestVoice(from: voices)
+    private func resolveSpeechVoiceSelection() -> SpeechVoiceSelection? {
+        ensurePreferredVoiceSelection()
+        guard !preferredVoiceIdentifier.isEmpty else { return nil }
+        return SpeechVoiceSelection(identifier: preferredVoiceIdentifier)
     }
+
+#if INTERNAL_AUDIO_CALIBRATION
+    private func resolveSpeechVoice() -> AVSpeechSynthesisVoice? {
+        resolveSpeechVoiceSelection().flatMap { AVSpeechSynthesisVoice(identifier: $0.identifier) }
+    }
+#endif
 
     private func ensurePreferredVoiceSelection() {
-        let voices = availableSpeechVoices()
-        if let first = voices.first, !first.identifier.isEmpty {
-            preferredVoiceIdentifier = voices.first(where: { $0.identifier == preferredVoiceIdentifier })?.identifier
-                ?? first.identifier
-            return
-        }
-        preferredVoiceIdentifier = ""
-    }
-
-    private func bestVoice(from voices: [AVSpeechSynthesisVoice]) -> AVSpeechSynthesisVoice? {
-        guard !voices.isEmpty else {
-            return nil
-        }
-
-        if let preferredGb = voices
-            .filter({ $0.language == "en-GB" })
-            .max(by: compareVoiceQuality) {
-            return preferredGb
-        }
-
-        if let preferredEnglish = voices
-            .filter({ $0.language.hasPrefix("en") })
-            .max(by: compareVoiceQuality) {
-            return preferredEnglish
-        }
-
-        return voices.max(by: compareVoiceQuality)
-    }
-
-    private func compareVoiceQuality(lhs: AVSpeechSynthesisVoice, rhs: AVSpeechSynthesisVoice) -> Bool {
-        if Self.speechQualityRank(lhs.quality) != Self.speechQualityRank(rhs.quality) {
-            return Self.speechQualityRank(lhs.quality) > Self.speechQualityRank(rhs.quality)
-        }
-        return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-    }
-
-    private static func speechQualityRank(_ quality: AVSpeechSynthesisVoiceQuality) -> Int {
-        switch quality {
-        case .premium:
-            return 3
-        case .enhanced:
-            return 2
-        case .default:
-            return 1
-        @unknown default:
-            return 1
+        let resolvedIdentifier = SpeechVoiceCatalog.resolvedIdentifier(
+            preferredIdentifier: preferredVoiceIdentifier,
+            options: availableSpeechVoices()
+        )
+        if preferredVoiceIdentifier != resolvedIdentifier {
+            preferredVoiceIdentifier = resolvedIdentifier
         }
     }
 

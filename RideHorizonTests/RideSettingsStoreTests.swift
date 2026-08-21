@@ -74,6 +74,19 @@ final class RideSettingsStoreTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "RideHorizonFactInterestCategories"), "history,landmarks")
     }
 
+    func testAppleVoiceSelectionPersistsExactInstalledVoiceIdentifier() {
+        let store = UserDefaultsRideSettingsStore(defaults: defaults)
+        var settings = store.load()
+        settings.preferredVoiceIdentifier = "com.apple.voice.premium.en-GB.Serena"
+
+        store.save(settings, changed: .preferredVoiceIdentifier)
+
+        XCTAssertEqual(
+            store.load().preferredVoiceIdentifier,
+            "com.apple.voice.premium.en-GB.Serena"
+        )
+    }
+
     func testSpeechProviderMigrationRemainsOneTimeAndPreservesLaterAppleChoice() {
         defaults.set(SpeechProvider.apple.rawValue, forKey: "RideHorizonSpeechProvider")
         let store = UserDefaultsRideSettingsStore(defaults: defaults)

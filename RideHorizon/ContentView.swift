@@ -1108,6 +1108,7 @@ private struct SettingsView: View {
     @State private var showPrivacyNotice = false
     @State private var showClearLocalDataConfirmation = false
     @State private var showClearRideMemoryConfirmation = false
+    @State private var diagnosticsCopyStatus: String?
     @AppStorage("RideHorizonMapLabelScale") private var mapLabelScale = 1.0
     @AppStorage("RideHorizonNightMode") private var nightMode = false
 #if DEBUG
@@ -1477,6 +1478,23 @@ private struct SettingsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
+                        Button {
+                            diagnosticsCopyStatus = RideDiagnosticsClipboard.copy(from: rideDiagnostics)
+                                ? "Diagnostics copied."
+                                : "No diagnostics available to copy."
+                        } label: {
+                            Label("Copy diagnostics", systemImage: "doc.on.doc")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(rideDiagnostics.entries.isEmpty)
+
+                        if let diagnosticsCopyStatus {
+                            Text(diagnosticsCopyStatus)
+                                .font(.callout.weight(.semibold))
+                                .foregroundStyle(palette.secondaryText)
+                        }
+
                         ShareLink(item: rideDiagnostics.exportURL) {
                             Label("Export diagnostics", systemImage: "square.and.arrow.up")
                                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -1514,10 +1532,11 @@ private struct SettingsView: View {
                         )
                         SettingsToggleRow(
                             title: "Speak after every location lookup",
-                            subtitle: "Developer-only noisy speech mode.",
+                            subtitle: "Test Mode only. Repeats after every location lookup.",
                             isOn: $locationManager.speakAfterEveryGeocode,
                             palette: palette
                         )
+                        .disabled(!locationManager.testMode)
 
 #if INTERNAL_AUDIO_CALIBRATION
                         NavigationLink {
