@@ -1,16 +1,19 @@
 ---
 id: RH-077
 title: Restore AI availability for private-beta fallback sessions
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:36'
-updated_date: '2026-08-21 11:38'
+updated_date: '2026-08-21 11:43'
 labels:
   - proxy
   - ai
   - reliability
 dependencies: []
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/54'
+  - 'https://github.com/rjbarbour/MotoGuide/actions/runs/32478371230'
 modified_files:
   - >-
     fact-proxy/src/main/java/ai/digitalmercenaries/ridehorizon/factproxy/JdbcSessionAuthority.java
@@ -30,9 +33,9 @@ The live private beta uses fallback sessions because App Attest is not enabled. 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A production-default fallback session can complete at least 21 fact requests in one day without receiving HTTP 429.
-- [ ] #2 Fallback fact and speech allowances match the existing verified-session private-beta allowances while global caps remain unchanged.
-- [ ] #3 The focused proxy regression tests pass and the corrected proxy is deployed with live requests no longer rejected at the old fallback cap.
+- [x] #1 A production-default fallback session can complete at least 21 fact requests in one day without receiving HTTP 429.
+- [x] #2 Fallback fact and speech allowances match the existing verified-session private-beta allowances while global caps remain unchanged.
+- [x] #3 The focused proxy regression tests pass and the corrected proxy is deployed with live requests no longer rejected at the old fallback cap.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,4 +48,12 @@ The live private beta uses fallback sessions because App Attest is not enabled. 
 
 <!-- SECTION:NOTES:BEGIN -->
 Red evidence: PrivateBetaFallbackQuotaHttpTest failed deterministically on request 21 with the production fallback default. Live Fly logs showed repeated HTTP 429 rate_limit before OpenAI, and aggregate PostgreSQL counters were exactly 20 facts and 11,998 of 12,000 speech characters for one fallback subject while global fact usage was only 20 of 2,000. Fix raises fallback defaults to the existing verified-session allowances: 180 facts and 120,000 speech characters; global caps are unchanged. Focused automatic-session/quota tests and the complete proxy suite both passed with BUILD SUCCESSFUL.
+
+PR #54 merged to main at 88c59fa. Post-merge main tests passed; canonical proxy deployment run 32478371230 deployed that exact commit and its health smoke check passed. A read-only runtime check confirmed no Fly environment overrides mask the new fallback or global quota defaults.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Restored private-beta AI availability by raising fallback per-installation quotas from 20 facts and 12,000 speech characters to the existing verified-session allowances of 180 and 120,000. The request-21 HTTP regression, focused tests, full proxy suite, post-merge tests, production deployment and health smoke check passed; global caps remain unchanged.
+<!-- SECTION:FINAL_SUMMARY:END -->
