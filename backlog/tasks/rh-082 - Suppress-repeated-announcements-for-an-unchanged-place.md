@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:46'
-updated_date: '2026-08-21 11:46'
+updated_date: '2026-08-21 12:27'
 labels:
   - core
   - announcement
@@ -32,8 +32,18 @@ Road-test regression observed on 2026-08-21: RideHorizon continuously repeats th
 - [ ] #4 Focused automated evidence and a physical road-test check demonstrate that an unchanged place remains quiet across multiple updates
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add a failing LocationManager regression proving that the developer noisy-speech flag cannot repeat unchanged places during a live ride, while a genuine place change still announces once. 2. Scope Speak after every location lookup to Test Mode and make the UI constraint explicit. 3. Verify the explicit Test Mode repeat path remains available. 4. Run focused tests and the complete iOS unit-test checkpoint, build/install if the supported iPhone is connected, then push and raise a separate PR.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Captured from the 2026-08-21 road test. Intended branch: codex/rh-082-suppress-unchanged-place-repeats. Coordination only in this session; diagnosis and implementation have not started.
+
+2026-08-21 diagnosis: the normal AnnouncementPolicy already rejects unchanged addresses. Static path analysis found one bypass: Speak after every location lookup forces speech for unchanged addresses and is currently honoured during live rides. The field setting itself is not proven from captured road diagnostics, but this is the only code path that produces the reported unchanged-place behaviour.
+
+2026-08-21 red/green evidence: the live-ride test failed with repeated Stroud and Stonehouse announcements before the fix; the Test Mode repeat test passed. After gating the noisy override to Test Mode, both focused tests passed. The complete RideHorizonTests suite passed 240 tests with 0 failures. Robert's iPhone was not listed by xcodebuild, so physical build/install and unchanged-place road validation remain pending.
 <!-- SECTION:NOTES:END -->
