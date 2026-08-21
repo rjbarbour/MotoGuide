@@ -236,7 +236,7 @@ The iOS app automatically stores only its short-lived session token in Keychain.
 | `OPENAI_API_KEY` | Yes | OpenAI key (Fly secret only) |
 | `ELEVENLABS_API_KEY` | Yes for speech | ElevenLabs key (Fly secret only) |
 | `RIDEHORIZON_PROXY_TOKEN` | Operator compatibility only | Server-side operator credential; never ship it in the app |
-| `OPENAI_MODEL` | No | Fly runtime variable. Default `gpt-4o-mini` in `fly.toml` |
+| `OPENAI_MODEL` | No | Fly runtime variable. Default `gpt-5.6-sol` in `fly.toml` |
 | `ELEVENLABS_VOICE_ID` | No | Voice id for `/v1/speech`; default is the service default in `application.yml` |
 | `ELEVENLABS_MODEL_ID` | No | ElevenLabs model id. Default `eleven_multilingual_v2` |
 | `ELEVENLABS_OUTPUT_FORMAT` | No | ElevenLabs output format. Default `mp3_44100_128` |

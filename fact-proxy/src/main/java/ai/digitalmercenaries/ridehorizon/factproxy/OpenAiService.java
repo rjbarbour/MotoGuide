@@ -12,13 +12,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 
 @Service
 public class OpenAiService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiService.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
+    private static final int MAX_OUTPUT_TOKENS = 4_096;
 
     private static final String BASE_SYSTEM_PROMPT = """
             You are a place-fact generator for a motorcycling ride companion.
@@ -114,7 +114,10 @@ public class OpenAiService {
             }
 
             JsonNode root = objectMapper.readTree(response.body());
-            String content = root.path("choices").path(0).path("message").path("content").asText(null);
+            if (!"completed".equals(root.path("status").asText(null))) {
+                throw new UpstreamException("OpenAI response was not completed");
+            }
+            String content = extractOutputText(root);
             String sanitized = FactSanitizer.sanitize(content, factMode);
             if (sanitized == null) {
                 throw new UpstreamException("OpenAI response could not be sanitized");
@@ -132,13 +135,35 @@ public class OpenAiService {
     private Map<String, Object> buildPayload(ValidatedFactRequest request, FactMode factMode) {
         return Map.of(
                 "model", openAiProperties.model(),
-                "messages", List.of(
-                        Map.of("role", "system", "content", systemPrompt(factMode, request)),
-                        Map.of("role", "user", "content", userPrompt(request, factMode))
-                ),
-                "max_completion_tokens", factMode.maxCompletionTokens(),
-                "temperature", 0.35
+                "instructions", systemPrompt(factMode, request),
+                "input", userPrompt(request, factMode),
+                "reasoning", Map.of("effort", "medium"),
+                "store", false,
+                "max_output_tokens", MAX_OUTPUT_TOKENS
         );
+    }
+
+    private static String extractOutputText(JsonNode root) {
+        StringBuilder outputText = new StringBuilder();
+        for (JsonNode outputItem : root.path("output")) {
+            if (!"message".equals(outputItem.path("type").asText())) {
+                continue;
+            }
+            for (JsonNode contentItem : outputItem.path("content")) {
+                if (!"output_text".equals(contentItem.path("type").asText())) {
+                    continue;
+                }
+                String text = contentItem.path("text").asText(null);
+                if (text == null || text.isBlank()) {
+                    continue;
+                }
+                if (!outputText.isEmpty()) {
+                    outputText.append('\n');
+                }
+                outputText.append(text);
+            }
+        }
+        return outputText.isEmpty() ? null : outputText.toString();
     }
 
     private String systemPrompt(FactMode factMode, ValidatedFactRequest request) {

@@ -68,7 +68,9 @@ x-deployment:
     RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST:
       description: Comma-separated host allowlist for prompt override JSON fetches. Required when RIDEHORIZON_PROMPT_OVERRIDES_ENABLED=true.
     OPENAI_MODEL:
-      default: gpt-4o-mini
+      default: gpt-5.6-sol
+      deployedValue: gpt-4o-mini
+      deploymentStatus: RH-062 is not yet deployed. Merging to main intentionally deploys the private-beta candidate for evaluation.
       description: OpenAI model selected by the Fly runtime environment.
     RATE_LIMIT_PER_MINUTE:
       default: 30
@@ -86,6 +88,15 @@ x-current-security-model:
     - Apple App Attest assertion verification.
     - Server-side device approval, revocation, and quota state.
     - Per-user auth before wider non-TestFlight distribution.
+x-upstream-openai-candidate:
+  task: RH-062
+  endpoint: /v1/responses
+  model: gpt-5.6-sol
+  reasoningEffort: medium
+  store: false
+  maxOutputTokens: 4096
+  acceptedResponseStatus: completed
+  deploymentStatus: Not yet deployed. Merging to main intentionally deploys the private-beta candidate; evaluation follows deployment.
 x-observability:
   responseHeaders:
     X-Request-Id: Correlates app requests with Fly proxy logs.
