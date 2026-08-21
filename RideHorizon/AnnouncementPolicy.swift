@@ -809,7 +809,6 @@ final class AnnouncementCoordinator {
         activeDeliveryContext = delivery
         fallbackInProgress = false
         terminalFailureInProgress = false
-        self.audioPolicy = delivery.audioPolicy()
         let aiSharingAllowed = delivery.aiSharingAllowed()
         let provider: SpeechProvider = aiSharingAllowed ? delivery.selectedProvider() : .apple
         let result = AnnouncementWorkflowResult.speechRequested(
@@ -1014,12 +1013,14 @@ final class AnnouncementCoordinator {
         audioReleaseScheduler.cancel()
         do {
             if !ownsAudioSession {
-                try audioSession.activate(policy: audioPolicy)
+                let playbackAudioPolicy = activeDeliveryContext?.audioPolicy() ?? audioPolicy
+                audioPolicy = playbackAudioPolicy
+                try audioSession.activate(policy: playbackAudioPolicy)
                 ownsAudioSession = true
                 diagnostics.record(AnnouncementDiagnosticSignal(
                     event: .audioSessionActivated,
                     announcementID: activePlan?.id,
-                    audioPolicy: audioPolicy
+                    audioPolicy: playbackAudioPolicy
                 ))
             }
             diagnostics.record(AnnouncementDiagnosticSignal(

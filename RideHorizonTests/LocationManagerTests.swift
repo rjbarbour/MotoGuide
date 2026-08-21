@@ -1683,9 +1683,10 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testBackgroundPlaybackUsesMixablePolicyWhenInterruptMusicIsEnabled() {
+    func testForegroundToBackgroundTransitionDuringPreparationUsesMixablePlaybackPolicy() {
         let speechOutput = RecordingSpeechOutputEngine()
         let audioSession = RecordingAudioSessionManager()
+        var isApplicationForeground = true
         let diagnostics = RideDiagnosticsStore(
             directoryURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),
             persistenceDelay: 0
@@ -1694,25 +1695,30 @@ final class LocationManagerTests: XCTestCase {
             speechOutput: speechOutput,
             audioSession: audioSession,
             diagnostics: diagnostics,
-            isApplicationForeground: { false },
+            isApplicationForeground: { isApplicationForeground },
             aiSharingAllowed: { true }
         )
         locationManager.interruptsMusic = true
-        locationManager.recordAppLifecycle(isForeground: false)
 
         locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        isApplicationForeground = false
+        locationManager.recordAppLifecycle(isForeground: false)
         speechOutput.beginPlayback()
 
         XCTAssertEqual(audioSession.activationRequests, [.mix])
         let activation = diagnostics.entries.last { $0.event == .audioSessionActivated }
         XCTAssertEqual(activation?.appState, .background)
         XCTAssertEqual(activation?.audioPolicy, .mix)
+        let playback = diagnostics.entries.last { $0.event == .audioPlaybackStarted }
+        XCTAssertEqual(playback?.appState, .background)
+        XCTAssertEqual(playback?.audioPolicy, .mix)
     }
 
     @MainActor
-    func testCurrentForegroundStateOverridesAStaleBackgroundLifecycleRecord() {
+    func testBackgroundToForegroundTransitionDuringPreparationUsesInterruptingPlaybackPolicy() {
         let speechOutput = RecordingSpeechOutputEngine()
         let audioSession = RecordingAudioSessionManager()
+        var isApplicationForeground = false
         let diagnostics = RideDiagnosticsStore(
             directoryURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),
             persistenceDelay: 0
@@ -1721,19 +1727,24 @@ final class LocationManagerTests: XCTestCase {
             speechOutput: speechOutput,
             audioSession: audioSession,
             diagnostics: diagnostics,
-            isApplicationForeground: { true },
+            isApplicationForeground: { isApplicationForeground },
             aiSharingAllowed: { true }
         )
         locationManager.interruptsMusic = true
         locationManager.recordAppLifecycle(isForeground: false)
 
         locationManager.speakForTesting(text: "Test announcement", boundary: .town)
+        isApplicationForeground = true
+        locationManager.recordAppLifecycle(isForeground: true)
         speechOutput.beginPlayback()
 
         XCTAssertEqual(audioSession.activationRequests, [.interrupt])
         let activation = diagnostics.entries.last { $0.event == .audioSessionActivated }
         XCTAssertEqual(activation?.appState, .foreground)
         XCTAssertEqual(activation?.audioPolicy, .interrupt)
+        let playback = diagnostics.entries.last { $0.event == .audioPlaybackStarted }
+        XCTAssertEqual(playback?.appState, .foreground)
+        XCTAssertEqual(playback?.audioPolicy, .interrupt)
     }
 
     @MainActor
