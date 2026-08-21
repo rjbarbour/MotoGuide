@@ -18,7 +18,7 @@ import java.util.Map;
 public class OpenAiService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiService.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
-    private static final int MAX_OUTPUT_TOKENS = 25_000;
+    private static final int MAX_OUTPUT_TOKENS = 4_096;
 
     private static final String BASE_SYSTEM_PROMPT = """
             You are a place-fact generator for a motorcycling ride companion.

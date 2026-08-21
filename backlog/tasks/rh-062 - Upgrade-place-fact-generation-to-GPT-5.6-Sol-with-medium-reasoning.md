@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 10:28'
+updated_date: '2026-08-21 10:39'
 labels:
   - core
   - model
@@ -51,12 +51,12 @@ Upgrade the production place-fact path from gpt-4o-mini Chat Completions to GPT-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Keep this branch limited to RH-062 by removing RH-024, RH-028 and RH-063 ledger changes while leaving main unchanged.
-2. Send stateless Responses requests to /v1/responses with model gpt-5.6-sol, reasoning.effort medium, store false and a 25,000 generated-token ceiling that includes reasoning.
-3. Accept output only when the top-level Responses status is completed; then parse typed output_text and apply the existing FactSanitizer, timeout and upstream-error behaviour.
-4. Reconcile FACT_PROXY_OPENAPI.yaml, the fact-proxy architecture contract and SAR/erasure operations documentation without claiming deployment or live evaluation.
-5. Add focused Java tests for endpoint, model, reasoning, storage, token budget, completed/incomplete parsing and failure handling; run only focused fact-proxy tests.
-6. Record exact evidence, commit coherent RH-062 changes, push the rewritten task branch with force-with-lease, and leave the deployment/evaluation gate open.
+1. Keep the branch limited to RH-062 and preserve current main.
+2. Send stateless Responses requests to /v1/responses with model gpt-5.6-sol, reasoning.effort medium, store false and max_output_tokens 4096 for 35–90-word place facts.
+3. Accept output only when the top-level Responses status is completed; reject incomplete or other non-completed output before sanitisation.
+4. Reconcile OpenAPI, architecture contract and SAR documentation: merging to main intentionally deploys the private-beta candidate; store false disables stored Response objects but does not remove prompt caching of encrypted tensors for up to 24 hours or default abuse-monitoring logs for up to 30 days.
+5. Run only OpenAiServiceTest and OpenApiContractTest, record exact evidence, commit one RH-062 correction and force-with-lease push.
+6. Do not merge or deploy; keep RH-062 In Progress until representative UK factuality, repetition, relevance, latency and token-cost evaluation completes.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -69,6 +69,10 @@ Focused verification on 2026-08-21: ./gradlew test --tests ai.digitalmercenaries
 Independent review remediation started on 2026-08-21. The pre-existing branch included one mixed ledger commit affecting RH-024, RH-028 and RH-063; local branch history was reset softly to current main e95db355 and those three non-RH-062 task files were restored exactly from main. Main was not modified.
 
 The 2026-08-21 continuation instruction supersedes the earlier no-push boundary: push this RH-062-only branch, but do not merge or deploy. Review remediation now sends store:false, requires top-level status completed, uses a 25,000 max_output_tokens calibration ceiling that includes reasoning, and reconciles the OpenAPI, architecture contract and SAR documentation while distinguishing candidate configuration from the last documented deployment. Focused verification: ./gradlew test --tests ai.digitalmercenaries.ridehorizon.factproxy.OpenAiServiceTest --tests ai.digitalmercenaries.ridehorizon.factproxy.OpenApiContractTest --console=plain completed BUILD SUCCESSFUL in 2s. JUnit: OpenAiServiceTest 6 tests and OpenApiContractTest 2 tests; total 8, failures 0, errors 0, skipped 0. The deployment and representative UK factuality, repetition, relevance, latency and token-cost evaluation gate remains open; RH-062 stays In Progress.
+
+Second independent review started on 2026-08-21. Official OpenAI documentation confirms max_output_tokens includes reasoning and visible output but provides no smaller workload-specific safe ceiling; owner selected 4,096 for bounded 35–90-word facts. Prior notes saying deployment waits for evaluation and treating store:false as the whole retention picture are superseded.
+
+Second-review correction verified on 2026-08-21: max_output_tokens is 4,096 for both fact modes; non-completed Responses remain rejected before output parsing; OpenAPI and architecture wording now state that merging to main intentionally deploys the private-beta candidate; SAR wording distinguishes no stored Response object under store:false from encrypted prompt-cache tensors retained for up to 24 hours and default abuse-monitoring logs retained for up to 30 days. Focused command ./gradlew test --tests ai.digitalmercenaries.ridehorizon.factproxy.OpenAiServiceTest --tests ai.digitalmercenaries.ridehorizon.factproxy.OpenApiContractTest --console=plain completed BUILD SUCCESSFUL in 3s. JUnit: 8 tests total, 0 failures, 0 errors, 0 skipped. No merge, deployment or iOS test was performed. Representative UK quality, latency and cost evaluation remains open and RH-062 stays In Progress.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -78,5 +82,11 @@ author: @codex
 created: 2026-08-21 10:28
 ---
 Independent review code and documentation findings are resolved with focused evidence. Deployment and representative live evaluation remain explicitly open.
+---
+
+author: @codex
+created: 2026-08-21 10:39
+---
+Second independent review findings are resolved with focused proxy evidence. Merge/deployment was not performed; post-deployment representative UK evaluation remains open.
 ---
 <!-- COMMENTS:END -->

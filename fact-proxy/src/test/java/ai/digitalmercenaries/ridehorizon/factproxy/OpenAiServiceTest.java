@@ -51,7 +51,7 @@ class OpenAiServiceTest {
             assertEquals("medium", payload.path("reasoning").path("effort").asText());
             assertTrue(payload.has("store"));
             assertFalse(payload.path("store").asBoolean());
-            assertEquals(25_000, payload.path("max_output_tokens").asInt());
+            assertEquals(4_096, payload.path("max_output_tokens").asInt());
             assertTrue(payload.path("max_completion_tokens").isMissingNode());
             assertTrue(payload.path("messages").isMissingNode());
             assertTrue(payload.path("previous_response_id").isMissingNode());
@@ -99,7 +99,7 @@ class OpenAiServiceTest {
             ).validateAndNormalize());
 
             JsonNode payload = objectMapper.readTree(requestBody.get());
-            assertEquals(25_000, payload.path("max_output_tokens").asInt());
+            assertEquals(4_096, payload.path("max_output_tokens").asInt());
             String systemPrompt = payload.path("instructions").asText();
             assertTrue(systemPrompt.contains("LONG PROMPT"));
             assertTrue(systemPrompt.contains("For longFacts"));

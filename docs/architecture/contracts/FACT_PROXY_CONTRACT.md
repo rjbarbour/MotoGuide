@@ -113,7 +113,7 @@ Runtime configuration:
 
 | Environment variable | Default | Meaning |
 |----------------------|---------|---------|
-| `OPENAI_MODEL` | Live: `gpt-4o-mini`; RH-062 candidate: `gpt-5.6-sol` | OpenAI model selected by the Fly runtime environment. The candidate has not been deployed or live-evaluated. |
+| `OPENAI_MODEL` | Live: `gpt-4o-mini`; RH-062 candidate: `gpt-5.6-sol` | OpenAI model selected by the Fly runtime environment. The candidate has not yet been deployed; merging it to `main` intentionally deploys it for private-beta evaluation. |
 | `RIDEHORIZON_DIAGNOSTICS_ENABLED` | `false` | Enables verbose proxy diagnostics at startup. |
 | `RIDEHORIZON_SHORT_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `shortFacts`. Never sent by iOS. |
 | `RIDEHORIZON_LONG_FACT_PROMPT` | Built-in prompt | Optional server-side prompt override for `longFacts`. Never sent by iOS. |
@@ -126,9 +126,9 @@ Runtime configuration:
 
 ### RH-062 candidate OpenAI request contract
 
-The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium` and `store: false`. It sets the initial calibration ceiling to `max_output_tokens: 25000`; OpenAI documents that this ceiling covers reasoning, visible output and non-visible formatting tokens and recommends reserving at least 25,000 tokens when first calibrating reasoning models. The proxy accepts only a top-level Responses result with `status: completed`, then extracts typed `output_text` content and applies the existing fact sentence and character limits. [OpenAI reasoning guidance](https://developers.openai.com/api/docs/guides/reasoning#allocating-space-for-reasoning) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
+The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium` and `store: false`. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–90-word facts. OpenAI documents that this ceiling covers reasoning, visible output and non-visible formatting tokens; it does not publish a smaller workload-specific safe value. The proxy accepts only a top-level Responses result with `status: completed`, then extracts typed `output_text` content and applies the existing fact sentence and character limits. [OpenAI reasoning guidance](https://developers.openai.com/api/docs/guides/reasoning#allocating-space-for-reasoning) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
 
-This is candidate behaviour only. The last documented Fly deployment remains on `gpt-4o-mini` until RH-062 passes representative UK factuality, repetition, relevance, latency and token-cost evaluation and is explicitly deployed. Use those measurements to reduce the 25,000-token ceiling if a lower value reliably leaves enough space for medium reasoning and complete visible output.
+This is candidate behaviour only. Merging the accepted RH-062 change to `main` intentionally deploys the private-beta candidate. RH-062 remains In Progress after deployment until representative UK factuality, repetition, relevance, latency and token-cost evaluation is complete.
 
 Health check:
 
