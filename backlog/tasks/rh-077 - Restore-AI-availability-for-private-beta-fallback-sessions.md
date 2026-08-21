@@ -5,15 +5,18 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:36'
+updated_date: '2026-08-21 11:38'
 labels:
   - proxy
   - ai
   - reliability
 dependencies: []
 modified_files:
+  - >-
+    fact-proxy/src/main/java/ai/digitalmercenaries/ridehorizon/factproxy/JdbcSessionAuthority.java
   - fact-proxy/src/main/resources/application.yml
   - >-
-    fact-proxy/src/test/java/ai/digitalmercenaries/ridehorizon/factproxy/AutomaticSessionHttpTest.java
+    fact-proxy/src/test/java/ai/digitalmercenaries/ridehorizon/factproxy/PrivateBetaFallbackQuotaHttpTest.java
 priority: high
 type: bug
 ordinal: 215000
@@ -37,3 +40,9 @@ The live private beta uses fallback sessions because App Attest is not enabled. 
 <!-- SECTION:PLAN:BEGIN -->
 1. Add a production-default HTTP regression that fails on the 21st fallback fact request. 2. Raise only the fallback per-installation defaults to the existing verified-session values and keep global limits unchanged. 3. Run focused automatic-session and quota tests, then the proxy suite. 4. Commit, push, review, merge and verify the live proxy no longer rejects at the old cap.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Red evidence: PrivateBetaFallbackQuotaHttpTest failed deterministically on request 21 with the production fallback default. Live Fly logs showed repeated HTTP 429 rate_limit before OpenAI, and aggregate PostgreSQL counters were exactly 20 facts and 11,998 of 12,000 speech characters for one fallback subject while global fact usage was only 20 of 2,000. Fix raises fallback defaults to the existing verified-session allowances: 180 facts and 120,000 speech characters; global caps are unchanged. Focused automatic-session/quota tests and the complete proxy suite both passed with BUILD SUCCESSFUL.
+<!-- SECTION:NOTES:END -->

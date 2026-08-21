@@ -22,8 +22,8 @@ ridehorizon:
   fallback-session-ttl-seconds: ${RIDEHORIZON_FALLBACK_SESSION_TTL_SECONDS:900}
   verified-fact-daily-limit: ${RIDEHORIZON_VERIFIED_FACT_DAILY_LIMIT:180}
   verified-speech-char-daily-limit: ${RIDEHORIZON_VERIFIED_SPEECH_CHAR_DAILY_LIMIT:120000}
-  fallback-fact-daily-limit: ${RIDEHORIZON_FALLBACK_FACT_DAILY_LIMIT:20}
-  fallback-speech-char-daily-limit: ${RIDEHORIZON_FALLBACK_SPEECH_CHAR_DAILY_LIMIT:12000}
+  fallback-fact-daily-limit: ${RIDEHORIZON_FALLBACK_FACT_DAILY_LIMIT:180}
+  fallback-speech-char-daily-limit: ${RIDEHORIZON_FALLBACK_SPEECH_CHAR_DAILY_LIMIT:120000}
   global-fact-daily-limit: ${RIDEHORIZON_GLOBAL_FACT_DAILY_LIMIT:2000}
   global-speech-char-daily-limit: ${RIDEHORIZON_GLOBAL_SPEECH_CHAR_DAILY_LIMIT:250000}
   session-record-retention-days: ${RIDEHORIZON_SESSION_RECORD_RETENTION_DAYS:30}
