@@ -597,6 +597,69 @@ final class AnnouncementCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.pending)
     }
 
+    func testDeliveryReadyReplacementWaitsBehindNavigationInterruptedSpeech() {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(scheduler: scheduler, speechOutput: speechOutput)
+
+        XCTAssertEqual(coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))), .noAnnouncement)
+        let active = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        )))
+        guard case .accepted(let activePlan, _) = active else {
+            return XCTFail("Expected the active announcement to be accepted")
+        }
+        scheduler.fire()
+        XCTAssertTrue(speechOutput.beginPlayback(provider: .apple))
+
+        XCTAssertEqual(
+            coordinator.externalAudioBegan(.primaryAudio),
+            .interrupted(announcementID: activePlan.id, reason: .primaryAudioActive)
+        )
+        let replacement = coordinator.submit(workflowInput(address: Address(
+            street: "Castle Street",
+            town: "Cardiff",
+            county: "South Glamorgan",
+            administrativeArea: "Wales",
+            country: "United Kingdom"
+        )))
+        guard case .accepted(let replacementPlan, _) = replacement else {
+            return XCTFail("Expected the replacement announcement to be accepted")
+        }
+        scheduler.fire()
+
+        XCTAssertEqual(coordinator.interruptedPlan, activePlan)
+        XCTAssertEqual(coordinator.pending?.id, replacementPlan.id)
+        XCTAssertEqual(speechOutput.requests.map(\.announcementID), [activePlan.id])
+
+        XCTAssertEqual(
+            coordinator.externalAudioEnded(.primaryAudio, shouldResume: true),
+            .resumed(announcementID: activePlan.id)
+        )
+        XCTAssertEqual(
+            speechOutput.requests.map(\.announcementID),
+            [activePlan.id, activePlan.id]
+        )
+
+        speechOutput.finish()
+
+        XCTAssertEqual(
+            speechOutput.requests.map(\.announcementID),
+            [activePlan.id, activePlan.id, replacementPlan.id]
+        )
+        XCTAssertNil(coordinator.pending)
+    }
+
     func testAnnouncementDeferredBeforePlaybackResumesThroughCoordinator() {
         let scheduler = RecordingAnnouncementScheduler()
         let speechOutput = RecordingCoordinatorSpeechOutput()

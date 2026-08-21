@@ -913,7 +913,7 @@ final class AnnouncementCoordinator {
         guard let pending,
               pending.id == id,
               let delivery = pendingDeliveryContext else { return }
-        guard !isSpeaking else { return }
+        guard !isSpeaking, pauseSources.isEmpty else { return }
         let plan = AnnouncementPlan(id: pending.id, text: pending.text, boundary: pending.boundary)
 
         cancelPending(id: id)
