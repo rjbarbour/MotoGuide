@@ -103,4 +103,22 @@ class PlaceInputValidatorTest {
         assertThrows(BadRequestException.class,
                 () -> PlaceInputValidator.validateCustomFactInstructions("Focus on engineering {json}"));
     }
+
+    @Test
+    void validatesAtMostThreePreviousRideSummaries() {
+        assertEquals(
+                java.util.List.of("One delivered fact.", "Another delivered fact."),
+                PlaceInputValidator.validatePreviousRideSummaries(
+                        java.util.List.of(" One delivered fact. ", "Another delivered fact.")
+                )
+        );
+
+        BadRequestException error = assertThrows(
+                BadRequestException.class,
+                () -> PlaceInputValidator.validatePreviousRideSummaries(
+                        java.util.List.of("One.", "Two.", "Three.", "Four.")
+                )
+        );
+        assertEquals("previousRideSummaries has too many entries", error.getMessage());
+    }
 }

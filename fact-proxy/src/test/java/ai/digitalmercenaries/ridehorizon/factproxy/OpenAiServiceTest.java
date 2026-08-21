@@ -800,6 +800,40 @@ class OpenAiServiceTest {
     }
 
     @Test
+    void previousRideSummariesAreBoundedPromptContextWithoutRecentPlaceList() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> handleOpenAiRequest(exchange, requestBody));
+        server.start();
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+            service.generateFact(new FactRequest(
+                    "town",
+                    "Stonehouse",
+                    "shortFacts",
+                    "United Kingdom",
+                    new PlaceHierarchy(null, "Stonehouse", "Gloucestershire", "England", "United Kingdom"),
+                    null,
+                    List.of(
+                            "The wool trade shaped the town's steep streets.",
+                            "The canal carried coal and cloth."
+                    )
+            ).validateAndNormalize());
+
+            String input = objectMapper.readTree(requestBody.get()).path("input").asText();
+            assertTrue(input.contains("Previous completed ride summaries:"));
+            assertTrue(input.contains("The wool trade shaped the town's steep streets."));
+            assertTrue(input.contains("The canal carried coal and cloth."));
+            assertTrue(input.contains("Avoid repeating fact content already heard"));
+            assertFalse(input.contains("Recent places"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void rejectsNonSuccessfulResponsesWithoutChangingFailureClassification() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

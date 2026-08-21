@@ -392,7 +392,7 @@ final class AppleSpeechOutput: NSObject, AppleSpeechOutputting, AVSpeechSynthesi
     func speak(text: String, boundary: BoundaryType?, voice: AVSpeechSynthesisVoice?, requestID: UUID) {
         guard let voice else {
             ProxyDiagnostics.log("Speech", "No usable Apple voice.")
-            onFinish?(requestID)
+            onCancel?(requestID)
             return
         }
 
@@ -986,12 +986,15 @@ class LocationManager: NSObject, ObservableObject {
     private var wantsRideTracking: Bool { rideSessionController.wantsLocationInput }
     private var hasSeededTestRoute = false
     private let rideSessionController: RideSessionController
+    private let previousRideMemoryStore: PreviousRideMemoryStore
     private var rideStartedAt: Date?
     private var hasAppliedDebugTestModeCampaignDefaults = false
     private var audioSessionReleaseRetryWorkItem: DispatchWorkItem?
     private var audioSessionReleaseRetryAttempts = 0
     private var activeRideSessionID: UUID?
     private var diagnosticAppState: DiagnosticAppState = .foreground
+    private var factContentByAnnouncementID: [UUID: String] = [:]
+    private var deliveredFactContents: [String] = []
     private var announcementLogContexts: [UUID: AnnouncementLogContext] = [:]
 #if INTERNAL_AUDIO_CALIBRATION
     private let calibrationProcessor: PremiumSpeechProcessing = DefaultPremiumSpeechProcessor()
@@ -1087,6 +1090,7 @@ class LocationManager: NSObject, ObservableObject {
     @Published private(set) var locationStatus: LocationServiceStatus = .idle
     @Published private(set) var currentSpeedMetersPerSecond: CLLocationSpeed?
     @Published private(set) var announcementStatus: AnnouncementPipelineStatus = .idle
+    @Published private(set) var previousRideSummaryCount = 0
 
     var allowsMapInteraction: Bool {
         true
@@ -1115,6 +1119,7 @@ class LocationManager: NSObject, ObservableObject {
         locationSource: LocationSource,
         placeResolver: PlaceResolver,
         rideDistanceMeasurer: RideDistanceMeasuring,
+        previousRideMemoryStore: PreviousRideMemoryStore = .shared,
         liveActivityManager: RideLiveActivityManaging? = nil,
         speechVoiceOptions: @escaping () -> [SpeechVoiceOption] = {
             AVSpeechSynthesisVoice.speechVoices().map { voice in
@@ -1156,10 +1161,12 @@ class LocationManager: NSObject, ObservableObject {
         self.audioSession = audioSession
         self.diagnostics = diagnostics
         self.rideSessionController = rideSessionController
+        self.previousRideMemoryStore = previousRideMemoryStore
         self.liveActivityManager = liveActivityManager ?? SystemRideLiveActivityManager()
         self.speechVoiceOptions = speechVoiceOptions
         self.isApplicationForeground = isApplicationForeground
         self.aiSharingAllowed = aiSharingAllowed
+        self.previousRideSummaryCount = previousRideMemoryStore.summaries.count
         super.init()
         self.liveActivityManager.endOrphanedActivities()
         configureAnnouncementCoordinator()
@@ -1253,6 +1260,7 @@ class LocationManager: NSObject, ObservableObject {
         rideSettingsStore: RideSettingsStore? = nil,
         rideSessionController: RideSessionController? = nil,
         liveActivityManager: RideLiveActivityManaging? = nil,
+        previousRideMemoryStore: PreviousRideMemoryStore? = nil,
         speechVoiceOptions: @escaping () -> [SpeechVoiceOption] = {
             AVSpeechSynthesisVoice.speechVoices().map { voice in
                 SpeechVoiceOption(
@@ -1291,6 +1299,7 @@ class LocationManager: NSObject, ObservableObject {
             locationSource: locationAdapter,
             placeResolver: locationAdapter,
             rideDistanceMeasurer: CoreLocationRideDistanceMeasurer(),
+            previousRideMemoryStore: previousRideMemoryStore ?? .shared,
             liveActivityManager: liveActivityManager ?? DisabledRideLiveActivityManager(),
             speechVoiceOptions: speechVoiceOptions,
             isApplicationForeground: isApplicationForeground,
@@ -1397,6 +1406,8 @@ class LocationManager: NSObject, ObservableObject {
         ) else { return }
         activeRideSessionID = start.sessionID
         rideStartedAt = start.startedAt
+        factContentByAnnouncementID.removeAll()
+        deliveredFactContents.removeAll()
         rideSessionState = rideSessionController.state
         locationStatus = .checking
         liveActivityManager.startRide(id: start.sessionID)
@@ -1459,6 +1470,15 @@ class LocationManager: NSObject, ObservableObject {
         _ = announcementCoordinator.cancelAll(reason: reason)
 
         guard case .rideEnded(let wasActive) = intent else { return }
+        if wasActive {
+            previousRideMemoryStore.completeRide(
+                deliveredFacts: deliveredFactContents,
+                endedAt: Date()
+            )
+            previousRideSummaryCount = previousRideMemoryStore.summaries.count
+        }
+        factContentByAnnouncementID.removeAll()
+        deliveredFactContents.removeAll()
         announcementLogContexts.removeAll()
         liveActivityManager.endRide()
         if wasActive, let activeRideSessionID {
@@ -1512,6 +1532,7 @@ class LocationManager: NSObject, ObservableObject {
         announcementStatus = .idle
         locationStatus = .idle
         announcementCoordinator.resetContext()
+        clearPreviousRideMemory()
         lastUpdateTime = nil
 
         homeCountry = ""
@@ -1522,6 +1543,11 @@ class LocationManager: NSObject, ObservableObject {
         contentMode = .shortFacts
         lastNonQuietContentMode = .shortFacts
         speechProvider = .proxyElevenLabs
+    }
+
+    func clearPreviousRideMemory() {
+        previousRideMemoryStore.clear()
+        previousRideSummaryCount = 0
     }
 
     private func startRideTrackingIfAuthorized() {
@@ -1919,7 +1945,8 @@ class LocationManager: NSObject, ObservableObject {
             boundaryCooldown: TimeInterval(boundarySpeechCooldownSeconds),
             now: Date(),
             placeLookupID: placeLookupID,
-            rideSessionID: activeRideSessionID
+            rideSessionID: activeRideSessionID,
+            previousRideSummaries: previousRideMemoryStore.summaries.map(\.content)
         ))
 
         switch outcome {
@@ -2370,9 +2397,12 @@ class LocationManager: NSObject, ObservableObject {
 
     private func handleAnnouncementWorkflowResult(_ result: AnnouncementWorkflowResult) {
         switch result {
-        case .boundaryAccepted:
-            break
+        case .boundaryAccepted(_, let supersededAnnouncementIDs):
+            for announcementID in supersededAnnouncementIDs {
+                factContentByAnnouncementID.removeValue(forKey: announcementID)
+            }
         case .boundaryRejected(let announcementID):
+            factContentByAnnouncementID.removeValue(forKey: announcementID)
             announcementLogContexts.removeValue(forKey: announcementID)
         case .announcementQueued(let plan, let placeLookupID):
             announcementStatus = .phraseReady
@@ -2393,10 +2423,14 @@ class LocationManager: NSObject, ObservableObject {
             announcementStatus = .phraseReady
         case .factCancelled(let announcementID):
             if let announcementID {
+                factContentByAnnouncementID.removeValue(forKey: announcementID)
                 announcementLogContexts.removeValue(forKey: announcementID)
             }
             if !isSpeechOutputActive { announcementStatus = .idle }
         case .speechRequested(let plan, _, let shouldRecordTestLog):
+            if activeRideSessionID != nil, let factContent = plan.factContent {
+                factContentByAnnouncementID[plan.id] = factContent
+            }
             AppDiagnostics.log("Speaking an announcement.")
             lastSpokenPhrase = plan.text
             lastSpokenAt = Date()
@@ -2413,10 +2447,20 @@ class LocationManager: NSObject, ObservableObject {
             announcementStatus = .waitingForAudio
         case .resumed:
             announcementStatus = .preparingVoice
-        case .completed(let announcementID),
-             .cancelled(let announcementID, _),
-             .failed(let announcementID, _):
+        case .completed(let announcementID):
+            if activeRideSessionID != nil,
+               let announcementID,
+               let factContent = factContentByAnnouncementID[announcementID] {
+                deliveredFactContents.append(factContent)
+            }
             if let announcementID {
+                factContentByAnnouncementID.removeValue(forKey: announcementID)
+                announcementLogContexts.removeValue(forKey: announcementID)
+            }
+            announcementStatus = .idle
+        case .cancelled(let announcementID, _), .failed(let announcementID, _):
+            if let announcementID {
+                factContentByAnnouncementID.removeValue(forKey: announcementID)
                 announcementLogContexts.removeValue(forKey: announcementID)
             }
             announcementStatus = .idle
@@ -2460,6 +2504,10 @@ class LocationManager: NSObject, ObservableObject {
     }
 
 #if DEBUG
+    func handleAnnouncementWorkflowResultForTesting(_ result: AnnouncementWorkflowResult) {
+        handleAnnouncementWorkflowResult(result)
+    }
+
     func startRideWithoutLocationInputForTesting(at date: Date = Date()) {
         startRide(at: date, startsLocationInput: false)
     }

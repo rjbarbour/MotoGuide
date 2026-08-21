@@ -855,6 +855,7 @@ private struct FactProxyRequest: Encodable {
     let countryContext: String?
     let placeHierarchy: PlaceHierarchy
     let riderContext: RiderContext
+    let previousRideSummaries: [String]?
 
     init(from request: PlaceFactRequest) {
         self.boundary = request.boundary.factLabel
@@ -863,6 +864,9 @@ private struct FactProxyRequest: Encodable {
         self.countryContext = request.countryContext
         self.placeHierarchy = request.placeHierarchy
         self.riderContext = request.riderContext
+        self.previousRideSummaries = request.previousRideSummaries.isEmpty
+            ? nil
+            : request.previousRideSummaries
     }
 }
 

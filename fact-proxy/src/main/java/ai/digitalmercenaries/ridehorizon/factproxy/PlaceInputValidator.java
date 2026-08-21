@@ -14,6 +14,8 @@ public final class PlaceInputValidator {
     private static final int MAX_WORDS = 10;
     private static final int MAX_CUSTOM_FACT_INSTRUCTIONS_WORDS = 36;
     private static final int MAX_FACT_INTEREST_CATEGORIES = 7;
+    private static final int MAX_PREVIOUS_RIDE_SUMMARIES = 3;
+    private static final int MAX_PREVIOUS_RIDE_SUMMARY_LENGTH = 720;
 
     private static final Pattern PLACE_CHARACTERS = Pattern.compile("^[A-Za-z0-9 .,'’&()\\-]+$");
     private static final Pattern COUNTRY_CHARACTERS = Pattern.compile("^[A-Za-z .,'’()\\-]+$");
@@ -150,6 +152,31 @@ public final class PlaceInputValidator {
         }
 
         return List.copyOf(normalizedCategories);
+    }
+
+    public static List<String> validatePreviousRideSummaries(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        if (values.size() > MAX_PREVIOUS_RIDE_SUMMARIES) {
+            throw new BadRequestException("previousRideSummaries has too many entries");
+        }
+
+        LinkedHashSet<String> normalizedSummaries = new LinkedHashSet<>();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                throw new BadRequestException("previousRideSummaries contains an empty entry");
+            }
+            String normalized = normalizeCommon(value);
+            if (normalized.length() > MAX_PREVIOUS_RIDE_SUMMARY_LENGTH) {
+                throw new BadRequestException("previousRideSummaries contains an entry that is too long");
+            }
+            if (normalized.chars().anyMatch(Character::isISOControl)) {
+                throw new BadRequestException("previousRideSummaries contains unsupported characters");
+            }
+            normalizedSummaries.add(normalized);
+        }
+        return List.copyOf(normalizedSummaries);
     }
 
     private static String validate(String value, String field, int maxLength, Pattern allowedCharacters) {

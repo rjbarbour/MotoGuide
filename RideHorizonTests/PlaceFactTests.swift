@@ -156,6 +156,23 @@ final class PlaceFactCacheTests: XCTestCase {
         XCTAssertEqual(firstRide.cacheKey, secondRide.cacheKey)
     }
 
+    func testCacheKeyIncludesPreviousRideSummaryContext() {
+        let first = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            previousRideSummaries: ["The wool trade shaped the town."]
+        )
+        let second = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom",
+            previousRideSummaries: ["The canal carried coal and cloth."]
+        )
+
+        XCTAssertNotEqual(first.cacheKey, second.cacheKey)
+    }
+
     func testCacheKeyIncludesPlaceHierarchy() {
         let first = PlaceFactRequest(
             boundary: .town,
@@ -464,6 +481,44 @@ final class ProxyFactGeneratorTests: XCTestCase {
         XCTAssertNil(previousResponseHeaders[0])
         XCTAssertEqual(previousResponseHeaders[1], "resp_1")
         XCTAssertNil(previousResponseHeaders[2])
+    }
+
+    func testPreviousRideSummariesAreBodyContextSeparateFromActiveRideLinkage() async throws {
+        let rideSessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000064")!
+        let summaries = [
+            "The wool trade shaped the town's steep streets.",
+            "The canal carried coal and cloth."
+        ]
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertNil(request.value(forHTTPHeaderField: FactProxyContract.previousResponseIdHeader))
+            let body = try self.requestBodyData(from: request)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["previousRideSummaries"] as? [String], summaries)
+            XCTAssertNil(json["recentPlaces"])
+            return (
+                HTTPURLResponse(
+                    url: self.endpoint,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: [FactProxyContract.responseIdHeader: "resp_1"]
+                )!,
+                Data(#"{"fact":"Known for its wool trade.","sources":[]}"#.utf8)
+            )
+        }
+        let generator = ProxyFactGenerator(
+            proxyTokenProvider: { "proxy-token" },
+            session: makeMockSession(),
+            endpoint: endpoint,
+            retryDelays: []
+        )
+
+        _ = try await generator.fact(for: PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stonehouse",
+            countryContext: "United Kingdom",
+            rideSessionID: rideSessionID,
+            previousRideSummaries: summaries
+        ))
     }
 
     func testEndRideWithoutAnEligibleFactMakesNoProxyRequest() async {

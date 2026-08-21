@@ -205,7 +205,8 @@ enum AnnouncementPolicy {
         address: Address,
         mode: FactMode = .shortFacts,
         riderContext: RiderContext = .empty,
-        rideSessionID: UUID? = nil
+        rideSessionID: UUID? = nil,
+        previousRideSummaries: [String] = []
     ) -> PlaceFactRequest {
         PlaceFactRequest(
             boundary: plan.boundary,
@@ -214,7 +215,8 @@ enum AnnouncementPolicy {
             countryContext: Address.isValidPlaceName(address.country) ? address.country : nil,
             placeHierarchy: PlaceHierarchy(minimizing: address, for: plan.boundary),
             riderContext: riderContext,
-            rideSessionID: rideSessionID
+            rideSessionID: rideSessionID,
+            previousRideSummaries: previousRideSummaries
         )
     }
 }
@@ -224,6 +226,7 @@ struct AnnouncementRequest: Equatable {
     let text: String
     let boundary: BoundaryType
     let sources: [PlaceFactSource]
+    let factContent: String?
 }
 
 struct AnnouncementQueue {
@@ -233,9 +236,16 @@ struct AnnouncementQueue {
         id: UUID = UUID(),
         text: String,
         boundary: BoundaryType,
-        sources: [PlaceFactSource] = []
+        sources: [PlaceFactSource] = [],
+        factContent: String? = nil
     ) -> AnnouncementRequest {
-        let request = AnnouncementRequest(id: id, text: text, boundary: boundary, sources: sources)
+        let request = AnnouncementRequest(
+            id: id,
+            text: text,
+            boundary: boundary,
+            sources: sources,
+            factContent: factContent
+        )
         pending = request
         return request
     }
@@ -333,6 +343,7 @@ struct AnnouncementWorkflowInput {
     let now: Date
     let placeLookupID: UUID?
     let rideSessionID: UUID?
+    let previousRideSummaries: [String]
 }
 
 enum AnnouncementSubmissionOutcome: Equatable {
@@ -496,7 +507,8 @@ final class AnnouncementCoordinator {
                     address: input.address,
                     mode: factMode,
                     riderContext: input.riderContext,
-                    rideSessionID: input.rideSessionID
+                    rideSessionID: input.rideSessionID,
+                    previousRideSummaries: input.previousRideSummaries
                 ),
                 mode: factMode,
                 aiSharingAllowed: input.delivery.aiSharingAllowed
@@ -535,7 +547,13 @@ final class AnnouncementCoordinator {
         let supersedablePlans = [
             factWork.map { AnnouncementPlan(id: $0.announcementID, text: "", boundary: $0.boundary) },
             pending.map {
-                AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary, sources: $0.sources)
+                AnnouncementPlan(
+                    id: $0.id,
+                    text: $0.text,
+                    boundary: $0.boundary,
+                    sources: $0.sources,
+                    factContent: $0.factContent
+                )
             }
         ].compactMap { $0 }
         let protectedPlans = [
@@ -594,7 +612,13 @@ final class AnnouncementCoordinator {
         pauseSources.insert(source)
         let plan = activePlan
             ?? pending.map {
-                AnnouncementPlan(id: $0.id, text: $0.text, boundary: $0.boundary, sources: $0.sources)
+                AnnouncementPlan(
+                    id: $0.id,
+                    text: $0.text,
+                    boundary: $0.boundary,
+                    sources: $0.sources,
+                    factContent: $0.factContent
+                )
             }
             ?? fallbackPlan
         guard let plan else { return nil }
@@ -665,7 +689,8 @@ final class AnnouncementCoordinator {
             id: plan.id,
             text: plan.text,
             boundary: plan.boundary,
-            sources: plan.sources
+            sources: plan.sources,
+            factContent: plan.factContent
         )
         pendingDeliveryReady = false
         scheduler.schedule(after: delay) { [weak self] in
@@ -752,7 +777,8 @@ final class AnnouncementCoordinator {
                     id: plan.id,
                     text: FactPhraseBuilder.utterance(basePhrase: plan.text, fact: fact.text, mode: mode),
                     boundary: plan.boundary,
-                    sources: fact.sources
+                    sources: fact.sources,
+                    factContent: fact.text
                 ))
             }
         }
@@ -940,7 +966,8 @@ final class AnnouncementCoordinator {
             id: pending.id,
             text: pending.text,
             boundary: pending.boundary,
-            sources: pending.sources
+            sources: pending.sources,
+            factContent: pending.factContent
         )
 
         cancelPending(id: id)

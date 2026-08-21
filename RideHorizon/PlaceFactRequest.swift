@@ -190,6 +190,7 @@ struct PlaceFactRequest: Equatable {
     let placeHierarchy: PlaceHierarchy
     let riderContext: RiderContext
     let rideSessionID: UUID?
+    let previousRideSummaries: [String]
 
     var cacheKey: String {
         [
@@ -208,7 +209,8 @@ struct PlaceFactRequest: Equatable {
             PlaceNameNormalizer.normalize(
                 riderContext.factInterestCategories.map(\.rawValue).joined(separator: ",")
             ),
-            PlaceNameNormalizer.normalize(riderContext.customFactInstructions ?? "")
+            PlaceNameNormalizer.normalize(riderContext.customFactInstructions ?? ""),
+            PlaceNameNormalizer.normalize(previousRideSummaries.joined(separator: "|"))
         ].joined(separator: ":")
     }
 
@@ -219,7 +221,8 @@ struct PlaceFactRequest: Equatable {
         countryContext: String?,
         placeHierarchy: PlaceHierarchy = .empty,
         riderContext: RiderContext = .empty,
-        rideSessionID: UUID? = nil
+        rideSessionID: UUID? = nil,
+        previousRideSummaries: [String] = []
     ) {
         self.boundary = boundary
         self.placeName = placeName
@@ -228,6 +231,9 @@ struct PlaceFactRequest: Equatable {
         self.placeHierarchy = placeHierarchy
         self.riderContext = riderContext
         self.rideSessionID = rideSessionID
+        self.previousRideSummaries = Array(
+            previousRideSummaries.suffix(PreviousRideMemoryStore.maximumSummaries)
+        )
     }
 }
 

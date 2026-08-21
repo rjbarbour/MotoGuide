@@ -1107,6 +1107,7 @@ private struct SettingsView: View {
     @State private var lastNonQuietMode: ContentMode = .shortFacts
     @State private var showPrivacyNotice = false
     @State private var showClearLocalDataConfirmation = false
+    @State private var showClearRideMemoryConfirmation = false
     @State private var diagnosticsCopyStatus: String?
     @AppStorage("RideHorizonMapLabelScale") private var mapLabelScale = 1.0
     @AppStorage("RideHorizonNightMode") private var nightMode = false
@@ -1365,7 +1366,18 @@ private struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity, minHeight: 50)
 
-                    Text("Clearing removes settings, cached facts, ride history, release diagnostics, consent, the installation identifier and the proxy access credential. Access will be provisioned automatically when needed.")
+                    Button("Clear previous ride memory", role: .destructive) {
+                        showClearRideMemoryConfirmation = true
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .disabled(locationManager.previousRideSummaryCount == 0)
+
+                    Text("Ride memory contains \(locationManager.previousRideSummaryCount) of the latest three completed ride summaries. It stores compact fact content that finished playing, not coordinates or tracks.")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(palette.secondaryText)
+
+                    Text("Clearing all local data also removes previous ride memory, settings, cached facts, ride history, release diagnostics, consent, the installation identifier and the proxy access credential. Access will be provisioned automatically when needed.")
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(palette.secondaryText)
                     }
@@ -1602,7 +1614,15 @@ private struct SettingsView: View {
                 onClearLocalData()
             }
         } message: {
-            Text("This removes local settings, cached facts, ride history, release diagnostics, consent and proxy access from this iPhone. It does not yet submit a remote deletion request.")
+            Text("This removes previous ride memory, local settings, cached facts, ride history, release diagnostics, consent and proxy access from this iPhone. It does not submit a remote deletion request.")
+        }
+        .alert("Clear previous ride memory?", isPresented: $showClearRideMemoryConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear memory", role: .destructive) {
+                locationManager.clearPreviousRideMemory()
+            }
+        } message: {
+            Text("This removes the compact fact summaries from the previous three completed rides. It does not change the active ride or delete remote provider data.")
         }
     }
 

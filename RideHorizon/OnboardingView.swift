@@ -318,11 +318,11 @@ struct PrivacyNoticeView: View {
         NavigationStack {
             List {
                 Section("On your iPhone") {
-                    Text("RideHorizon uses precise location to identify places, but does not send latitude or longitude to the RideHorizon fact or speech proxy. Ride history stays in memory for the current session. Uncited generated facts may be cached for up to 30 days. Web-derived facts with source links are not persistently cached.")
+                    Text("RideHorizon uses precise location to identify places, but does not send latitude or longitude to the RideHorizon fact or speech proxy. Exact ride history stays in memory for the current session. On End ride, the app may keep compact fact summaries from the latest three completed rides; they contain only fact content that finished playing, not coordinates or tracks. Uncited generated facts may be cached for up to 30 days. Web-derived facts with source links are not persistently cached.")
                 }
 
                 Section("Optional AI features") {
-                    Text("With your permission, OpenAI receives the announced place hierarchy and optional rider fact preferences to generate a short fact. It may search the public web and return cited source links for the in-memory Log. ElevenLabs receives announcement text only when Premium Voice is selected; source titles and URLs are not included. OpenAI may retain API inputs and outputs for up to 30 days unless lower-retention controls apply. RideHorizon asks ElevenLabs not to log the text or generated audio; availability depends on the production account configuration.")
+                    Text("With your permission, OpenAI receives the announced place hierarchy, optional rider fact preferences and up to three compact previous-ride fact summaries to generate a short fact without repeating content you already heard. These summaries are separate from the active-ride conversation and contain no recent-place list, coordinates or tracks. OpenAI may search the public web and return cited source links for the in-memory Log. ElevenLabs receives announcement text only when Premium Voice is selected; source titles and URLs are not included. OpenAI may retain API inputs and outputs for up to 30 days unless lower-retention controls apply. RideHorizon asks ElevenLabs not to log the text or generated audio; availability depends on the production account configuration.")
                 }
 
                 Section("Service operation") {
@@ -330,7 +330,7 @@ struct PrivacyNoticeView: View {
                 }
 
                 Section("Your controls") {
-                    Text("You can withdraw AI permission, use Apple Voice, clear local data, remove location permission in iOS Settings, or stop ride tracking. Clearing local data also removes this installation's proxy access credential. If you later grant AI permission again, a new credential is provisioned when an AI feature next needs it.")
+                    Text("You can withdraw AI permission, use Apple Voice, clear previous ride memory, clear all local data, remove location permission in iOS Settings, or stop ride tracking. Clearing all local data also removes previous ride memory and this installation's proxy access credential. If you later grant AI permission again, a new credential is provisioned when an AI feature next needs it.")
                 }
 
                 Section("Not tracking") {

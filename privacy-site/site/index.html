@@ -180,7 +180,7 @@
 
     <div class="plain-summary">
       <strong>The short version</strong>
-      RideHorizon processes your precise location on your iPhone to recognise places. It does not send your latitude, longitude, or ride history to the RideHorizon proxy. AI facts and Premium Voice are optional. If you enable them, minimised place information or announcement text is sent to the named providers below. We do not use advertising or cross-app tracking.
+      RideHorizon processes your precise location on your iPhone to recognise places. It does not send your latitude, longitude, raw ride history, or tracks to the RideHorizon proxy. AI facts and Premium Voice are optional. If you enable them, minimised place information, up to three compact previous-ride fact summaries, or announcement text is sent to the named providers below. We do not use advertising or cross-app tracking.
     </div>
 
     <nav aria-label="Policy contents">
@@ -210,11 +210,11 @@
       <h2>2. Information we process</h2>
 
       <h3>Location and ride information on your iPhone</h3>
-      <p>With your iOS permission, RideHorizon uses precise location, speed, and Apple-provided place information to detect when you move between roads, towns, counties, regions, or countries. Exact coordinates and the current ride history are processed on your iPhone. RideHorizon does not send latitude, longitude, or ride history to our fact or speech proxy.</p>
-      <p>Your settings, consent choice, and uncited generated-fact cache are stored locally on your iPhone. Web-derived facts with source links are not put in the persistent fact cache. Their clickable source titles and URLs are held only with the recent ride log in memory for the active app session. iOS and Apple location or geocoding services operate under Apple's terms and privacy information.</p>
+      <p>With your iOS permission, RideHorizon uses precise location, speed, and Apple-provided place information to detect when you move between roads, towns, counties, regions, or countries. Exact coordinates and the current ride history are processed on your iPhone. RideHorizon does not send latitude, longitude, raw ride history, or tracks to our fact or speech proxy. If you enable AI facts, it may send the separately described compact fact summaries from up to three previous rides.</p>
+      <p>Your settings, consent choice, uncited generated-fact cache, and up to three compact previous-ride fact summaries are stored locally on your iPhone. A summary is created only at End ride from fact content that completed speech playback; it does not contain coordinates, tracks, generated-but-undelivered announcements, or source links. Web-derived facts with source links are not put in the persistent fact cache. Their clickable source titles and URLs are held only with the recent ride log in memory for the active app session. iOS and Apple location or geocoding services operate under Apple's terms and privacy information.</p>
 
       <h3>Optional AI facts</h3>
-      <p>If you explicitly enable AI sharing and request AI facts, RideHorizon sends the announced place hierarchy, such as town, county, region, and country, to our proxy. It may also send the home or familiar regions, fact-interest categories, and custom fact instructions you choose. During an active ride, the app also sends a random ride identifier and temporarily holds and sends an opaque OpenAI response identifier so later facts can take account of earlier ones. Our proxy sends the minimised request to OpenAI, which may use that context to search the public web before generating the fact. For a web-derived fact, the proxy returns up to five cited source titles and HTTPS URLs so the app can show visible clickable links in its Log. Citation titles and URLs are not added to announcement text or sent for text-to-speech. The proxy does not send your coordinates or log search queries, results, source titles or source URLs.</p>
+      <p>If you explicitly enable AI sharing and request AI facts, RideHorizon sends the announced place hierarchy, such as town, county, region, and country, to our proxy. It may also send the home or familiar regions, fact-interest categories, custom fact instructions you choose, and the compact fact summaries from up to three previous completed rides so a later fact can avoid repeating content you already heard. These summaries are separate from the active-ride conversation and contain no recent-place list, coordinates or tracks. During an active ride, the app also sends a random ride identifier and temporarily holds and sends an opaque OpenAI response identifier so later facts can take account of earlier ones. Our proxy sends the minimised request to OpenAI, which may use that context to search the public web before generating the fact. For a web-derived fact, the proxy returns up to five cited source titles and HTTPS URLs so the app can show visible clickable links in its Log. Citation titles and URLs are not added to announcement text or sent for text-to-speech. The proxy does not send coordinates and does not log search queries, results, source titles or source URLs.</p>
 
       <h3>Optional Premium Voice</h3>
       <p>If you explicitly enable AI sharing and select Premium Voice, RideHorizon sends the announcement text through our proxy to ElevenLabs and receives generated speech audio. We do not upload recordings of your voice or surroundings.</p>
@@ -264,6 +264,7 @@
       <h2>5. Retention and deletion</h2>
       <ul>
         <li>Exact location and the active ride history remain in app memory for the current session and are not stored by the RideHorizon proxy.</li>
+        <li>The app retains only the latest three compact previous-ride fact summaries. A summary remains until it is evicted by a newer completed ride, you clear previous ride memory or all local data, or you uninstall the app.</li>
         <li>Uncited generated facts and context-derived cache keys may be stored locally for up to 30 days, unless you clear local data or uninstall sooner. Web-derived facts with cited source links are not placed in that persistent cache; their fact and source links remain only in the in-memory recent ride log for the active app session.</li>
         <li>Local release diagnostics retain at most 2,000 events, seven days, or 1 MiB, whichever limit is reached first. You can clear them at any time.</li>
         <li>Proxy sessions expire after 15 minutes for the current automatic beta-access flow. Expired or revoked session and inactive installation records are deleted after 30 days.</li>
@@ -272,7 +273,7 @@
         <li>ElevenLabs retention depends on the production account's eligibility for its Zero Retention Mode and ElevenLabs' applicable terms. You can use Apple Voice instead.</li>
         <li>We retain limited legal or security records longer only when reasonably necessary to meet a legal obligation or establish, exercise, or defend a claim.</li>
       </ul>
-      <p>Clearing local data in RideHorizon removes local settings, cached facts, ride history, release diagnostics, consent, the installation identifier, and the proxy access credential from that iPhone. It does not by itself send a remote deletion request to us or a provider. Contact us if you want to request deletion of information held by us.</p>
+      <p>Clearing previous ride memory removes its three local summaries. Clearing all local data in RideHorizon also removes those summaries, local settings, cached facts, ride history, release diagnostics, consent, the installation identifier, and the proxy access credential from that iPhone. Neither control sends a remote deletion request to us or a provider. Contact us if you want to request deletion of information held by us.</p>
     </section>
 
     <section id="choices">
@@ -281,7 +282,7 @@
         <li>Decline or remove location access in iOS Settings. RideHorizon cannot provide live place awareness without location access.</li>
         <li>Decline or withdraw AI sharing in RideHorizon Settings. Names-only announcements remain available.</li>
         <li>Select Apple Voice instead of Premium Voice.</li>
-        <li>Use Clear Local Data in the app or uninstall RideHorizon.</li>
+        <li>Use Clear Previous Ride Memory, Clear Local Data, or uninstall RideHorizon.</li>
         <li>Contact us to make a server-side privacy request.</li>
       </ul>
       <p>Withdrawing consent does not affect processing that was lawful before withdrawal.</p>

@@ -1930,12 +1930,21 @@ final class LocationManagerTests: XCTestCase {
 
     @MainActor
     func testActiveRideIdentityBoundsFactRequestsAndEndConversation() async throws {
+        let suiteName = "LocationManagerRideRequestMemory.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let memoryStore = PreviousRideMemoryStore(defaults: defaults)
+        memoryStore.completeRide(
+            deliveredFacts: ["The previous ride heard about the wool trade."],
+            endedAt: Date(timeIntervalSince1970: 1)
+        )
         let factGenerator = MockPlaceFactGenerator()
         let factRequested = expectation(description: "Fact request records the active ride identity")
         factGenerator.onRequest = { _ in factRequested.fulfill() }
         let locationManager = LocationManager(
             factGenerator: factGenerator,
             speechOutput: RecordingSpeechOutputEngine(),
+            previousRideMemoryStore: memoryStore,
             aiSharingAllowed: { true }
         )
         locationManager.contentMode = .shortFacts
@@ -1969,7 +1978,208 @@ final class LocationManagerTests: XCTestCase {
         locationManager.endRide()
         await fulfillment(of: [conversationEnded], timeout: 1)
 
+        XCTAssertEqual(
+            factGenerator.requests.first?.previousRideSummaries,
+            ["The previous ride heard about the wool trade."]
+        )
         XCTAssertEqual(factGenerator.endedRideSessionIDs, [rideSessionID])
+    }
+
+    @MainActor
+    func testEndRidePersistsOnlyFactContentThatCompletedPlayback() async {
+        let suiteName = "LocationManagerRideMemory.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let memoryStore = PreviousRideMemoryStore(defaults: defaults)
+
+        let cancelledSpeech = RecordingSpeechOutputEngine()
+        let cancelledRequest = expectation(description: "Cancelled fact reached speech preparation")
+        cancelledSpeech.onRequest = { cancelledRequest.fulfill() }
+        let cancelledRide = LocationManager(
+            factGenerator: ConstantPlaceFactGenerator(fact: "This generated fact must not persist."),
+            speechOutput: cancelledSpeech,
+            previousRideMemoryStore: memoryStore,
+            aiSharingAllowed: { true }
+        )
+        prepareFactRide(cancelledRide)
+        await fulfillment(of: [cancelledRequest], timeout: 2)
+        cancelledRide.endRide()
+        XCTAssertEqual(memoryStore.summaries, [])
+
+        let deliveredSpeech = RecordingSpeechOutputEngine()
+        let deliveredRequest = expectation(description: "Delivered fact reached speech preparation")
+        deliveredSpeech.onRequest = { deliveredRequest.fulfill() }
+        let deliveredRide = LocationManager(
+            factGenerator: ConstantPlaceFactGenerator(fact: "The canal carried coal and cloth."),
+            speechOutput: deliveredSpeech,
+            previousRideMemoryStore: memoryStore,
+            aiSharingAllowed: { true }
+        )
+        prepareFactRide(deliveredRide)
+        await fulfillment(of: [deliveredRequest], timeout: 2)
+        deliveredSpeech.beginPlayback()
+        deliveredSpeech.finishPlayback()
+        deliveredRide.endRide()
+
+        XCTAssertEqual(memoryStore.summaries.map(\.content), ["The canal carried coal and cloth."])
+    }
+
+    @MainActor
+    func testPendingFactInterruptedDuringBluetoothDelayResumesAndPersistsCompletedRideMemory() async {
+        let suiteName = "LocationManagerInterruptedRideMemory.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let memoryStore = PreviousRideMemoryStore(defaults: defaults)
+        let source = PlaceFactSource(
+            title: "Cotswold Canals Trust",
+            url: URL(string: "https://www.cotswoldcanals.org/history")!
+        )
+        let factRequested = expectation(description: "Fact generated before Bluetooth delay")
+        let speechRequested = expectation(description: "Interrupted fact resumed into speech")
+        let sourceLogged = expectation(description: "Resumed fact retained attribution sources")
+        let speechOutput = RecordingSpeechOutputEngine()
+        speechOutput.onRequest = { speechRequested.fulfill() }
+        var loggedSources: [PlaceFactSource] = []
+        let locationManager = LocationManager(
+            factGenerator: ConstantPlaceFactGenerator(
+                fact: "The canal carried coal and cloth.",
+                sources: [source],
+                beforeResult: { factRequested.fulfill() }
+            ),
+            speechOutput: speechOutput,
+            previousRideMemoryStore: memoryStore,
+            aiSharingAllowed: { true }
+        )
+        locationManager.onRideLog = { _, _, _, sources in
+            guard !sources.isEmpty else { return }
+            loggedSources = sources
+            sourceLogged.fulfill()
+        }
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 10
+        locationManager.startRideWithoutLocationInputForTesting()
+        locationManager.processResolvedAddressForTesting(
+            Address(
+                street: "High Street",
+                town: "Stroud",
+                county: "Gloucestershire",
+                administrativeArea: "England",
+                country: "United Kingdom"
+            ),
+            resolvedCoordinate: CLLocationCoordinate2D(latitude: 51.7457, longitude: -2.2178)
+        )
+        locationManager.processResolvedAddressForTesting(
+            Address(
+                street: "Bristol Road",
+                town: "Stonehouse",
+                county: "Gloucestershire",
+                administrativeArea: "England",
+                country: "United Kingdom"
+            ),
+            resolvedCoordinate: CLLocationCoordinate2D(latitude: 51.7486, longitude: -2.2797)
+        )
+
+        await fulfillment(of: [factRequested], timeout: 2)
+        for _ in 0..<100 {
+            if locationManager.announcementStatus == .phraseReady { break }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(locationManager.announcementStatus, .phraseReady)
+        XCTAssertTrue(speechOutput.requests.isEmpty)
+
+        NotificationCenter.default.post(
+            name: AVAudioSession.silenceSecondaryAudioHintNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: [
+                AVAudioSessionSilenceSecondaryAudioHintTypeKey:
+                    AVAudioSession.SilenceSecondaryAudioHintType.begin.rawValue
+            ]
+        )
+        XCTAssertEqual(locationManager.announcementStatus, .waitingForAudio)
+
+        NotificationCenter.default.post(
+            name: AVAudioSession.silenceSecondaryAudioHintNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: [
+                AVAudioSessionSilenceSecondaryAudioHintTypeKey:
+                    AVAudioSession.SilenceSecondaryAudioHintType.end.rawValue
+            ]
+        )
+        await fulfillment(of: [speechRequested, sourceLogged], timeout: 2)
+        XCTAssertEqual(loggedSources, [source])
+
+        speechOutput.beginPlayback()
+        speechOutput.finishPlayback()
+        locationManager.endRide()
+
+        XCTAssertEqual(memoryStore.summaries.map(\.content), ["The canal carried coal and cloth."])
+    }
+
+    @MainActor
+    func testSupersededFactCannotEnterCompletedRideSummary() {
+        let suiteName = "LocationManagerSupersededRideMemory.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let memoryStore = PreviousRideMemoryStore(defaults: defaults)
+        let locationManager = LocationManager(previousRideMemoryStore: memoryStore)
+        let plan = AnnouncementPlan(
+            text: "Stonehouse. This content was superseded.",
+            boundary: .town,
+            factContent: "This content was superseded."
+        )
+        locationManager.startRideWithoutLocationInputForTesting()
+
+        locationManager.handleAnnouncementWorkflowResultForTesting(.speechRequested(
+            plan: plan,
+            provider: .apple,
+            shouldRecordTestLog: false
+        ))
+        locationManager.handleAnnouncementWorkflowResultForTesting(.cancelled(
+            announcementID: plan.id,
+            reason: .supersededByNewerContext
+        ))
+        locationManager.handleAnnouncementWorkflowResultForTesting(.completed(announcementID: plan.id))
+        locationManager.endRide()
+
+        XCTAssertEqual(memoryStore.summaries, [])
+    }
+
+    @MainActor
+    func testMissingAppleVoiceCancelsInsteadOfReportingCompletedPlayback() {
+        let output = AppleSpeechOutput()
+        let requestID = UUID()
+        var finishedRequestIDs: [UUID] = []
+        var cancelledRequestIDs: [UUID] = []
+        output.onFinish = { finishedRequestIDs.append($0) }
+        output.onCancel = { cancelledRequestIDs.append($0) }
+
+        output.speak(text: "A fact that cannot play.", boundary: .town, voice: nil, requestID: requestID)
+
+        XCTAssertEqual(finishedRequestIDs, [])
+        XCTAssertEqual(cancelledRequestIDs, [requestID])
+    }
+
+    @MainActor
+    private func prepareFactRide(_ locationManager: LocationManager) {
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.startRideWithoutLocationInputForTesting()
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
     }
 
     @MainActor
@@ -3092,7 +3302,12 @@ final class LocationManagerTests: XCTestCase {
 
     @MainActor
     func testClearLocalPrivacyStateRemovesRiderContextAndVisibleRideState() {
-        let locationManager = LocationManager()
+        let suiteName = "LocationManagerClearRideMemory.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let memoryStore = PreviousRideMemoryStore(defaults: defaults)
+        memoryStore.completeRide(deliveredFacts: ["A delivered fact."], endedAt: Date())
+        let locationManager = LocationManager(previousRideMemoryStore: memoryStore)
         locationManager.homeCountry = "United Kingdom"
         locationManager.homeRegion = "Gloucestershire"
         locationManager.familiarRegions = "Cotswolds"
@@ -3116,6 +3331,8 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertEqual(locationManager.lastNonQuietContentMode, .shortFacts)
         XCTAssertEqual(locationManager.speechProvider, .proxyElevenLabs)
         XCTAssertFalse(locationManager.isTracking)
+        XCTAssertEqual(locationManager.previousRideSummaryCount, 0)
+        XCTAssertEqual(memoryStore.summaries, [])
     }
 
     @MainActor

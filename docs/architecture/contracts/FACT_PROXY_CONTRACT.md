@@ -14,7 +14,7 @@ Keep the iOS app, fact proxy server, tests, and markdown in sync with the OpenAP
 
 The fact proxy contract lets RideHorizon ask for one bounded place fact without storing or sending an OpenAI API key from the iOS app.
 
-The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the RideHorizon fact proxy. It also sends optional rider context (`homeCountry`, `homeRegion`, `familiarRegions`, `customFactInstructions`) and optional `factInterestCategories` so the proxy can tune fact focus toward geography, culture, history, landmarks, and practical rider context without sending prompts.
+The iOS app sends `factMode`, the boundary/place fields, and the current place hierarchy to the RideHorizon fact proxy. It also sends optional rider context (`homeCountry`, `homeRegion`, `familiarRegions`, `customFactInstructions`) and optional `factInterestCategories` so the proxy can tune fact focus toward geography, culture, history, landmarks, and practical rider context without sending prompts. It may separately send `previousRideSummaries`: at most three compact local summaries containing only fact content that reached completed speech playback on earlier rides.
 
 Speech is proxied separately through ElevenLabs. The iOS app sends bounded text to `/v1/speech`; the proxy owns the ElevenLabs API key, voice id, model id, and output format.
 The proxy validates the request, chooses the server-side prompt for `shortFacts` or `longFacts`, calls OpenAI server-side, sanitizes the model output, and returns a bounded fact.
@@ -33,6 +33,12 @@ The proxy uses `store=true` for this linkage. OpenAI currently documents that
 Responses API application state is retained for at least 30 days in this
 configuration. End ride stops further linkage but does not remotely delete
 provider application state.
+
+Cross-ride memory is app-owned and separate from the active Responses chain.
+At End ride, the app deterministically compacts only delivered fact content,
+stores no coordinates or tracks, retains the latest three summaries and sends
+those summaries in the request body on later fact calls. It sends no recent-place
+list. Generated, cancelled and superseded announcements do not enter a summary.
 
 Every place-fact Responses request offers the hosted `web_search` tool without
 forcing its use. OpenAI's model may make zero or one search call; the proxy sets
@@ -87,7 +93,7 @@ Exact command:
 ./fact-proxy/gradlew -p fact-proxy openApiContractTest --no-daemon
 ```
 
-Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.4.0`, every published operation, schema and security scheme, and proves the intentional version-drift fixture fails validation.
+Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.5.0`, every published operation, schema and security scheme, and proves the intentional version-drift fixture fails validation.
 
 Drift proof:
 

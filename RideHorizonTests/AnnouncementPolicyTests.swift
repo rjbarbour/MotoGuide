@@ -786,6 +786,47 @@ final class AnnouncementCoordinatorTests: XCTestCase {
         XCTAssertEqual(speechOutput.requests.last?.text, "You are in Stonehouse, Gloucestershire")
     }
 
+    func testDeliveredFactContentSurvivesQueueUntilCompletedPlayback() async {
+        let scheduler = RecordingAnnouncementScheduler()
+        let speechOutput = RecordingCoordinatorSpeechOutput()
+        let coordinator = makeCoordinator(
+            scheduler: scheduler,
+            factClient: StubFactClient(result: "Known for its canal-side industry."),
+            speechOutput: speechOutput
+        )
+        let queued = expectation(description: "Fact announcement queued")
+        var results: [AnnouncementWorkflowResult] = []
+        coordinator.onResult = { result in
+            results.append(result)
+            if case .announcementQueued = result { queued.fulfill() }
+        }
+
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), mode: .shortFacts))
+        _ = coordinator.submit(workflowInput(address: Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ), mode: .shortFacts))
+
+        await fulfillment(of: [queued], timeout: 1)
+        scheduler.fire()
+        guard case .speechRequested(let deliveredPlan, _, _) = results.last else {
+            return XCTFail("Expected speech request")
+        }
+        XCTAssertEqual(deliveredPlan.factContent, "Known for its canal-side industry.")
+        XCTAssertTrue(speechOutput.beginPlayback(provider: .apple))
+        speechOutput.finish()
+        XCTAssertTrue(results.contains(.completed(announcementID: deliveredPlan.id)))
+    }
+
     private func workflowInput(
         address: Address,
         cooldown: TimeInterval = 0,
@@ -812,7 +853,8 @@ final class AnnouncementCoordinatorTests: XCTestCase {
             boundaryCooldown: cooldown,
             now: now,
             placeLookupID: nil,
-            rideSessionID: nil
+            rideSessionID: nil,
+            previousRideSummaries: []
         )
     }
 
