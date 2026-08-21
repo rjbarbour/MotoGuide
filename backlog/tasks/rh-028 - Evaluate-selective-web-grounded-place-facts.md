@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-17 22:42'
-updated_date: '2026-08-21 13:47'
+updated_date: '2026-08-21 14:03'
 labels:
   - proxy
   - model
@@ -40,14 +40,14 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 - [x] #1 Responses request exposes model-controlled hosted web_search.
 - [x] #2 Searched and unsearched outputs satisfy the existing ride-safe text and privacy contract.
 - [x] #3 Timeout, provider failure and tool-cost diagnostics and fallback remain bounded and tested.
-- [ ] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
-- [ ] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
+- [x] #4 Web-derived facts return bounded structured sources parsed from final-response url_citation annotations, and the existing RideHorizon Log displays those sources as clearly visible clickable links without adding citation titles or URLs to announcement text or TTS.
+- [x] #5 Any generated fact that can later be displayed carries its sources through the app pipeline and cache; otherwise that web-derived fact is not cached.
 - [x] #6 When message phase is present, only a completed final_answer message is accepted; a completed phase-less message remains compatible, while commentary and incomplete message paths are rejected.
 - [x] #7 openai_result and its diagnostics-only fields are documented as bounded and privacy-safe, excluding search queries, results, sources, place text and rider text.
 - [x] #8 Citation URLs are canonicalised before validation; HTTPS is checked case-insensitively on the canonical URI, the final ASCII URL is at most 2048 characters, and deduplication uses that canonical URL so Unicode expansion cannot break iOS attribution.
 - [x] #9 The iOS fact response requires a sources field and fails closed when it is missing or any provided source is malformed; an uncited response is valid only with an explicit empty sources array.
 - [x] #10 Every success example in FACT_PROXY_CONTRACT.md includes the required sources field, either empty or populated with bounded cited sources.
-- [ ] #11 Each accepted announcement retains its resolved coordinate and address by announcement ID; delivered phrase/source logging uses that immutable context even after newer or rejected geocodes, and context is removed on supersession, terminal completion/cancellation/failure and End ride.
+- [x] #11 Each accepted announcement retains its resolved coordinate and address by announcement ID; delivered phrase/source logging uses that immutable context even after newer or rejected geocodes, and context is removed on supersession, terminal completion/cancellation/failure and End ride.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -98,4 +98,6 @@ Exclusions: no recent-place list, no change to GPT-5.6 Sol medium, no spoken cit
 2026-08-21 PR #59 iOS drift hand-off: commits b0f9079 and 8b30de4 were pushed to origin/codex/rh-028-web-search. PR #59 remains open and unmerged; no deployment was performed.
 
 2026-08-21 PR #59 thread PRRT_kwDOMm8pys6bKd8z reopened citation-place correctness. The accepted reverse-geocode request retains its coordinate, but LocationManager currently logs a delivered sourced plan through mutable lastKnownLocation/lastKnownAddress. Scope is limited to announcement-ID context capture/use/cleanup and focused Swift evidence; speech text, source semantics, provider state and navigation behaviour remain unchanged.
+
+2026-08-21 PR #59 thread PRRT_kwDOMm8pys6bKd8z resolution evidence: commit 7e1025f retains each accepted announcement's resolved coordinate/address by announcement ID and uses that immutable context for delivered Log phrase/sources. Context is removed on supersession, fact or pending cancellation, completed/cancelled/failed terminal results and End ride; interruption hand-off remains non-terminal. Deterministic focused regressions passed 3 tests with 0 failures for original-place citation logging after a newer lower-priority rejection, active-fact cancellation, supersession replacement, completion and End ride cleanup. Final focused simulator verification on iPhone 17 / iOS 26.3.1 passed LocationManagerTests 102 plus AnnouncementCoordinatorTests 26, 128 tests total with 0 failures. The first sandboxed simulator attempt failed because CoreSimulatorService was inaccessible; host CoreSimulator verification then succeeded. Follow-up Standards and Specification reviews of git diff 01ce1d2...7e1025f both returned zero findings. Speech text and source semantics are unchanged. No full iOS suite, device build, merge or deployment was performed.
 <!-- SECTION:NOTES:END -->
