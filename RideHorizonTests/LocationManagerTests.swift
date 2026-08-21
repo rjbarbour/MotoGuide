@@ -3212,20 +3212,26 @@ final class LocationManagerTests: XCTestCase {
             country: "United Kingdom"
         )
 
+        locationManager.startRideWithoutLocationInputForTesting()
         locationManager.processResolvedAddressForTesting(stroud)
-        try? await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertTrue(speechOutput.requests.isEmpty)
 
+        let firstEligibleAnnouncement = expectation(description: "First eligible post-start boundary announces")
+        speechOutput.onRequest = { firstEligibleAnnouncement.fulfill() }
         locationManager.processResolvedAddressForTesting(stonehouse)
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await fulfillment(of: [firstEligibleAnnouncement], timeout: 1)
         XCTAssertEqual(speechOutput.requests.map(\.text), ["Stonehouse, Gloucestershire"])
         speechOutput.beginPlayback(provider: .apple)
         speechOutput.finishPlayback()
 
+        let duplicateAnnouncement = expectation(description: "Unchanged place does not announce")
+        duplicateAnnouncement.isInverted = true
+        speechOutput.onRequest = { duplicateAnnouncement.fulfill() }
         locationManager.processResolvedAddressForTesting(stonehouse)
         locationManager.processResolvedAddressForTesting(stonehouse)
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await fulfillment(of: [duplicateAnnouncement], timeout: 0.2)
         XCTAssertEqual(speechOutput.requests.count, 1)
+        locationManager.endRide()
     }
 
     @MainActor
@@ -3244,15 +3250,21 @@ final class LocationManagerTests: XCTestCase {
             country: "United Kingdom"
         )
 
+        locationManager.startRideWithoutLocationInputForTesting()
+        let firstAnnouncement = expectation(description: "Authorised first post-start lookup announces")
+        speechOutput.onRequest = { firstAnnouncement.fulfill() }
         locationManager.processResolvedAddressForTesting(stroud)
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await fulfillment(of: [firstAnnouncement], timeout: 1)
         XCTAssertEqual(speechOutput.requests.count, 1)
         speechOutput.beginPlayback(provider: .apple)
         speechOutput.finishPlayback()
 
+        let authorisedRepeat = expectation(description: "Authorised unchanged-place repeat announces")
+        speechOutput.onRequest = { authorisedRepeat.fulfill() }
         locationManager.processResolvedAddressForTesting(stroud)
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await fulfillment(of: [authorisedRepeat], timeout: 1)
         XCTAssertEqual(speechOutput.requests.count, 2)
+        locationManager.endRide()
     }
 
     private func clearSpeechProviderDefaults() {

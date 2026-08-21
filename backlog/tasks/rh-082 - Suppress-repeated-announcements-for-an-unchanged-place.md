@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:46'
-updated_date: '2026-08-21 12:28'
+updated_date: '2026-08-21 12:37'
 labels:
   - core
   - announcement
@@ -28,16 +28,16 @@ Road-test regression observed on 2026-08-21: RideHorizon continuously repeats th
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Repeated accepted GPS or geocoder updates that resolve to the same meaningful place do not enqueue or speak duplicate announcements
-- [ ] #2 A genuine eligible town, county, region or country change still produces one announcement according to the configured policy
-- [ ] #3 The fix does not suppress a valid first announcement after ride start or an explicitly authorised repeat condition
+- [x] #1 Repeated accepted GPS or geocoder updates that resolve to the same meaningful place do not enqueue or speak duplicate announcements
+- [x] #2 A genuine eligible town, county, region or country change still produces one announcement according to the configured policy
+- [x] #3 The fix does not suppress a valid first announcement after ride start or an explicitly authorised repeat condition
 - [ ] #4 Focused automated evidence and a physical road-test check demonstrate that an unchanged place remains quiet across multiple updates
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Add a failing LocationManager regression proving that the developer noisy-speech flag cannot repeat unchanged places during a live ride, while a genuine place change still announces once. 2. Scope Speak after every location lookup to Test Mode and make the UI constraint explicit. 3. Verify the explicit Test Mode repeat path remains available. 4. Run focused tests and the complete iOS unit-test checkpoint, build/install if the supported iPhone is connected, then push and raise a separate PR.
+1. Trace accepted GPS/place-resolution updates through LocationManager and AnnouncementCoordinator. 2. Keep normal boundary change detection unchanged; confine the explicit every-lookup bypass and its Settings control to Test Mode. 3. Cover live unchanged updates, the first eligible post-start boundary change, and the authorised Test Mode first/repeat path with deterministic asynchronous regressions. 4. Run focused tests and one complete RideHorizonTests simulator checkpoint, obtain independent read-only review, commit and push. 5. Leave physical unchanged-place road validation open; do not merge or build/install on a device.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -50,4 +50,6 @@ Captured from the 2026-08-21 road test. Intended branch: codex/rh-082-suppress-u
 2026-08-21 red/green evidence: the live-ride test failed with repeated Stroud and Stonehouse announcements before the fix; the Test Mode repeat test passed. After gating the noisy override to Test Mode, both focused tests passed. The complete RideHorizonTests suite passed 240 tests with 0 failures. Robert's iPhone was not listed by xcodebuild, so physical build/install and unchanged-place road validation remain pending.
 
 Draft PR #58 opened on 2026-08-21. Keep draft until physical unchanged-place road evidence is captured on the supported iPhone.
+
+2026-08-21 independent review found a ride-start coverage gap and timing-sensitive negative assertion. Remediation now starts explicit ride sessions, awaits positive speech requests and uses an inverted request expectation for unchanged updates. Final independent re-review: zero findings; git diff --check passed. Verification in this session: focused RH-082 tests passed 2/2 after final remediation; the complete RideHorizonTests simulator checkpoint passed 240/240 before the test-only review strengthening. No physical-device build, install or road test was performed; acceptance criterion 4 remains open.
 <!-- SECTION:NOTES:END -->
