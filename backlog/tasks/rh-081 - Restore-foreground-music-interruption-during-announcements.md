@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-21 11:46'
-updated_date: '2026-08-21 12:17'
+updated_date: '2026-08-21 12:28'
 labels:
   - core
   - audio
@@ -13,6 +13,8 @@ labels:
   - road-test
 milestone: m-1
 dependencies: []
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/57'
 priority: high
 type: bug
 ordinal: 217000
@@ -46,4 +48,6 @@ Captured from the 2026-08-21 road test. Intended branch: codex/rh-081-foreground
 2026-08-21 diagnosis: RH-059 introduced a cached lifecycle gate for audio policy. A stale background value can select the mix policy even while the app is currently foreground, matching the road-test symptom. The fix will use current application state at delivery time and keep the cached value for diagnostics only.
 
 2026-08-21 evidence: focused foreground/background policy tests passed (2 tests, 0 failures). The complete RideHorizonTests suite passed 239 tests with 0 failures. Robert's iPhone was not listed by xcodebuild, so physical build/install and X-COM2 music-pause acceptance remain pending.
+
+Draft PR #57 opened on 2026-08-21. Keep draft until physical foreground music pause/resume evidence is captured on the supported iPhone and X-COM2.
 <!-- SECTION:NOTES:END -->
