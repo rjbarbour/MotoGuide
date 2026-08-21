@@ -88,6 +88,20 @@ class FactControllerTest {
     }
 
     @Test
+    void webSearchFailureKeepsTheExistingRetryableFactFallbackStatus() throws Exception {
+        when(openAiService.generateFact(any())).thenThrow(
+                new UpstreamException(UpstreamException.Category.TOOL, "OpenAI web search failed")
+        );
+
+        mockMvc.perform(post("/v1/fact")
+                        .header("Authorization", "Bearer test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error").value("OpenAI web search failed"));
+    }
+
+    @Test
     void rideHeadersCarryAppOwnedLinkageThroughTheStatelessProxy() throws Exception {
         String rideId = "00000000-0000-0000-0000-000000000063";
         when(openAiService.generateFactWithLinkage(any(), eq("resp_previous"))).thenReturn(

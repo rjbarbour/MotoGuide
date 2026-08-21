@@ -36,7 +36,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(UpstreamException.class)
     public ResponseEntity<Map<String, String>> handleUpstream(UpstreamException ex) {
-        log.warn("event=fact_request_upstream_failure status=502 reason={}", ex.getMessage());
+        log.warn(
+                "event=fact_request_upstream_failure status=502 category={} reason={}",
+                ex.category(),
+                ex.getMessage()
+        );
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("error", ex.getMessage()));
     }

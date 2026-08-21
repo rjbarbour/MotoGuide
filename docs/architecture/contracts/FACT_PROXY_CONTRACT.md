@@ -34,6 +34,23 @@ Responses API application state is retained for at least 30 days in this
 configuration. End ride stops further linkage but does not remotely delete
 provider application state.
 
+Every place-fact Responses request offers the hosted `web_search` tool without
+forcing its use. OpenAI's model may make zero or one search call; the proxy sets
+`max_tool_calls: 1` to bound the dominant per-fact tool cost. A derived search
+query may contain the minimised place and rider-preference context already sent
+to OpenAI. The proxy does not request sources, return search metadata to the
+app, or log search queries, results, sources, place text, or rider text. It
+counts only `web_search_call` output items for privacy-safe cost diagnostics.
+
+Responses may contain reasoning and hosted-tool output items before the final
+message. The proxy ignores those items as rider text and extracts only
+`output_text` from final message content. It accepts either a completed
+unsearched response or a completed one-search response, then applies the
+existing sanitizer. A failed search, more than one search call, provider
+failure, timeout, incomplete response, missing final text, or rejected text
+remains a `502`; the iOS client retains its bounded retries and base-place
+announcement fallback.
+
 ## Implementations
 
 - iOS client: `RideHorizon/ProxyFactGenerator.swift`
@@ -137,11 +154,11 @@ Runtime configuration:
 | `RIDEHORIZON_PROMPT_OVERRIDES_HOST_ALLOWLIST` | (not set) | Comma-separated host allowlist. Required when `RIDEHORIZON_PROMPT_OVERRIDES_ENABLED=true`. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Per identity (trusted user/device if provided, else IP) request limit for authenticated proxy calls. |
 
-### RH-062 candidate OpenAI request contract
+### RH-028 candidate OpenAI request contract
 
-The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium` and `store: false`. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–90-word facts. OpenAI documents that this ceiling covers reasoning, visible output and non-visible formatting tokens; it does not publish a smaller workload-specific safe value. The proxy accepts only a top-level Responses result with `status: completed`, then extracts typed `output_text` content and applies the existing fact sentence and character limits. [OpenAI reasoning guidance](https://developers.openai.com/api/docs/guides/reasoning#allocating-space-for-reasoning) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
+The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium`, the model-controlled hosted `web_search` tool and `max_tool_calls: 1`. It retains `store: false` outside rides and RH-063's `store: true`, `previous_response_id` and compaction behaviour for active rides. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–90-word facts. The proxy accepts only a top-level Responses result with `status: completed`, tolerates reasoning and hosted-tool output items, extracts only typed final-message `output_text`, and applies the existing fact sentence and character limits. [OpenAI tools guidance](https://developers.openai.com/api/docs/guides/tools) [OpenAI Responses reference](https://developers.openai.com/api/reference/resources/responses/methods/create) [OpenAI reasoning guidance](https://developers.openai.com/api/docs/guides/reasoning#allocating-space-for-reasoning) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
 
-This is candidate behaviour only. Merging the accepted RH-062 change to `main` intentionally deploys the private-beta candidate. RH-062 remains In Progress after deployment until representative UK factuality, repetition, relevance, latency and token-cost evaluation is complete.
+This is candidate behaviour only. RH-028 is not merged or deployed by this work item hand-off.
 
 Health check:
 

@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -21,6 +22,7 @@ public class OpenAiService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiService.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
     private static final int MAX_OUTPUT_TOKENS = 4_096;
+    static final int MAX_WEB_SEARCH_CALLS = 1;
     static final int COMPACT_THRESHOLD_TOKENS = 24_000;
 
     private static final String BASE_SYSTEM_PROMPT = """
@@ -100,7 +102,10 @@ public class OpenAiService {
             boolean rideLinked
     ) {
         if (openAiProperties.apiKey() == null || openAiProperties.apiKey().isBlank()) {
-            throw new UpstreamException("OpenAI API key is not configured");
+            throw new UpstreamException(
+                    UpstreamException.Category.CONFIGURATION,
+                    "OpenAI API key is not configured"
+            );
         }
 
         try {
@@ -111,32 +116,86 @@ public class OpenAiService {
             }
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new UpstreamException("OpenAI returned HTTP " + response.statusCode());
+                throw new UpstreamException(
+                        UpstreamException.Category.PROVIDER,
+                        "OpenAI returned HTTP " + response.statusCode()
+                );
             }
 
             JsonNode root = objectMapper.readTree(response.body());
             if (!"completed".equals(root.path("status").asText(null))) {
-                throw new UpstreamException("OpenAI response was not completed");
+                throw new UpstreamException(
+                        UpstreamException.Category.PROVIDER,
+                        "OpenAI response was not completed"
+                );
+            }
+            WebSearchUsage webSearchUsage = inspectWebSearchUsage(root);
+            if (webSearchUsage.callCount() > MAX_WEB_SEARCH_CALLS) {
+                throw new UpstreamException(
+                        UpstreamException.Category.TOOL,
+                        "OpenAI exceeded web search call limit"
+                );
+            }
+            if (webSearchUsage.failed()) {
+                throw new UpstreamException(
+                        UpstreamException.Category.TOOL,
+                        "OpenAI web search failed"
+                );
             }
             String content = extractOutputText(root);
             String sanitized = FactSanitizer.sanitize(content, factMode);
             if (sanitized == null) {
-                throw new UpstreamException("OpenAI response could not be sanitized");
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI response could not be sanitized"
+                );
             }
             String responseId = root.path("id").asText(null);
             if (responseId == null
                     || responseId.isBlank()
                     || responseId.length() > 200
                     || !responseId.matches("[A-Za-z0-9_-]+")) {
-                throw new UpstreamException("OpenAI response id is missing");
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI response id is missing"
+                );
+            }
+            if (diagnosticsSettings.enabled()) {
+                log.info(
+                        "event=openai_result boundary={} factMode={} webSearchCalls={} searched={}",
+                        request.boundary(),
+                        factMode.wireValue(),
+                        webSearchUsage.callCount(),
+                        webSearchUsage.callCount() > 0
+                );
             }
             return new GeneratedFact(sanitized, responseId);
         } catch (UpstreamException ex) {
-            log.warn("event=openai_upstream_error boundary={} reason={}", request.boundary(), ex.getMessage());
+            log.warn(
+                    "event=openai_upstream_error boundary={} category={} reason={}",
+                    request.boundary(),
+                    ex.category(),
+                    ex.getMessage()
+            );
             throw ex;
+        } catch (HttpTimeoutException ex) {
+            log.warn("event=openai_request_failed boundary={} category=TIMEOUT", request.boundary());
+            throw new UpstreamException(
+                    UpstreamException.Category.TIMEOUT,
+                    "OpenAI request timed out",
+                    ex
+            );
         } catch (Exception ex) {
-            log.warn("event=openai_request_failed boundary={} reason={}", request.boundary(), ex.getClass().getSimpleName());
-            throw new UpstreamException("OpenAI request failed: " + ex.getMessage());
+            log.warn(
+                    "event=openai_request_failed boundary={} category=PROVIDER reason={}",
+                    request.boundary(),
+                    ex.getClass().getSimpleName()
+            );
+            throw new UpstreamException(
+                    UpstreamException.Category.PROVIDER,
+                    "OpenAI request failed",
+                    ex
+            );
         }
     }
 
@@ -185,6 +244,8 @@ public class OpenAiService {
         payload.put("input", userPrompt(request, factMode));
         payload.put("reasoning", Map.of("effort", "medium"));
         payload.put("max_output_tokens", MAX_OUTPUT_TOKENS);
+        payload.put("tools", List.of(Map.of("type", "web_search")));
+        payload.put("max_tool_calls", MAX_WEB_SEARCH_CALLS);
         payload.put("store", rideLinked);
         if (rideLinked) {
             payload.put(
@@ -212,11 +273,12 @@ public class OpenAiService {
     }
 
     private static String extractOutputText(JsonNode root) {
-        StringBuilder outputText = new StringBuilder();
+        String finalOutputText = null;
         for (JsonNode outputItem : root.path("output")) {
             if (!"message".equals(outputItem.path("type").asText())) {
                 continue;
             }
+            StringBuilder messageOutputText = new StringBuilder();
             for (JsonNode contentItem : outputItem.path("content")) {
                 if (!"output_text".equals(contentItem.path("type").asText())) {
                     continue;
@@ -225,13 +287,32 @@ public class OpenAiService {
                 if (text == null || text.isBlank()) {
                     continue;
                 }
-                if (!outputText.isEmpty()) {
-                    outputText.append('\n');
+                if (!messageOutputText.isEmpty()) {
+                    messageOutputText.append('\n');
                 }
-                outputText.append(text);
+                messageOutputText.append(text);
+            }
+            if (!messageOutputText.isEmpty()) {
+                finalOutputText = messageOutputText.toString();
             }
         }
-        return outputText.isEmpty() ? null : outputText.toString();
+        return finalOutputText;
+    }
+
+    private static WebSearchUsage inspectWebSearchUsage(JsonNode root) {
+        int callCount = 0;
+        boolean failed = false;
+        for (JsonNode outputItem : root.path("output")) {
+            if (!"web_search_call".equals(outputItem.path("type").asText())) {
+                continue;
+            }
+            callCount += 1;
+            failed = failed || !"completed".equals(outputItem.path("status").asText());
+        }
+        return new WebSearchUsage(callCount, failed);
+    }
+
+    private record WebSearchUsage(int callCount, boolean failed) {
     }
 
     record GeneratedFact(String fact, String responseId) {
