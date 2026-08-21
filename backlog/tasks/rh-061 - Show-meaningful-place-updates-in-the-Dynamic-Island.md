@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-20 14:16'
+updated_date: '2026-08-21 09:30'
 labels:
   - core
   - dynamic-island
@@ -47,6 +47,8 @@ During an active ride, present short RideHorizon place or boundary updates in th
 
 <!-- SECTION:PLAN:BEGIN -->
 1. Add a minimal ActivityKit contract and system adapter for one active ride. 2. Start and end the activity with the ride lifecycle, and update it only when the resolved glanceable place text changes. 3. Add the smallest WidgetKit extension required for Dynamic Island presentation, leaving the richer persistent Lock Screen experience to RH-067. 4. Verify lifecycle logic with focused tests, then run the complete simulator suite and unsigned simulator build; physical Google Maps coexistence remains owner acceptance.
+
+5. Resolve PR #47 review by reconciling an idle reconstructed LocationManager with ActivityKit: end orphaned existing RideHorizon activities on construction, preserve the existing start/update/end methods, and run only the focused Live Activity lifecycle tests.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -57,4 +59,6 @@ Owner authorised simulator-only integration while AFK. Physical iPhone and Googl
 Implemented the minimum ActivityKit surface: an embedded WidgetKit extension with compact, minimal and expanded Dynamic Island views; a shared ride activity contract; and start, place-update and end lifecycle wiring. Unit tests isolate ActivityKit behind a capability seam. Focused lifecycle tests passed, the complete simulator suite passed 226 tests with zero failures, the extension embedded and validated successfully, and the final focused rerun passed. AC3 remains open for the exact iPhone with Google Maps because the owner is AFK.
 
 Implementation is in PR #47. The task remains In Progress until exact-device Google Maps coexistence is verified.
+
+2026-08-21 PR #47 P2 resolution: idle LocationManager construction now asks the ActivityKit adapter to end every existing RideHorizon activity, preventing stale Ride in progress content after app termination while leaving normal start/update/end methods unchanged. Focused simulator verification passed: testIdleConstructionEndsOrphanedLiveActivities, testActiveRideStartsUpdatesAndEndsLiveActivity, and testResolvedPlaceDoesNotUpdateLiveActivityOutsideRide; 3 tests executed, 0 failures, xcodebuild exit 0 and TEST SUCCEEDED. The full suite, device deployment, Google Maps coexistence, and road testing were deliberately not run; AC3 remains open.
 <!-- SECTION:NOTES:END -->

@@ -164,7 +164,12 @@ private final class RecordingRideLiveActivityManager: RideLiveActivityManaging {
 
     private(set) var startedRideIDs: [UUID] = []
     private(set) var updates: [Update] = []
+    private(set) var orphanedActivityEndCount = 0
     private(set) var endCount = 0
+
+    func endOrphanedActivities() {
+        orphanedActivityEndCount += 1
+    }
 
     func startRide(id: UUID) {
         startedRideIDs.append(id)
@@ -2073,6 +2078,18 @@ final class LocationManagerTests: XCTestCase {
         XCTAssertFalse(locationManager.isTracking)
         XCTAssertEqual(notifier.cancelCount, 1)
         XCTAssertEqual(speechOutput.stopCount, 1)
+    }
+
+    @MainActor
+    func testIdleConstructionEndsOrphanedLiveActivities() {
+        let liveActivityManager = RecordingRideLiveActivityManager()
+
+        _ = LocationManager(liveActivityManager: liveActivityManager)
+
+        XCTAssertEqual(liveActivityManager.orphanedActivityEndCount, 1)
+        XCTAssertTrue(liveActivityManager.startedRideIDs.isEmpty)
+        XCTAssertTrue(liveActivityManager.updates.isEmpty)
+        XCTAssertEqual(liveActivityManager.endCount, 0)
     }
 
     @MainActor

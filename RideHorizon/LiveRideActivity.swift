@@ -12,6 +12,7 @@ struct RideHorizonActivityAttributes: ActivityAttributes {
 
 @MainActor
 protocol RideLiveActivityManaging: AnyObject {
+    func endOrphanedActivities()
     func startRide(id: UUID)
     func update(placeName: String, context: String)
     func endRide()
@@ -19,6 +20,7 @@ protocol RideLiveActivityManaging: AnyObject {
 
 @MainActor
 final class DisabledRideLiveActivityManager: RideLiveActivityManaging {
+    func endOrphanedActivities() {}
     func startRide(id: UUID) {}
     func update(placeName: String, context: String) {}
     func endRide() {}
@@ -28,6 +30,17 @@ final class DisabledRideLiveActivityManager: RideLiveActivityManaging {
 final class SystemRideLiveActivityManager: RideLiveActivityManaging {
     private var activity: Activity<RideHorizonActivityAttributes>?
     private var lastState: RideHorizonActivityAttributes.ContentState?
+
+    func endOrphanedActivities() {
+        let orphanedActivities = Activity<RideHorizonActivityAttributes>.activities
+        guard !orphanedActivities.isEmpty else { return }
+
+        Task {
+            for activity in orphanedActivities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+    }
 
     func startRide(id: UUID) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }

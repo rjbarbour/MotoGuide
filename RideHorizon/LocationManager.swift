@@ -1035,6 +1035,7 @@ class LocationManager: NSObject, ObservableObject {
         self.liveActivityManager = liveActivityManager ?? SystemRideLiveActivityManager()
         self.aiSharingAllowed = aiSharingAllowed
         super.init()
+        self.liveActivityManager.endOrphanedActivities()
         configureAnnouncementCoordinator()
         if testMode {
             applyDebugTestModeCampaignDefaults()
