@@ -10,16 +10,24 @@ struct CachedPlaceFactGenerator: PlaceFactGenerating {
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
-        if let cached = cache.fact(forKey: request.cacheKey) {
+        let usesCrossRideCache = request.rideSessionID == nil
+        if usesCrossRideCache, let cached = cache.fact(forKey: request.cacheKey) {
             ProxyDiagnostics.log("Facts", "Cache hit for \(request.cacheKey)")
             return cached
         }
 
-        ProxyDiagnostics.log("Facts", "Cache miss for \(request.cacheKey)")
+        ProxyDiagnostics.log(
+            "Facts",
+            usesCrossRideCache
+                ? "Cache miss for \(request.cacheKey)"
+                : "Bypassing cross-ride cache for active ride fact"
+        )
         let fact = try await generator.fact(for: request)
         if let sanitized = FactPhraseBuilder.sanitize(fact, mode: request.factMode) {
-            cache.store(sanitized, forKey: request.cacheKey)
-            ProxyDiagnostics.log("Facts", "Stored fact in cache for \(request.cacheKey)")
+            if usesCrossRideCache {
+                cache.store(sanitized, forKey: request.cacheKey)
+                ProxyDiagnostics.log("Facts", "Stored fact in cache for \(request.cacheKey)")
+            }
             return sanitized
         }
         ProxyDiagnostics.log("Facts", "Generated fact failed local sanitization for \(request.cacheKey)")

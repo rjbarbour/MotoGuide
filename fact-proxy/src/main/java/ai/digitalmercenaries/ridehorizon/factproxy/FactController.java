@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,6 +18,8 @@ public class FactController {
     private static final Logger log = LoggerFactory.getLogger(FactController.class);
     private static final String USER_HEADER = "X-RideHorizon-User-Id";
     private static final String RIDE_HEADER = "X-RideHorizon-Ride-Id";
+    private static final String PREVIOUS_RESPONSE_HEADER = "X-RideHorizon-Previous-Response-Id";
+    private static final String RESPONSE_HEADER = "X-RideHorizon-Response-Id";
 
     private final OpenAiService openAiService;
     private final ElevenLabsSpeechService elevenLabsSpeechService;
@@ -44,10 +45,11 @@ public class FactController {
 
     @PostMapping(path = "/v1/fact", consumes = MediaType.APPLICATION_JSON_VALUE)
     // Contract: see /Users/rob_dev/DocsLocal/motoguide/repo/FACT_PROXY_OPENAPI.yaml.
-    public FactResponse fact(
+    public ResponseEntity<FactResponse> fact(
             @RequestBody(required = false) FactRequest request,
             @RequestHeader(name = USER_HEADER, required = false) String userId,
             @RequestHeader(name = RIDE_HEADER, required = false) String rideId,
+            @RequestHeader(name = PREVIOUS_RESPONSE_HEADER, required = false) String previousResponseId,
             HttpServletRequest httpRequest
     ) {
         if (request == null) {
@@ -55,6 +57,14 @@ public class FactController {
         }
 
         ValidatedFactRequest validatedRequest = request.validateAndNormalize(normalizeUserId(userId));
+        boolean linkedRideRequest = rideId != null && !rideId.isBlank();
+        String normalizedPreviousResponseId = null;
+        if (linkedRideRequest) {
+            validateRideId(rideId);
+            normalizedPreviousResponseId = normalizePreviousResponseId(previousResponseId);
+        } else if (previousResponseId != null && !previousResponseId.isBlank()) {
+            throw new BadRequestException("ride id is required with previous response id");
+        }
 
         if (diagnosticsSettings.enabled()) {
             log.info(
@@ -71,10 +81,13 @@ public class FactController {
         );
         sessions.authorizeFact(auth);
 
-        OpenAiService.RideConversation rideConversation = rideConversation(auth, rideId, false);
-        String fact = rideConversation == null
-                ? openAiService.generateFact(validatedRequest)
-                : openAiService.generateFact(validatedRequest, rideConversation);
+        OpenAiService.GeneratedFact generatedFact = linkedRideRequest
+                ? openAiService.generateFactWithLinkage(
+                        validatedRequest,
+                        normalizedPreviousResponseId
+                )
+                : new OpenAiService.GeneratedFact(openAiService.generateFact(validatedRequest), null);
+        String fact = generatedFact.fact();
         if (diagnosticsSettings.enabled()) {
             log.info(
                     "event=fact_request_success boundary={} factMode={} factLength={}",
@@ -83,19 +96,11 @@ public class FactController {
                     fact.length()
             );
         }
-        return new FactResponse(fact);
-    }
-
-    @DeleteMapping("/v1/ride/conversation")
-    public ResponseEntity<Void> endRideConversation(
-            @RequestHeader(name = RIDE_HEADER) String rideId,
-            HttpServletRequest httpRequest
-    ) {
-        SessionAuthority.SessionAuthentication auth = (SessionAuthority.SessionAuthentication) httpRequest.getAttribute(
-                ProxyAuthFilter.SESSION_AUTH_ATTRIBUTE
-        );
-        openAiService.endRideConversation(rideConversation(auth, rideId, true));
-        return ResponseEntity.noContent().build();
+        ResponseEntity.BodyBuilder response = ResponseEntity.ok();
+        if (generatedFact.responseId() != null) {
+            response.header(RESPONSE_HEADER, generatedFact.responseId());
+        }
+        return response.body(new FactResponse(fact));
     }
 
     @PostMapping(path = "/v1/speech", consumes = MediaType.APPLICATION_JSON_VALUE, produces = "audio/mpeg")
@@ -129,21 +134,22 @@ public class FactController {
         return UserIdSanitizer.normalizeAndValidate(userId);
     }
 
-    private static OpenAiService.RideConversation rideConversation(
-            SessionAuthority.SessionAuthentication auth,
-            String rideId,
-            boolean required
-    ) {
-        if (rideId == null || rideId.isBlank()) {
-            if (required) {
-                throw new BadRequestException("ride id is required");
-            }
-            return null;
-        }
+    private static void validateRideId(String rideId) {
         try {
-            return new OpenAiService.RideConversation(auth.quotaSubjectHash(), UUID.fromString(rideId));
+            UUID.fromString(rideId);
         } catch (IllegalArgumentException ex) {
             throw new BadRequestException("ride id is invalid");
         }
+    }
+
+    private static String normalizePreviousResponseId(String previousResponseId) {
+        if (previousResponseId == null || previousResponseId.isBlank()) {
+            return null;
+        }
+        String normalized = previousResponseId.trim();
+        if (normalized.length() > 200 || !normalized.matches("[A-Za-z0-9_-]+")) {
+            throw new BadRequestException("previous response id is invalid");
+        }
+        return normalized;
     }
 }

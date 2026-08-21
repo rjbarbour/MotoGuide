@@ -26,12 +26,11 @@ final class OpenApiContractTest {
     private static final String ACCEPTED_OPENAPI_VERSION = "3.0.3";
     private static final String ACCEPTED_CONTRACT_VERSION = "0.3.0";
     private static final String ACCEPTED_CONTRACT_SHA256 =
-            "3055c15cae175d6241cfc2d6d1b6e78d46c2bab8c07b5c019824cb84de647df0";
+            "cf92067870e9b02cdb01cc4e7a6d859b6031dab1e6af49ebd0343c85d51c7cef";
 
     private static final Map<String, String> PUBLISHED_OPERATIONS = Map.ofEntries(
             Map.entry("GET /health", "getHealth"),
             Map.entry("POST /v1/fact", "createPlaceFact"),
-            Map.entry("DELETE /v1/ride/conversation", "endRideConversation"),
             Map.entry("POST /v1/speech", "createSpeech"),
             Map.entry("POST /v1/session/fallback", "issueFallbackSession"),
             Map.entry("GET /admin/v1/sessions", "listInstallations"),

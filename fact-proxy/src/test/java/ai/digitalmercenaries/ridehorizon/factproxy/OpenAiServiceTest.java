@@ -12,7 +12,6 @@ import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -25,29 +24,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OpenAiServiceTest {
 
     @Test
-    void continuesOneRideWithPreviousResponseIdAndBoundedServerCompaction() throws Exception {
+    void appCarriedPreviousResponseIdContinuesAcrossStatelessProxyCalls() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         List<String> requestBodies = new CopyOnWriteArrayList<>();
         AtomicInteger requestNumber = new AtomicInteger();
         HttpServer server = responseServer(requestBodies, requestNumber, exchange ->
-                sendResponse(exchange, 200, responseBody("resp-" + requestNumber.get(), "Known for its wool trade."))
+                sendResponse(exchange, 200, responseBody("resp_" + requestNumber.get(), "Known for its wool trade."))
         );
 
         try {
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
-            OpenAiService.RideConversation ride = new OpenAiService.RideConversation(
-                    "subject-1",
-                    UUID.fromString("00000000-0000-0000-0000-000000000063")
+            OpenAiService.GeneratedFact firstFact = service.generateFactWithLinkage(shortFactRequest(), null);
+            OpenAiService restartedProxy = serviceWithDependencies(objectMapper, endpoint(server), null);
+            OpenAiService.GeneratedFact secondFact = restartedProxy.generateFactWithLinkage(
+                    shortFactRequest(),
+                    firstFact.responseId()
             );
-
-            service.generateFact(shortFactRequest(), ride);
-            service.generateFact(shortFactRequest(), ride);
 
             JsonNode first = objectMapper.readTree(requestBodies.get(0));
             JsonNode second = objectMapper.readTree(requestBodies.get(1));
             assertTrue(first.path("previous_response_id").isMissingNode());
-            assertEquals("resp-1", second.path("previous_response_id").asText());
+            assertEquals("resp_1", firstFact.responseId());
+            assertEquals("resp_2", secondFact.responseId());
+            assertEquals("resp_1", second.path("previous_response_id").asText());
             assertEquals(true, first.path("store").asBoolean());
+            assertEquals(4_096, first.path("max_output_tokens").asInt());
             assertEquals(
                     OpenAiService.COMPACT_THRESHOLD_TOKENS,
                     first.path("context_management").path(0).path("compact_threshold").asInt()
@@ -62,32 +63,36 @@ class OpenAiServiceTest {
     }
 
     @Test
-    void endRideClearsLinkageAndKeepsTheEndedRideClosed() throws Exception {
+    void structuredPreviousResponseErrorRestartsTheCurrentTurnWithoutLinkageOnce() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         List<String> requestBodies = new CopyOnWriteArrayList<>();
         AtomicInteger requestNumber = new AtomicInteger();
-        HttpServer server = responseServer(requestBodies, requestNumber, exchange ->
-                sendResponse(exchange, 200, responseBody("resp-" + requestNumber.get(), "A bounded fact."))
-        );
+        HttpServer server = responseServer(requestBodies, requestNumber, exchange -> {
+            if (requestNumber.get() == 1) {
+                sendResponse(
+                        exchange,
+                        404,
+                        "{\"error\":{\"message\":\"not found\",\"param\":\"previous_response_id\",\"code\":\"not_found\"}}"
+                );
+            } else {
+                sendResponse(exchange, 200, responseBody("resp_restarted", "A bounded fact."));
+            }
+        });
 
         try {
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
-            OpenAiService.RideConversation endedRide = new OpenAiService.RideConversation(
-                    "subject-1",
-                    UUID.fromString("00000000-0000-0000-0000-000000000063")
+            OpenAiService.GeneratedFact restarted = service.generateFactWithLinkage(
+                    shortFactRequest(),
+                    "resp_expired"
             );
-            service.generateFact(shortFactRequest(), endedRide);
 
-            service.endRideConversation(endedRide);
-
-            assertThrows(BadRequestException.class, () -> service.generateFact(shortFactRequest(), endedRide));
-            OpenAiService.RideConversation nextRide = new OpenAiService.RideConversation(
-                    "subject-1",
-                    UUID.fromString("00000000-0000-0000-0000-000000000064")
-            );
-            service.generateFact(shortFactRequest(), nextRide);
-
+            assertEquals("A bounded fact.", restarted.fact());
+            assertEquals("resp_restarted", restarted.responseId());
             assertEquals(2, requestBodies.size());
+            assertEquals(
+                    "resp_expired",
+                    objectMapper.readTree(requestBodies.get(0)).path("previous_response_id").asText()
+            );
             assertTrue(objectMapper.readTree(requestBodies.get(1)).path("previous_response_id").isMissingNode());
         } finally {
             server.stop(0);
@@ -95,61 +100,55 @@ class OpenAiServiceTest {
     }
 
     @Test
-    void invalidPreviousResponseRestartsTheCurrentTurnWithoutLinkageOnce() throws Exception {
+    void unstructuredPreviousResponseTextDoesNotTriggerRecovery() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         List<String> requestBodies = new CopyOnWriteArrayList<>();
         AtomicInteger requestNumber = new AtomicInteger();
-        HttpServer server = responseServer(requestBodies, requestNumber, exchange -> {
-            if (requestNumber.get() == 2) {
-                sendResponse(exchange, 404, "{\"error\":{\"message\":\"previous_response_id not found\"}}");
-            } else {
-                sendResponse(exchange, 200, responseBody("resp-" + requestNumber.get(), "A bounded fact."));
-            }
-        });
+        HttpServer server = responseServer(requestBodies, requestNumber, exchange ->
+                sendResponse(
+                        exchange,
+                        404,
+                        "{\"error\":{\"message\":\"previous_response_id not found\",\"param\":\"input\"}}"
+                )
+        );
 
         try {
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
-            OpenAiService.RideConversation ride = new OpenAiService.RideConversation(
-                    "subject-1",
-                    UUID.fromString("00000000-0000-0000-0000-000000000063")
+
+            UpstreamException error = assertThrows(
+                    UpstreamException.class,
+                    () -> service.generateFactWithLinkage(shortFactRequest(), "resp_expired")
             );
-            service.generateFact(shortFactRequest(), ride);
 
-            String restartedFact = service.generateFact(shortFactRequest(), ride);
-
-            assertEquals("A bounded fact.", restartedFact);
-            assertEquals("resp-1", objectMapper.readTree(requestBodies.get(1)).path("previous_response_id").asText());
-            assertTrue(objectMapper.readTree(requestBodies.get(2)).path("previous_response_id").isMissingNode());
+            assertEquals("OpenAI returned HTTP 404", error.getMessage());
+            assertEquals(1, requestBodies.size());
         } finally {
             server.stop(0);
         }
     }
 
     @Test
-    void failedProviderTurnClearsLinkageForTheNextEligibleFact() throws Exception {
+    void serverErrorWithPreviousResponseParamDoesNotTriggerRecovery() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         List<String> requestBodies = new CopyOnWriteArrayList<>();
         AtomicInteger requestNumber = new AtomicInteger();
-        HttpServer server = responseServer(requestBodies, requestNumber, exchange -> {
-            if (requestNumber.get() == 2) {
-                sendResponse(exchange, 500, "{\"error\":{\"message\":\"failed\"}}");
-            } else {
-                sendResponse(exchange, 200, responseBody("resp-" + requestNumber.get(), "A bounded fact."));
-            }
-        });
+        HttpServer server = responseServer(requestBodies, requestNumber, exchange ->
+                sendResponse(
+                        exchange,
+                        500,
+                        "{\"error\":{\"message\":\"failed\",\"param\":\"previous_response_id\"}}"
+                )
+        );
 
         try {
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
-            OpenAiService.RideConversation ride = new OpenAiService.RideConversation(
-                    "subject-1",
-                    UUID.fromString("00000000-0000-0000-0000-000000000063")
+            UpstreamException error = assertThrows(
+                    UpstreamException.class,
+                    () -> service.generateFactWithLinkage(shortFactRequest(), "resp_current")
             );
-            service.generateFact(shortFactRequest(), ride);
-            assertThrows(UpstreamException.class, () -> service.generateFact(shortFactRequest(), ride));
 
-            service.generateFact(shortFactRequest(), ride);
-
-            assertTrue(objectMapper.readTree(requestBodies.get(2)).path("previous_response_id").isMissingNode());
+            assertEquals("OpenAI returned HTTP 500", error.getMessage());
+            assertEquals(1, requestBodies.size());
         } finally {
             server.stop(0);
         }
@@ -444,7 +443,7 @@ class OpenAiServiceTest {
 
     private static String responseBody(String id, String text) {
         return """
-                {"id":"%s","output":[{"type":"message","content":[{"type":"output_text","text":"%s"}]}]}
+                {"id":"%s","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"%s"}]}]}
                 """.formatted(id, text);
     }
 
@@ -537,6 +536,7 @@ class OpenAiServiceTest {
         byte[] response = """
                 {
                   "status": "completed",
+                  "id": "resp_test",
                   "output": [
                     {"type": "reasoning", "summary": []},
                     {

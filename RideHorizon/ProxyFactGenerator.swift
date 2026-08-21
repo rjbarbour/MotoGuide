@@ -121,6 +121,9 @@ enum FactProxyContract {
     static let sessionOperationTimeoutSeconds: TimeInterval = 30
     static let iosTimeoutSeconds: TimeInterval = 60
     static let retryDelaysSeconds: [TimeInterval] = [3, 10]
+    static let rideIdHeader = "X-RideHorizon-Ride-Id"
+    static let previousResponseIdHeader = "X-RideHorizon-Previous-Response-Id"
+    static let responseIdHeader = "X-RideHorizon-Response-Id"
 
     static func factEndpoint(baseURL: URL = productionBaseURL) -> URL {
         baseURL
@@ -136,13 +139,6 @@ enum FactProxyContract {
 
     static func healthEndpoint(baseURL: URL = productionBaseURL) -> URL {
         baseURL.appendingPathComponent("health")
-    }
-
-    static func endRideConversationEndpoint(baseURL: URL = productionBaseURL) -> URL {
-        baseURL
-            .appendingPathComponent("v1")
-            .appendingPathComponent("ride")
-            .appendingPathComponent("conversation")
     }
 }
 
@@ -317,10 +313,10 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
     private let credentialRefresher: CredentialRefresher
     private let requestExecutor: ProxyRequestExecutor
     private let endpoint: URL
-    private let endRideEndpoint: URL
     private let operationTimeoutSeconds: TimeInterval
-    private let attemptedRideLock = NSLock()
-    private var attemptedRideIDs: Set<UUID> = []
+    private let conversationMutex = AsyncMutex()
+    private var linkedRideSessionID: UUID?
+    private var previousResponseID: String?
 
     init(
         proxyTokenProvider: @escaping ProxyTokenProvider = { KeychainCredentialLoader.loadRideHorizonProxyToken() },
@@ -332,7 +328,6 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
         session: URLSession = .shared,
         baseURL: URL = FactProxyContract.productionBaseURL,
         endpoint: URL? = nil,
-        endRideEndpoint: URL? = nil,
         retryDelays: [TimeInterval] = FactProxyContract.retryDelaysSeconds,
         operationTimeoutSeconds: TimeInterval = FactProxyContract.iosTimeoutSeconds
     ) {
@@ -342,25 +337,50 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
         self.credentialRefresher = credentialRefresher
         self.requestExecutor = ProxyRequestExecutor(session: session, retryDelays: retryDelays)
         self.endpoint = endpoint ?? FactProxyContract.factEndpoint(baseURL: baseURL)
-        self.endRideEndpoint = endRideEndpoint ?? FactProxyContract.endRideConversationEndpoint(baseURL: baseURL)
         self.operationTimeoutSeconds = operationTimeoutSeconds
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
-        if let rideSessionID = request.rideSessionID {
-            _ = attemptedRideLock.withLock {
-                attemptedRideIDs.insert(rideSessionID)
+        await conversationMutex.acquire()
+        do {
+            try Task.checkCancellation()
+            if let rideSessionID = request.rideSessionID,
+               rideSessionID != linkedRideSessionID {
+                linkedRideSessionID = rideSessionID
+                previousResponseID = nil
             }
-        }
-        return try await ProxyOperationDeadline.run(seconds: operationTimeoutSeconds) {
-            try await self.fact(for: request, retryAfterAuthenticationFailure: true)
+            let requestPreviousResponseID = previousResponseID
+            let response = try await ProxyOperationDeadline.run(seconds: operationTimeoutSeconds) {
+                try await self.fact(
+                    for: request,
+                    previousResponseID: requestPreviousResponseID,
+                    retryAfterAuthenticationFailure: true
+                )
+            }
+            if let rideSessionID = request.rideSessionID {
+                guard let responseID = response.responseID else {
+                    throw PlaceFactError.invalidResponse
+                }
+                linkedRideSessionID = rideSessionID
+                previousResponseID = responseID
+            }
+            await conversationMutex.release()
+            return response.fact
+        } catch {
+            if request.rideSessionID == linkedRideSessionID {
+                linkedRideSessionID = nil
+                previousResponseID = nil
+            }
+            await conversationMutex.release()
+            throw error
         }
     }
 
     private func fact(
         for request: PlaceFactRequest,
+        previousResponseID: String?,
         retryAfterAuthenticationFailure: Bool
-    ) async throws -> String {
+    ) async throws -> ProxyFactResult {
         var proxyToken = proxyTokenProvider()
         if proxyToken?.isEmpty != false {
             ProxyDiagnostics.log("Proxy", "Proxy session missing; provisioning automatically.")
@@ -381,7 +401,16 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
         urlRequest.setValue("Bearer \(proxyToken)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let rideSessionID = request.rideSessionID {
-            urlRequest.setValue(rideSessionID.uuidString.lowercased(), forHTTPHeaderField: "X-RideHorizon-Ride-Id")
+            urlRequest.setValue(
+                rideSessionID.uuidString.lowercased(),
+                forHTTPHeaderField: FactProxyContract.rideIdHeader
+            )
+            if let previousResponseID {
+                urlRequest.setValue(
+                    previousResponseID,
+                    forHTTPHeaderField: FactProxyContract.previousResponseIdHeader
+                )
+            }
         }
         if let deviceId = deviceIdProvider()?.trimmingCharacters(in: .whitespacesAndNewlines),
            !deviceId.isEmpty {
@@ -421,7 +450,11 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
                 if retryAfterAuthenticationFailure {
                     ProxyDiagnostics.log("Auth", "Proxy session rejected; reprovisioning and retrying once.")
                     try await credentialRefresher()
-                    return try await fact(for: request, retryAfterAuthenticationFailure: false)
+                    return try await fact(
+                        for: request,
+                        previousResponseID: previousResponseID,
+                        retryAfterAuthenticationFailure: false
+                    )
                 }
             }
             throw PlaceFactError.httpError(http.statusCode)
@@ -440,79 +473,48 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
             throw PlaceFactError.invalidResponse
         }
         ProxyDiagnostics.log("Proxy", "Fact accepted: \(sanitized)")
-        return sanitized
+        let responseID = request.rideSessionID == nil
+            ? nil
+            : http.value(forHTTPHeaderField: FactProxyContract.responseIdHeader)
+        return ProxyFactResult(fact: sanitized, responseID: responseID)
     }
 
     func endRideConversation(_ rideSessionID: UUID) async {
-        let wasAttempted = attemptedRideLock.withLock {
-            attemptedRideIDs.remove(rideSessionID) != nil
+        await conversationMutex.acquire()
+        if linkedRideSessionID == rideSessionID {
+            linkedRideSessionID = nil
+            previousResponseID = nil
         }
-        guard wasAttempted else { return }
-
-        do {
-            try await ProxyOperationDeadline.run(seconds: operationTimeoutSeconds) { [self] in
-                try await self.sendEndRideConversation(rideSessionID, retryAfterAuthenticationFailure: true)
-            }
-        } catch {
-            ProxyDiagnostics.log("Proxy", "Could not clear ended ride conversation: \(error.localizedDescription)")
-        }
-    }
-
-    private func sendEndRideConversation(
-        _ rideSessionID: UUID,
-        retryAfterAuthenticationFailure: Bool
-    ) async throws {
-        var proxyToken = proxyTokenProvider()
-        if proxyToken?.isEmpty != false {
-            try await credentialRefresher()
-            proxyToken = proxyTokenProvider()
-        }
-        guard let proxyToken, !proxyToken.isEmpty else {
-            throw PlaceFactError.missingProxyToken
-        }
-
-        var urlRequest = URLRequest(url: endRideEndpoint)
-        urlRequest.httpMethod = "DELETE"
-        urlRequest.timeoutInterval = FactProxyContract.factTimeoutSeconds
-        urlRequest.setValue("Bearer \(proxyToken)", forHTTPHeaderField: "Authorization")
-        urlRequest.setValue(rideSessionID.uuidString.lowercased(), forHTTPHeaderField: "X-RideHorizon-Ride-Id")
-        if let deviceId = deviceIdProvider()?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !deviceId.isEmpty {
-            urlRequest.setValue(deviceId, forHTTPHeaderField: "X-RideHorizon-Device-Id")
-        }
-
-        let (data, response) = try await requestExecutor.data(
-            for: urlRequest,
-            category: "Proxy",
-            shouldRetryResponse: { http, _ in
-                ProxyRequestExecutor.isTransientHTTPStatus(http.statusCode)
-            }
-        )
-        guard let http = response as? HTTPURLResponse else {
-            throw PlaceFactError.invalidResponse
-        }
-        guard (200...299).contains(http.statusCode) else {
-            if http.statusCode == 401 {
-                credentialInvalidator()
-                if retryAfterAuthenticationFailure {
-                    try await credentialRefresher()
-                    return try await sendEndRideConversation(
-                        rideSessionID,
-                        retryAfterAuthenticationFailure: false
-                    )
-                }
-            }
-            ProxyDiagnostics.log("Proxy", "End ride clear returned HTTP \(http.statusCode), \(data.count) byte(s).")
-            throw PlaceFactError.httpError(http.statusCode)
-        }
+        await conversationMutex.release()
     }
 }
 
-private extension NSLock {
-    func withLock<Value>(_ operation: () -> Value) -> Value {
-        lock()
-        defer { unlock() }
-        return operation()
+private struct ProxyFactResult: Sendable {
+    let fact: String
+    let responseID: String?
+}
+
+private actor AsyncMutex {
+    private var isLocked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        if !isLocked {
+            isLocked = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            isLocked = false
+        } else {
+            let next = waiters.removeFirst()
+            next.resume()
+        }
     }
 }
 

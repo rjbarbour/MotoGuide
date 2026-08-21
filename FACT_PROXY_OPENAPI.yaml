@@ -81,6 +81,7 @@ x-current-security-model:
   deviceSecretStorage: A per-install identifier and short-lived session token are stored in iOS Keychain.
   serverSecretStorage: Fly.io secrets.
   openAiKeyExposure: Server-side only. Never store the OpenAI API key in the iOS app or repository.
+  openAiResponseRetention: With store=true, OpenAI retains Responses API application state for at least 30 days under its current documented default.
   currentLimitations:
     - Automatic sessions are restricted by per-install, global daily, and per-IP request limits but are not yet protected by Apple App Attest.
     - The server-side RIDEHORIZON_PROXY_TOKEN remains an operator-only compatibility path until the private beta migration is complete.
@@ -187,14 +188,24 @@ paths:
         - in: header
           name: X-RideHorizon-Ride-Id
           description: |
-            App-owned active ride UUID. When present, successful place-fact
-            responses continue one bounded OpenAI Responses conversation for
-            this authenticated installation and ride. It is not added to the
-            fact JSON or cache key.
+            App-owned active ride UUID. It bounds linkage held by the app and
+            is not added to the fact JSON or persisted cache key. The proxy
+            does not retain ride conversation state.
           required: false
           schema:
             type: string
             format: uuid
+        - in: header
+          name: X-RideHorizon-Previous-Response-Id
+          description: |
+            Latest successful OpenAI response ID held by the app for this
+            active ride. Omitted for the first call and after End ride or a
+            failed call. Requires X-RideHorizon-Ride-Id.
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+            pattern: "^[A-Za-z0-9_-]+$"
       x-ios-keychain-service: RideHorizonProxy
       x-ios-device-id-keychain-service: RideHorizonDeviceId
       x-ios-attempt-timeout-seconds: 35
@@ -247,6 +258,15 @@ paths:
       responses:
         "200":
           description: One sanitized bounded fact.
+          headers:
+            X-RideHorizon-Response-Id:
+              description: |
+                OpenAI response ID for app-owned continuation of the active
+                ride. Present when X-RideHorizon-Ride-Id was supplied.
+              schema:
+                type: string
+                maxLength: 200
+                pattern: "^[A-Za-z0-9_-]+$"
           content:
             application/json:
               schema:
@@ -265,33 +285,6 @@ paths:
           description: Proxy is misconfigured, including missing server-side proxy token.
         "502":
           description: OpenAI returned an error or unusable response.
-  /v1/ride/conversation:
-    delete:
-      tags:
-        - Facts
-      summary: End the active ride's OpenAI conversation
-      description: |
-        Clears provider response linkage for the supplied app-owned ride UUID.
-        This endpoint does not delete application-owned ride evidence and does
-        not call the model provider.
-      operationId: endRideConversation
-      security:
-        - RideHorizonProxyToken: []
-      parameters:
-        - in: header
-          name: X-RideHorizon-Ride-Id
-          description: App-owned UUID for the ride that has ended.
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "204":
-          description: Provider conversation linkage cleared or already absent.
-        "400":
-          description: Missing or invalid ride UUID.
-        "401":
-          description: Missing or wrong proxy bearer token.
   /v1/speech:
     post:
       tags:
