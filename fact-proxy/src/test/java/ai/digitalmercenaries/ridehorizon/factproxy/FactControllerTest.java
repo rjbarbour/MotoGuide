@@ -76,7 +76,9 @@ class FactControllerTest {
     @Test
     void factReturnsSanitizedSentence() throws Exception {
         // Contract coverage: POST /v1/fact requires Bearer auth and returns {"fact": "..."}.
-        when(openAiService.generateFact(any())).thenReturn("Known for its wool trade.");
+        when(openAiService.generateFactWithMetadata(any())).thenReturn(
+                new OpenAiService.GeneratedFact("Known for its wool trade.", null)
+        );
 
         mockMvc.perform(post("/v1/fact")
                         .header("Authorization", "Bearer test-token")
@@ -84,12 +86,39 @@ class FactControllerTest {
                         .content(FactRequestFixture.shortFactRequestWithDefaults()))
                 .andExpect(status().isOk())
                 .andExpect(header().exists(RequestInstrumentationFilter.REQUEST_ID_HEADER))
-                .andExpect(jsonPath("$.fact").value("Known for its wool trade."));
+                .andExpect(jsonPath("$.fact").value("Known for its wool trade."))
+                .andExpect(jsonPath("$.sources").isEmpty());
+    }
+
+    @Test
+    void factReturnsStructuredSourcesSeparatelyFromAnnouncementText() throws Exception {
+        when(openAiService.generateFactWithMetadata(any())).thenReturn(
+                new OpenAiService.GeneratedFact(
+                        "Known for its wool trade.",
+                        java.util.List.of(new FactSource(
+                                "Cotswold Canals Trust",
+                                "https://www.cotswoldcanals.org/history"
+                        )),
+                        null
+                )
+        );
+
+        mockMvc.perform(post("/v1/fact")
+                        .header("Authorization", "Bearer test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(FactRequestFixture.shortFactRequestWithDefaults()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fact").value("Known for its wool trade."))
+                .andExpect(jsonPath("$.fact").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("https://")
+                )))
+                .andExpect(jsonPath("$.sources[0].title").value("Cotswold Canals Trust"))
+                .andExpect(jsonPath("$.sources[0].url").value("https://www.cotswoldcanals.org/history"));
     }
 
     @Test
     void webSearchFailureKeepsTheExistingRetryableFactFallbackStatus() throws Exception {
-        when(openAiService.generateFact(any())).thenThrow(
+        when(openAiService.generateFactWithMetadata(any())).thenThrow(
                 new UpstreamException(UpstreamException.Category.TOOL, "OpenAI web search failed")
         );
 
@@ -226,7 +255,12 @@ class FactControllerTest {
 
     @Test
     void factReturnsLongFact() throws Exception {
-        when(openAiService.generateFact(any())).thenReturn("Stroud is in Gloucestershire. It is an old market town by the River Frome.");
+        when(openAiService.generateFactWithMetadata(any())).thenReturn(
+                new OpenAiService.GeneratedFact(
+                        "Stroud is in Gloucestershire. It is an old market town by the River Frome.",
+                        null
+                )
+        );
 
         mockMvc.perform(post("/v1/fact")
                         .header("Authorization", "Bearer test-token")
@@ -239,7 +273,9 @@ class FactControllerTest {
 
     @Test
     void factPreservesSafeIncomingRequestId() throws Exception {
-        when(openAiService.generateFact(any())).thenReturn("Known for its wool trade.");
+        when(openAiService.generateFactWithMetadata(any())).thenReturn(
+                new OpenAiService.GeneratedFact("Known for its wool trade.", null)
+        );
 
         mockMvc.perform(post("/v1/fact")
                         .header("Authorization", "Bearer test-token")
@@ -267,7 +303,7 @@ class FactControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("factMode must be one of: shortFacts, longFacts"));
 
-        verify(openAiService, never()).generateFact(any());
+        verify(openAiService, never()).generateFactWithMetadata(any());
     }
 
     @Test
@@ -287,7 +323,7 @@ class FactControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("placeName does not look like a place name"));
 
-        verify(openAiService, never()).generateFact(any());
+        verify(openAiService, never()).generateFactWithMetadata(any());
     }
 
     @Test
@@ -307,7 +343,7 @@ class FactControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("placeName contains unsupported characters"));
 
-        verify(openAiService, never()).generateFact(any());
+        verify(openAiService, never()).generateFactWithMetadata(any());
     }
 
     @Test
@@ -319,7 +355,7 @@ class FactControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("request body is required"));
 
-        verify(openAiService, never()).generateFact(any());
+        verify(openAiService, never()).generateFactWithMetadata(any());
     }
 
     @Test
@@ -331,7 +367,7 @@ class FactControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("placeHierarchy is required"));
 
-        verify(openAiService, never()).generateFact(any());
+        verify(openAiService, never()).generateFactWithMetadata(any());
     }
 
     @Test
@@ -343,7 +379,7 @@ class FactControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("request body is invalid"));
 
-        verify(openAiService, never()).generateFact(any());
+        verify(openAiService, never()).generateFactWithMetadata(any());
     }
 
     @Test
@@ -355,7 +391,7 @@ class FactControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("request body is invalid"));
 
-        verify(openAiService, never()).generateFact(any());
+        verify(openAiService, never()).generateFactWithMetadata(any());
     }
 
     @Test

@@ -32,6 +32,7 @@ private struct RideLogEntry: Identifiable {
     let location: CLLocationCoordinate2D
     let address: Address
     let utteredPhrase: String?
+    let sources: [PlaceFactSource]
 }
 
 struct LocationHierarchyRow: Equatable, Identifiable {
@@ -380,8 +381,13 @@ struct ContentView: View {
                 appendLog(location: location, address: address, utteredPhrase: nil)
             }
         }
-        locationManager.onRideLog = { location, address, utteredPhrase in
-            appendLog(location: location, address: address, utteredPhrase: utteredPhrase)
+        locationManager.onRideLog = { location, address, utteredPhrase, sources in
+            appendLog(
+                location: location,
+                address: address,
+                utteredPhrase: utteredPhrase,
+                sources: sources
+            )
         }
     }
 
@@ -416,13 +422,15 @@ struct ContentView: View {
     private func appendLog(
         location: CLLocationCoordinate2D,
         address: Address,
-        utteredPhrase: String?
+        utteredPhrase: String?,
+        sources: [PlaceFactSource] = []
     ) {
         let entry = RideLogEntry(
             timestamp: Date(),
             location: location,
             address: address,
-            utteredPhrase: utteredPhrase
+            utteredPhrase: utteredPhrase,
+            sources: sources
         )
         logs.insert(entry, at: 0)
         AppDiagnostics.log("Ride log entry added.")
@@ -1308,7 +1316,7 @@ private struct SettingsView: View {
                     }
 
                     SettingsCard(title: "Privacy", palette: palette) {
-                    Text("Choose whether RideHorizon may send place information and optional preferences to OpenAI, and announcement text to ElevenLabs for Premium Voice.")
+                    Text("Choose whether RideHorizon may send place information and optional preferences to OpenAI, which may search the public web and return source links for the Log, and announcement text to ElevenLabs for Premium Voice. Source titles and URLs are not sent for speech.")
                         .font(.title3)
                         .fontWeight(.semibold)
                         .foregroundStyle(palette.secondaryText)
@@ -1838,7 +1846,8 @@ private struct LogHistoryView: View {
                     timestamp: Date(),
                     location: location,
                     address: address,
-                    utteredPhrase: nil
+                    utteredPhrase: nil,
+                    sources: []
                 ),
                 at: 0
             )
@@ -1861,6 +1870,20 @@ private struct LogRow: View {
             if showSpokenPhrase, let phrase = log.utteredPhrase {
                 Text("Spoke: \(phrase)")
                     .font(.subheadline)
+            }
+
+            if !log.sources.isEmpty {
+                Text("Sources")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                ForEach(log.sources) { source in
+                    Link(destination: source.url) {
+                        Label(source.title, systemImage: "arrow.up.right.square")
+                    }
+                    .font(.caption)
+                    .accessibilityLabel("Source: \(source.title)")
+                }
             }
 
             Text("\(log.address.administrativeArea), \(log.address.country)")

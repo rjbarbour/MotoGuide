@@ -231,6 +231,44 @@ struct PlaceFactRequest: Equatable {
     }
 }
 
+struct PlaceFactSource: Codable, Equatable, Identifiable, Sendable {
+    static let maximumCount = 5
+    static let maximumTitleLength = 160
+    static let maximumURLLength = 2_048
+
+    let title: String
+    let url: URL
+
+    var id: String { url.absoluteString }
+
+    static func validated(title rawTitle: String, url rawURL: String) -> PlaceFactSource? {
+        let title = rawTitle
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        guard !title.isEmpty,
+              title.count <= maximumTitleLength,
+              rawURL.count <= maximumURLLength,
+              let url = URL(string: rawURL),
+              url.scheme?.lowercased() == "https",
+              url.host?.isEmpty == false,
+              url.user == nil,
+              url.password == nil else {
+            return nil
+        }
+        return PlaceFactSource(title: title, url: url)
+    }
+}
+
+struct GeneratedPlaceFact: Equatable, Sendable {
+    let text: String
+    let sources: [PlaceFactSource]
+
+    init(text: String, sources: [PlaceFactSource] = []) {
+        self.text = text
+        self.sources = Array(sources.prefix(PlaceFactSource.maximumCount))
+    }
+}
+
 private extension Array where Element == FactInterestCategory {
     func removingDuplicatesPreserveOrder() -> [FactInterestCategory] {
         var seen = Set<String>()
@@ -278,10 +316,15 @@ enum PlaceNameNormalizer {
 
 protocol FactClient {
     func fact(for request: PlaceFactRequest) async throws -> String
+    func generatedFact(for request: PlaceFactRequest) async throws -> GeneratedPlaceFact
     func endRideConversation(_ rideSessionID: UUID) async
 }
 
 extension FactClient {
+    func generatedFact(for request: PlaceFactRequest) async throws -> GeneratedPlaceFact {
+        GeneratedPlaceFact(text: try await fact(for: request))
+    }
+
     func endRideConversation(_ rideSessionID: UUID) async {}
 }
 

@@ -341,6 +341,10 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
     }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
+        try await generatedFact(for: request).text
+    }
+
+    func generatedFact(for request: PlaceFactRequest) async throws -> GeneratedPlaceFact {
         await conversationMutex.acquire()
         do {
             try Task.checkCancellation()
@@ -365,7 +369,7 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
                 previousResponseID = responseID
             }
             await conversationMutex.release()
-            return response.fact
+            return response.generatedFact
         } catch {
             if request.rideSessionID == linkedRideSessionID {
                 linkedRideSessionID = nil
@@ -472,11 +476,24 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
             ProxyDiagnostics.log("Proxy", "Proxy fact failed local sanitization.")
             throw PlaceFactError.invalidResponse
         }
+        var seenSourceURLs = Set<String>()
+        let sources = (decoded.sources ?? [])
+            .prefix(PlaceFactSource.maximumCount)
+            .compactMap { rawSource -> PlaceFactSource? in
+                guard let source = PlaceFactSource.validated(title: rawSource.title, url: rawSource.url),
+                      seenSourceURLs.insert(source.url.absoluteString).inserted else {
+                    return nil
+                }
+                return source
+            }
         ProxyDiagnostics.log("Proxy", "Fact accepted: \(sanitized)")
         let responseID = request.rideSessionID == nil
             ? nil
             : http.value(forHTTPHeaderField: FactProxyContract.responseIdHeader)
-        return ProxyFactResult(fact: sanitized, responseID: responseID)
+        return ProxyFactResult(
+            generatedFact: GeneratedPlaceFact(text: sanitized, sources: sources),
+            responseID: responseID
+        )
     }
 
     func endRideConversation(_ rideSessionID: UUID) async {
@@ -490,7 +507,7 @@ final class ProxyFactGenerator: PlaceFactGenerating, @unchecked Sendable {
 }
 
 private struct ProxyFactResult: Sendable {
-    let fact: String
+    let generatedFact: GeneratedPlaceFact
     let responseID: String?
 }
 
@@ -841,6 +858,12 @@ private struct FactProxyRequest: Encodable {
 
 private struct FactProxyResponse: Decodable {
     let fact: String
+    let sources: [Source]?
+
+    struct Source: Decodable {
+        let title: String
+        let url: String
+    }
 }
 
 private struct SpeechProxyRequest: Encodable {

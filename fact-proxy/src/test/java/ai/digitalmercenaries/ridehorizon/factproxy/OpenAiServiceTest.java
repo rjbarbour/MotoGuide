@@ -216,7 +216,7 @@ class OpenAiServiceTest {
     }
 
     @Test
-    void searchedResponseToleratesToolItemsAndExtractsOnlyFinalOutputText(CapturedOutput output) throws Exception {
+    void searchedResponseExtractsBoundedSourcesFromCompletedFinalAnswerOnly(CapturedOutput output) throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/responses", exchange -> sendResponse(exchange, 200, """
@@ -228,6 +228,7 @@ class OpenAiServiceTest {
                     {
                       "type": "message",
                       "status": "completed",
+                      "phase": "commentary",
                       "content": [{"type": "output_text", "text": "Intermediate text must not become a rider fact."}]
                     },
                     {
@@ -240,7 +241,18 @@ class OpenAiServiceTest {
                     {
                       "type": "message",
                       "status": "completed",
-                      "content": [{"type": "output_text", "text": "The restored canal basin reflects Stroud's wool-trade history."}]
+                      "phase": "final_answer",
+                      "content": [{
+                        "type": "output_text",
+                        "text": "The restored canal basin reflects Stroud's wool-trade history.",
+                        "annotations": [{
+                          "type": "url_citation",
+                          "start_index": 4,
+                          "end_index": 26,
+                          "url": "https://www.cotswoldcanals.org/history",
+                          "title": "Cotswold Canals Trust"
+                        }]
+                      }]
                     }
                   ]
                 }
@@ -251,13 +263,19 @@ class OpenAiServiceTest {
             RideHorizonProperties properties = diagnosticProperties();
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), properties);
 
-            String fact = service.generateFact(shortFactRequest());
+            OpenAiService.GeneratedFact generated = service.generateFactWithMetadata(shortFactRequest());
 
-            assertEquals("The restored canal basin reflects Stroud's wool-trade history.", fact);
-            assertTrue(output.getOut().contains("webSearchCalls=1 searched=true"));
+            assertEquals("The restored canal basin reflects Stroud's wool-trade history.", generated.fact());
+            assertEquals(
+                    List.of(new FactSource("Cotswold Canals Trust", "https://www.cotswoldcanals.org/history")),
+                    generated.sources()
+            );
+            assertTrue(output.getOut().contains("webSearchCalls=1 searched=true sourceCount=1"));
             assertFalse(output.getOut().contains("private search query"));
             assertFalse(output.getOut().contains("Tool text must not become"));
-            assertFalse(fact.contains("Intermediate text"));
+            assertFalse(generated.fact().contains("Intermediate text"));
+            assertFalse(generated.fact().contains("Cotswold Canals Trust"));
+            assertFalse(generated.fact().contains("https://"));
         } finally {
             server.stop(0);
         }
@@ -276,10 +294,170 @@ class OpenAiServiceTest {
             OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), diagnosticProperties());
 
             assertEquals("Known for its wool trade.", service.generateFact(shortFactRequest()));
-            assertTrue(output.getOut().contains("webSearchCalls=0 searched=false"));
+            assertTrue(output.getOut().contains("webSearchCalls=0 searched=false sourceCount=0"));
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    void searchedResponseWithoutUsableCitationIsRejected() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> sendResponse(exchange, 200, """
+                {
+                  "id": "resp_missing_citation",
+                  "status": "completed",
+                  "output": [
+                    {"type": "web_search_call", "id": "ws_1", "status": "completed"},
+                    {
+                      "type": "message",
+                      "status": "completed",
+                      "phase": "final_answer",
+                      "content": [{"type": "output_text", "text": "A web-derived place fact."}]
+                    }
+                  ]
+                }
+                """));
+        server.start();
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+
+            UpstreamException error = assertThrows(
+                    UpstreamException.class,
+                    () -> service.generateFact(shortFactRequest())
+            );
+
+            assertEquals(UpstreamException.Category.OUTPUT, error.category());
+            assertEquals("OpenAI web search response lacked usable citations", error.getMessage());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void citationMetadataInsideFactTextIsRejectedBeforeAnnouncementOrTts() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> sendResponse(exchange, 200, """
+                {
+                  "id": "resp_spoken_citation",
+                  "status": "completed",
+                  "output": [
+                    {"type": "web_search_call", "id": "ws_1", "status": "completed"},
+                    {
+                      "type": "message",
+                      "status": "completed",
+                      "phase": "final_answer",
+                      "content": [{
+                        "type": "output_text",
+                        "text": "A canal fact. Source: Cotswold Canals Trust https://www.cotswoldcanals.org/history",
+                        "annotations": [{
+                          "type": "url_citation",
+                          "url": "https://www.cotswoldcanals.org/history",
+                          "title": "Cotswold Canals Trust"
+                        }]
+                      }]
+                    }
+                  ]
+                }
+                """));
+        server.start();
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+
+            UpstreamException error = assertThrows(
+                    UpstreamException.class,
+                    () -> service.generateFact(shortFactRequest())
+            );
+
+            assertEquals(UpstreamException.Category.OUTPUT, error.category());
+            assertEquals("OpenAI response mixed citation metadata into fact text", error.getMessage());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void citationSourcesAreHttpsOnlyDeduplicatedAndBounded() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> sendResponse(exchange, 200, """
+                {
+                  "id": "resp_bounded_citations",
+                  "status": "completed",
+                  "output": [
+                    {"type": "web_search_call", "id": "ws_1", "status": "completed"},
+                    {
+                      "type": "message",
+                      "status": "completed",
+                      "phase": "final_answer",
+                      "content": [{
+                        "type": "output_text",
+                        "text": "A bounded cited fact.",
+                        "annotations": [
+                          {"type":"url_citation","url":"http://unsafe.example/a","title":"Unsafe"},
+                          {"type":"url_citation","url":"https://one.example/a","title":" One  Source "},
+                          {"type":"url_citation","url":"https://one.example/a","title":"Duplicate"},
+                          {"type":"url_citation","url":"https://two.example/a","title":"Two"},
+                          {"type":"url_citation","url":"https://three.example/a","title":"Three"},
+                          {"type":"url_citation","url":"https://four.example/a","title":"Four"},
+                          {"type":"url_citation","url":"https://five.example/a","title":"Five"},
+                          {"type":"url_citation","url":"https://six.example/a","title":"Six"}
+                        ]
+                      }]
+                    }
+                  ]
+                }
+                """));
+        server.start();
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+
+            OpenAiService.GeneratedFact generated = service.generateFactWithMetadata(shortFactRequest());
+
+            assertEquals(5, generated.sources().size());
+            assertEquals(new FactSource("One Source", "https://one.example/a"), generated.sources().get(0));
+            assertEquals("https://five.example/a", generated.sources().get(4).url());
+            assertFalse(generated.sources().stream().anyMatch(source -> source.url().startsWith("http://")));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void commentaryOnlyResponseIsRejected() throws Exception {
+        assertUnusableCompletedResponse("""
+                {
+                  "id": "resp_commentary_only",
+                  "status": "completed",
+                  "output": [{
+                    "type": "message",
+                    "status": "completed",
+                    "phase": "commentary",
+                    "content": [{"type": "output_text", "text": "Not the final answer."}]
+                  }]
+                }
+                """);
+    }
+
+    @Test
+    void incompleteFinalAnswerMessageIsRejected() throws Exception {
+        assertUnusableCompletedResponse("""
+                {
+                  "id": "resp_incomplete_final",
+                  "status": "completed",
+                  "output": [{
+                    "type": "message",
+                    "status": "incomplete",
+                    "phase": "final_answer",
+                    "content": [{"type": "output_text", "text": "Partial final answer."}]
+                  }]
+                }
+                """);
     }
 
     @Test
@@ -544,7 +722,7 @@ class OpenAiServiceTest {
                     () -> service.generateFact(shortFactRequest())
             );
 
-            assertEquals("OpenAI response could not be sanitized", error.getMessage());
+            assertEquals("OpenAI response lacked a completed final answer", error.getMessage());
         } finally {
             server.stop(0);
         }
@@ -619,8 +797,27 @@ class OpenAiServiceTest {
 
     private static String responseBody(String id, String text) {
         return """
-                {"id":"%s","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"%s"}]}]}
+                {"id":"%s","status":"completed","output":[{"type":"message","status":"completed","content":[{"type":"output_text","text":"%s"}]}]}
                 """.formatted(id, text);
+    }
+
+    private static void assertUnusableCompletedResponse(String responseBody) throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/responses", exchange -> sendResponse(exchange, 200, responseBody));
+        server.start();
+
+        try {
+            OpenAiService service = serviceWithDependencies(objectMapper, endpoint(server), null);
+            UpstreamException error = assertThrows(
+                    UpstreamException.class,
+                    () -> service.generateFact(shortFactRequest())
+            );
+            assertEquals(UpstreamException.Category.OUTPUT, error.category());
+            assertEquals("OpenAI response lacked a completed final answer", error.getMessage());
+        } finally {
+            server.stop(0);
+        }
     }
 
     private static void sendResponse(HttpExchange exchange, int status, String body) throws IOException {

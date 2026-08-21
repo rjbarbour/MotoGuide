@@ -38,18 +38,33 @@ Every place-fact Responses request offers the hosted `web_search` tool without
 forcing its use. OpenAI's model may make zero or one search call; the proxy sets
 `max_tool_calls: 1` to bound the dominant per-fact tool cost. A derived search
 query may contain the minimised place and rider-preference context already sent
-to OpenAI. The proxy does not request sources, return search metadata to the
-app, or log search queries, results, sources, place text, or rider text. It
-counts only `web_search_call` output items for privacy-safe cost diagnostics.
+to OpenAI. The proxy extracts at most five unique HTTPS `url_citation`
+annotations from the accepted final answer and returns their bounded titles and
+URLs separately from fact text. It does not log search queries, results,
+sources, place text or rider text.
 
 Responses may contain reasoning and hosted-tool output items before the final
-message. The proxy ignores those items as rider text and extracts only
-`output_text` from final message content. It accepts either a completed
-unsearched response or a completed one-search response, then applies the
-existing sanitizer. A failed search, more than one search call, provider
-failure, timeout, incomplete response, missing final text, or rejected text
+message. When any assistant message has `phase`, the proxy accepts only a
+completed `final_answer`; completed phase-less messages remain compatible when
+no message carries phase. Commentary and incomplete messages are never fact
+text. A failed search, more than one search call, a searched answer without a
+usable citation, provider failure, timeout, missing final text or rejected text
 remains a `502`; the iOS client retains its bounded retries and base-place
 announcement fallback.
+
+The app carries sources beside the generated fact through the announcement
+queue and into the existing in-memory RideHorizon Log. Each source is shown as
+a clearly visible clickable link. Announcement text and TTS receive only the
+sanitised fact text, never source titles or URLs. Cross-ride caching remains
+available for unsearched facts; facts with sources are not persisted so a
+later display cannot lose required attribution. Active-ride facts continue to
+bypass that cache under RH-063.
+
+`openai_result` is emitted only when verbose proxy diagnostics are enabled. Its
+privacy-safe fields are `boundary` (type only), `factMode`, `webSearchCalls`
+(`0...1`), `searched` and `sourceCount` (`0...5`). It excludes search queries,
+results, source titles and URLs, place names, rider/fact/announcement text,
+coordinates, identifiers, tokens and credentials.
 
 ## Implementations
 
@@ -70,7 +85,7 @@ Exact command:
 ./fact-proxy/gradlew -p fact-proxy openApiContractTest --no-daemon
 ```
 
-Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.2.0`, every published operation, schema and security scheme, and proves the intentional version-drift fixture fails validation.
+Expected result: `BUILD SUCCESSFUL`. The gate validates OpenAPI `3.0.3`, contract version `0.4.0`, every published operation, schema and security scheme, and proves the intentional version-drift fixture fails validation.
 
 Drift proof:
 
@@ -156,7 +171,7 @@ Runtime configuration:
 
 ### RH-028 candidate OpenAI request contract
 
-The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium`, the model-controlled hosted `web_search` tool and `max_tool_calls: 1`. It retains `store: false` outside rides and RH-063's `store: true`, `previous_response_id` and compaction behaviour for active rides. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–90-word facts. The proxy accepts only a top-level Responses result with `status: completed`, tolerates reasoning and hosted-tool output items, extracts only typed final-message `output_text`, and applies the existing fact sentence and character limits. [OpenAI tools guidance](https://developers.openai.com/api/docs/guides/tools) [OpenAI Responses reference](https://developers.openai.com/api/reference/resources/responses/methods/create) [OpenAI reasoning guidance](https://developers.openai.com/api/docs/guides/reasoning#allocating-space-for-reasoning) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
+The review candidate calls `POST /v1/responses` with `gpt-5.6-sol`, `reasoning.effort: medium`, the model-controlled hosted `web_search` tool and `max_tool_calls: 1`. It retains `store: false` outside rides and RH-063's `store: true`, `previous_response_id` and compaction behaviour for active rides. It sets `max_output_tokens: 4096`, a product-selected ceiling for tightly bounded 35–90-word facts. The proxy accepts only a top-level Responses result with `status: completed`, selects a completed `final_answer` when phase is present, accepts a completed phase-less compatibility message otherwise, and extracts typed `output_text` plus bounded `url_citation` annotations. OpenAI requires citations for displayed web-derived information to be visible and clickable. [OpenAI web-search output and citations](https://developers.openai.com/api/docs/guides/tools-web-search#output-and-citations) [OpenAI phase guidance](https://developers.openai.com/api/docs/guides/reasoning#phase-parameter) [OpenAI Responses reference](https://developers.openai.com/api/reference/resources/responses/methods/create) [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data#v1responses)
 
 This is candidate behaviour only. RH-028 is not merged or deployed by this work item hand-off.
 

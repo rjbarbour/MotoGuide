@@ -262,9 +262,19 @@ private struct DelayedFailingProxySpeechGenerator: ProxySpeechGenerating {
 
 private struct ConstantPlaceFactGenerator: PlaceFactGenerating {
     let fact: String
+    let sources: [PlaceFactSource]
+
+    init(fact: String, sources: [PlaceFactSource] = []) {
+        self.fact = fact
+        self.sources = sources
+    }
 
     func fact(for request: PlaceFactRequest) async throws -> String {
         fact
+    }
+
+    func generatedFact(for request: PlaceFactRequest) async throws -> GeneratedPlaceFact {
+        GeneratedPlaceFact(text: fact, sources: sources)
     }
 }
 
@@ -1501,6 +1511,61 @@ final class LocationManagerTests: XCTestCase {
             [.factGenerationStarted, .factGenerationFinished, .announcementTextReady, .announcementQueued]
         )
         XCTAssertEqual(Set(pipeline.compactMap(\.announcementID)).count, 1)
+    }
+
+    @MainActor
+    func testWebFactSourcesReachRideLogWithoutEnteringSpeechText() async throws {
+        let source = PlaceFactSource(
+            title: "Cotswold Canals Trust",
+            url: URL(string: "https://www.cotswoldcanals.org/history")!
+        )
+        let speechOutput = RecordingSpeechOutputEngine()
+        let speechRequested = expectation(description: "Fact announcement reached speech output")
+        speechOutput.onRequest = { speechRequested.fulfill() }
+        let sourceLogged = expectation(description: "Fact source reached the ride log")
+        var loggedPhrase: String?
+        var loggedSources: [PlaceFactSource] = []
+        let locationManager = LocationManager(
+            factGenerator: ConstantPlaceFactGenerator(
+                fact: "Known for its wool trade.",
+                sources: [source]
+            ),
+            speechOutput: speechOutput,
+            aiSharingAllowed: { true }
+        )
+        locationManager.onRideLog = { _, _, phrase, sources in
+            guard !sources.isEmpty else { return }
+            loggedPhrase = phrase
+            loggedSources = sources
+            sourceLogged.fulfill()
+        }
+        locationManager.testMode = true
+        locationManager.contentMode = .shortFacts
+        locationManager.boundarySpeechCooldownSeconds = 0
+        locationManager.bluetoothDelaySeconds = 0
+        locationManager.startRide()
+
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "High Street",
+            town: "Stroud",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+        locationManager.processResolvedAddressForTesting(Address(
+            street: "Bristol Road",
+            town: "Stonehouse",
+            county: "Gloucestershire",
+            administrativeArea: "England",
+            country: "United Kingdom"
+        ))
+
+        await fulfillment(of: [speechRequested, sourceLogged], timeout: 3)
+        XCTAssertEqual(loggedSources, [source])
+        XCTAssertEqual(speechOutput.requests.last?.text, loggedPhrase)
+        XCTAssertFalse(loggedPhrase?.contains(source.title) ?? true)
+        XCTAssertFalse(loggedPhrase?.contains(source.url.absoluteString) ?? true)
+        locationManager.endRide()
     }
 
     @MainActor

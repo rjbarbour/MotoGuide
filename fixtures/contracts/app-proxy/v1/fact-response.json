@@ -1,3 +1,9 @@
 {
-  "fact": "Known for its historic wool trade."
+  "fact": "Known for its historic wool trade.",
+  "sources": [
+    {
+      "title": "Cotswold Canals Trust",
+      "url": "https://www.cotswoldcanals.org/history"
+    }
+  ]
 }

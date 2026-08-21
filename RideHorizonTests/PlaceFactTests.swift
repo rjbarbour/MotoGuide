@@ -3,6 +3,7 @@ import XCTest
 
 final class MockPlaceFactGenerator: PlaceFactGenerating {
     var factsByCacheKey: [String: String] = [:]
+    var sourcesByCacheKey: [String: [PlaceFactSource]] = [:]
     var callCount = 0
     var delayNanoseconds: UInt64 = 0
     var shouldThrow = false
@@ -22,6 +23,11 @@ final class MockPlaceFactGenerator: PlaceFactGenerating {
             return fact
         }
         throw PlaceFactError.invalidResponse
+    }
+
+    func generatedFact(for request: PlaceFactRequest) async throws -> GeneratedPlaceFact {
+        let text = try await fact(for: request)
+        return GeneratedPlaceFact(text: text, sources: sourcesByCacheKey[request.cacheKey] ?? [])
     }
 
     func endRideConversation(_ rideSessionID: UUID) async {
@@ -210,6 +216,31 @@ final class CachedPlaceFactGeneratorTests: XCTestCase {
         XCTAssertEqual(fact, "Fresh current-ride fact.")
         XCTAssertEqual(mock.callCount, 1)
         XCTAssertEqual(cache.fact(forKey: request.cacheKey), "Stale cached fact.")
+    }
+
+    func testSourcedFactIsReturnedWithSourcesAndNotPersistedInCrossRideCache() async throws {
+        let mock = MockPlaceFactGenerator()
+        let cache = PlaceFactCache(loadPersisted: false)
+        let generator = CachedPlaceFactGenerator(generator: mock, cache: cache)
+        let request = PlaceFactRequest(
+            boundary: .town,
+            placeName: "Stroud",
+            countryContext: "United Kingdom"
+        )
+        let source = PlaceFactSource(
+            title: "Cotswold Canals Trust",
+            url: URL(string: "https://www.cotswoldcanals.org/history")!
+        )
+        mock.factsByCacheKey[request.cacheKey] = "A cited canal fact."
+        mock.sourcesByCacheKey[request.cacheKey] = [source]
+
+        let first = try await generator.generatedFact(for: request)
+        let second = try await generator.generatedFact(for: request)
+
+        XCTAssertEqual(first, GeneratedPlaceFact(text: "A cited canal fact.", sources: [source]))
+        XCTAssertEqual(second.sources, [source])
+        XCTAssertEqual(mock.callCount, 2)
+        XCTAssertNil(cache.fact(forKey: request.cacheKey))
     }
 }
 
@@ -1197,9 +1228,19 @@ final class ProxyFactGeneratorTests: XCTestCase {
             endpoint: endpoint
         )
 
-        let fact = try await generator.fact(for: request)
+        let fact = try await generator.generatedFact(for: request)
 
-        XCTAssertEqual(fact, "Known for its historic wool trade.")
+        XCTAssertEqual(fact.text, "Known for its historic wool trade.")
+        XCTAssertEqual(
+            fact.sources,
+            [
+                PlaceFactSource(
+                    title: "Cotswold Canals Trust",
+                    url: URL(string: "https://www.cotswoldcanals.org/history")!
+                )
+            ]
+        )
+        XCTAssertFalse(fact.text.contains("https://"))
     }
 
     func testSharedSpeechErrorFixtureMatchesIOSDecoder() async {

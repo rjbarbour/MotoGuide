@@ -993,7 +993,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     var onAddressChange: ((Address) -> Void)?
-    var onRideLog: ((CLLocationCoordinate2D, Address, String?) -> Void)?
+    var onRideLog: ((CLLocationCoordinate2D, Address, String?, [PlaceFactSource]) -> Void)?
 
     init(
         announcementCoordinator: AnnouncementCoordinator,
@@ -1856,11 +1856,14 @@ class LocationManager: NSObject, ObservableObject {
         )
     }
 
-    private func recordTestLog(utteredPhrase: String?) {
-        guard testMode,
+    private func recordTestLog(
+        utteredPhrase: String?,
+        sources: [PlaceFactSource] = []
+    ) {
+        guard (testMode || !sources.isEmpty),
               let location = lastKnownLocation,
               let address = lastKnownAddress else { return }
-        onRideLog?(location, address, utteredPhrase)
+        onRideLog?(location, address, utteredPhrase, sources)
     }
 
     private func recordSupersededAnnouncements(_ supersededAnnouncementIDs: Set<UUID>) {
@@ -2273,7 +2276,9 @@ class LocationManager: NSObject, ObservableObject {
             lastSpokenPhrase = plan.text
             lastSpokenAt = Date()
             lastSpeechDiagnosticNote = nil
-            if shouldRecordTestLog { recordTestLog(utteredPhrase: plan.text) }
+            if shouldRecordTestLog {
+                recordTestLog(utteredPhrase: plan.text, sources: plan.sources)
+            }
             announcementStatus = .preparingVoice
         case .retryScheduled, .fallbackStarted:
             announcementStatus = .preparingVoice
@@ -2328,6 +2333,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     func processResolvedAddressForTesting(_ address: Address, placeLookupID: UUID? = nil) {
+        lastKnownAddress = address
         processResolvedAddress(address, placeLookupID: placeLookupID)
     }
 

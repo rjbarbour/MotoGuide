@@ -13,15 +13,22 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class OpenAiService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiService.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
     private static final int MAX_OUTPUT_TOKENS = 4_096;
+    static final int MAX_FACT_SOURCES = 5;
+    private static final int MAX_SOURCE_TITLE_LENGTH = 160;
+    private static final int MAX_SOURCE_URL_LENGTH = 2_048;
     static final int MAX_WEB_SEARCH_CALLS = 1;
     static final int COMPACT_THRESHOLD_TOKENS = 24_000;
 
@@ -86,7 +93,11 @@ public class OpenAiService {
     }
 
     public String generateFact(ValidatedFactRequest request) {
-        return generateFact(request, null, false).fact();
+        return generateFactWithMetadata(request).fact();
+    }
+
+    public GeneratedFact generateFactWithMetadata(ValidatedFactRequest request) {
+        return generateFact(request, null, false);
     }
 
     public GeneratedFact generateFactWithLinkage(
@@ -142,8 +153,27 @@ public class OpenAiService {
                         "OpenAI web search failed"
                 );
             }
-            String content = extractOutputText(root);
-            String sanitized = FactSanitizer.sanitize(content, factMode);
+            JsonNode finalAnswerMessage = selectFinalAnswerMessage(root);
+            if (finalAnswerMessage == null) {
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI response lacked a completed final answer"
+                );
+            }
+            FinalAnswer finalAnswer = extractFinalAnswer(finalAnswerMessage);
+            if (webSearchUsage.callCount() > 0 && finalAnswer.sources().isEmpty()) {
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI web search response lacked usable citations"
+                );
+            }
+            if (containsCitationMetadata(finalAnswer.text(), finalAnswer.sources())) {
+                throw new UpstreamException(
+                        UpstreamException.Category.OUTPUT,
+                        "OpenAI response mixed citation metadata into fact text"
+                );
+            }
+            String sanitized = FactSanitizer.sanitize(finalAnswer.text(), factMode);
             if (sanitized == null) {
                 throw new UpstreamException(
                         UpstreamException.Category.OUTPUT,
@@ -162,14 +192,15 @@ public class OpenAiService {
             }
             if (diagnosticsSettings.enabled()) {
                 log.info(
-                        "event=openai_result boundary={} factMode={} webSearchCalls={} searched={}",
+                        "event=openai_result boundary={} factMode={} webSearchCalls={} searched={} sourceCount={}",
                         request.boundary(),
                         factMode.wireValue(),
                         webSearchUsage.callCount(),
-                        webSearchUsage.callCount() > 0
+                        webSearchUsage.callCount() > 0,
+                        finalAnswer.sources().size()
                 );
             }
-            return new GeneratedFact(sanitized, responseId);
+            return new GeneratedFact(sanitized, finalAnswer.sources(), responseId);
         } catch (UpstreamException ex) {
             log.warn(
                     "event=openai_upstream_error boundary={} category={} reason={}",
@@ -272,31 +303,121 @@ public class OpenAiService {
         }
     }
 
-    private static String extractOutputText(JsonNode root) {
-        String finalOutputText = null;
+    private static JsonNode selectFinalAnswerMessage(JsonNode root) {
+        JsonNode completedFinalAnswer = null;
+        JsonNode completedPhaseLess = null;
+        boolean phaseWasPresent = false;
         for (JsonNode outputItem : root.path("output")) {
             if (!"message".equals(outputItem.path("type").asText())) {
                 continue;
             }
-            StringBuilder messageOutputText = new StringBuilder();
-            for (JsonNode contentItem : outputItem.path("content")) {
-                if (!"output_text".equals(contentItem.path("type").asText())) {
-                    continue;
-                }
-                String text = contentItem.path("text").asText(null);
-                if (text == null || text.isBlank()) {
-                    continue;
-                }
-                if (!messageOutputText.isEmpty()) {
-                    messageOutputText.append('\n');
-                }
-                messageOutputText.append(text);
+            boolean hasPhase = outputItem.hasNonNull("phase");
+            phaseWasPresent = phaseWasPresent || hasPhase;
+            if (!"completed".equals(outputItem.path("status").asText())) {
+                continue;
             }
-            if (!messageOutputText.isEmpty()) {
-                finalOutputText = messageOutputText.toString();
+            if (hasPhase) {
+                if ("final_answer".equals(outputItem.path("phase").asText())) {
+                    completedFinalAnswer = outputItem;
+                }
+            } else {
+                completedPhaseLess = outputItem;
             }
         }
-        return finalOutputText;
+        return phaseWasPresent ? completedFinalAnswer : completedPhaseLess;
+    }
+
+    private static FinalAnswer extractFinalAnswer(JsonNode message) {
+        StringBuilder outputText = new StringBuilder();
+        List<FactSource> sources = new ArrayList<>();
+        Set<String> seenUrls = new HashSet<>();
+        for (JsonNode contentItem : message.path("content")) {
+            if (!"output_text".equals(contentItem.path("type").asText())) {
+                continue;
+            }
+            String text = contentItem.path("text").asText(null);
+            if (text != null && !text.isBlank()) {
+                if (!outputText.isEmpty()) {
+                    outputText.append('\n');
+                }
+                outputText.append(text);
+            }
+            appendCitationSources(contentItem.path("annotations"), sources, seenUrls);
+        }
+        return new FinalAnswer(outputText.isEmpty() ? null : outputText.toString(), List.copyOf(sources));
+    }
+
+    private static void appendCitationSources(
+            JsonNode annotations,
+            List<FactSource> sources,
+            Set<String> seenUrls
+    ) {
+        if (sources.size() >= MAX_FACT_SOURCES) {
+            return;
+        }
+        for (JsonNode annotation : annotations) {
+            if (sources.size() >= MAX_FACT_SOURCES) {
+                return;
+            }
+            if (!"url_citation".equals(annotation.path("type").asText())) {
+                continue;
+            }
+            String title = sanitizeSourceTitle(annotation.path("title").asText(null));
+            String url = sanitizeSourceUrl(annotation.path("url").asText(null));
+            if (title == null || url == null || !seenUrls.add(url)) {
+                continue;
+            }
+            sources.add(new FactSource(title, url));
+        }
+    }
+
+    private static String sanitizeSourceTitle(String rawTitle) {
+        if (rawTitle == null) {
+            return null;
+        }
+        String title = rawTitle.trim().replaceAll("\\s+", " ");
+        if (title.isEmpty()) {
+            return null;
+        }
+        return title.length() <= MAX_SOURCE_TITLE_LENGTH
+                ? title
+                : title.substring(0, MAX_SOURCE_TITLE_LENGTH).trim();
+    }
+
+    private static String sanitizeSourceUrl(String rawUrl) {
+        if (rawUrl == null) {
+            return null;
+        }
+        String url = rawUrl.trim();
+        if (url.isEmpty() || url.length() > MAX_SOURCE_URL_LENGTH) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(url);
+            if (!"https".equalsIgnoreCase(uri.getScheme())
+                    || uri.getHost() == null
+                    || uri.getHost().isBlank()
+                    || uri.getUserInfo() != null) {
+                return null;
+            }
+            return uri.toASCIIString();
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean containsCitationMetadata(String text, List<FactSource> sources) {
+        if (text == null) {
+            return false;
+        }
+        String normalized = text.toLowerCase(Locale.ROOT);
+        if (normalized.contains("http://") || normalized.contains("https://")) {
+            return true;
+        }
+        return sources.stream()
+                .map(FactSource::title)
+                .map(title -> title.toLowerCase(Locale.ROOT))
+                .anyMatch(normalized::contains);
     }
 
     private static WebSearchUsage inspectWebSearchUsage(JsonNode root) {
@@ -315,7 +436,17 @@ public class OpenAiService {
     private record WebSearchUsage(int callCount, boolean failed) {
     }
 
-    record GeneratedFact(String fact, String responseId) {
+    private record FinalAnswer(String text, List<FactSource> sources) {
+    }
+
+    record GeneratedFact(String fact, List<FactSource> sources, String responseId) {
+        GeneratedFact {
+            sources = List.copyOf(sources);
+        }
+
+        GeneratedFact(String fact, String responseId) {
+            this(fact, List.of(), responseId);
+        }
     }
 
     private String systemPrompt(FactMode factMode, ValidatedFactRequest request) {

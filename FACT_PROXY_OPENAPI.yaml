@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: RideHorizon Fact Proxy API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     MVP contract for the RideHorizon iOS app to request a short or long
     ride-safe place fact without storing or sending an OpenAI API key from
@@ -102,7 +102,8 @@ x-upstream-openai-candidate:
       selection: model-controlled
       maxCallsPerResponse: 1
   acceptedResponseStatus: completed
-  acceptedOutput: Final message output_text only; reasoning and web_search_call items are not rider text.
+  acceptedOutput: A completed final_answer message when phase is present, or a completed phase-less compatibility message. Commentary, incomplete messages, reasoning and web_search_call items are not rider text.
+  factSources: Up to 5 unique HTTPS url_citation annotations from the accepted final message, returned separately from fact text.
   deploymentStatus: Not yet deployed. Merging to main intentionally deploys the private-beta candidate; evaluation follows deployment.
 x-observability:
   responseHeaders:
@@ -137,6 +138,19 @@ x-observability:
     adminEndpointRequiresSecret: RIDEHORIZON_ADMIN_TOKEN
     adminEndpointHiddenWhenSecretUnset: true
     runtimeChangesAreProcessLocal: true
+    diagnosticsOnlyEventFields:
+      openai_result:
+        emittedWhen: Verbose diagnostics are enabled.
+        fields:
+          boundary: Boundary type only; never the place name.
+          factMode: shortFacts or longFacts.
+          webSearchCalls: Integer from 0 to 1.
+          searched: Boolean derived from webSearchCalls.
+          sourceCount: Integer from 0 to 5.
+        excludes:
+          - Search queries, results and source titles or URLs.
+          - Place names, rider text, fact text and announcement text.
+          - Coordinates, identifiers, tokens and credentials.
 paths:
   /health:
     get:
@@ -171,8 +185,11 @@ paths:
         preference data, not as system prompt text. The request offers OpenAI's
         hosted `web_search` tool for model-controlled use, limited to one call
         per response. A search may derive a public-web query from the minimised
-        place and preference context already sent to OpenAI; search queries,
-        results, and sources are not returned to the app or logged by the proxy.
+        place and preference context already sent to OpenAI; search queries and
+        results are not returned to the app or logged by the proxy.
+        For a web-derived fact, up to five cited source titles and HTTPS URLs
+        are returned separately so the app can show visible clickable links in
+        its Log. Source metadata is never appended to announcement text or TTS.
         The iOS app must fall back
         to the base place announcement after allowed transient retries are
         exhausted, or immediately for a permanent non-200 response, invalid
@@ -236,6 +253,7 @@ paths:
         - Short enough to keep the total spoken announcement ride-safe.
         - No questions.
         - No invitations, route advice, speed advice, or riding instructions.
+        - Citation titles and URLs remain structured Log metadata and are never included in announcement text or TTS.
       requestBody:
         required: true
         content:
@@ -270,7 +288,7 @@ paths:
                     customFactInstructions: engineering and old roads
       responses:
         "200":
-          description: One sanitized bounded fact.
+          description: One sanitized bounded fact plus zero to five structured sources for visible clickable Log attribution.
           headers:
             X-RideHorizon-Response-Id:
               description: |
@@ -288,6 +306,9 @@ paths:
                 fact:
                   value:
                     fact: Known for its wool trade.
+                    sources:
+                      - title: Cotswold Canals Trust
+                        url: https://www.cotswoldcanals.org/history
         "400":
           description: Invalid JSON, missing required field, invalid boundary, invalid factMode, invalid placeName, or invalid placeHierarchy.
         "401":
@@ -297,7 +318,7 @@ paths:
         "500":
           description: Proxy is misconfigured, including missing server-side proxy token.
         "502":
-          description: OpenAI timed out, returned a provider or hosted-tool error, exceeded the one-call web-search ceiling, or returned an unusable response. The iOS app applies its existing bounded retries and base-place fallback.
+          description: OpenAI timed out, returned a provider or hosted-tool error, exceeded the one-call web-search ceiling, omitted usable citations after searching, or returned an unusable response. The iOS app applies its existing bounded retries and base-place fallback.
   /v1/speech:
     post:
       tags:
@@ -737,15 +758,44 @@ components:
       additionalProperties: false
       required:
         - fact
+        - sources
       properties:
         fact:
           type: string
           minLength: 1
           maxLength: 1500
+        sources:
+          type: array
+          maxItems: 5
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/FactSource"
       description: |
         Sanitized ride-safe fact. shortFacts responses are bounded to 1100
         characters; longFacts responses are bounded to 1500 characters.
-          example: Known for its wool trade.
+        Sources are visual Log attribution only and are never announcement or
+        TTS text. A searched response without a usable source is rejected.
+      example:
+        fact: Known for its wool trade.
+        sources: []
+    FactSource:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - url
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        url:
+          type: string
+          format: uri
+          minLength: 9
+          maxLength: 2048
+          pattern: "^https://"
+      description: Bounded OpenAI url_citation attribution displayed as a clickable link in the RideHorizon Log.
     DiagnosticsRequest:
       type: object
       additionalProperties: false

@@ -58,7 +58,9 @@ class AutomaticSessionHttpTest {
 
         JsonNode payload = objectMapper.readTree(response);
         String sessionToken = payload.path("sessionToken").asText();
-        when(openAiService.generateFact(any())).thenReturn("Known for its wool trade.");
+        when(openAiService.generateFactWithMetadata(any())).thenReturn(
+                new OpenAiService.GeneratedFact("Known for its wool trade.", null)
+        );
 
         mockMvc.perform(post("/v1/fact")
                         .header("Authorization", "Bearer " + sessionToken)
@@ -70,7 +72,9 @@ class AutomaticSessionHttpTest {
 
     @Test
     void operatorAccessUsesOperatorQuotaInsteadOfFallbackQuota() throws Exception {
-        when(openAiService.generateFact(any())).thenReturn("Known for its wool trade.");
+        when(openAiService.generateFactWithMetadata(any())).thenReturn(
+                new OpenAiService.GeneratedFact("Known for its wool trade.", null)
+        );
 
         for (int requestNumber = 0; requestNumber < 2; requestNumber++) {
             mockMvc.perform(post("/v1/fact")

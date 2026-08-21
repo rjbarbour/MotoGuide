@@ -86,21 +86,22 @@ public class FactController {
                         validatedRequest,
                         normalizedPreviousResponseId
                 )
-                : new OpenAiService.GeneratedFact(openAiService.generateFact(validatedRequest), null);
+                : openAiService.generateFactWithMetadata(validatedRequest);
         String fact = generatedFact.fact();
         if (diagnosticsSettings.enabled()) {
             log.info(
-                    "event=fact_request_success boundary={} factMode={} factLength={}",
+                    "event=fact_request_success boundary={} factMode={} factLength={} sourceCount={}",
                     validatedRequest.boundary(),
                     validatedRequest.factMode().wireValue(),
-                    fact.length()
+                    fact.length(),
+                    generatedFact.sources().size()
             );
         }
         ResponseEntity.BodyBuilder response = ResponseEntity.ok();
         if (generatedFact.responseId() != null) {
             response.header(RESPONSE_HEADER, generatedFact.responseId());
         }
-        return response.body(new FactResponse(fact));
+        return response.body(new FactResponse(fact, generatedFact.sources()));
     }
 
     @PostMapping(path = "/v1/speech", consumes = MediaType.APPLICATION_JSON_VALUE, produces = "audio/mpeg")
