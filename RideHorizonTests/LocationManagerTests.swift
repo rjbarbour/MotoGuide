@@ -1657,6 +1657,50 @@ final class LocationManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSupersededFactCannotEnterCompletedRideSummary() {
+        let suiteName = "LocationManagerSupersededRideMemory.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let memoryStore = PreviousRideMemoryStore(defaults: defaults)
+        let locationManager = LocationManager(previousRideMemoryStore: memoryStore)
+        let plan = AnnouncementPlan(
+            text: "Stonehouse. This content was superseded.",
+            boundary: .town,
+            factContent: "This content was superseded."
+        )
+        locationManager.startRideWithoutLocationInputForTesting()
+
+        locationManager.handleAnnouncementWorkflowResultForTesting(.speechRequested(
+            plan: plan,
+            provider: .apple,
+            shouldRecordTestLog: false
+        ))
+        locationManager.handleAnnouncementWorkflowResultForTesting(.cancelled(
+            announcementID: plan.id,
+            reason: .supersededByNewerContext
+        ))
+        locationManager.handleAnnouncementWorkflowResultForTesting(.completed(announcementID: plan.id))
+        locationManager.endRide()
+
+        XCTAssertEqual(memoryStore.summaries, [])
+    }
+
+    @MainActor
+    func testMissingAppleVoiceCancelsInsteadOfReportingCompletedPlayback() {
+        let output = AppleSpeechOutput()
+        let requestID = UUID()
+        var finishedRequestIDs: [UUID] = []
+        var cancelledRequestIDs: [UUID] = []
+        output.onFinish = { finishedRequestIDs.append($0) }
+        output.onCancel = { cancelledRequestIDs.append($0) }
+
+        output.speak(text: "A fact that cannot play.", boundary: .town, voice: nil, requestID: requestID)
+
+        XCTAssertEqual(finishedRequestIDs, [])
+        XCTAssertEqual(cancelledRequestIDs, [requestID])
+    }
+
+    @MainActor
     private func prepareFactRide(_ locationManager: LocationManager) {
         locationManager.contentMode = .shortFacts
         locationManager.boundarySpeechCooldownSeconds = 0

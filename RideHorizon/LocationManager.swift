@@ -291,7 +291,7 @@ final class AppleSpeechOutput: NSObject, AppleSpeechOutputting, AVSpeechSynthesi
     func speak(text: String, boundary: BoundaryType?, voice: AVSpeechSynthesisVoice?, requestID: UUID) {
         guard let voice else {
             ProxyDiagnostics.log("Speech", "No usable Apple voice.")
-            onFinish?(requestID)
+            onCancel?(requestID)
             return
         }
 
@@ -2371,6 +2371,10 @@ class LocationManager: NSObject, ObservableObject {
     }
 
 #if DEBUG
+    func handleAnnouncementWorkflowResultForTesting(_ result: AnnouncementWorkflowResult) {
+        handleAnnouncementWorkflowResult(result)
+    }
+
     func startRideWithoutLocationInputForTesting(at date: Date = Date()) {
         startRide(at: date, startsLocationInput: false)
     }
