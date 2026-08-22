@@ -1,23 +1,10 @@
 import Foundation
 import Network
-import UIKit
 
 @MainActor
-protocol DiagnosticsPasteboardWriting: AnyObject {
-    var string: String? { get set }
-}
-
-extension UIPasteboard: DiagnosticsPasteboardWriting {}
-
-@MainActor
-enum RideDiagnosticsClipboard {
-    static func copy(
-        from store: RideDiagnosticsStore,
-        to pasteboard: DiagnosticsPasteboardWriting = UIPasteboard.general
-    ) -> Bool {
-        guard let text = store.currentExportText else { return false }
-        pasteboard.string = text
-        return true
+enum RideDiagnosticsShare {
+    static func item(from store: RideDiagnosticsStore) -> String? {
+        store.currentExportText
     }
 }
 
