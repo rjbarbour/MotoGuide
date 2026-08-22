@@ -137,7 +137,7 @@ It cannot identify Google Maps, YouTube Music or another app by name, inspect th
 
 Current interruption behaviour is explicit: RideHorizon stops its active speech, retains the announcement plan and, only when all observed pause sources have ended and the ride is still active, starts that announcement again from the beginning. If iOS ends an interruption without recommending resumption, RideHorizon cancels it. It does not resume from the interrupted word or audio offset.
 
-## Getting the diagnostic file into the UAT chat
+## Getting diagnostics into the UAT chat
 
 ChatGPT cannot directly read the sandbox of the TestFlight app.
 
@@ -145,9 +145,9 @@ While safely parked:
 
 1. open **RideHorizon → Settings → Advanced → Release diagnostics**;
 2. tap **Export diagnostics**;
-3. use the iOS share sheet to save or attach `ride-diagnostics.json` to the UAT chat.
+3. in the iOS share sheet, tap **Copy** and paste the plain JSON text into the UAT chat, or share it directly to an app that accepts plain text.
 
-The file already exists in RideHorizon’s private caches area. It retains at most seven days, 2,000 events or 1 MiB and excludes coordinates, spoken text and credentials. Copying individual visible event names is possible but loses the correlations; attaching the JSON export is preferred.
+RideHorizon generates the shared text from the current in-memory diagnostic log, so it includes events that may not yet have reached the app’s delayed local file. The log retains at most seven days, 2,000 events or 1 MiB and excludes coordinates, spoken text and credentials. Copying individual visible event names loses the correlations; sharing the complete JSON text is preferred.
 
 ## Post-ride evidence and SEERS handling
 

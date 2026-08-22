@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-22 08:55'
-updated_date: '2026-08-22 09:04'
+updated_date: '2026-08-22 09:11'
 labels:
   - ios
   - diagnostics
@@ -17,6 +17,7 @@ modified_files:
   - RideHorizon/ContentView.swift
   - RideHorizon/RideDiagnosticsStore.swift
   - RideHorizonTests/LocationManagerTests.swift
+  - docs/operations/testflight/RIDE_UAT_PROTOCOL.md
 priority: high
 type: bug
 ordinal: 220000
@@ -47,4 +48,6 @@ The diagnostics screen currently exposes both a dedicated Copy action and a file
 Red evidence: the focused test failed to compile because RideDiagnosticsShare did not exist. The former Export diagnostics ShareLink supplied a file URL, so share-sheet Copy could copy a file/attachment representation; the dedicated Copy button wrote plain text but duplicated the UI. The fix removes the pasteboard-specific action and supplies the current privacy-safe JSON String to the single Export diagnostics ShareLink. The focused regression and six diagnostics tests passed with zero failures.
 
 PR #64 opened from commit 5a7a3bc after rebasing against current origin/main.
+
+Automated PR review correctly identified that the active UAT protocol still required attaching ride-diagnostics.json. Updated it to instruct Copy and paste of the complete plain JSON text, or direct sharing to a plain-text-capable app.
 <!-- SECTION:NOTES:END -->
