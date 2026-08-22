@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-18 12:58'
-updated_date: '2026-08-21 09:30'
+updated_date: '2026-08-22 09:26'
 labels:
   - core
   - dynamic-island
@@ -46,9 +46,7 @@ During an active ride, present short RideHorizon place or boundary updates in th
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Add a minimal ActivityKit contract and system adapter for one active ride. 2. Start and end the activity with the ride lifecycle, and update it only when the resolved glanceable place text changes. 3. Add the smallest WidgetKit extension required for Dynamic Island presentation, leaving the richer persistent Lock Screen experience to RH-067. 4. Verify lifecycle logic with focused tests, then run the complete simulator suite and unsigned simulator build; physical Google Maps coexistence remains owner acceptance.
-
-5. Resolve PR #47 review by reconciling an idle reconstructed LocationManager with ActivityKit: end orphaned existing RideHorizon activities on construction, preserve the existing start/update/end methods, and run only the focused Live Activity lifecycle tests.
+1. Alert the existing Live Activity on meaningful place changes so iOS expands it over another foreground app. 2. Give alert updates high relevance while preserving the existing standard ride activity lifecycle. 3. Compile, install and physically verify on the supported iPhone with Google Maps.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -61,4 +59,8 @@ Implemented the minimum ActivityKit surface: an embedded WidgetKit extension wit
 Implementation is in PR #47. The task remains In Progress until exact-device Google Maps coexistence is verified.
 
 2026-08-21 PR #47 P2 resolution: idle LocationManager construction now asks the ActivityKit adapter to end every existing RideHorizon activity, preventing stale Ride in progress content after app termination while leaving normal start/update/end methods unchanged. Focused simulator verification passed: testIdleConstructionEndsOrphanedLiveActivities, testActiveRideStartsUpdatesAndEndsLiveActivity, and testResolvedPlaceDoesNotUpdateLiveActivityOutsideRide; 3 tests executed, 0 failures, xcodebuild exit 0 and TEST SUCCEEDED. The full suite, device deployment, Google Maps coexistence, and road testing were deliberately not run; AC3 remains open.
+
+2026-08-22 owner evidence: the Live Activity exists, but no Dynamic Island presentation appears while Google Maps is foregrounded; Google Maps foreground announcements pass.
+
+2026-08-22 fix candidate: meaningful place updates now request a high-relevance ActivityKit alert, causing iOS to expand the Dynamic Island; a bundled silent CAF avoids an extra alert tone. Signed device build succeeded and RideHorizon 0.14.0 (20260804.0246) was installed and launched. Google Maps physical confirmation remains pending.
 <!-- SECTION:NOTES:END -->

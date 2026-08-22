@@ -87,8 +87,16 @@ final class SystemRideLiveActivityManager: RideLiveActivityManaging {
         _ activity: Activity<RideHorizonActivityAttributes>,
         state: RideHorizonActivityAttributes.ContentState
     ) {
+        let alert = AlertConfiguration(
+            title: "RideHorizon",
+            body: LocalizedStringResource(stringLiteral: state.placeName),
+            sound: .named("RideHorizonSilent.caf")
+        )
         Task {
-            await activity.update(ActivityContent(state: state, staleDate: nil))
+            await activity.update(
+                ActivityContent(state: state, staleDate: nil, relevanceScore: 100),
+                alertConfiguration: alert
+            )
         }
     }
 }

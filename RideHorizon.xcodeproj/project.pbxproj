@@ -24,6 +24,7 @@
 		F06100000000000000000002 /* LiveRideActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06100000000000000000010 /* LiveRideActivity.swift */; };
 		F06100000000000000000003 /* RideHorizonLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06100000000000000000011 /* RideHorizonLiveActivity.swift */; };
 		F06100000000000000000004 /* RideHorizonLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F06100000000000000000013 /* RideHorizonLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F06100000000000000000005 /* RideHorizonSilent.caf in Resources */ = {isa = PBXBuildFile; fileRef = F06100000000000000000014 /* RideHorizonSilent.caf */; };
 		C30803010000000000000013 /* premium-place-name.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C30803010000000000000009 /* premium-place-name.mp3 */; };
 		C30803010000000000000014 /* premium-boundary.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C3080301000000000000000A /* premium-boundary.mp3 */; };
 		C30803010000000000000015 /* premium-short-fact.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C3080301000000000000000B /* premium-short-fact.mp3 */; };
@@ -151,6 +152,7 @@
 		F06100000000000000000011 /* RideHorizonLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideHorizonLiveActivity.swift; sourceTree = "<group>"; };
 		F06100000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F06100000000000000000013 /* RideHorizonLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RideHorizonLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F06100000000000000000014 /* RideHorizonSilent.caf */ = {isa = PBXFileReference; lastKnownFileType = audio.caf; path = RideHorizonSilent.caf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -212,6 +214,7 @@
 			children = (
 				E13E87A22C3EE36100308669 /* RideHorizonApp.swift */,
 				F06100000000000000000010 /* LiveRideActivity.swift */,
+				F06100000000000000000014 /* RideHorizonSilent.caf */,
 				A17D26072026071700000001 /* ProductIdentity.swift */,
 				B26080210000000000000001 /* RideSessionLifecycle.swift */,
 				B26080210000000000000005 /* RideDiagnosticsStore.swift */,
@@ -428,6 +431,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F06100000000000000000005 /* RideHorizonSilent.caf in Resources */,
 				C30803010000000000000013 /* premium-place-name.mp3 in Resources */,
 				C30803010000000000000014 /* premium-boundary.mp3 in Resources */,
 				C30803010000000000000015 /* premium-short-fact.mp3 in Resources */,
