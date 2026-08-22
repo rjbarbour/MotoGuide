@@ -5,12 +5,14 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-22 08:55'
-updated_date: '2026-08-22 09:03'
+updated_date: '2026-08-22 09:04'
 labels:
   - ios
   - diagnostics
   - reliability
 dependencies: []
+references:
+  - 'https://github.com/rjbarbour/MotoGuide/pull/64'
 modified_files:
   - RideHorizon/ContentView.swift
   - RideHorizon/RideDiagnosticsStore.swift
@@ -43,4 +45,6 @@ The diagnostics screen currently exposes both a dedicated Copy action and a file
 
 <!-- SECTION:NOTES:BEGIN -->
 Red evidence: the focused test failed to compile because RideDiagnosticsShare did not exist. The former Export diagnostics ShareLink supplied a file URL, so share-sheet Copy could copy a file/attachment representation; the dedicated Copy button wrote plain text but duplicated the UI. The fix removes the pasteboard-specific action and supplies the current privacy-safe JSON String to the single Export diagnostics ShareLink. The focused regression and six diagnostics tests passed with zero failures.
+
+PR #64 opened from commit 5a7a3bc after rebasing against current origin/main.
 <!-- SECTION:NOTES:END -->
