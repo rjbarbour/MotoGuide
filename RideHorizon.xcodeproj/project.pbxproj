@@ -704,7 +704,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -746,7 +746,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -765,7 +765,7 @@
 				DEVELOPMENT_TEAM = W64ZN45B4A;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizonTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -873,7 +873,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG INTERNAL_AUDIO_CALIBRATION $(inherited)";
@@ -893,7 +893,7 @@
 				DEVELOPMENT_TEAM = W64ZN45B4A;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizonTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG INTERNAL_AUDIO_CALIBRATION $(inherited)";
@@ -912,7 +912,7 @@
 				CURRENT_PROJECT_VERSION = 20260804.0246;
 				DEVELOPMENT_TEAM = W64ZN45B4A;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizonUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG INTERNAL_AUDIO_CALIBRATION $(inherited)";
@@ -937,7 +937,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon.liveactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -961,7 +961,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon.liveactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -986,7 +986,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.14.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.digitalmercenaries.ridehorizon.liveactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
