@@ -94,7 +94,7 @@ final class SystemRideLiveActivityManager: RideLiveActivityManaging {
         )
         Task {
             await activity.update(
-                ActivityContent(state: state, staleDate: nil, relevanceScore: 100),
+                ActivityContent(state: state, staleDate: nil),
                 alertConfiguration: alert
             )
         }
