@@ -1,11 +1,11 @@
 ---
 id: RH-084
 title: Share diagnostics as plain text
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-22 08:55'
-updated_date: '2026-08-22 09:11'
+updated_date: '2026-08-22 09:23'
 labels:
   - ios
   - diagnostics
@@ -13,6 +13,7 @@ labels:
 dependencies: []
 references:
   - 'https://github.com/rjbarbour/MotoGuide/pull/64'
+  - 'https://github.com/rjbarbour/MotoGuide/actions/runs/32564287560'
 modified_files:
   - RideHorizon/ContentView.swift
   - RideHorizon/RideDiagnosticsStore.swift
@@ -31,9 +32,9 @@ The diagnostics screen currently exposes both a dedicated Copy action and a file
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The diagnostics screen exposes one Export diagnostics action and no separate Copy diagnostics action
-- [ ] #2 Selecting Copy from the diagnostics share sheet yields current valid JSON as plain text without styling or a file attachment
-- [ ] #3 The shared text remains privacy-safe and does not wait for delayed file persistence
+- [x] #1 The diagnostics screen exposes one Export diagnostics action and no separate Copy diagnostics action
+- [x] #2 Selecting Copy from the diagnostics share sheet yields current valid JSON as plain text without styling or a file attachment
+- [x] #3 The shared text remains privacy-safe and does not wait for delayed file persistence
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,4 +51,12 @@ Red evidence: the focused test failed to compile because RideDiagnosticsShare di
 PR #64 opened from commit 5a7a3bc after rebasing against current origin/main.
 
 Automated PR review correctly identified that the active UAT protocol still required attaching ride-diagnostics.json. Updated it to instruct Copy and paste of the complete plain JSON text, or direct sharing to a plain-text-capable app.
+
+Post-merge verification: PR #64 was squash-merged as 302f3e5d. Current origin/main contains the single String-based Export diagnostics ShareLink and the updated UAT instructions. Final GitHub iOS suite passed in 9m38s; PR validation and Socket checks passed; proxy tests were correctly skipped. Residual field check: confirm the receiving app displays the pasted JSON legibly as plain text.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced the duplicate Copy plus file-export controls with one Export diagnostics action that shares current privacy-safe JSON as a plain String. Updated the UAT protocol for plain-text Copy/paste. The red regression, six focused diagnostics tests, full GitHub iOS suite, review correction and post-merge current-main inspection passed; merged in PR #64 at 302f3e5d.
+<!-- SECTION:FINAL_SUMMARY:END -->
